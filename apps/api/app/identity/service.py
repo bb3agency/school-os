@@ -365,10 +365,18 @@ def login_memberships(subject: str, *, support: bool = False) -> list[LoginChoic
 def membership_access(
     tenant_id: uuid.UUID, user_id: uuid.UUID, membership_id: uuid.UUID
 ) -> MembershipAccess:
-    """Roles (with their permissions), scopes and MFA flag of one membership."""
+    """Roles (with their permissions), scopes and MFA flag of one membership; nothing unless it
+    is active and unexpired (as ``repo.permission_keys_for_membership`` and sign-in)."""
     with tenant_session(tenant_id, user_id) as session:
         membership = repo.get_membership(session, membership_id)
-        if membership is None or membership.status != "active":
+        if (
+            membership is None
+            or membership.status != "active"
+            or (
+                membership.expires_at is not None
+                and membership.expires_at <= dt.datetime.now(dt.UTC)
+            )
+        ):
             return MembershipAccess(roles=(), scopes=(), mfa_required=False)
         roles = repo.list_roles_for_membership(session, membership_id)
         perms = repo.role_permission_keys(session, [r.id for r in roles])

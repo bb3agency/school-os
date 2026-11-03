@@ -226,3 +226,46 @@ def test_FR_TEN_002_other_tenants_user_and_membership_not_found(
         assert repo.get_user(s, ub) is None
         assert repo.get_membership(s, mb.id) is None
         assert repo.list_memberships_for_user(s, ub) == []
+
+
+def test_FR_IAM_014_membership_access_of_expired_membership_is_empty(
+    school: Callable[..., uuid.UUID],
+    admin_member: Callable[[uuid.UUID], tuple[uuid.UUID, str]],
+    admin_engine: Engine,
+) -> None:
+    """Workers re-check a requester's CURRENT access with ``membership_access`` (full export,
+    pre-check exports, imports). A time-bound membership (auditor_readonly TTL, break-glass)
+    that has expired grants nothing, as ``permission_keys_for_membership`` and sign-in say."""
+    from app.identity import service as identity
+
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO core.permissions (key, description) "
+                "VALUES ('student.read_basic', 'R') ON CONFLICT DO NOTHING"
+            )
+        )
+    tid = school()
+    inviter, _ = admin_member(tid)
+    user_id = _invite(tid, inviter)
+    with tenant_session(tid, inviter) as s:
+        m = repo.create_membership(
+            s,
+            user_id=user_id,
+            status="active",
+            expires_at=dt.datetime.now(dt.UTC) + dt.timedelta(days=1),
+        )
+        role = repo.create_role(s, key="teacher", name_en="Teacher", name_te="ఉపాధ్యాయుడు")
+        repo.grant_role_permission(s, role.id, "student.read_basic")
+        repo.add_membership_role(s, m.id, role.id)
+    assert [r.key for r in identity.membership_access(tid, user_id, m.id).roles] == ["teacher"]
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "UPDATE core.memberships SET created_at = now() - interval '2 days', "
+                "expires_at = now() - interval '1 minute' WHERE id = :m"
+            ),
+            {"m": m.id},
+        )
+    access = identity.membership_access(tid, user_id, m.id)
+    assert (access.roles, access.scopes) == ((), ())
