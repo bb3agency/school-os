@@ -20,8 +20,11 @@ export interface Problem {
   code: string;
   detail?: string;
   instance?: string;
-  request_id?: string;
+  /** Null when the request had no id (the API always sends the member). */
+  request_id?: string | null;
   step_up_url?: string;
+  /** 429 only: seconds to wait, the same number as the `Retry-After` header (docs/09 §2.7). */
+  retry_after?: number;
   /** Field errors: `field` is the dotted body path (e.g. `billing_account.gstin`). */
   errors?: Array<{ field: string; code: string; message_key: string }>;
 }
