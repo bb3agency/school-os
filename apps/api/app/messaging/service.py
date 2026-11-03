@@ -1555,6 +1555,7 @@ def deliver(
     to: str | None = None,
     text_body: str | None = None,
     url_suffix: str | None = None,
+    retry: bool = True,
 ) -> str:
     """Send one queued message now (worker). Checks the account, template, opt-in and number
     (:mod:`app.messaging.eligibility`; FR-MSG-011 as far as this wave goes), decrypts the
@@ -1563,7 +1564,9 @@ def deliver(
     error for permanent errors, or still ``queued`` with one more attempt for transient ones.
     ``to`` (10-digit mobile) / ``text_body``: a free-form reply to the number that wrote (inside
     its window). ``url_suffix``: the parent link token for a template with a URL button
-    (issued by the sender just before, ADR-0046; never logged).
+    (issued by the sender just before, ADR-0046; never logged). ``retry=False``: a one-shot
+    reply the sender never picks up again (STOP and join confirmations), so a transient error
+    is final too instead of leaving it ``queued``.
     Returns the resulting status."""
     with tenant_session(tenant_id) as session:
         message = repo.get_message(session, message_id, lock=True)
@@ -1589,7 +1592,7 @@ def deliver(
         cfg = load_config().sending
         transient = exc.transient and exc.meta_code not in cfg.permanent_error_codes
         with tenant_session(tenant_id) as session:
-            if transient and attempts < cfg.max_attempts:
+            if transient and retry and attempts < cfg.max_attempts:
                 repo.update_message(session, message_id, {"attempts": attempts, "error_code": code})
                 status = "queued"
             else:
@@ -2178,7 +2181,7 @@ def process_inbox(tenant_id: uuid.UUID) -> dict[str, int]:  # noqa: PLR0912 - on
             if outbox.replies and account is not None and account.status != "disconnected":
                 reply_token = (_token(session, account), account.phone_number_id)
         for message_id, to, body in outbox.deliveries:
-            deliver(tenant_id, message_id, to=to, text_body=body)
+            deliver(tenant_id, message_id, to=to, text_body=body, retry=False)
         if reply_token is not None:
             provider = _provider()
             for to, body in outbox.replies:

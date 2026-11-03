@@ -773,6 +773,27 @@ def test_FR_MSG_017_search_scope(world: Any, api: Any) -> None:
     )
 
 
+def test_FR_MSG_016_reply_to_an_inbound_message_is_never_left_queued(
+    world: Any, api: Any, admin_engine: Engine, fake_state: Any
+) -> None:
+    """The STOP confirmation is sent once, right after the inbox is applied; the sender never
+    retries it (it is not one of the sending purposes). A transient Meta error must end it as
+    ``failed``, not leave it ``queued`` for ever (counted as waiting, never finished)."""
+    _, waba = M.connect(world.a)
+    _, guardian, mobile = M.guardian(world.a)
+    assert M.opt_in(api, world.person("office_staff"), guardian, "notices").status_code == 201
+    STATE.failing["91" + mobile] = 130429  # throughput: transient
+    M.deliver_webhook(api, world.a, M.inbound(waba, "91" + mobile, text_body="STOP"))
+    rows = M.rows(
+        admin_engine,
+        "SELECT status, error_code FROM msg.messages WHERE tenant_id = :t "
+        "AND purpose = 'optin_stopped' AND guardian_id = :g",
+        t=world.a.tenant_id,
+        g=guardian,
+    )
+    assert rows == [{"status": "failed", "error_code": "meta:130429"}]
+
+
 def test_FR_MSG_017_scoped_reader_sees_no_message_about_a_student_outside_their_sections(
     world: Any, api: Any
 ) -> None:
