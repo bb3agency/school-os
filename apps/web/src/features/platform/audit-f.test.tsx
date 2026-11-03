@@ -19,7 +19,7 @@ import { PlatformTicketScreen } from "./SupportScreens";
 const T = "0192f3a4-0000-7000-8000-000000000001";
 const OP = "0192f3a4-0000-7000-8000-0000000000f1";
 const pm = messages.en.platform;
-const api = messages.en.errors.api as Record<string, { title: string; body: string }>;
+const api = messages.en.errors.api;
 
 const ME = {
   operator_id: OP,
@@ -171,9 +171,9 @@ describe("operator console: idempotent creates and plain-language refusals", () 
     await user.selectOptions(within(dialog).getByLabelText(pm.subscriptions.newPlan), ANNUAL);
     await user.click(within(dialog).getByRole("button", { name: pm.subscriptions.changePlan }));
     expect(
-      await within(dialog).findByText(api.ai_bundle_needs_monthly_plan?.title ?? "missing"),
+      await within(dialog).findByText(api.ai_bundle_needs_monthly_plan.title),
     ).toBeInTheDocument();
-    expect(within(dialog).queryByText(api.conflict?.title ?? "")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(api.conflict.title)).not.toBeInTheDocument();
   });
 });
 
