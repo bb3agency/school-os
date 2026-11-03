@@ -30,6 +30,7 @@ from app.knowledge import repository as repo
 from app.knowledge.ingestion.ports import (
     ChunkAcl,
     ChunkContext,
+    ChunkFilters,
     ContextStatus,
     StoredContext,
     VersionIndex,
@@ -103,10 +104,26 @@ class SqlChunkStore:
         repo.invalidate_cache_citing(session, document_id)
         return repo.demote_document(session, document_id)
 
-    def update_acl(self, session: Session, document_id: uuid.UUID, acl: ChunkAcl) -> int:
+    def update_acl(
+        self,
+        session: Session,
+        document_id: uuid.UUID,
+        acl: ChunkAcl,
+        filters: ChunkFilters | None = None,
+    ) -> int:
         # Who may read it changed: answers given its passages are not reused (answer cache).
         repo.invalidate_cache_citing(session, document_id)
-        return repo.refresh_acl(session, document_id=document_id, acl=_acl(acl))
+        facets = (
+            repo.DocumentFacets(
+                doc_type=filters.doc_type,
+                sensitivity=filters.sensitivity,
+                issued_on=filters.issued_on,
+                academic_year_id=filters.academic_year_id,
+            )
+            if filters is not None
+            else None
+        )
+        return repo.refresh_acl(session, document_id=document_id, acl=_acl(acl), facets=facets)
 
     def delete_versions(
         self, session: Session, document_id: uuid.UUID, version_ids: Sequence[uuid.UUID]

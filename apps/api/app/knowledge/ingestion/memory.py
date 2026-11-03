@@ -116,8 +116,16 @@ class InMemoryChunkStore:
     def hide_document(self, session: Any, document_id: uuid.UUID) -> int:
         return self._rewrite(session, document_id, is_latest=False)
 
-    def update_acl(self, session: Any, document_id: uuid.UUID, acl: ChunkAcl) -> int:
-        return self._rewrite(session, document_id, acl=acl)
+    def update_acl(
+        self,
+        session: Any,
+        document_id: uuid.UUID,
+        acl: ChunkAcl,
+        filters: ChunkFilters | None = None,
+    ) -> int:
+        if filters is None:
+            return self._rewrite(session, document_id, acl=acl)
+        return self._rewrite(session, document_id, acl=acl, filters=filters)
 
     def delete_versions(
         self, session: Any, document_id: uuid.UUID, version_ids: Sequence[uuid.UUID]

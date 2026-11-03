@@ -164,8 +164,15 @@ class ChunkStore(Protocol):
         Returns the number of chunks that changed."""
         ...
 
-    def update_acl(self, session: Session, document_id: uuid.UUID, acl: ChunkAcl) -> int:
-        """Rewrite the ACL copies on every chunk of the document (docs/05 §6)."""
+    def update_acl(
+        self,
+        session: Session,
+        document_id: uuid.UUID,
+        acl: ChunkAcl,
+        filters: ChunkFilters | None = None,
+    ) -> int:
+        """Rewrite the ACL copies (and, with ``filters``, the facets) on every chunk of the
+        document (docs/05 §6)."""
         ...
 
     def delete_versions(

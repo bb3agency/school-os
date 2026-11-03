@@ -63,6 +63,7 @@ def test_FR_OPS_004_hooks_and_routes_are_installed_once() -> None:
     hooks.install()
     assert documents.READY_HOOKS.count(hooks.on_version_ready) == 1
     assert documents.ACL_CHANGED_HOOKS.count(hooks.on_acl_changed) == 1
+    assert documents.METADATA_CHANGED_HOOKS.count(hooks.on_metadata_changed) == 1
     assert ops.OUTBOX_ROUTES[hooks.READY_EVENT] == hooks.INGEST_TASK
     assert ops.OUTBOX_ROUTES[hooks.ACL_EVENT] == hooks.ACL_TASK
     # documents' own consumers are untouched (one task per event type).
@@ -82,6 +83,20 @@ def test_FR_OPS_004_ready_and_acl_hooks_enqueue_ids_in_the_same_transaction(
         (session, "kb.version.ready", {"document_id": DOC, "version_id": version_id}),
         (session, "kb.document.acl_changed", {"document_id": DOC}),
     ]
+
+
+def test_FR_KB_002_metadata_change_enqueues_the_index_refresh(
+    monkeypatch: pytest.MonkeyPatch, enqueued: list[Any]
+) -> None:
+    """A PATCH that changes the type or date queues the refresh that rewrites the chunk facets
+    (docs/05 §6), in the PATCH's transaction."""
+    kb(monkeypatch, enabled=True)
+    session = object()
+    hooks.on_metadata_changed(session, DOC, frozenset({"doc_type"}))  # type: ignore[arg-type]
+    assert enqueued == [(session, "kb.document.acl_changed", {"document_id": DOC})]
+    kb(monkeypatch, enabled=False)
+    hooks.on_metadata_changed(object(), DOC, frozenset({"issued_on"}))  # type: ignore[arg-type]
+    assert len(enqueued) == 1
 
 
 def test_nothing_is_enqueued_while_knowledge_is_off(
