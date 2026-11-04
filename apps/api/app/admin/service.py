@@ -580,8 +580,9 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         # R3-1C (FR-DISC-012): the disclosure draft, snapshots and published document versions.
         *disclosure.export_records(session),
         # ADR-0034: each person's Ask memory items and switch (their own work context; the
-        # query log and conversations are not in the archive, docs/05 §12).
-        *knowledge.export_records(session),
+        # query log and conversations are not in the archive, docs/05 §12). Item texts only
+        # with include_sensitive (D56).
+        *knowledge.export_records(session, include_sensitive=snap.include_sensitive),
         # R3-1B (FR-DPDP-018): consent purposes and decisions; the breach register
         # (descriptions and containment steps are ciphertext and left out).
         *consents.export_records(session),

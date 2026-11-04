@@ -482,21 +482,35 @@ def test_ADR_0034_forget_everything_and_people_who_leave_lose_their_memory(
     assert left == 0
 
 
-def test_FR_ADM_001_memory_is_in_the_full_export_decrypted(
-    world: Any, api: Any, admin_engine: Engine, fake: Any
-) -> None:
-    who = _person(admin_engine, world)
-    assert _add(api, who, "I prefer tables in answers").status_code == 201
+def _exported_memories(world: Any, who: Any, *, include_sensitive: bool) -> list[Any]:
     with tenant_session(world.a.tenant_id) as s:
-        tables = {t.name: t for t in service.export_records(s)}
+        tables = {t.name: t for t in service.export_records(s, include_sensitive=include_sensitive)}
     assert set(tables) == {"ask_memories", "ask_memory_settings"}
     rows = [
         dict(zip(tables["ask_memories"].columns, r, strict=True))
         for r in tables["ask_memories"].rows
     ]
-    mine = [r for r in rows if r["user_id"] == who.user_id]
-    assert [(r["text"], r["source"], r["status"]) for r in mine] == [
+    return [(r["text"], r["source"], r["status"]) for r in rows if r["user_id"] == who.user_id]
+
+
+def test_FR_ADM_001_memory_is_in_the_full_export_decrypted_with_include_sensitive(
+    world: Any, api: Any, admin_engine: Engine, fake: Any
+) -> None:
+    who = _person(admin_engine, world)
+    assert _add(api, who, "I prefer tables in answers").status_code == 201
+    assert _exported_memories(world, who, include_sensitive=True) == [
         ("I prefer tables in answers", "explicit", "active")
+    ]
+
+
+def test_FR_ADM_001_memory_text_is_masked_in_the_export_without_include_sensitive(
+    world: Any, api: Any, admin_engine: Engine, fake: Any
+) -> None:
+    """D56: memory items follow ``include_sensitive`` like the other restricted classes."""
+    who = _person(admin_engine, world)
+    assert _add(api, who, "I prefer tables in answers").status_code == 201
+    assert _exported_memories(world, who, include_sensitive=False) == [
+        (service.MEMORY_MASK, "explicit", "active")
     ]
 
 
