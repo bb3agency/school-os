@@ -922,12 +922,30 @@ def _office_phone(value: str | None) -> str | None:
     return digits
 
 
+def _check_quiet_hours(data: MessagingSettingsIn) -> None:
+    """Quiet hours are whole minutes (HH:MM; ``HH:MM:00`` is accepted) with a start different
+    from the end: an empty window would silently mean "never quiet" (D56). An overnight
+    window (start after end, e.g. 21:00 to 07:00) is valid. 422 ``invalid_time`` /
+    ``quiet_hours_empty``."""
+    errors = [
+        _error(field, "invalid_time")
+        for field, value in (("quiet_start", data.quiet_start), ("quiet_end", data.quiet_end))
+        if value.second or value.microsecond or value.tzinfo is not None
+    ]
+    if errors:
+        raise ValidationFailed(errors)
+    if data.quiet_start == data.quiet_end:
+        raise ValidationFailed([_error("quiet_end", "quiet_hours_empty")])
+
+
 def update_messaging_settings(
     session: Session, ctx: UserContext, data: MessagingSettingsIn, *, expected_version: int
 ) -> MessagingSettingsOut:
     """Change switches and times (``messaging.configure``, step-up; ``If-Match``, ``W/"0"``
-    before the first save). Audit ``messaging.settings.changed`` (field names only)."""
+    before the first save). Audit ``messaging.settings.changed`` (field names only). 422
+    ``quiet_hours_empty`` when the quiet hours start and end at the same minute (D56)."""
     ensure_available()
+    _check_quiet_hours(data)
     office = _office_phone(data.office_phone)
     existing = repo.get_settings(session, lock=True)
     current = existing.version if existing is not None else 0

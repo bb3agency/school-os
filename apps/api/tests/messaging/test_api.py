@@ -719,6 +719,50 @@ def test_FR_MSG_004_settings_defaults_and_update(
     assert W.audit_events(admin_engine, world.a.tenant_id, "messaging.settings.changed")
 
 
+def test_FR_MSG_004_quiet_hours_start_must_differ_from_end(world: Any, api: Any) -> None:
+    """D56: an empty quiet window is a 422 ``quiet_hours_empty``; times are HH:MM (422
+    ``invalid_time`` with seconds); an overnight window (start after end) stays valid."""
+    M.connect(world.a)
+    owner = world.person("owner")
+    current = api.call(owner, "GET", "/api/v1/messaging/settings")
+    etag = current.headers["ETag"]
+    base = {
+        "notices_enabled": True,
+        "absence_alerts_enabled": False,
+        "fee_reminders_enabled": False,
+        "fee_receipts_enabled": True,
+        "absence_alert_time": "11:00",
+        "quiet_start": "21:00",
+        "quiet_end": "21:00",
+    }
+
+    def put(**change: str) -> Any:
+        return api.call(
+            owner,
+            "PUT",
+            "/api/v1/messaging/settings",
+            json={**base, **change},
+            headers={"If-Match": etag},
+        )
+
+    empty = put()
+    assert empty.status_code == 422, empty.text
+    assert [(e["field"], e["code"]) for e in empty.json()["errors"]] == [
+        ("quiet_end", "quiet_hours_empty")
+    ]
+    seconds = put(quiet_start="21:00:30", quiet_end="07:00")
+    assert seconds.status_code == 422, seconds.text
+    assert [(e["field"], e["code"]) for e in seconds.json()["errors"]] == [
+        ("quiet_start", "invalid_time")
+    ]
+    overnight = put(quiet_start="22:30", quiet_end="06:00")
+    assert overnight.status_code == 200, overnight.text
+    assert (overnight.json()["quiet_start"], overnight.json()["quiet_end"]) == (
+        "22:30:00",
+        "06:00:00",
+    )
+
+
 def test_FR_MSG_004_racing_first_settings_saves_refuse_the_second_with_412(
     world: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:

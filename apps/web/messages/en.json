@@ -2144,7 +2144,9 @@
       "unknown_field": "This field cannot be filled in here. Reload the page and try again.",
       "size_mismatch": "The file changed during the upload. Choose the file again and upload it.",
       "confirmation_required": "Tick the box to confirm before you go on.",
-      "ai_bundle": "This AI answer bundle is no longer offered. Choose another bundle."
+      "ai_bundle": "This AI answer bundle is no longer offered. Choose another bundle.",
+      "quiet_hours_empty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00.",
+      "invalid_time": "Enter a time as HH:MM, for example 07:00."
     },
     "api": {
       "generic": {
@@ -2499,7 +2501,8 @@
     "aboveLateFee": "The waiver is more than the late fee left on this instalment. Lower it.",
     "waiverReducesLateFee": "A late-fee waiver reduces the fee: enter it with a minus sign, like -100.",
     "waiverOnLateFee": "Choose the late-fee line of the instalment for a late-fee waiver.",
-    "lateFeeWaiverOnly": "The late-fee line takes only a late-fee waiver. Choose that reason or another line."
+    "lateFeeWaiverOnly": "The late-fee line takes only a late-fee waiver. Choose that reason or another line.",
+    "quietHoursEmpty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
