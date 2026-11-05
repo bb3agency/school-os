@@ -1,6 +1,13 @@
 # Public edge (TB1): ALB with TLS 1.2+/1.3 (ACM), HTTP->HTTPS redirect, access logs, and WAFv2 with AWS
 # managed rule groups + per-IP rate rules (SEC-022; public surface SEC-036). Only the web/BFF is
-# routed; the API is internal, except the HMAC-authenticated fleet heartbeat endpoint when expose_fleet_heartbeat = true.
+# routed; the API is internal, except two machine-authenticated paths, each behind its own switch:
+# the HMAC fleet heartbeat (expose_fleet_heartbeat) and the signed Tally edge-agent routes
+# /api/v1/edge/tally/* (expose_tally_edge; ADR-0032, D61).
+
+locals {
+  # The API target group exists only while at least one machine path is routed to it.
+  api_routed = var.expose_fleet_heartbeat || var.expose_tally_edge
+}
 
 # --- Certificate ------------------------------------------------------------------
 
@@ -81,10 +88,10 @@ resource "aws_vpc_security_group_egress_rule" "web" {
 }
 
 resource "aws_vpc_security_group_egress_rule" "api" {
-  count = var.expose_fleet_heartbeat ? 1 : 0
+  count = local.api_routed ? 1 : 0
 
   security_group_id = aws_security_group.alb.id
-  description       = "To API tasks (fleet heartbeat only)"
+  description       = "To API tasks (fleet heartbeat and Tally edge routes only)"
   ip_protocol       = "tcp"
   from_port         = var.api_port
   to_port           = var.api_port
@@ -136,7 +143,7 @@ resource "aws_lb_target_group" "web" {
 }
 
 resource "aws_lb_target_group" "api" {
-  count = var.expose_fleet_heartbeat ? 1 : 0
+  count = local.api_routed ? 1 : 0
 
   name                 = "${var.name}-api"
   port                 = var.api_port
@@ -211,6 +218,43 @@ resource "aws_lb_listener_rule" "fleet_heartbeat" {
   }
 }
 
+# Tally edge agent (ADR-0032, D61; docs/10 §13): only /api/v1/edge/tally/* with the methods the
+# agent uses reaches the API; every other /api/v1 path stays on the web/BFF default action. The
+# API's signature checks (app/tally/agent_auth.py) are the authority; the WAF machine rate rule
+# (rate-limit-machine, per IP) runs in front of them. Bodies: an ALB-attached WAF inspects only
+# the first 8 KB, so the 1 MiB limit is the API's (413 before parsing, core.middleware); the
+# block-oversized-non-json-body rule still refuses large non-JSON bodies here.
+resource "aws_lb_listener_rule" "tally_edge" {
+  count = var.expose_tally_edge ? 1 : 0
+
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 20
+
+  condition {
+    path_pattern {
+      values = ["/api/v1/edge/tally/*"]
+    }
+  }
+
+  condition {
+    http_request_method {
+      values = ["GET", "POST", "PUT"]
+    }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api[0].arn
+  }
+
+  lifecycle {
+    precondition {
+      condition     = anytrue([for p in var.waf_machine_path_prefixes : startswith("/api/v1/edge/tally/", lower(p))])
+      error_message = "expose_tally_edge needs a waf_machine_path_prefixes entry covering /api/v1/edge/tally/ (per-IP rate limit)."
+    }
+  }
+}
+
 # --- Route 53 alias records (optional) -------------------------------------------------
 
 resource "aws_route53_record" "alias" {
@@ -270,8 +314,8 @@ resource "aws_wafv2_web_acl" "this" {
     content      = jsonencode({ type = "https://docs.schoolos.example/errors/rate_limited", title = "Too many requests", status = 429, code = "rate_limited", detail = "Too many requests from this network. Wait a few minutes and try again." })
   }
 
-  # Machine paths (fleet heartbeat, Tally edge agent; P2-07): a tight per-IP budget in front of the
-  # HMAC checks. The app adds its own fail-closed per-IP layer and per-device limits.
+  # Machine paths (fleet heartbeat, Tally edge agent /api/v1/edge/tally/*; P2-07, D61): a tight
+  # per-IP budget in front of the HMAC checks. The app adds its own fail-closed per-IP layer and per-device limits.
   rule {
     name     = "rate-limit-machine"
     priority = 3

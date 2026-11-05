@@ -483,6 +483,12 @@ variable "expose_fleet_heartbeat" {
   default     = true
 }
 
+variable "expose_tally_edge" {
+  description = "Route the signed Tally edge-agent routes /api/v1/edge/tally/* to the API (ADR-0032, D61; WAF rate-limit-machine in front). The connector stays off per school until its feature flag is on."
+  type        = bool
+  default     = true
+}
+
 # --- Operations -------------------------------------------------------------------------
 
 variable "alarm_emails" {

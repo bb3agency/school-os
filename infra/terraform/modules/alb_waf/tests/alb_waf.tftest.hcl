@@ -186,8 +186,8 @@ run "api_not_routed_by_default" {
   command = plan
 
   assert {
-    condition     = length(aws_lb_target_group.api) == 0 && length(aws_lb_listener_rule.fleet_heartbeat) == 0
-    error_message = "The API is internal unless the fleet heartbeat is explicitly exposed."
+    condition     = length(aws_lb_target_group.api) == 0 && length(aws_lb_listener_rule.fleet_heartbeat) == 0 && length(aws_lb_listener_rule.tally_edge) == 0
+    error_message = "The API is internal unless the fleet heartbeat or the Tally edge routes are explicitly exposed."
   }
 }
 
@@ -202,4 +202,73 @@ run "heartbeat_exposes_only_one_path" {
     condition     = flatten([for c in aws_lb_listener_rule.fleet_heartbeat[0].condition : [for p in c.path_pattern : tolist(p.values)]]) == ["/api/v1/fleet/heartbeat"]
     error_message = "Only POST /api/v1/fleet/heartbeat reaches the API."
   }
+
+  assert {
+    condition     = length(aws_lb_listener_rule.tally_edge) == 0
+    error_message = "The heartbeat switch does not expose the Tally edge routes."
+  }
+}
+
+# D61 (ADR-0032; docs/10 §13): the Tally edge agent reaches the API only on /api/v1/edge/tally/*.
+run "tally_edge_not_routed_by_default" {
+  command = plan
+
+  assert {
+    condition     = length(aws_lb_listener_rule.tally_edge) == 0 && length(aws_lb_target_group.api) == 0
+    error_message = "The Tally edge routes are not exposed unless expose_tally_edge is set."
+  }
+}
+
+run "tally_edge_exposes_only_its_path" {
+  command = plan
+
+  variables {
+    expose_tally_edge = true
+  }
+
+  assert {
+    condition     = flatten([for c in aws_lb_listener_rule.tally_edge[0].condition : [for p in c.path_pattern : tolist(p.values)]]) == ["/api/v1/edge/tally/*"]
+    error_message = "Only /api/v1/edge/tally/* reaches the API; no wider /api/v1 pattern."
+  }
+
+  assert {
+    condition     = toset(flatten([for c in aws_lb_listener_rule.tally_edge[0].condition : [for m in c.http_request_method : tolist(m.values)]])) == toset(["GET", "POST", "PUT"])
+    error_message = "Only the methods the edge agent uses (GET config, PUT catalog, POST enrol, syncs and key-rotation)."
+  }
+
+  assert {
+    condition     = one(aws_lb_listener_rule.tally_edge[0].action).type == "forward" && length(aws_lb_target_group.api) == 1 && length(aws_vpc_security_group_egress_rule.api) == 1
+    error_message = "The rule forwards to the API target group."
+  }
+
+  # Every other path, /api/v1 included, stays on the web/BFF default action.
+  assert {
+    condition     = length(aws_lb_listener_rule.fleet_heartbeat) == 0 && one(aws_lb_listener.https.default_action).type == "forward"
+    error_message = "Exposing the edge routes opens nothing else of the API."
+  }
+
+  assert {
+    condition = length([
+      for r in aws_wafv2_web_acl.this.rule : r
+      if r.name == "rate-limit-machine"
+      && one(one(r.statement).rate_based_statement).aggregate_key_type == "IP"
+      && contains([
+        for s in one(one(one(one(r.statement).rate_based_statement).scope_down_statement).or_statement).statement :
+        one(s.byte_match_statement).search_string
+      ], "/api/v1/edge/")
+    ]) == 1
+    error_message = "The per-IP machine rate rule covers /api/v1/edge/ (WAF, before the signature checks)."
+  }
+}
+
+# Exposing the edge routes without a per-IP rate rule over them is refused.
+run "tally_edge_needs_the_machine_rate_rule" {
+  command = plan
+
+  variables {
+    expose_tally_edge         = true
+    waf_machine_path_prefixes = ["/api/v1/fleet/", "/api/v1/other/"]
+  }
+
+  expect_failures = [aws_lb_listener_rule.tally_edge]
 }
