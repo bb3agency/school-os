@@ -352,6 +352,10 @@ def resend_owner_invite(
     tenant_id: uuid.UUID,
     ctx: Annotated[Ctx, Depends(require_platform("platform.tenants.provision"))],
 ) -> dict[str, str]:
+    """Queue the school owner's invitation email again (D62, D65). Allowed while the school is
+    provisioning, active or suspended; 409 ``invalid_state`` once offboarding or deleted. Only
+    queued: the school side sends nothing if the owner already accepted, and keeps the 10-minute
+    invitation cool-down."""
     tenants.resend_owner_invite(_actor(ctx), tenant_id)
     return {"status": "queued"}
 
