@@ -730,7 +730,9 @@ def mark_tenant_audit_delivered(session: Session, event_id: uuid.UUID) -> None:
     session.execute(
         update(o)
         .where(o.c.id == event_id, o.c.delivered_at.is_(None))
-        .values(delivered_at=func.now(), attempts=o.c.attempts + 1, last_error=None)
+        # clock_timestamp(), not now(): the copy committed before this statement started, so
+        # the time is never before its created_at (set once, D68 trigger 0079).
+        .values(delivered_at=func.clock_timestamp(), attempts=o.c.attempts + 1, last_error=None)
     )
 
 
@@ -754,18 +756,55 @@ def pending_tenant_audit(session: Session) -> tuple[int, dt.datetime | None]:
     return int(row[0]), row[1]
 
 
-def purge_delivered_tenant_audit(session: Session, *, older_than_days: int) -> int:
-    """Delete copies delivered more than ``older_than_days`` ago (D51 for the control plane).
-    Undelivered copies (``delivered_at IS NULL``) are never touched; the database refuses to
-    delete them anyway (trigger ``tenant_audit_outbox_delivered_only``, 0074)."""
+def _purgeable(older_than_days: int) -> list[Any]:
+    """Copies delivered more than ``older_than_days`` ago."""
+    o = m.tenant_audit_outbox
+    return [
+        o.c.delivered_at.is_not(None),
+        o.c.delivered_at < func.now() - func.make_interval(0, 0, 0, older_than_days),
+    ]
+
+
+def tenants_with_purgeable_tenant_audit(
+    session: Session, *, older_than_days: int
+) -> list[uuid.UUID]:
+    """Schools with copies delivered more than ``older_than_days`` ago (D51, D68)."""
+    o = m.tenant_audit_outbox
+    stmt = (
+        select(o.c.tenant_id)
+        .where(*_purgeable(older_than_days))
+        .group_by(o.c.tenant_id)
+        .order_by(o.c.tenant_id)
+    )
+    return list(session.execute(stmt).scalars())
+
+
+def purgeable_tenant_audit_batch(
+    session: Session, tenant_id: uuid.UUID, *, older_than_days: int, after_seq: int, limit: int
+) -> list[RowMapping]:
+    """Next ``limit`` purge candidates of one school (``id``, ``seq``, ``created_at``), by seq."""
+    o = m.tenant_audit_outbox
+    stmt = (
+        select(o.c.id, o.c.seq, o.c.created_at)
+        .where(o.c.tenant_id == tenant_id, o.c.seq > after_seq, *_purgeable(older_than_days))
+        .order_by(o.c.seq)
+        .limit(limit)
+    )
+    return list(session.execute(stmt).mappings())
+
+
+def purge_delivered_tenant_audit(
+    session: Session, ids: Sequence[uuid.UUID], *, older_than_days: int
+) -> int:
+    """Delete the given copies if still delivered more than ``older_than_days`` ago (D51). The
+    caller passes only copies confirmed in their school's chain (D68). Undelivered copies are
+    never touched; the database refuses to delete them anyway (trigger
+    ``tenant_audit_outbox_delivered_only``, 0074)."""
+    if not ids:
+        return 0
     o = m.tenant_audit_outbox
     result = session.execute(
-        delete(o)
-        .where(
-            o.c.delivered_at.is_not(None),
-            o.c.delivered_at < func.now() - func.make_interval(0, 0, 0, older_than_days),
-        )
-        .returning(o.c.id)
+        delete(o).where(o.c.id.in_(list(ids)), *_purgeable(older_than_days)).returning(o.c.id)
     )
     return len(result.all())
 
