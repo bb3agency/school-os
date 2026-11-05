@@ -2244,18 +2244,23 @@ def settle_spend(tenant_id: uuid.UUID, payload: Mapping[str, object]) -> str:
 # --- full data export (FR-ADM-001; ADR-0034) --------------------------------------------------
 
 
-def export_records(session: Session) -> list[RecordTable]:
+MEMORY_MASK: Final = "••••"
+
+
+def export_records(session: Session, *, include_sensitive: bool) -> list[RecordTable]:
     """Worker only: the school's Ask memory for its full data export (the caller checked
-    ``tenant.export_all`` and audits the export). Memory items are decrypted (the archive masks
-    Aadhaar-like numbers in every text value; items never hold them). The query log and
-    conversations are not in the archive (docs/05 §12, 14 · M1 status: knowledge questions)."""
+    ``tenant.export_all`` and audits the export). A memory item's text is free text a person
+    wrote and may name students, so it is decrypted only when the owner explicitly included
+    restricted values (``include_sensitive``) and is ``••••`` otherwise, like the other
+    restricted classes (D56); the archive also masks Aadhaar-like numbers in every text value.
+    The query log and conversations are not in the archive (docs/05 §12, 14)."""
     items: list[tuple[object, ...]] = [
         (
             r.id,
             r.user_id,
             r.source,
             r.status,
-            redact(memory.text_of(session, r)),
+            redact(memory.text_of(session, r)) if include_sensitive else MEMORY_MASK,
             r.created_at,
             r.updated_at,
             r.expires_at,

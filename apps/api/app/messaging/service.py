@@ -76,7 +76,14 @@ from app.messaging import eligibility as rules
 from app.messaging import repository as repo
 from app.messaging import slips
 from app.messaging.config import OPTIN_CATEGORIES, OptinCategory, load_config
-from app.messaging.models import Account, Message, MessageTemplate, MessagingSettings, Optin
+from app.messaging.models import (
+    Account,
+    Message,
+    MessageTemplate,
+    MessagingSettings,
+    Optin,
+    ProviderEvent,
+)
 from app.messaging.providers import (
     MessagingProvider,
     ProviderError,
@@ -922,12 +929,30 @@ def _office_phone(value: str | None) -> str | None:
     return digits
 
 
+def _check_quiet_hours(data: MessagingSettingsIn) -> None:
+    """Quiet hours are whole minutes (HH:MM; ``HH:MM:00`` is accepted) with a start different
+    from the end: an empty window would silently mean "never quiet" (D56). An overnight
+    window (start after end, e.g. 21:00 to 07:00) is valid. 422 ``invalid_time`` /
+    ``quiet_hours_empty``."""
+    errors = [
+        _error(field, "invalid_time")
+        for field, value in (("quiet_start", data.quiet_start), ("quiet_end", data.quiet_end))
+        if value.second or value.microsecond or value.tzinfo is not None
+    ]
+    if errors:
+        raise ValidationFailed(errors)
+    if data.quiet_start == data.quiet_end:
+        raise ValidationFailed([_error("quiet_end", "quiet_hours_empty")])
+
+
 def update_messaging_settings(
     session: Session, ctx: UserContext, data: MessagingSettingsIn, *, expected_version: int
 ) -> MessagingSettingsOut:
     """Change switches and times (``messaging.configure``, step-up; ``If-Match``, ``W/"0"``
-    before the first save). Audit ``messaging.settings.changed`` (field names only)."""
+    before the first save). Audit ``messaging.settings.changed`` (field names only). 422
+    ``quiet_hours_empty`` when the quiet hours start and end at the same minute (D56)."""
     ensure_available()
+    _check_quiet_hours(data)
     office = _office_phone(data.office_phone)
     existing = repo.get_settings(session, lock=True)
     current = existing.version if existing is not None else 0
@@ -1631,7 +1656,54 @@ def deliver(
                 "sent_at": repo.now(session),
             },
         )
+        _apply_awaiting_statuses(session, message_id, result.provider_message_id)
     return "sent"
+
+
+def _apply_awaiting_statuses(
+    session: Session, message_id: uuid.UUID, provider_message_id: str
+) -> None:
+    """D56 (FR-MSG-016): Meta can report a status (sent, delivered, read, failed) before the
+    worker recorded the send. The inbox keeps such an event (``ignored``, ``awaiting_send``);
+    here, in the send's transaction, each one is applied in arrival order through
+    :func:`_apply_status` (forward only, so the order of arrival never moves a status back)
+    and finished as ``processed`` or ``ignored``. Idempotent: a finished event is never
+    picked up again. Audit ``messaging.statuses.applied`` with the counts."""
+    events = repo.awaiting_status_events(session, provider_message_id)
+    if not events:
+        return
+    counts: Counter[str] = Counter()
+    for event in events:
+        try:
+            payload = json.loads(
+                crypto.decrypt_value(
+                    session,
+                    bytes(event.payload_ciphertext or b""),
+                    table=EVENTS_TABLE,
+                    column="payload_ciphertext",
+                    row_id=event.id,
+                )
+            )
+        except (CryptoError, ValueError):
+            log.warning(
+                "messaging.status_awaiting_failed", resource_id=event.id, error_type="decrypt"
+            )
+            continue
+        outcome = _apply_status(session, payload, counts)
+        if outcome == repo.AWAITING_SEND:  # pragma: no cover - the message was just recorded
+            continue
+        repo.finish_event(
+            session, event.id, status=outcome, attempts=event.attempts + 1, error_code=None
+        )
+    if counts:
+        _audit(
+            session,
+            action="messaging.statuses.applied",
+            resource_type="message",
+            resource_id=message_id,
+            summary={**dict(counts), "after_send": True},
+            system=True,
+        )
 
 
 def _error_reason(code: str | None) -> str | None:
@@ -1866,9 +1938,13 @@ class _Outbox:
 
 
 def _apply_status(session: Session, payload: Mapping[str, Any], counts: Counter[str]) -> str:
+    """Apply one Meta delivery status (FR-MSG-016): statuses only move forward (sent <
+    delivered < read), ``failed`` only from queued or sent. A status for a message whose send
+    is not recorded yet answers ``awaiting_send``: the inbox keeps the event and the send
+    applies it when it lands (:func:`_apply_awaiting_statuses`; D56)."""
     message = repo.message_by_provider_id(session, str(payload.get("id") or ""))
     if message is None:
-        return "ignored"
+        return repo.AWAITING_SEND
     new = str(payload.get("status") or "").lower()
     old = message.status
     if old in ("read", "failed", "skipped"):
@@ -2108,6 +2184,19 @@ def _apply_account_event(
     return "ignored"
 
 
+def _finish_applied(session: Session, event: ProviderEvent, outcome: str) -> None:
+    """Finish an applied inbox event. D56: a status before its send is kept (``ignored``,
+    ``awaiting_send``); the send applies it when it is recorded."""
+    awaiting = outcome == repo.AWAITING_SEND
+    repo.finish_event(
+        session,
+        event.id,
+        status="ignored" if awaiting else outcome,
+        attempts=event.attempts + 1,
+        error_code=repo.AWAITING_SEND if awaiting else None,
+    )
+
+
 def process_inbox(tenant_id: uuid.UUID) -> dict[str, int]:  # noqa: PLR0912 - one branch per event type
     """Apply the school's stored webhook events in arrival order (worker; FR-MSG-010,
     FR-MSG-016, FR-MSG-021): statuses, inbound keywords, template and account updates. Each
@@ -2168,9 +2257,7 @@ def process_inbox(tenant_id: uuid.UUID) -> dict[str, int]:  # noqa: PLR0912 - on
                     )
                     totals["failed"] += 1
                     continue
-                repo.finish_event(
-                    session, event.id, status=outcome, attempts=event.attempts + 1, error_code=None
-                )
+                _finish_applied(session, event, outcome)
                 totals[outcome] += 1
             if statuses:
                 _audit(

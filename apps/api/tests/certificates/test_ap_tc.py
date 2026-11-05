@@ -258,6 +258,30 @@ def test_FR_CERT_018_preview_shows_restricted_values_only_within_the_read_sensit
     assert (caste.value, caste.masked) == ("Synthetic Caste", False)
 
 
+def test_FR_CERT_018_draft_print_view_masks_restricted_values_outside_read_sensitive(
+    school: Any, ap: None, admin_engine: Engine
+) -> None:
+    """SEC-015 (D56): a pending TC's print view follows the preview. A reader without
+    ``student.read_sensitive`` sees the printed restricted values masked; a reader with it sees
+    them. The frozen content of the issued TC is unchanged."""
+    _settings(admin_engine, school.tenant_id, {"print_restricted_tc_fields": True})
+    sid = _student(school)
+    pending = C.issue(school, sid, "transfer", inputs=ap_inputs())
+    clerk_page = C.call(
+        school, school.people["office_staff"], "office_staff", certificates.print_page, pending.id
+    )
+    assert "Synthetic Caste" not in clerk_page
+    assert "Synthetic Faith" not in clerk_page
+    assert certificates.RESTRICTED_MASK in clerk_page
+    admin_page = C.call(
+        school, school.people["office_admin"], "office_admin", certificates.print_page, pending.id
+    )
+    assert "Synthetic Caste" in admin_page
+    assert certificates.RESTRICTED_MASK not in admin_page
+    issued = C.approve(school, pending)
+    assert _lines(issued)["caste"] == "Synthetic Caste"
+
+
 def test_FR_CERT_017_pen_only_when_verified(school: Any, ap: None, admin_engine: Engine) -> None:
     sid = _student(school)
     unverified = _ap_tc(school, sid)

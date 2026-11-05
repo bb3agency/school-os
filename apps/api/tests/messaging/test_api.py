@@ -521,6 +521,80 @@ def test_FR_MSG_016_statuses_only_move_forward(
     assert any("read" in e["summary"] for e in applied)
 
 
+def test_FR_MSG_016_status_before_the_send_is_recorded_is_kept_and_applied(
+    world: Any, api: Any, admin_engine: Engine, fake_state: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D56: Meta reports ``delivered`` (and a late ``sent``) while the worker is still between
+    the provider call and recording the send. The inbox keeps the statuses; the send applies
+    them when it lands, in order and once: the message ends ``delivered``."""
+    _, waba = M.connect(world.a)
+    student, guardian, _mobile = M.guardian(world.a)
+    assert M.opt_in(api, world.person("office_staff"), guardian, "attendance").status_code == 201
+    with tenant_session(world.a.tenant_id) as db:
+        queued = service.queue_message(
+            db,
+            purpose="absence_alert",
+            guardian_id=guardian,
+            student_id=student,
+            source_type="attendance_day",
+            source_id=uuid.uuid4(),
+            dedupe_key=TODAY,
+            variables={
+                "school_name": "Synthetic Model School",
+                "child_first_name": "Synthetica",
+                "date": TODAY,
+            },
+        )
+    assert queued is not None
+    provider = service._provider()
+    real_send = provider.send_template
+    early: dict[str, Any] = {}
+
+    def racing_send(*args: Any, **kwargs: Any) -> Any:
+        result = real_send(*args, **kwargs)
+        now = int(time.time())
+        wamid = result.provider_message_id
+        early["delivered"] = M.deliver_webhook(
+            api, world.a, M.status(waba, wamid, "delivered", ts=now)
+        )
+        early["sent"] = M.deliver_webhook(api, world.a, M.status(waba, wamid, "sent", ts=now - 1))
+        early["wamid"] = wamid
+        return result
+
+    monkeypatch.setattr(provider, "send_template", racing_send)
+    monkeypatch.setattr(service, "_provider", lambda: provider)
+    assert service.deliver(world.a.tenant_id, queued.message_id) == "sent"
+    assert early["delivered"].get("awaiting_send") == 1
+    kept = M.rows(
+        admin_engine,
+        "SELECT status, error_code FROM msg.provider_events WHERE event_key LIKE :k",
+        k=f"status:{early['wamid']}:%",
+    )
+    assert sorted((r["status"], r["error_code"]) for r in kept) == [
+        ("ignored", None),  # the late "sent": never moves the status back
+        ("processed", None),
+    ]
+    row = M.rows(
+        admin_engine,
+        "SELECT status, sent_at, delivered_at FROM msg.messages WHERE id = :i",
+        i=queued.message_id,
+    )[0]
+    assert row["status"] == "delivered"
+    assert row["sent_at"] is not None
+    assert row["delivered_at"] is not None
+    # Idempotent: another inbox run or a replay changes nothing.
+    service.process_inbox(world.a.tenant_id)
+    M.deliver_webhook(
+        api, world.a, M.status(waba, early["wamid"], "delivered", ts=int(time.time()))
+    )
+    again = M.rows(
+        admin_engine, "SELECT status FROM msg.messages WHERE id = :i", i=queued.message_id
+    )
+    assert again[0]["status"] == "delivered"
+    applied = W.audit_events(admin_engine, world.a.tenant_id, "messaging.statuses.applied")
+    assert any(e["summary"].get("after_send") for e in applied)
+
+
 def test_FR_MSG_020_replayed_and_duplicate_events_apply_once(
     world: Any, api: Any, admin_engine: Engine, fake_state: Any
 ) -> None:
@@ -717,6 +791,50 @@ def test_FR_MSG_004_settings_defaults_and_update(
     )
     assert stale.status_code == 412
     assert W.audit_events(admin_engine, world.a.tenant_id, "messaging.settings.changed")
+
+
+def test_FR_MSG_004_quiet_hours_start_must_differ_from_end(world: Any, api: Any) -> None:
+    """D56: an empty quiet window is a 422 ``quiet_hours_empty``; times are HH:MM (422
+    ``invalid_time`` with seconds); an overnight window (start after end) stays valid."""
+    M.connect(world.a)
+    owner = world.person("owner")
+    current = api.call(owner, "GET", "/api/v1/messaging/settings")
+    etag = current.headers["ETag"]
+    base = {
+        "notices_enabled": True,
+        "absence_alerts_enabled": False,
+        "fee_reminders_enabled": False,
+        "fee_receipts_enabled": True,
+        "absence_alert_time": "11:00",
+        "quiet_start": "21:00",
+        "quiet_end": "21:00",
+    }
+
+    def put(**change: str) -> Any:
+        return api.call(
+            owner,
+            "PUT",
+            "/api/v1/messaging/settings",
+            json={**base, **change},
+            headers={"If-Match": etag},
+        )
+
+    empty = put()
+    assert empty.status_code == 422, empty.text
+    assert [(e["field"], e["code"]) for e in empty.json()["errors"]] == [
+        ("quiet_end", "quiet_hours_empty")
+    ]
+    seconds = put(quiet_start="21:00:30", quiet_end="07:00")
+    assert seconds.status_code == 422, seconds.text
+    assert [(e["field"], e["code"]) for e in seconds.json()["errors"]] == [
+        ("quiet_start", "invalid_time")
+    ]
+    overnight = put(quiet_start="22:30", quiet_end="06:00")
+    assert overnight.status_code == 200, overnight.text
+    assert (overnight.json()["quiet_start"], overnight.json()["quiet_end"]) == (
+        "22:30:00",
+        "06:00:00",
+    )
 
 
 def test_FR_MSG_004_racing_first_settings_saves_refuse_the_second_with_412(

@@ -20,6 +20,7 @@ import {
   formatDayList,
   parseDayList,
   settingsBody,
+  settingsSchema,
   type Account,
   type GuardianOptins,
   type MessagePage,
@@ -238,6 +239,29 @@ describe("helpers", () => {
       "/bff/api/v1/sections/s-1/join-slips?categories=notices&categories=fees",
     );
     expect(estimatedCost(412, "0.115", "18")).toBe(55.91);
+  });
+
+  it("refuses quiet hours that start and end at the same time (D56)", () => {
+    const form = {
+      notices_enabled: "on",
+      absence_alerts_enabled: "off",
+      fee_reminders_enabled: "off",
+      fee_receipts_enabled: "on",
+      absence_alert_time: "11:00",
+      quiet_start: "21:00",
+      quiet_end: "21:00",
+      daily_cap: "",
+      office_phone: "",
+      no_message_dates: "",
+    };
+    const empty = settingsSchema.safeParse(form);
+    expect(empty.success).toBe(false);
+    expect(empty.error?.issues.map((issue) => [issue.path.join("."), issue.message])).toEqual([
+      ["quiet_end", "quietHoursEmpty"],
+    ]);
+    expect(settingsSchema.safeParse({ ...form, quiet_end: "07:00" }).success).toBe(true);
+    expect(messages.en.validation.quietHoursEmpty).toBeTruthy();
+    expect(messages.en.errors.field.quiet_hours_empty).toBeTruthy();
   });
 
   it("allows Meta's SDK and popups on the WhatsApp settings page only", () => {

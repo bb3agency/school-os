@@ -145,27 +145,33 @@ export const manualSchema = z.object({
 const onOff = z.enum(["on", "off"]).transform((value) => value === "on");
 
 /** 10 digits (an 11-digit landline with its STD code is allowed too); empty = none. */
-export const settingsSchema = z.object({
-  notices_enabled: onOff,
-  absence_alerts_enabled: onOff,
-  fee_reminders_enabled: onOff,
-  fee_receipts_enabled: onOff,
-  absence_alert_time: z.string().regex(/^[0-2][0-9]:[0-5][0-9](:[0-5][0-9])?$/),
-  quiet_start: z.string().regex(/^[0-2][0-9]:[0-5][0-9](:[0-5][0-9])?$/),
-  quiet_end: z.string().regex(/^[0-2][0-9]:[0-5][0-9](:[0-5][0-9])?$/),
-  daily_cap: z
-    .string()
-    .trim()
-    .regex(/^[0-9]{0,7}$/, { error: "invalidNumber" }),
-  office_phone: z
-    .string()
-    .trim()
-    .regex(/^(\+?91[\s-]?)?[0-9\s-]{10,13}$|^$/, { error: "invalidPhone" }),
-  no_message_dates: z
-    .string()
-    .trim()
-    .refine((value) => parseDayList(value) !== null, { error: "invalidDate" }),
-});
+export const settingsSchema = z
+  .object({
+    notices_enabled: onOff,
+    absence_alerts_enabled: onOff,
+    fee_reminders_enabled: onOff,
+    fee_receipts_enabled: onOff,
+    absence_alert_time: z.string().regex(/^[0-2][0-9]:[0-5][0-9](:[0-5][0-9])?$/),
+    quiet_start: z.string().regex(/^[0-2][0-9]:[0-5][0-9](:[0-5][0-9])?$/),
+    quiet_end: z.string().regex(/^[0-2][0-9]:[0-5][0-9](:[0-5][0-9])?$/),
+    daily_cap: z
+      .string()
+      .trim()
+      .regex(/^[0-9]{0,7}$/, { error: "invalidNumber" }),
+    office_phone: z
+      .string()
+      .trim()
+      .regex(/^(\+?91[\s-]?)?[0-9\s-]{10,13}$|^$/, { error: "invalidPhone" }),
+    no_message_dates: z
+      .string()
+      .trim()
+      .refine((value) => parseDayList(value) !== null, { error: "invalidDate" }),
+  })
+  // D56: an empty quiet window (start = end) is refused; overnight (start after end) is fine.
+  .refine((value) => value.quiet_start.slice(0, 5) !== value.quiet_end.slice(0, 5), {
+    error: "quietHoursEmpty",
+    path: ["quiet_end"],
+  });
 
 const DAY = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 

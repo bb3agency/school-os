@@ -1165,12 +1165,19 @@ def _input_text(layout: _Layout, key: str, value: str | None) -> str | None:
 
 
 NOT_PRINTED: Final = "—"
+# A restricted value the school prints, on a draft print view for a reader whose
+# ``student.read_sensitive`` does not reach the student (SEC-015; D56).
+RESTRICTED_MASK: Final = "••••• (restricted)"
 
 
-def _format_lines(record: _Record, inputs: Mapping[str, str]) -> list[ContentLine]:
+def _format_lines(
+    record: _Record, inputs: Mapping[str, str], *, mask_restricted: bool = False
+) -> list[ContentLine]:
     """The printed lines of a format TC in order (FR-CERT-015..018). Optional inputs left empty
     and restricted lines the school does not print stay ``None`` (a labelled blank to fill by
-    hand); an identifier that may not be printed is "—" (never a blank to fill in)."""
+    hand); an identifier that may not be printed is "—" (never a blank to fill in). With
+    ``mask_restricted`` (a draft print view outside the reader's ``read_sensitive`` reach) a
+    printed restricted value is shown as ``RESTRICTED_MASK``, never its value."""
     fmt = record.layout.fmt
     if fmt is None:  # pragma: no cover - callers check
         return []
@@ -1189,6 +1196,8 @@ def _format_lines(record: _Record, inputs: Mapping[str, str]) -> list[ContentLin
             value = ident.value if ident is not None and ident.value else NOT_PRINTED
         elif line.fill == "restricted" and line.attribute is not None and record.print_restricted:
             value = record.restricted.get(line.attribute)
+            if mask_restricted and value is not None:
+                value = RESTRICTED_MASK
         out.append(
             ContentLine(key=line.key, label_en=line.label_en, label_te=line.label_te, value=value)
         )
@@ -1203,6 +1212,7 @@ def _build_content(
     serial: str,
     year: AcademicYearOut,
     issued_on: dt.date,
+    mask_restricted: bool = False,
 ) -> CertificateContent:
     cfg = settings()
     spec = record.spec
@@ -1215,7 +1225,7 @@ def _build_content(
     blanks: list[ContentLine]
     if fmt is not None:
         # A format TC prints every line in the format's order (FR-CERT-015/016).
-        fields = _format_lines(record, inputs)
+        fields = _format_lines(record, inputs, mask_restricted=mask_restricted)
         details, blanks = [], []
         title_en, title_te = fmt.title_en, fmt.title_te
     else:
@@ -2126,6 +2136,12 @@ def _page(session: Session, ctx: UserContext, row: Certificate, *, for_pdf: bool
         year = record.structure.current
         if year is None:
             raise NoCurrentYear()
+        # SEC-015 (D56): a draft shows the restricted values the school prints only where the
+        # reader's read_sensitive reaches this student, as the preview does. Issued (frozen)
+        # content is unchanged.
+        sensitive = record.print_restricted and _in_reach(
+            _reach(session, ctx, [STUDENT_SENSITIVE]), row.student_id
+        )
         content = _build_content(
             session,
             record,
@@ -2133,6 +2149,7 @@ def _page(session: Session, ctx: UserContext, row: Certificate, *, for_pdf: bool
             serial="—",
             year=year,
             issued_on=_today(session),
+            mask_restricted=not sensitive,
         )
     return templates.render_certificate(
         content,
