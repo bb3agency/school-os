@@ -406,7 +406,10 @@ Every screen must work at **1366×768** (office PC, the design baseline) and **3
 in English (and in Telugu while it is switched on, §5.4): no horizontal page scroll, nothing past the screen or its card edge, no
 clipped text (a decorative, `aria-hidden` sample-data illustration with a caption may be
 cropped, §5.6), touch targets of at least 24×24 px (WCAG 2.5.8; inline links in a sentence and
-well-spaced small targets are the exceptions). `e2e/responsive.spec.ts` checks all of it for
+well-spaced small targets are the exceptions). Breadcrumb links (the page header trail and the
+top bar's link back to the list) are `inline-flex min-h-6 min-w-6` (44px tall on touch), and on a
+tablet (768-1023px) the top-bar label truncates inside the link, so the target keeps its size in
+Telugu too (unit checks in `AppShell.test.tsx` and `primitives.test.tsx`). `e2e/responsive.spec.ts` checks all of it for
 every screen (`make e2e` with `E2E_STAND_IN=1`, on every pull request); `e2e/audit/responsive.audit.ts`
 sweeps ten viewports with screenshots (`make e2e-audit`, nightly).
 

@@ -410,6 +410,26 @@ describe("AppShell: top bar (breadcrumb, palette, preferences)", () => {
     );
   });
 
+  it.each(["en", "te"] as const)(
+    "the trail link is at least a 24×24 target, 44px on touch, cut inside the link on a tablet [%s] (WCAG 2.5.8)",
+    (locale) => {
+      path.current = "/students/0193";
+      renderWithIntl(shell(), locale);
+      const trail = document.querySelector<HTMLElement>("header nav ol");
+      const link = trail?.querySelector<HTMLAnchorElement>("a[href='/students']");
+      expect(link).toBeTruthy();
+      // jsdom applies no CSS: the classes are the contract; e2e/responsive.spec.ts measures
+      // the box at 768-1024 in a real browser.
+      expect(link).toHaveClass("inline-flex", "items-center", "min-h-6", "min-w-6");
+      expect(link).toHaveClass("pointer-coarse:min-h-11", "max-w-full");
+      // The label truncates inside the link (tablets show one line), so the link keeps its
+      // full height instead of being clipped by the list item.
+      const label = link?.querySelector("span");
+      expect(label).toHaveClass("min-w-0", "max-lg:truncate");
+      expect(label).toHaveTextContent("Students");
+    },
+  );
+
   it("no trail for a page outside the menu", () => {
     path.current = "/notifications";
     renderWithIntl(shell());

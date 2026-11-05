@@ -265,6 +265,29 @@ describe("page chrome primitives", () => {
     expect(within(crumbs).getByText("Sample student A")).toHaveAttribute("aria-current", "page");
   });
 
+  it.each(["en", "te"] as const)(
+    "breadcrumb links are at least 24×24, 44px tall on touch [%s] (WCAG 2.5.8)",
+    (locale) => {
+      renderWithIntl(
+        <PageHeader
+          title="Sample student A"
+          breadcrumb={[
+            { label: "Home", href: "/" },
+            { label: "Students", href: "/students" },
+            { label: "Sample student A" },
+          ]}
+        />,
+        locale,
+      );
+      const links = document.querySelectorAll("nav a");
+      expect(links).toHaveLength(2);
+      for (const link of links) {
+        expect(link).toHaveClass("inline-flex", "items-center", "min-h-6", "min-w-6");
+        expect(link).toHaveClass("pointer-coarse:min-h-11");
+      }
+    },
+  );
+
   it("Card with an eyebrow is still named by its title", () => {
     renderWithIntl(
       <Card title="Mismatches" eyebrow="Checks">

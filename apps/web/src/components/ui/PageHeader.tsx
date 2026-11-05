@@ -25,9 +25,11 @@ export function Breadcrumb({ items, label }: { items: readonly Crumb[]; label?: 
           return (
             <li key={index} className="inline-flex min-w-0 items-center gap-1 break-anywhere">
               {item.href && !last ? (
+                // WCAG 2.5.8: at least 24×24 (44px tall on touch), in Telugu too; a long
+                // label wraps inside the link instead of squeezing it.
                 <Link
                   href={item.href}
-                  className="inline-flex min-h-6 items-center rounded-sm underline-offset-4 hover:text-ink hover:underline pointer-coarse:min-h-11"
+                  className="inline-flex min-h-6 min-w-6 items-center rounded-sm underline-offset-4 hover:text-ink hover:underline pointer-coarse:min-h-11"
                 >
                   {item.label}
                 </Link>
