@@ -220,8 +220,8 @@ describe("page shells render in both languages (NFR-I18N-001, FR-PLT-001..030)",
   it("dashboard shows — for every KPI while nothing has loaded", () => {
     renderWithIntl(<PlatformDashboardPage />, "en");
     const kpis = screen.getByRole("region", { name: messages.en.platform.dashboard.kpisLabel });
-    expect(within(kpis).getAllByText("—")).toHaveLength(9);
-    expect(within(kpis).getAllByText(messages.en.common.notAvailable)).toHaveLength(9);
+    expect(within(kpis).getAllByText("—")).toHaveLength(10);
+    expect(within(kpis).getAllByText(messages.en.common.notAvailable)).toHaveLength(10);
   });
 });
 
