@@ -1,7 +1,9 @@
 /**
- * Client-side guard for invariant 4 (no Aadhaar numbers, ever): finds 12-digit sequences
- * (optionally grouped 4-4-4 by spaces or hyphens) that pass the Verhoeff check, the same
- * rule `core.redaction` uses on the server. Forms refuse such text before it is sent; the API
+ * Client-side guard for invariant 4 (no Aadhaar numbers, ever): finds 12-digit sequences,
+ * ungrouped or grouped 4-4-4 with 1-3 separator characters between groups (whitespace incl.
+ * no-break spaces, dashes, dot, slash, underscore, invisible format characters, in any mix, or a
+ * single comma; lead decision D52), that pass the Verhoeff check, as `core.redaction` does on
+ * the server. Forms refuse such text before it is sent; the API
  * refuses it again (`aadhaar_full_number_rejected`). Never logs or returns the number.
  */
 
@@ -23,7 +25,7 @@ const P = [
   [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
   [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
   [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
-  [9, 4, 5, 3, 1, 2, 7, 6, 8, 0],
+  [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
   [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
   [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
   [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
@@ -42,8 +44,19 @@ export function verhoeffValid(digits: string): boolean {
   return check === 0;
 }
 
-// 12 digits not touching other digits; groups of 4 may be separated by one space or hyphen.
-const CANDIDATE = /(?<!\d)(\d{4})[ -]?(\d{4})[ -]?(\d{4})(?!\d)/g;
+/**
+ * What may join two 4-digit groups (D52, same as `AADHAAR_GROUP_SEPARATOR` in core.redaction):
+ * 1-3 of whitespace (all Zs), dashes (Pd, minus), dot, slash, underscore and format characters
+ * (Cf) in any mix, or one comma. Bounded quantifiers only, so matching stays linear.
+ */
+export const AADHAAR_GROUP_SEPARATOR = String.raw`(?:[\s\p{Cf}\p{Pd}\u2212._/]{1,3}|,)`;
+
+// 12 digits not touching other digits, ungrouped or grouped 4-4-4. Lookahead so that
+// overlapping candidates (a fourth group) are all checked.
+const CANDIDATE = new RegExp(
+  String.raw`(?<!\d)(?=(\d{4})(?:${AADHAAR_GROUP_SEPARATOR})?(\d{4})(?:${AADHAAR_GROUP_SEPARATOR})?(\d{4})(?!\d))`,
+  "gu",
+);
 
 /** True when the text holds something that looks like a full Aadhaar number. */
 export function containsAadhaarNumber(text: string): boolean {
