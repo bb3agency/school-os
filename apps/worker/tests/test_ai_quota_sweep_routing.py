@@ -26,3 +26,22 @@ def test_ADR_0038_ai_quota_sweep_hourly_on_the_shared_tier_only() -> None:
     assert entry["schedule"] == 3600.0
     assert entry["options"] == {"queue": "maintenance"}
     assert dedicated == {}
+
+
+PLAN_LIMIT_TASK = "notifications.plan_limit_sweep"
+
+
+def test_D57_plan_limit_sweep_registered_on_a_consumed_queue() -> None:
+    celery_app.loader.import_default_modules()
+    assert PLAN_LIMIT_TASK in celery_app.tasks
+    queue = celery_app.amqp.router.route({}, PLAN_LIMIT_TASK)["queue"].name
+    assert queue == "maintenance"
+    assert queue in QUEUES
+
+
+def test_D57_plan_limit_sweep_hourly_on_the_shared_tier_only() -> None:
+    shared = beat_schedule(Settings(deployment_mode=DeploymentMode.SHARED))
+    (entry,) = [v for v in shared.values() if v["task"] == PLAN_LIMIT_TASK]
+    assert entry["schedule"] == 3600.0
+    assert entry["options"] == {"queue": "maintenance"}
+    assert beat_schedule(Settings(deployment_mode=DeploymentMode.DEDICATED)) == {}

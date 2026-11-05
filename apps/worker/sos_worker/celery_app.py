@@ -80,7 +80,8 @@ TASK_MODULES: list[str] = [
     "app.audit.tasks",
     "app.ops.tasks",
     "app.notifications.tasks",
-    # ADR-0038 follow-up (docs/16 §19 Q16): AI answer quota alerts pulled to owner and principal.
+    # ADR-0038 follow-up (docs/16 §19 Q16): AI answer quota alerts pulled to owner and principal;
+    # D57: plan-limit crossings too (notifications.plan_limit_sweep).
     "app.notifications.quota_sync",
     "app.breakglass.tasks",
     "app.platform.tasks",
@@ -175,6 +176,8 @@ def create_celery() -> Celery:
             "platform.incident_clock_alerts": {"queue": "maintenance"},
             # ADR-0038 follow-up (docs/16 §19 Q16): the hourly AI answer quota alert pull.
             "notifications.ai_quota_sweep": {"queue": "maintenance"},
+            # D57 (docs/16 §5.10): the hourly plan-limit crossing pull.
+            "notifications.plan_limit_sweep": {"queue": "maintenance"},
             # FR-CERT-010: certificate PDFs render on the Chromium workers.
             "certificates.render": {"queue": "pdf"},
             # FR-FEE-011: receipt PDFs on the Chromium workers; FR-FEE-009 late fees nightly.

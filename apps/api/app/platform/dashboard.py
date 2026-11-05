@@ -1,6 +1,7 @@
 """Dashboard KPIs (docs/16 §5.1). Each tile appears only when the operator holds its read
 permission; every value is an aggregate over platform tables (no school records). Holders of
-``platform.incidents.read`` also get the incident clocks due soon or overdue (D49 part 2)."""
+``platform.incidents.read`` also get the incident clocks due soon or overdue (D49 part 2), and
+holders of ``platform.usage.read`` the plan-limit crossings of this billing period (D57)."""
 
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ from typing import Any
 from sqlalchemy import case, func, select
 
 from app.core.db import platform_session
-from app.platform import incident_alerts
+from app.platform import incident_alerts, usage
 from app.platform import models as m
 from app.platform.common import now, today_ist
 from app.platform.schemas import DashboardOut
@@ -115,6 +116,8 @@ def build(permissions: frozenset[str]) -> DashboardOut:
             out["ai_spend_top"] = [
                 {"tenant_id": str(t), "ai_cost_inr": str(Decimal(c).quantize(_TWO))} for t, c in top
             ]
+            # D57 (docs/16 §5.10): schools by their highest plan-limit crossing this period.
+            out["plan_limit_alerts"] = usage.plan_limit_tile(s)
         if "platform.support.read" in permissions:
             open_ = m.support_tickets.c.status.not_in(("resolved", "closed"))
             out["open_tickets_by_priority"] = {

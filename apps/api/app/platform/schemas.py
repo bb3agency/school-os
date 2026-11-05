@@ -314,6 +314,22 @@ class AiQuotaAlertOut(Out):
     crossed_at: dt.datetime
 
 
+class PlanLimitAlertOut(Out):
+    """A school crossed 80 % or 100 % of one of its plan's limits in a billing period (docs/16
+    §5.10, §19 Q16; FR-PLT-021, D57). Counts only: the metric code, the value counted when the
+    crossing was recorded and the plan's limit; never a record or a person. Recorded once per
+    school, metric, threshold and billing period by the usage collector. Limits never block
+    school work: nothing is switched off at 100 %."""
+
+    tenant_id: uuid.UUID
+    metric: str
+    threshold: Literal[80, 100]
+    period_start: dt.date
+    usage_value: Decimal
+    limit_value: Decimal
+    crossed_at: dt.datetime
+
+
 class TenantAiAnswersOut(Out):
     """A school's AI answers this month against its bundle, for operators (docs/18 R4, FR-PLT-020;
     ADR-0038). Platform data only (``platform.subscriptions``, ``ai_bundles``, ``usage_daily``):
@@ -1213,6 +1229,12 @@ class DashboardOut(Out):
         default=None,
         description="Open incident clocks due soon or overdue, most urgent first; only for "
         "holders of platform.incidents.read (D49 part 2).",
+    )
+    plan_limit_alerts: dict[str, int] | None = Field(
+        default=None,
+        description="Schools whose plan-limit crossings this billing period reached 80 or 100 % "
+        "at their highest, keyed by that threshold ('80', '100'); only for holders of "
+        "platform.usage.read (docs/16 §5.10, D57). Limits never block school work.",
     )
 
 
