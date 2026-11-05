@@ -10532,7 +10532,8 @@
       "makeNoticeConsequence": "ఏదీ పంపబడదు. SchoolOS తనంతట తాను ఉల్లంఘన నోటీసును ఎప్పుడూ పంపదు.",
       "noticeMadeTitle": "నోటీసు ముసాయిదా తయారైంది",
       "noticeMadeBody": "దాన్ని పూర్తి చేసి ఆమోదానికి పంపడానికి నోటీసులలో తెరవండి.",
-      "openNotice": "నోటీసు ముసాయిదాను తెరవండి"
+      "openNotice": "నోటీసు ముసాయిదాను తెరవండి",
+      "printPage": "Open the print page"
     },
     "errors": {
       "breach_closed": {
@@ -10547,6 +10548,13 @@
         "title": "SchoolOS నోటీసులు వాటంతట అవే వస్తాయి",
         "body": "ఇక్కడ పాఠశాల వైపు జరిగిన ఉల్లంఘనలను మాత్రమే నమోదు చేయండి."
       }
+    },
+    "print": {
+      "crumb": "Print draft",
+      "title": "Print: {draft}",
+      "description": "One A4 page with the school's name. Check every line before you print it.",
+      "print": "Print",
+      "schoolFallback": "Our school"
     }
   },
   "portalCalendar": {
@@ -11157,7 +11165,12 @@
       "fieldVersionHint": "నోటీసు అడుగున ముద్రించిన వెర్షన్.",
       "fieldLanguage": "భాష",
       "fieldIssuedOn": "ఇచ్చిన తేదీ",
-      "fieldChannel": "ఎలా ఇచ్చారు"
+      "fieldChannel": "ఎలా ఇచ్చారు",
+      "makePdf": "Also make the PDF of this notice",
+      "makePdfHint": "The notice as it is now, filled from the school's settings, as an A4 PDF to keep or print.",
+      "recordedTitle": "Notice recorded",
+      "recordedBody": "It is in the list of notices the school issued.",
+      "recordedPdfBody": "It is in the list of notices the school issued. The PDF is being made: download it below when it is ready."
     },
     "audience": {
       "parents": "తల్లిదండ్రుల కోసం నోటీసు",
@@ -11267,6 +11280,13 @@
         "title": "సమ్మతి ఉపసంహరణ కాదు",
         "body": "విద్యార్థి గురించిన సమ్మతి ఉపసంహరణ అభ్యర్థన మాత్రమే ఉపసంహరణను నమోదు చేస్తుంది."
       }
+    },
+    "withdraw": {
+      "action": "Mark as withdrawn",
+      "title": "Mark this request as withdrawn?",
+      "body": "Use this when the person who asked takes the request back.",
+      "confirm": "Mark as withdrawn",
+      "consequence": "The request is closed as withdrawn and cannot be opened again. Log a new request if they ask again."
     }
   }
 }
