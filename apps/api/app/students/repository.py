@@ -63,8 +63,10 @@ _CONSTRAINT_FIELDS: dict[str, str] = {
     "guardians_full_name_length": "full_name",
 }
 _DUPLICATE_MESSAGES: dict[str, str] = {
+    # Exact index from 0008, dropped by 0076_drop_adm_no_exact (D64); kept so a downgraded
+    # database still answers the same.
     "students_adm_no": "Another student already has this admission number.",
-    # Same number in another case (``adm/1`` vs ``ADM/1``; D53, 0073_admission_no_ci).
+    # Same number in any case (``adm/1`` vs ``ADM/1``; D53, 0073_admission_no_ci).
     "students_adm_no_ci": "Another student already has this admission number.",
     "one_active_enrollment": "The student is already enrolled for this academic year.",
     "student_guardians_pkey": "This guardian is already linked to the student.",
@@ -200,7 +202,7 @@ def all_student_ids(session: Session) -> list[uuid.UUID]:
 
 
 def admission_numbers(session: Session) -> dict[uuid.UUID, str]:
-    """Student id -> admission number (the unique ``students_adm_no`` projection)."""
+    """Student id -> admission number (unique per school ignoring case, ``students_adm_no_ci``)."""
     stmt = select(Student.id, Student.admission_no).where(Student.admission_no.is_not(None))
     return {sid: adm for sid, adm in session.execute(stmt) if adm}
 

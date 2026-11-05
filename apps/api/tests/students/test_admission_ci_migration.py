@@ -101,6 +101,8 @@ def _scalar(admin: Engine, sql: str) -> Any:
 
 
 INDEX = "SELECT to_regclass('sis.students_adm_no_ci') IS NOT NULL"
+EXACT = "SELECT to_regclass('sis.students_adm_no') IS NOT NULL"
+CONTRACT = "0076_drop_adm_no_exact"
 
 
 def test_D53_admission_no_ci_round_trips_on_a_populated_database(
@@ -113,7 +115,7 @@ def test_D53_admission_no_ci_round_trips_on_a_populated_database(
     assert _scalar(admin, INDEX) is True
     command.downgrade(cfg, BELOW)
     assert _scalar(admin, INDEX) is False
-    # The exact index stays (expand only).
+    # 0073 is expand only; below it the exact index exists again (0076's downgrade recreates it).
     assert _scalar(admin, "SELECT to_regclass('sis.students_adm_no') IS NOT NULL") is True
     command.upgrade(cfg, REV)
     command.downgrade(cfg, BELOW)
@@ -171,3 +173,34 @@ def test_D53_admission_no_ci_stops_on_case_duplicates_with_counts_only(
             )
     command.upgrade(cfg, "head")
     assert _scalar(admin, INDEX) is True
+
+
+def test_D64_drop_adm_no_exact_round_trips_and_the_ci_index_still_refuses_exact_duplicates(
+    populated: tuple[Config, Engine],
+) -> None:
+    """D64 (contract step after D53; BR-01, FR-STU-001): at head only ``students_adm_no_ci``
+    exists; it refuses an exact duplicate as well as a case variant. The downgrade recreates
+    the exact index on a populated database (no exact duplicates can exist under the CI index)."""
+    from sqlalchemy.exc import IntegrityError
+
+    cfg, admin = populated
+    a, b = _tenants(admin)[:2]
+    _add(admin, a, "D64/1", "D64/2")
+    _add(admin, b, "d64/1", "D64/2")  # another school may reuse any spelling
+    assert _scalar(admin, EXACT) is False
+    assert _scalar(admin, INDEX) is True
+    with pytest.raises(IntegrityError, match="students_adm_no_ci"):
+        _add(admin, a, "D64/1")  # exact duplicate
+    with pytest.raises(IntegrityError, match="students_adm_no_ci"):
+        _add(admin, a, "d64/2")  # case variant
+
+    command.downgrade(cfg, "0075_breach_retention")
+    assert _scalar(admin, EXACT) is True
+    assert _scalar(admin, INDEX) is True
+    command.upgrade(cfg, CONTRACT)
+    assert _scalar(admin, EXACT) is False
+    command.downgrade(cfg, "0075_breach_retention")
+    command.upgrade(cfg, "head")
+    assert _scalar(admin, EXACT) is False
+    assert _scalar(admin, INDEX) is True
+    assert _scalar(admin, "SELECT count(*) FROM sis.students WHERE admission_no LIKE 'D64/%'") == 3
