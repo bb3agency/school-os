@@ -65,6 +65,7 @@ from app.privacy import breach_repository as repo
 from app.privacy.breach_config import NOT_SET, BreachConfig, DraftKey, fill, load_config
 from app.privacy.breach_models import BreachRecord
 from app.privacy.breach_schemas import (
+    AffectedCountIn,
     AffectedCountsOut,
     AffectedIn,
     AffectedOut,
@@ -83,6 +84,7 @@ from app.privacy.breach_schemas import (
 from app.privacy.breach_subjects import subject_report
 from app.students import crypto
 from app.students import rotation as key_rotation
+from app.students import service as students
 from app.tenancy import service as tenancy
 
 READ: Final = "privacy.breach.read"
@@ -494,6 +496,69 @@ def set_affected(
     return get_affected(session, breach_id)
 
 
+def _picked_students(session: Session, ctx: UserContext, data: AffectedCountIn) -> set[uuid.UUID]:
+    """Students named by the picker, within the caller's ``student.read_basic`` reach (D59)."""
+    errors: list[dict[str, str]] = []
+    if data.class_ids or data.section_ids:
+        year = tenancy.get_current_academic_year(session)
+        sections = tenancy.list_sections(session, academic_year_id=year.id) if year else []
+        if not set(data.section_ids) <= {s.id for s in sections}:
+            errors.append(_error("section_ids", "not_found"))
+        if not set(data.class_ids) <= {c.id for c in tenancy.list_classes(session)}:
+            errors.append(_error("class_ids", "not_found"))
+    reach = set(students.list_students_in_scope(session, ctx))
+    if not set(data.student_ids) <= reach:
+        errors.append(_error("student_ids", "not_found"))
+    if errors:
+        raise ValidationFailed(errors)
+    picked = set(reach) if data.all_students else set(data.student_ids)
+    if data.section_ids:
+        picked.update(students.list_students_in_scope(session, ctx, section_ids=data.section_ids))
+    if data.class_ids:
+        picked.update(students.list_students_in_scope(session, ctx, class_ids=data.class_ids))
+    return picked
+
+
+def _picked_staff(session: Session, data: AffectedCountIn) -> set[uuid.UUID]:
+    """Membership ids named by the picker: all active staff, active staff holding a role, and
+    single members of this school (422 ``not_found`` for an unknown role key or member)."""
+    errors: list[dict[str, str]] = []
+    roles = set(data.staff_role_keys)
+    if roles and not roles <= {r.key for r in identity.list_roles(session)}:
+        errors.append(_error("staff_role_keys", "not_found"))
+    known = identity.member_display_names(session, data.membership_ids)
+    if not set(data.membership_ids) <= set(known):
+        errors.append(_error("membership_ids", "not_found"))
+    if errors:
+        raise ValidationFailed(errors)
+    picked = set(data.membership_ids)
+    if data.all_staff or roles:
+        picked.update(
+            m.membership_id
+            for m in identity.active_members(session)
+            if data.all_staff or roles & set(m.roles)
+        )
+    return picked
+
+
+def count_affected(
+    session: Session, ctx: UserContext, breach_id: uuid.UUID, data: AffectedCountIn
+) -> AffectedCountsOut:
+    """Count the people a picker selection names, per category (D59, FR-DPDP-033): students
+    (whole school, classes or sections of the current year, single students; the caller's
+    ``student.read_basic`` reach), their linked guardians, and staff. Each person counts once
+    however often they were picked. Read-only: nothing is stored or audited (the selection is
+    never kept, D41); the school saves the counts with PATCH as before. 422 ``not_found`` for ids
+    or role keys this school does not have; 409 ``breach_closed``."""
+    row = _get(session, breach_id)
+    if row.status == "closed":
+        raise Conflict("This breach is closed.", code="breach_closed")
+    picked = _picked_students(session, ctx, data)
+    guardians = {g.guardian_id for g in students.guardians_of_students(session, picked)}
+    staff = _picked_staff(session, data)
+    return AffectedCountsOut(students=len(picked), guardians=len(guardians), staff=len(staff))
+
+
 # --- drafts (FR-DPDP-036, FR-DPDP-037) ----------------------------------------------------------
 
 
@@ -800,6 +865,7 @@ __all__ = [
     "MANAGE",
     "READ",
     "control_plane_here",
+    "count_affected",
     "create_breach",
     "create_notice_draft",
     "draft",
