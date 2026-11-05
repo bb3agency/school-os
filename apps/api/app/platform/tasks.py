@@ -95,8 +95,10 @@ def deliver_tenant_audit() -> dict[str, int]:
 def purge_tenant_audit() -> dict[str, int]:
     """Both modes, nightly at 02:50 IST (queue ``maintenance``): delete school-chain copies
     delivered more than ``tenant_audit.delivered_retention_days`` ago (lead decision D51 for the
-    control plane). Undelivered copies are kept. Counts only."""
-    return {"purged": tenant_audit.purge_delivered()}
+    control plane). Undelivered copies are kept, and so are delivered copies not confirmed in
+    the school's own chain (D68). Counts only."""
+    result = tenant_audit.purge_delivered()
+    return {"purged": result.purged, "kept_unconfirmed": result.kept_unconfirmed}
 
 
 @shared_task(name="offboarding.process", acks_late=True, ignore_result=True)

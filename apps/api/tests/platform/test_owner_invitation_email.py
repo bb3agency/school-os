@@ -205,7 +205,9 @@ def test_FR_PLT_002_resume_and_redelivery_do_not_email_twice(  # noqa: PLR0917 -
     assert api.call("POST", "/tenants", owner, json=body).status_code in {200, 201}
     # A deliverer that crashed after the school's commit but before marking the copy delivered
     # finds the event already in the school's chain and does not queue the email again.
+    # (Superuser with user triggers off: delivered_at is set once since D68, migration 0079.)
     with admin_engine.begin() as c:
+        c.execute(text("SET LOCAL session_replication_role = replica"))
         c.execute(
             text(
                 "UPDATE platform.tenant_audit_outbox SET delivered_at = NULL "

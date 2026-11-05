@@ -50,8 +50,10 @@ def _enqueue(tenant_id: uuid.UUID, action: str = "tenant.suspended") -> uuid.UUI
 
 
 def _age(admin: Engine, event_id: uuid.UUID, delivered_days_ago: int) -> None:
-    """Pretend the copy was delivered ``delivered_days_ago`` days ago (admin, test only)."""
+    """Pretend the copy was delivered ``delivered_days_ago`` days ago (superuser with user
+    triggers off, test only: ``delivered_at`` is set once since D68, migration 0079)."""
     with admin.begin() as c:
+        c.execute(text("SET LOCAL session_replication_role = replica"))
         c.execute(
             text(
                 "UPDATE platform.tenant_audit_outbox SET delivered_at = "
@@ -113,6 +115,7 @@ def test_FR_AUD_001_D51_purge_deletes_only_delivered_copies_older_than_30_days(
     out = tasks.purge_tenant_audit.apply().get()
 
     assert out["purged"] >= 1
+    assert set(out) == {"purged", "kept_unconfirmed"}
     assert _ids(admin_engine, school) == {recent, pending}
     with admin_engine.connect() as c:
         audited = c.execute(
@@ -122,7 +125,7 @@ def test_FR_AUD_001_D51_purge_deletes_only_delivered_copies_older_than_30_days(
             )
         ).one()
     assert audited.actor_type == "system"
-    assert set(audited.summary) == {"count", "retention_days"}  # counts only
+    assert set(audited.summary) == {"count", "kept_unconfirmed", "retention_days"}  # counts only
 
 
 @pytest.mark.db
@@ -150,12 +153,79 @@ def test_FR_AUD_001_D51_a_purged_copy_is_never_delivered_again(
     assert _school_copies(admin_engine, school, event_id) == 1
     _age(admin_engine, event_id, 31)
 
-    assert tenant_audit.purge_delivered() >= 1
+    assert tenant_audit.purge_delivered().purged >= 1
     assert event_id not in _ids(admin_engine, school)
 
     again = tenant_audit.deliver_pending(tenant_id=school)
     assert (again.delivered, again.already_present, again.failed) == (0, 0, 0)
     assert _school_copies(admin_engine, school, event_id) == 1
+
+
+class _Recorder:
+    def __init__(self) -> None:
+        self.lines: list[tuple[str, dict[str, Any]]] = []
+
+    def _add(self, event: str, **fields: Any) -> None:
+        self.lines.append((event, fields))
+
+    info = warning = error = _add
+
+
+@pytest.mark.db
+def test_FR_AUD_001_D68_purge_keeps_a_delivered_copy_missing_from_the_school_chain(
+    school: uuid.UUID, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A copy marked delivered without being written into the school's chain is never purged:
+    the purge confirms ``platform_event_id`` in that school's chain first (invariant 7)."""
+    confirmed = _enqueue(school)
+    tenant_audit.deliver_pending(tenant_id=school)
+    unconfirmed = _enqueue(school, "tenant.reactivated")
+    with platform_session() as s:  # the control plane's role claims a delivery it never made
+        s.execute(
+            text(
+                "UPDATE platform.tenant_audit_outbox SET delivered_at = clock_timestamp() "
+                "WHERE id = :i"
+            ),
+            {"i": unconfirmed},
+        )
+    _age(admin_engine, confirmed, 31)
+    _age(admin_engine, unconfirmed, 31)
+    assert _school_copies(admin_engine, school, unconfirmed) == 0
+    recorder = _Recorder()
+    monkeypatch.setattr(tenant_audit, "log", recorder)
+
+    result = tenant_audit.purge_delivered()
+
+    assert result.purged >= 1
+    assert result.kept_unconfirmed >= 1
+    remaining = _ids(admin_engine, school)
+    assert confirmed not in remaining
+    assert unconfirmed in remaining
+    kept = [f for e, f in recorder.lines if e == "platform.tenant_audit.kept_unconfirmed"]
+    assert {"tenant_id": str(school), "count": 1, "outcome": "kept"} in kept
+    for _event, fields in recorder.lines:  # ids of schools and counts only, no personal data
+        assert set(fields) <= {"tenant_id", "count", "outcome", "error_type"}
+        assert str(unconfirmed) not in str(fields)
+    with admin_engine.connect() as c:
+        summary: dict[str, Any] = c.execute(
+            text(
+                "SELECT summary FROM platform.audit_events "
+                "WHERE action = 'tenant_audit.copies_purged' ORDER BY occurred_at DESC LIMIT 1"
+            )
+        ).scalar_one()
+    assert summary["kept_unconfirmed"] >= 1
+
+    # Kept, not lost: once the school chain has the event, the next purge deletes the copy.
+    with admin_engine.begin() as c:
+        c.execute(text("SET LOCAL session_replication_role = replica"))
+        c.execute(
+            text("UPDATE platform.tenant_audit_outbox SET delivered_at = NULL WHERE id = :i"),
+            {"i": unconfirmed},
+        )
+    assert tenant_audit.deliver_pending(tenant_id=school).delivered == 1
+    _age(admin_engine, unconfirmed, 31)
+    assert tenant_audit.purge_delivered().purged >= 1
+    assert unconfirmed not in _ids(admin_engine, school)
 
 
 @pytest.mark.db
