@@ -64,6 +64,8 @@ _CONSTRAINT_FIELDS: dict[str, str] = {
 }
 _DUPLICATE_MESSAGES: dict[str, str] = {
     "students_adm_no": "Another student already has this admission number.",
+    # Same number in another case (``adm/1`` vs ``ADM/1``; D53, 0073_admission_no_ci).
+    "students_adm_no_ci": "Another student already has this admission number.",
     "one_active_enrollment": "The student is already enrolled for this academic year.",
     "student_guardians_pkey": "This guardian is already linked to the student.",
     "student_guardians_one_primary": "The student already has a primary guardian.",
@@ -74,6 +76,7 @@ _DUPLICATE_MESSAGES: dict[str, str] = {
 }
 _DUPLICATE_CODES: dict[str, str] = {
     "students_adm_no": "duplicate_admission_no",
+    "students_adm_no_ci": "duplicate_admission_no",
     "promotion_runs_one_committed": "promotion_already_committed",
 }
 
