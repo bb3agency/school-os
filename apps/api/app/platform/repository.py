@@ -64,16 +64,18 @@ _CONSTRAINT_MESSAGES: dict[str, tuple[str, str]] = {
 _CHECK_DETAIL = "One of the values isn't allowed. Check the form and try again."
 
 
+def _log_refusal(event: str, constraint: str, error_code: str, error_type: str) -> None:
+    """The constraint name at warning, never a value, the SQL or its parameters (invariant 5)."""
+    get_logger(__name__).warning(
+        event, constraint=constraint or "unknown", error_code=error_code, error_type=error_type
+    )
+
+
 def _check_refusal(constraint: str) -> ValidationFailed:
     """An unmapped CHECK refusal (SQLSTATE 23514) answers like the central D55 handler
     (``core.errors._database_refusal``): 422 ``invalid_value`` on ``body``, with no constraint or
     table name in the body (D64). The constraint name is logged at warning, never a value."""
-    get_logger(__name__).warning(
-        "db.check_violation",
-        constraint=constraint or "unknown",
-        error_code="invalid_value",
-        error_type="CheckViolation",
-    )
+    _log_refusal("db.check_violation", constraint, "invalid_value", "CheckViolation")
     refusal = ValidationFailed(
         [{"field": "body", "code": "invalid_value", "message_key": "errors.invalid_value"}],
         detail=_CHECK_DETAIL,
@@ -100,21 +102,22 @@ def translate_db_error(exc: DBAPIError) -> DomainError | None:  # noqa: PLR0911
     if state == "23514":
         return _check_refusal(constraint)
     if state == "23503":
+        # A referenced row is missing: the field-level ``not_found`` the web already shows, on
+        # ``body`` (the FK name is logged only; D64).
+        _log_refusal("db.foreign_key_violation", constraint, "not_found", "ForeignKeyViolation")
         return ValidationFailed(
-            [
-                {
-                    "field": constraint or "body",
-                    "code": "not_found",
-                    "message_key": "errors.not_found",
-                }
-            ]
+            [{"field": "body", "code": "not_found", "message_key": "errors.not_found"}]
         )
     if state == "P0002":
         return NotFound()
     if state == "55000":
-        return Conflict(
-            getattr(diag, "message_primary", None) or None, code=constraint or "invalid_state"
+        # Frozen rows (plans, invoices, AI bundles) and other trigger refusals: the generic
+        # ``invalid_state``, never the constraint name as the code (D64). The detail is the
+        # trigger's authored sentence (no values, no schema names).
+        _log_refusal(
+            "db.state_refusal", constraint, "invalid_state", "ObjectNotInPrerequisiteState"
         )
+        return Conflict(getattr(diag, "message_primary", None) or None, code="invalid_state")
     if state == "42501":
         return Forbidden()
     if state in ("22003", "22008"):

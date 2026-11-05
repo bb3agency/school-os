@@ -28,6 +28,8 @@ from app.platform import common
 from app.platform import repository as repo
 
 _UNKNOWN = "subscriptions_seats_positive"
+_FK = "subscriptions_plan_fk"
+_FROZEN = "invoices_frozen"
 _SECRET = "Synthetica Vidyalaya"  # synthetic; must never reach the body or the logs
 
 
@@ -36,6 +38,7 @@ class _Diag:
         self.constraint_name = constraint
         self.table_name = "subscriptions"
         self.schema_name = "platform"
+        self.message_primary = "issued invoices are immutable"
 
 
 def _error(cls: type[psycopg.Error], constraint: str) -> SAIntegrityError:
@@ -72,6 +75,16 @@ def _app() -> FastAPI:
     def gstin() -> None:
         with common.db_errors():
             raise _error(psycopg.errors.CheckViolation, "billing_accounts_gstin_state")
+
+    @app.post("/api/v1/platform/fk")
+    def fk() -> None:
+        with common.db_errors():
+            raise _error(psycopg.errors.ForeignKeyViolation, _FK)
+
+    @app.post("/api/v1/platform/state")
+    def state() -> None:
+        with common.db_errors():
+            raise _error(psycopg.errors.ObjectNotInPrerequisiteState, _FROZEN)
 
     return app
 
@@ -134,3 +147,44 @@ def test_D64_translate_db_error_returns_the_d55_shape_directly() -> None:
     assert mapped.errors == [
         {"field": "body", "code": "invalid_value", "message_key": "errors.invalid_value"}
     ]
+
+
+def _refusals(stream: io.StringIO, event: str) -> list[dict[str, Any]]:
+    lines = [json.loads(x) for x in stream.getvalue().splitlines() if x.strip()]
+    return [line for line in lines if line["event"] == event]
+
+
+def test_D64_an_unmapped_foreign_key_violation_does_not_name_the_constraint(
+    log_lines: io.StringIO,
+) -> None:
+    """23503 stays the 422 field error ``not_found`` the web already shows, now on ``body``."""
+    res = TestClient(_app(), raise_server_exceptions=False).post("/api/v1/platform/fk")
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"] == [
+        {"field": "body", "code": "not_found", "message_key": "errors.not_found"}
+    ]
+    for leak in (_FK, "subscriptions", "platform.", "UPDATE", _SECRET, "constraint"):
+        assert leak not in res.text, leak
+    (line,) = _refusals(log_lines, "db.foreign_key_violation")
+    assert (line["level"], line["constraint"]) == ("WARN", _FK)
+    assert set(line) <= set(ALLOWED_FIELDS)
+    assert _SECRET not in log_lines.getvalue()
+
+
+def test_D64_a_prerequisite_state_refusal_is_409_invalid_state_not_the_constraint_name(
+    log_lines: io.StringIO,
+) -> None:
+    """55000 (frozen plans, invoices, AI bundles, undelivered outbox rows) answers the generic
+    409 ``invalid_state`` the web already translates; the trigger's authored sentence stays the
+    detail; the constraint name is only logged."""
+    res = TestClient(_app(), raise_server_exceptions=False).post("/api/v1/platform/state")
+    assert res.status_code == 409, res.text
+    body = res.json()
+    assert body["code"] == "invalid_state"
+    assert body["detail"] == "issued invoices are immutable"
+    for leak in (_FROZEN, "subscriptions", "platform.", "UPDATE", _SECRET, "constraint"):
+        assert leak not in res.text, leak
+    (line,) = _refusals(log_lines, "db.state_refusal")
+    assert (line["level"], line["constraint"]) == ("WARN", _FROZEN)
+    assert line["error_code"] == "invalid_state"
+    assert set(line) <= set(ALLOWED_FIELDS)
