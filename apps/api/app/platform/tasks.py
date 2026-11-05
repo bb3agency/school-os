@@ -91,6 +91,14 @@ def deliver_tenant_audit() -> dict[str, int]:
     }
 
 
+@shared_task(name="platform.purge_tenant_audit", acks_late=True)
+def purge_tenant_audit() -> dict[str, int]:
+    """Both modes, nightly at 02:50 IST (queue ``maintenance``): delete school-chain copies
+    delivered more than ``tenant_audit.delivered_retention_days`` ago (lead decision D51 for the
+    control plane). Undelivered copies are kept. Counts only."""
+    return {"purged": tenant_audit.purge_delivered()}
+
+
 @shared_task(name="offboarding.process", acks_late=True, ignore_result=True)
 def process_offboarding() -> dict[str, int]:
     """Every 10 minutes on ``maintenance`` (shared only): advance scheduled deletions (inventory,
@@ -133,6 +141,12 @@ _BOTH_MODES: dict[str, dict[str, Any]] = {
     "platform-deliver-tenant-audit": {
         "task": "platform.deliver_tenant_audit",
         "schedule": 60.0,
+        "options": {"queue": "maintenance"},
+    },
+    # D51 for the control plane: the outbox fills in both modes, so it is purged in both.
+    "platform-purge-tenant-audit": {
+        "task": "platform.purge_tenant_audit",
+        "schedule": crontab(minute=20, hour=21),  # 02:50 IST
         "options": {"queue": "maintenance"},
     },
 }

@@ -19,6 +19,12 @@ and ``sos_app`` connections, so the copy goes through a transactional outbox:
    tenant session and looks for an event carrying it; if one exists (a crash after the tenant
    commit but before the platform commit), it only marks the row delivered.
 
+4. Retention (lead decision D51 for the control plane): :func:`purge_delivered` (Celery
+   ``platform.purge_tenant_audit``, nightly, both modes) deletes copies delivered more than
+   ``tenant_audit.delivered_retention_days`` ago. Only delivered rows go (the database refuses
+   the others), and the deliverer only ever claims undelivered rows, so a purge can never cause
+   a redelivery or a duplicate in a school chain.
+
 Payloads are IDs, codes and counts only (never names, emails or free text). The control plane
 reads nothing from the school except whether that one event already exists.
 """
@@ -42,7 +48,7 @@ from app.core.db import platform_session, tenant_session
 from app.core.ids import new_id
 from app.core.logging import get_logger
 from app.platform import repository as repo
-from app.platform.common import Actor, config
+from app.platform.common import SYSTEM, Actor, audit_platform, config
 
 log = get_logger(__name__)
 
@@ -231,4 +237,35 @@ def check_backlog(*, now: dt.datetime | None = None) -> int:
     limit = dt.timedelta(minutes=_cfg("backlog_alert_minutes"))
     if count and oldest is not None and current - oldest > limit:
         log.error("platform.tenant_audit.backlog", count=count, outcome="stale")
+    return count
+
+
+def retention_days(raw: Mapping[str, Any] | None = None) -> int:
+    """``tenant_audit.delivered_retention_days`` from ``billing.yaml`` (at least 1)."""
+    section = (raw if raw is not None else config())["tenant_audit"]
+    days = int(section["delivered_retention_days"])
+    if days < 1:
+        raise ValueError("tenant_audit.delivered_retention_days must be at least 1")
+    return days
+
+
+def purge_delivered() -> int:
+    """Nightly (D51 for the control plane): delete copies delivered more than
+    ``tenant_audit.delivered_retention_days`` ago, in one platform transaction. Undelivered
+    copies are kept. Audited as ``tenant_audit.copies_purged`` (system, count only) like the
+    other platform purges; logs the count only."""
+    days = retention_days()
+    with platform_session() as ps:
+        count = repo.purge_delivered_tenant_audit(ps, older_than_days=days)
+        if count:
+            audit_platform(
+                ps,
+                SYSTEM,
+                "tenant_audit.copies_purged",
+                "tenant_audit_outbox",
+                None,
+                {"count": count, "retention_days": days},
+            )
+    if count:
+        log.info("platform.tenant_audit.purged", count=count, outcome="ok")
     return count
