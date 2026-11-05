@@ -935,7 +935,7 @@
       "activate": "Go live",
       "activateTitle": "Make this school live?",
       "activateBody": "Staff can sign in once the school is active.",
-      "resendInvite": "Resend owner invite",
+      "resendInvite": "Re-send owner invitation",
       "resendInviteTitle": "Send the owner's invitation again?",
       "resendInviteBody": "A new invitation email goes to the owner.",
       "suspend": "Suspend school",
@@ -1108,7 +1108,8 @@
       "withdrawOffboardBody": "The school stays as it is. Anyone who may offboard schools can request it again later.",
       "offboardExpires": "If no one approves it by {date}, it expires and must be requested again.",
       "offboardExpiredTitle": "The offboarding request has expired",
-      "offboardExpiredBody": "Requested on {date} and not approved in time. Withdraw it, or make a new request."
+      "offboardExpiredBody": "Requested on {date} and not approved in time. Withdraw it, or make a new request.",
+      "resendInviteLiveNote": "Only sent if the owner has not accepted yet. If they already signed in, nothing is sent. A second re-send within 10 minutes is not sent either."
     },
     "provision": {
       "title": "Provision school",

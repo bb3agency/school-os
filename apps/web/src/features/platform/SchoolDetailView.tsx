@@ -95,43 +95,48 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
     return (
       <>
         {status === "provisioning" && can("platform.tenants.provision") ? (
-          <>
-            <ActionDialog
-              triggerLabel={t("activate")}
-              triggerVariant={data.provisioning?.resumable ? "secondary" : "primary"}
-              title={t("activateTitle")}
-              description={t("activateBody")}
-              note={
-                data.provisioning && data.provisioning.state !== "completed"
-                  ? t("provisioning.activateIncomplete")
-                  : undefined
-              }
-              confirmLabel={t("activate")}
-              stepUp
-              schema={z.object({})}
-              invalidate={invalidate}
-              submit={() =>
-                unwrap(
-                  api.POST("/api/v1/platform/tenants/{tenant_id}/activate", { params: { path } }),
-                )
-              }
-            />
-            <ActionDialog
-              triggerLabel={t("resendInvite")}
-              title={t("resendInviteTitle")}
-              description={t("resendInviteBody")}
-              confirmLabel={t("resendInvite")}
-              schema={z.object({})}
-              invalidate={invalidate}
-              submit={() =>
-                unwrap(
-                  api.POST("/api/v1/platform/tenants/{tenant_id}/owner-invite:resend", {
-                    params: { path },
-                  }),
-                )
-              }
-            />
-          </>
+          <ActionDialog
+            triggerLabel={t("activate")}
+            triggerVariant={data.provisioning?.resumable ? "secondary" : "primary"}
+            title={t("activateTitle")}
+            description={t("activateBody")}
+            note={
+              data.provisioning && data.provisioning.state !== "completed"
+                ? t("provisioning.activateIncomplete")
+                : undefined
+            }
+            confirmLabel={t("activate")}
+            stepUp
+            schema={z.object({})}
+            invalidate={invalidate}
+            submit={() =>
+              unwrap(
+                api.POST("/api/v1/platform/tenants/{tenant_id}/activate", { params: { path } }),
+              )
+            }
+          />
+        ) : null}
+        {/* D65: also after go-live (and while suspended, so the owner can sort out the
+            subscription) until offboarding. Whether the owner is still only invited is decided
+            school-side; the control plane cannot see it, so the note says so. */}
+        {(status === "provisioning" || status === "active" || status === "suspended") &&
+        can("platform.tenants.provision") ? (
+          <ActionDialog
+            triggerLabel={t("resendInvite")}
+            title={t("resendInviteTitle")}
+            description={t("resendInviteBody")}
+            note={status === "provisioning" ? undefined : t("resendInviteLiveNote")}
+            confirmLabel={t("resendInvite")}
+            schema={z.object({})}
+            invalidate={invalidate}
+            submit={() =>
+              unwrap(
+                api.POST("/api/v1/platform/tenants/{tenant_id}/owner-invite:resend", {
+                  params: { path },
+                }),
+              )
+            }
+          />
         ) : null}
         {(status === "active" || (status === "suspended" && !held)) &&
         can("platform.tenants.suspend") ? (

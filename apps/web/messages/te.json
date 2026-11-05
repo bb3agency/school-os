@@ -1108,7 +1108,8 @@
       "withdrawOffboardBody": "పాఠశాల అలాగే ఉంటుంది. పాఠశాలలను ఆఫ్‌బోర్డ్ చేయగలవారు తర్వాత మళ్లీ అభ్యర్థించవచ్చు.",
       "offboardExpires": "{date} లోపు ఎవరూ ఆమోదించకపోతే, దీని గడువు ముగుస్తుంది; మళ్లీ అభ్యర్థించాలి.",
       "offboardExpiredTitle": "ఆఫ్‌బోర్డింగ్ అభ్యర్థన గడువు ముగిసింది",
-      "offboardExpiredBody": "{date} న అభ్యర్థించారు, సమయానికి ఆమోదం రాలేదు. దీన్ని ఉపసంహరించండి, లేదా కొత్త అభ్యర్థన చేయండి."
+      "offboardExpiredBody": "{date} న అభ్యర్థించారు, సమయానికి ఆమోదం రాలేదు. దీన్ని ఉపసంహరించండి, లేదా కొత్త అభ్యర్థన చేయండి.",
+      "resendInviteLiveNote": "Only sent if the owner has not accepted yet. If they already signed in, nothing is sent. A second re-send within 10 minutes is not sent either."
     },
     "provision": {
       "title": "పాఠశాలను ఏర్పాటు చేయండి",

@@ -297,6 +297,38 @@ describe("school detail actions (FR-PLT-004..005, SEC-027)", () => {
     expect(within(dialog).getByText(/req_test/)).toBeInTheDocument();
   });
 
+  it.each(["active", "suspended"] as const)(
+    "D65: the owner invitation can be re-sent from a %s school; the note says it is only sent while invited",
+    async (status) => {
+      const RESEND = `POST /bff/api/v1/platform/tenants/${T}/owner-invite:resend`;
+      stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () =>
+        Response.json({ ...DETAIL, tenant_status: status, security_hold: status === "suspended" });
+      stub.routes[RESEND] = () => Response.json({ status: "queued" }, { status: 202 });
+      const user = userEvent.setup();
+      renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+      await user.click(await screen.findByRole("button", { name: pm.schoolDetail.resendInvite }));
+      const dialog = screen.getByRole("dialog", { name: pm.schoolDetail.resendInviteTitle });
+      expect(within(dialog).getByText(pm.schoolDetail.resendInviteLiveNote)).toBeVisible();
+      await user.click(within(dialog).getByRole("button", { name: pm.schoolDetail.resendInvite }));
+      await waitFor(() => expect(dialog).not.toHaveAttribute("open"));
+      const [call] = stub.callsTo(RESEND);
+      expect(call?.headers.get("x-csrf-token")).toBe(CSRF);
+    },
+  );
+
+  it("D65: no owner invitation re-send once the school is offboarding", async () => {
+    stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () =>
+      Response.json({
+        ...DETAIL,
+        tenant_status: "offboarding",
+        offboard_requested_at: "2026-09-20T04:30:00Z",
+        offboard_approved_at: "2026-09-21T04:30:00Z",
+      });
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    expect(await screen.findAllByText(DETAIL.school_name)).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: pm.schoolDetail.resendInvite })).toBeNull();
+  });
+
   it("step-up required (428) leaves for re-authentication", async () => {
     stub.routes[`POST /bff/api/v1/platform/tenants/${T}/offboarding`] = () =>
       problem(428, "step_up_required", {

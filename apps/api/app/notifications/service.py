@@ -484,14 +484,25 @@ def queue_owner_invitation_resend(
     _resource_id: uuid.UUID | None,
     _summary: Mapping[str, Any],
 ) -> None:
-    """``audit.on_platform_event("tenant.owner_invite_resent")`` (FR-PLT-002, D62): an operator
-    asked to send the owner's invitation again. Emails this school's invited owner(s) unless one
-    was sent within the staff invitation cool-down (then skipped, logged as ``cooldown``)."""
+    """``audit.on_platform_event("tenant.owner_invite_resent")`` (FR-PLT-002, D62, D65): an
+    operator asked to send the owner's invitation again (in any status but offboarding; the
+    control plane cannot see whether the owner accepted, so this decides). Emails this school's
+    invited owner(s) unless one was sent within the staff invitation cool-down. Sends nothing,
+    logging an outcome code only, when no owner is still invited (``owner_not_invited``: the
+    owner accepted), an invitation expired or has no address, or within the cool-down."""
     if not get_settings().email_enabled:
         return
     moment = dt.datetime.now(dt.UTC)
-    for user in _invited_owners(session):
-        if _invitation_problem(user, moment) is not None:
+    invited = _invited_owners(session)
+    if not invited:
+        log.info(
+            "notifications.email.skipped", action=INVITATION_TEMPLATE, outcome="owner_not_invited"
+        )
+        return
+    for user in invited:
+        problem = _invitation_problem(user, moment)
+        if problem is not None:
+            log.info("notifications.email.skipped", action=INVITATION_TEMPLATE, outcome=problem)
             continue
         if not _cooldown(user.membership_id):
             log.info("notifications.email.skipped", action=INVITATION_TEMPLATE, outcome="cooldown")

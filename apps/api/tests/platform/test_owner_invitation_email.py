@@ -365,3 +365,111 @@ def test_D62_owner_event_names_are_shared_and_the_hooks_are_registered() -> None
     assert service.queue_owner_invitation_resend in audit.platform_event_hooks(
         tenant_audit.OWNER_INVITE_RESENT
     )
+
+
+RESEND_EVENT = "tenant.owner_invite_resent"
+
+
+def _resend(api: Api, op: Operator, tid: uuid.UUID) -> Any:
+    return api.call("POST", f"/tenants/{tid}/owner-invite:resend", op)
+
+
+def _platform_actions(admin: Engine, tid: uuid.UUID, action: str) -> int:
+    n: int = _scalar(
+        admin,
+        "SELECT count(*) FROM platform.audit_events WHERE subject_tenant_id = :t AND action = :a",
+        t=tid,
+        a=action,
+    )
+    return n
+
+
+@pytest.mark.parametrize("status", ["active", "suspended"])
+def test_FR_PLT_002_D65_resend_after_go_live_emails_the_still_invited_owner(  # noqa: PLR0917 - fixtures
+    api: Api,
+    owner: Operator,
+    body: dict[str, Any],
+    admin_engine: Engine,
+    email_on: email.FakeEmailSender,
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+) -> None:
+    tid = _provision(api, owner, body)
+    user_id = _owner_user(admin_engine, tid)
+    assert api.call("POST", f"/tenants/{tid}/activate", owner).status_code == 200
+    if status == "suspended":
+        hold = {"reason": "Security incident reported by the school"}
+        res = api.call("POST", f"/tenants/{tid}/suspend", owner, json=hold)
+        assert res.status_code == 200, res.text
+
+    monkeypatch.setattr(service, "_cooldown", lambda _membership_id: True)
+    res = _resend(api, owner, tid)
+    assert res.status_code == 202, res.text
+    assert res.json() == {"status": "queued"}
+    events = _email_events(admin_engine, tid)
+    assert len(events) == 2
+    assert events[-1]["user_id"] == str(user_id)
+    assert _school_actions(admin_engine, tid).count(RESEND_EVENT) == 1
+    assert _platform_actions(admin_engine, tid, "tenant.owner_invite_sent") == 1
+
+    # The cool-down still applies after go-live: recorded on both sides, nothing sent.
+    monkeypatch.setattr(service, "_cooldown", lambda _membership_id: False)
+    assert _resend(api, owner, tid).status_code == 202
+    assert len(_email_events(admin_engine, tid)) == 2
+    assert _school_actions(admin_engine, tid).count(RESEND_EVENT) == 2
+    assert _platform_actions(admin_engine, tid, "tenant.owner_invite_sent") == 2
+
+
+def test_FR_PLT_002_D65_resend_sends_nothing_once_the_owner_accepted(  # noqa: PLR0917 - fixtures
+    api: Api,
+    owner: Operator,
+    body: dict[str, Any],
+    admin_engine: Engine,
+    email_on: email.FakeEmailSender,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    tid = _provision(api, owner, body)
+    assert api.call("POST", f"/tenants/{tid}/activate", owner).status_code == 200
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE core.memberships SET status = 'active' WHERE tenant_id = :t"), {"t": tid}
+        )
+    monkeypatch.setattr(service, "_cooldown", lambda _membership_id: True)
+    capsys.readouterr()
+
+    res = _resend(api, owner, tid)
+    # The control plane cannot see the membership: it accepts and queues; the school side
+    # decides and sends nothing, logging an outcome code only.
+    assert res.status_code == 202, res.text
+    assert res.json() == {"status": "queued"}
+    assert len(_email_events(admin_engine, tid)) == 1
+    assert _school_actions(admin_engine, tid).count(RESEND_EVENT) == 1
+    assert _platform_actions(admin_engine, tid, "tenant.owner_invite_sent") == 1
+    out = capsys.readouterr()
+    logs = out.out + out.err
+    assert "owner_not_invited" in logs
+    for secret in (body["owner"]["email"], body["owner"]["display_name"]):
+        assert secret not in logs
+
+
+@pytest.mark.parametrize("status", ["offboarding", "deleted"])
+def test_FR_PLT_002_D65_resend_is_refused_once_the_school_is_closing(  # noqa: PLR0917 - fixtures
+    api: Api,
+    owner: Operator,
+    body: dict[str, Any],
+    admin_engine: Engine,
+    email_on: email.FakeEmailSender,
+    status: str,
+) -> None:
+    tid = _provision(api, owner, body)
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE platform.deployments SET tenant_status = :s WHERE tenant_id = :t"),
+            {"s": status, "t": tid},
+        )
+    res = _resend(api, owner, tid)
+    assert (res.status_code, res.json()["code"]) == (409, "invalid_state")
+    assert _platform_actions(admin_engine, tid, "tenant.owner_invite_sent") == 0
+    assert RESEND_EVENT not in _school_actions(admin_engine, tid)
+    assert len(_email_events(admin_engine, tid)) == 1

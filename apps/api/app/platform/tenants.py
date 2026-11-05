@@ -20,7 +20,7 @@ import datetime as dt
 import secrets
 import uuid
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Final
 
 from sqlalchemy import RowMapping, and_, func, or_, select
 from sqlalchemy.orm import Session
@@ -537,10 +537,26 @@ def approve_offboarding(actor: Actor, tenant_id: uuid.UUID) -> TenantDetailOut:
     )
 
 
+OWNER_INVITE_RESEND_STATUSES: Final = ("provisioning", "active", "suspended")
+"""School statuses in which an operator may re-send the owner's invitation (lead decision D65):
+all but ``offboarding`` and ``deleted``. Suspended included, so the owner can sort out the
+subscription."""
+
+
 def resend_owner_invite(actor: Actor, tenant_id: uuid.UUID) -> None:
+    """``owner-invite:resend`` (FR-PLT-002, D62, D65): queue the owner's invitation again.
+
+    Allowed while the school is provisioning, active or suspended; 409 ``invalid_state`` once it
+    is offboarding or deleted. The control plane cannot read memberships, so whether the owner is
+    still only invited is decided school-side by the hook of ``tenant.owner_invite_resent``
+    (``notifications.queue_owner_invitation_resend``): it sends nothing when the owner already
+    accepted, and keeps the staff invitation cool-down. The re-send is therefore only queued."""
     dep = _deployment(tenant_id)
-    if dep["tenant_status"] != "provisioning":
-        raise Conflict("The school is already live.", code="invalid_state")
+    if dep["tenant_status"] not in OWNER_INVITE_RESEND_STATUSES:
+        raise Conflict(
+            f"A school that is {dep['tenant_status']} cannot be sent the owner's invitation.",
+            code="invalid_state",
+        )
     with platform_session() as s:
         audit_platform(
             s, actor, "tenant.owner_invite_sent", "tenant", tenant_id, {}, tenant_id=tenant_id
