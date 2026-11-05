@@ -20,6 +20,7 @@ import { useStaffCan } from "@/lib/bff/staff-me";
 import { formatCount, formatDateTime } from "@/lib/format";
 import { formList } from "@/lib/forms";
 import { PeopleCounts } from "./BreachesScreen";
+import { draftPrintHref } from "./DraftPrintScreen";
 import { CategoryChecklist, CountFields } from "./fields";
 import { BreachStatusPill, DutyClockPill, OriginPill, useCategoryNames } from "./parts";
 import { breachFactsSchema, closeSchema, dutyDoneSchema, istLocalInput } from "./schema";
@@ -609,6 +610,9 @@ function DraftText({ breachId, kind }: { breachId: string; kind: DraftKind }) {
         <Button variant="secondary" size="sm" onClick={() => window.print()}>
           {t("print")}
         </Button>
+        <ButtonLink variant="secondary" size="sm" href={draftPrintHref(breachId, kind)}>
+          {t("printPage")}
+        </ButtonLink>
         <span role="status" className="text-sm">
           {copied ? t("copied") : null}
         </span>
