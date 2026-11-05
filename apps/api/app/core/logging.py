@@ -87,6 +87,7 @@ ALLOWED_FIELDS: tuple[str, ...] = (
     "policy",
     "ip_hash",
     "retry_after_s",
+    "constraint",
     "logger",
 )
 CONTEXT_FIELDS: frozenset[str] = frozenset(

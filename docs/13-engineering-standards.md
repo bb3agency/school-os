@@ -92,7 +92,7 @@ schoolos/
 ## 7. Database rules
 
 - Every tenant table: `tenant_id`, RLS ENABLE+FORCE, policy in the same migration, `tenant_id` leading in indexes.
-- Constraints in the DB for invariants (FKs, CHECKs like no self-approval, partial unique indexes like one current value).
+- Constraints in the DB for invariants (FKs, CHECKs like no self-approval, partial unique indexes like one current value). Validate in the request model or service too; a CHECK refusal that still reaches the API answers 422 `invalid_value` through the central handler and logs `db.check_violation` (warning, constraint name only), so a missing input check shows up in the logs (D55; docs/09 §3).
 - No destructive migration without an expand/contract plan; no data backfills inside schema migrations for large tables.
 - Query review: `EXPLAIN (ANALYZE, BUFFERS)` for new heavy queries against seeded data; add to performance tests when critical.
 

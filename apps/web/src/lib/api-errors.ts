@@ -73,6 +73,8 @@ export const KNOWN_API_CODES = [
   "guardian_shared_out_of_scope",
   // Issuing an invoice whose number would pass 16 characters (CGST Rule 46; 409).
   "invoice_number_length",
+  // A database CHECK refusal the input checks missed (D55; 422, docs/09 §3).
+  "invalid_value",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 

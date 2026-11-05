@@ -2374,6 +2374,10 @@
       "invoice_number_length": {
         "title": "The invoice number would be too long",
         "body": "An invoice number can have at most 16 characters (GST rules). Shorten the invoice number prefix in the billing settings, then issue the invoice again."
+      },
+      "invalid_value": {
+        "title": "One of the values isn't allowed",
+        "body": "One of the values isn't allowed. Check the form and try again."
       }
     },
     "stepUp": {
