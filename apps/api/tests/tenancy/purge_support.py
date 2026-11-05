@@ -1104,6 +1104,16 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             s=ids["student"],
             u=u["user"],
         )
+        _run(
+            c,
+            "INSERT INTO ops.tally_bills (id, tenant_id, party_id, sync_id, reference, "
+            "bill_date, due_date, pending) VALUES (:i, :t, :p, :s, 'Term 1', '2026-04-01', "
+            "'2026-06-15', 10.00)",
+            i=uuid.uuid4(),
+            t=t,
+            p=tparty,
+            s=sync,
+        )
         # --- R2-1B fees (0058_fees_core): one row in every fin table --------------------------
         f = {
             k: uuid.uuid4() for k in ("head", "plan", "acct", "rcpt", "conc", "adj", "canc", "rfd")

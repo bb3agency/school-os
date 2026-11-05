@@ -34,6 +34,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Final
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
@@ -62,7 +63,7 @@ from app.students.schemas import SearchFilters, StudentSummary
 from app.tally import repository as repo
 from app.tally.agent_auth import AgentCaller, EnrolmentCaller
 from app.tally.config import rules, version_tuple
-from app.tally.models import Device, Group, Party
+from app.tally.models import Bill, Device, Group, Party
 from app.tally.schemas import (
     MAX_AMOUNT,
     AgentConfigOut,
@@ -71,6 +72,7 @@ from app.tally.schemas import (
     ClassDuesOut,
     ConnectorStatus,
     DeviceOut,
+    DueBillOut,
     DuesPage,
     DuesTotals,
     EnrolIn,
@@ -105,6 +107,12 @@ KEY_ID_ALPHABET: Final = "abcdefghijklmnopqrstuvwxyz"
 """Letters only: key ids appear in audit summaries, which reject long digit runs."""
 SECRET_BYTES: Final = 32
 ZERO: Final = Decimal("0.00")
+IST: Final = ZoneInfo("Asia/Kolkata")
+
+
+def _today_ist() -> dt.date:
+    """Overdue is judged on the school's calendar day (D63)."""
+    return _now().astimezone(IST).date()
 
 
 def _now() -> dt.datetime:
@@ -539,6 +547,40 @@ def _sharing(balances: Iterable[repo.LinkedBalance]) -> dict[uuid.UUID, int]:
     return {sid: len(o) for sid, o in others.items()}
 
 
+def _is_overdue(due_date: dt.date | None, pending: Decimal, today: dt.date) -> bool:
+    return due_date is not None and pending > 0 and due_date < today
+
+
+def _student_bills(
+    balances: Iterable[repo.LinkedBalance],
+    bills: Mapping[uuid.UUID, Sequence[Bill]],
+    links: Mapping[uuid.UUID, Collection[uuid.UUID]],
+    today: dt.date,
+) -> dict[uuid.UUID, list[DueBillOut]]:
+    """Per student: the pending bills of its present linked ledgers (D63), a shared ledger's on
+    each child and marked shared (D54). The ledger total stays the closing balance."""
+    out: dict[uuid.UUID, list[DueBillOut]] = defaultdict(list)
+    for b in balances:
+        if not b.present:
+            continue
+        shared = len(set(links.get(b.party_id, ())) - {b.student_id}) > 0
+        out[b.student_id].extend(
+            DueBillOut(
+                ledger_name=b.ledger_name,
+                reference=bill.reference,
+                bill_date=bill.bill_date,
+                due_date=bill.due_date,
+                pending=bill.pending,
+                overdue=_is_overdue(bill.due_date, bill.pending, today),
+                shared=shared,
+            )
+            for bill in bills.get(b.party_id, ())
+        )
+    for rows in out.values():
+        rows.sort(key=lambda r: (r.due_date is None, r.due_date or dt.date.min, r.reference))
+    return dict(out)
+
+
 @dataclass(frozen=True, slots=True)
 class ClassDues:
     class_id: uuid.UUID | None
@@ -593,6 +635,13 @@ def list_dues(
     totals = _student_totals(balances)
     shared = _sharing(balances)
     visible = students.summaries(session, ctx, totals)
+    party_ids = {b.party_id for b in balances if b.student_id in visible}
+    bills = _student_bills(
+        (b for b in balances if b.student_id in visible),
+        repo.bills_of(session, party_ids),
+        repo.links_of(session, party_ids),
+        _today_ist(),
+    )
     ledgers: dict[uuid.UUID, int] = defaultdict(int)
     as_of: dict[uuid.UUID, dt.date] = {}
     for b in balances:
@@ -610,6 +659,9 @@ def list_dues(
                 as_of=as_of[sid],
                 shared_ledger=shared.get(sid, 0) > 0,
                 shared_with=shared.get(sid, 0),
+                bills=bills.get(sid, []),
+                overdue_due=sum((x.pending for x in bills.get(sid, ()) if x.overdue), ZERO),
+                overdue_bills=sum(1 for x in bills.get(sid, ()) if x.overdue),
             )
             for sid, total in totals.items()
             if total > 0 and sid in visible
@@ -649,6 +701,17 @@ def list_dues(
 
 
 @dataclass(frozen=True, slots=True)
+class BillDue:
+    """One pending bill of a ledger (D63), as stored."""
+
+    reference: str
+    bill_date: dt.date | None
+    due_date: dt.date | None
+    pending: Decimal
+    overdue: bool
+
+
+@dataclass(frozen=True, slots=True)
 class LedgerDue:
     ledger_name: str
     group_name: str
@@ -656,6 +719,8 @@ class LedgerDue:
     as_of: dt.date
     shared_with: int = 0
     """Other students this ledger is also linked to (a family ledger; D54)."""
+    bills: tuple[BillDue, ...] = ()
+    """Pending bills by due date (D63); empty without bill-wise details in Tally."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -700,6 +765,8 @@ def student_fee_dues(session: Session, ctx: UserContext, student_id: uuid.UUID) 
         raise NotFound("Student not found")
     present = [b for b in repo.linked_balances(session, [student_id]) if b.present]
     links = repo.links_of(session, [b.party_id for b in present])
+    bills = repo.bills_of(session, [b.party_id for b in present])
+    today = _today_ist()
     return StudentFeeDues(
         student_id=student_id,
         display_name=summary.display_name,
@@ -712,6 +779,16 @@ def student_fee_dues(session: Session, ctx: UserContext, student_id: uuid.UUID) 
                 b.closing_balance,
                 b.as_of,
                 shared_with=len(set(links.get(b.party_id, ())) - {student_id}),
+                bills=tuple(
+                    BillDue(
+                        x.reference,
+                        x.bill_date,
+                        x.due_date,
+                        x.pending,
+                        _is_overdue(x.due_date, x.pending, today),
+                    )
+                    for x in bills.get(b.party_id, ())
+                ),
             )
             for b in present
         ),
@@ -979,15 +1056,27 @@ def _accept_sync(caller: AgentCaller, data: SyncIn) -> SyncOut:
         creates: list[dict[str, Any]] = []
         updates: list[tuple[Party, dict[str, Any]]] = []
         seen: set[uuid.UUID] = set()
+        bill_rows: list[dict[str, Any]] = []
         changed = 0
         for item in data.parties:
             match = by_guid.get(item.guid) if item.guid else None
             if match is None:
                 match = by_name.get(item.name)
+            party_id = match.id if match is not None and match.id not in seen else new_id()
+            bill_rows.extend(
+                {
+                    "party_id": party_id,
+                    "reference": bill.reference,
+                    "bill_date": bill.bill_date,
+                    "due_date": bill.due_date,
+                    "pending": bill.pending,
+                }
+                for bill in item.bills
+            )
             if match is None or match.id in seen:
                 creates.append(
                     {
-                        "id": new_id(),
+                        "id": party_id,
                         "company": company,
                         "guid": item.guid,
                         "ledger_name": item.name,
@@ -1039,6 +1128,13 @@ def _accept_sync(caller: AgentCaller, data: SyncIn) -> SyncOut:
             [{"id": party.id, **values, "last_sync_id": sync.id} for party, values in updates],
         )
         repo.mark_parties_missing(session, missing, sync.id)
+        # Bill-wise dues (D63): each ledger's pending bills are replaced as a whole; a ledger
+        # sent without bills (no bill-wise details) or missing from the snapshot keeps none.
+        repo.replace_bills(
+            session,
+            [p.id for p in stored] + missing,
+            [{**r, "sync_id": sync.id} for r in bill_rows],
+        )
         repo.update_device(
             session,
             device.id,
@@ -1152,6 +1248,7 @@ def export_records(session: Session) -> list[RecordTable]:
 
 _PURGE = purging.PurgeTables(
     deleted=(
+        "ops.tally_bills",
         "ops.tally_party_links",
         "ops.tally_parties",
         "ops.tally_syncs",
@@ -1181,6 +1278,7 @@ __all__ = [
     "CONFIGURE",
     "DEVICE_MANAGE",
     "READ",
+    "BillDue",
     "FeeSummary",
     "LedgerDue",
     "StudentFeeDues",

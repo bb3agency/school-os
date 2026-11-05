@@ -53,3 +53,18 @@ def test_R_08_control_and_bidi_characters_are_removed_from_agent_names() -> None
 def test_R_08_ordinary_names_are_unchanged() -> None:
     party = _party("  Lakshmi   Devi (Class 9A) ")
     assert party.name == "Lakshmi   Devi (Class 9A)"
+
+
+def test_R_08_D63_bill_references_are_cleaned_like_ledger_names() -> None:
+    party = PartyIn.model_validate(
+        {
+            "name": "Ravi K",
+            "group": "Sundry Debtors",
+            "closing_balance": "10.00",
+            "bills": [{"reference": f"Term\u202e 1 {SPACED}", "pending": "10.00"}],
+        }
+    )
+    (bill,) = party.bills
+    assert not contains_full_aadhaar(bill.reference)
+    assert bill.reference.startswith("Term 1 ")
+    assert (bill.bill_date, bill.due_date) == (None, None)

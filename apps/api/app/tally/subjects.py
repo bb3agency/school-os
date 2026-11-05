@@ -24,6 +24,7 @@ COLUMNS = (
     "Last synced",
     "Still in Tally",
 )
+BILL_COLUMNS = ("Tally ledger", "Bill", "Bill date", "Due date", "Pending")
 
 
 def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
@@ -47,7 +48,7 @@ def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
         for b in balances
     ]
     kept, note = cap_rows(rows)
-    return [
+    sections = [
         ReportSection(
             class_key=CLASS_KEY,
             title="Tally ledgers linked to the student",
@@ -56,6 +57,31 @@ def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
             note=note,
         )
     ]
+    names = {b.party_id: b.ledger_name for b in balances}
+    bills = repo.bills_of(session, list(names))
+    bill_rows = [
+        (
+            fmt_text(names[party_id]),
+            fmt_text(bill.reference),
+            fmt_date(bill.bill_date),
+            fmt_date(bill.due_date),
+            fmt_money(bill.pending),
+        )
+        for party_id in names
+        for bill in bills.get(party_id, ())
+    ]
+    if bill_rows:
+        kept_bills, bills_note = cap_rows(bill_rows)
+        sections.append(
+            ReportSection(
+                class_key=CLASS_KEY,
+                title="Pending Tally bills of those ledgers",
+                columns=BILL_COLUMNS,
+                rows=tuple(kept_bills),
+                note=bills_note,
+            )
+        )
+    return sections
 
 
 __all__ = ["subject_report"]

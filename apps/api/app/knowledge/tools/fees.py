@@ -11,7 +11,10 @@ re-checks both when it runs. Two shapes:
   its Tally group, the Tally as-of date and when it was synced. Ledger names are NOT sent (the
   amount and group suffice; CLAUDE.md §11 "send only the field needed"). No link: the block says
   SchoolOS has no fee figure for the student; it never guesses a ledger by name. A ledger also
-  linked to a sibling is marked "shared with N other students" (D54).
+  linked to a sibling is marked "shared with N other students" (D54). When Tally keeps bill-wise
+  details (D63), the overdue bills (due date before today, IST) are named by their Tally
+  reference and due date with the pending amount as stored (at most ``MAX_OVERDUE_BILLS``, the
+  rest counted); they are part of the ledger total, which stays the closing balance.
 - without a student: ``tally.service.fee_summary``: numbers only (students with dues, total,
   per-class totals, unlinked ledgers), no names; each ledger counted once in the school total and
   once in each class it touches (D54).
@@ -58,6 +61,8 @@ if TYPE_CHECKING:
 NAME: Final = "get_fee_dues"
 IST: Final = ZoneInfo("Asia/Kolkata")
 _NAMESPACE: Final = uuid.UUID("0192f0c1-7a51-7c4e-9d0e-5c0a6b0e7f11")
+MAX_OVERDUE_BILLS: Final = 12
+"""Overdue bills named in one answer (D63); the rest are counted."""
 
 
 class FeeArgs(BaseModel):
@@ -251,6 +256,27 @@ class GetFeeDuesTool:
             f"ledger{'s' if count != 1 else ''} ({'; '.join(parts)}). A negative amount is an "
             f"advance paid."
         )
+        overdue = [
+            (i, bill)
+            for i, ledger in enumerate(dues.ledgers, start=1)
+            for bill in ledger.bills
+            if bill.overdue
+        ]
+        if overdue:
+            shown = [
+                f"bill {bill.reference} of ledger {i}, due {_date(bill.due_date)}: "
+                f"{inr(bill.pending)}"
+                for i, bill in overdue[:MAX_OVERDUE_BILLS]
+            ]
+            more = len(overdue) - len(shown)
+            total = sum((bill.pending for _, bill in overdue), Decimal("0.00"))
+            text += (
+                f" Overdue Tally bill{'s' if len(overdue) != 1 else ''} ({inr(total)} in all, "
+                f"part of the total above): {'; '.join(shown)}"
+                f"{f'; and {more} more' if more > 0 else ''}."
+            )
+        elif any(ledger.bills for ledger in dues.ledgers):
+            text += " No Tally bill of these ledgers is past its due date."
         if any(ledger.shared_with for ledger in dues.ledgers):
             text += (
                 " A ledger shared with a sibling is one family account: its amount is owed once "
