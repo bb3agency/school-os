@@ -1944,10 +1944,8 @@
       },
       "reopenTold": "Record that the school was told",
       "reopenToldTitle": "Record that {school} was told",
-      "reopenToldBody": "This school is on a dedicated host, so its register does not pull the reopened incident. Tell the school by phone or e-mail about reopen {count}, then record it here.",
+      "reopenToldBody": "This school is on a dedicated host, so its register does not pull the reopened incident. Tell the school by phone, by e-mail or in person about reopen {count}, then record it here.",
       "reopenToldConsequence": "The school is then shown as having received the reopen. This is recorded in the platform audit log.",
-      "reopenToldNote": "How the school was told",
-      "reopenToldNoteHint": "For example, who you spoke to by role and how. No names, phone numbers or e-mail addresses.",
       "errors": {
         "no_schools": {
           "title": "No schools to confirm",
@@ -2001,6 +1999,12 @@
           "title": "The incident changed",
           "body": "The incident was reopened again. Reload the page and record it again."
         }
+      },
+      "reopenToldChannel": "How the school was told",
+      "reopenToldChannels": {
+        "phone": "By phone",
+        "email": "By e-mail",
+        "in_person": "In person"
       }
     }
   },
