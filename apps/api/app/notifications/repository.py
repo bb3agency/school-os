@@ -24,10 +24,13 @@ def current_tenant(session: Session) -> uuid.UUID | None:
     return uuid.UUID(str(value)) if value is not None else None
 
 
-def insert_many(session: Session, rows: Sequence[dict[str, Any]]) -> int:
-    """Insert; a row whose (recipient, dedupe_key) already exists is skipped."""
+def insert_new(
+    session: Session, rows: Sequence[dict[str, Any]]
+) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """Insert; a row whose (recipient, dedupe_key) already exists is skipped. Returns
+    ``(recipient_membership_id, id)`` of the rows created."""
     if not rows:
-        return 0
+        return []
     stmt = (
         pg_insert(n)
         .values(list(rows))
@@ -35,9 +38,21 @@ def insert_many(session: Session, rows: Sequence[dict[str, Any]]) -> int:
             index_elements=[n.c.tenant_id, n.c.recipient_membership_id, n.c.dedupe_key],
             index_where=n.c.dedupe_key.is_not(None),
         )
-        .returning(n.c.id)
+        .returning(n.c.recipient_membership_id, n.c.id)
     )
-    return len(session.execute(stmt).all())
+    return [(r[0], r[1]) for r in session.execute(stmt).all()]
+
+
+def insert_many(session: Session, rows: Sequence[dict[str, Any]]) -> int:
+    """Insert; a row whose (recipient, dedupe_key) already exists is skipped."""
+    return len(insert_new(session, rows))
+
+
+def get_for_recipient(
+    session: Session, membership_id: uuid.UUID, notification_id: uuid.UUID
+) -> RowMapping | None:
+    stmt = select(n).where(n.c.id == notification_id, n.c.recipient_membership_id == membership_id)
+    return session.execute(stmt).mappings().one_or_none()
 
 
 def list_for_recipient(

@@ -116,13 +116,24 @@ def test_invitation_template_renders_in_english_and_telugu(telugu_on: None) -> N
     assert email.render_email("invitation.staff", params, "fr").language == "en"
 
 
+_SAMPLE_PARAMS: dict[str, Any] = {
+    "school": "Synthetic High School",
+    "sign_in_url": "https://app.example.test/",
+    "expires_on": "28/10/2026",
+    "level": "used_up",
+    "included": 500,
+    "metric": "students",
+}
+
+
+def _sample(template_key: str) -> dict[str, Any]:
+    template = email.email_catalog()[template_key]
+    return {k: v for k, v in _SAMPLE_PARAMS.items() if k in template.params}
+
+
 def test_ADR_0036_email_is_english_while_telugu_is_hidden() -> None:
-    params = {
-        "school": "Synthetic High School",
-        "sign_in_url": "https://app.example.test/",
-        "expires_on": "28/10/2026",
-    }
     for template_key in email.email_catalog():
+        params = _sample(template_key)
         te = email.render_email(template_key, params, "te")
         assert te.language == "en"
         assert te == email.render_email(template_key, params, "en")
@@ -148,6 +159,28 @@ def test_every_email_template_has_both_languages() -> None:
     assert "invitation.staff" in catalog
     for template in catalog.values():
         assert set(template.subjects) == set(template.bodies) == {"en", "te"}
+
+
+@pytest.mark.parametrize(
+    "template_key", ["billing.ai_answers_used_up", "billing.plan_limit_reached"]
+)
+def test_Q16_D70_limit_emails_say_nothing_is_switched_off_and_where_to_look(
+    template_key: str,
+) -> None:
+    content = email.render_email(template_key, _sample(template_key), "en")
+    assert "Synthetic High School" in content.subject
+    assert "switched off" in content.text
+    assert "Settings > Plan and billing" in content.text
+    assert "https://app.example.test/" in content.text
+    assert "₹" not in content.text  # no amounts other than the counts
+
+
+@pytest.mark.usefixtures("telugu_on")
+def test_Q16_D70_limit_emails_have_telugu_text_for_when_telugu_is_on() -> None:
+    for template_key in ("billing.ai_answers_used_up", "billing.plan_limit_reached"):
+        te = email.render_email(template_key, _sample(template_key), "te")
+        assert te.language == "te"
+        assert re.search(r"[ఀ-౿]", te.subject + te.text), "Telugu script"
 
 
 def test_invitation_window_matches_the_acceptance_migration() -> None:

@@ -133,6 +133,30 @@ def notify(
     not exactly the declared ones, and personal data in params raise ``TemplateError`` /
     ``SummaryError`` (programming errors, caught by tests).
     """
+    return len(
+        _create(
+            session,
+            tenant_id=tenant_id,
+            recipients=recipients,
+            template_key=template_key,
+            params=params,
+            resource_id=resource_id,
+            dedupe_key=dedupe_key,
+        )
+    )
+
+
+def _create(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    recipients: Recipients,
+    template_key: str,
+    params: Mapping[str, Any],
+    resource_id: uuid.UUID | None,
+    dedupe_key: str | None,
+) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """:func:`notify`; returns ``(recipient membership, notification id)`` per created row."""
     template = templates.get(template_key)
     clean = sanitize_summary(params)
     templates.check_params(template, clean)
@@ -158,8 +182,8 @@ def notify(
         }
         for member in targets
     ]
-    created = repo.insert_many(session, rows)
-    log.info("notifications.created", action=template_key, count=created)
+    created = repo.insert_new(session, rows)
+    log.info("notifications.created", action=template_key, count=len(created))
     return created
 
 
@@ -265,6 +289,7 @@ def request_email(
     template_key: str,
     via: str,
     actor_type: ActorType = "user",
+    notification_id: uuid.UUID | None = None,
 ) -> bool:
     """Queue one email to a member of the current school, sent by the worker after commit.
 
@@ -273,6 +298,8 @@ def request_email(
     language and the template values are read by the worker when it sends. ``via`` says what
     asked for it (a code, e.g. ``invite``, ``resend`` or ``owner_invite``). ``actor_type`` is
     ``system`` when no signed-in person asked (the owner invite at provisioning).
+    ``notification_id`` names the recipient's in-app notice whose values (counts and codes) the
+    worker reads for a 100 % alert email (D70).
     """
     if template_key not in email.email_catalog():
         raise templates.TemplateError(f"unknown email template {template_key!r}")
@@ -281,17 +308,22 @@ def request_email(
     if repo.current_tenant(session) != tenant_id:
         raise RuntimeError("request_email() must run in the tenant_session of tenant_id")
     message_id = new_id()
-    ops.enqueue_event(
-        session,
-        EMAIL_EVENT,
-        {"message_id": message_id, "user_id": user_id, "template_key": template_key},
-    )
+    payload: dict[str, Any] = {
+        "message_id": message_id,
+        "user_id": user_id,
+        "template_key": template_key,
+    }
+    summary: dict[str, Any] = {"message_id": message_id, "template_key": template_key, "via": via}
+    if notification_id is not None:
+        payload["notification_id"] = notification_id
+        summary["notification_id"] = notification_id
+    ops.enqueue_event(session, EMAIL_EVENT, payload)
     audit.record(
         session,
         action="notification.email_requested",
         resource_type="user",
         resource_id=user_id,
-        summary={"message_id": message_id, "template_key": template_key, "via": via},
+        summary=summary,
         actor_type=actor_type,
         request_id=_request_id(),
     )
@@ -409,6 +441,111 @@ def resend_invitation_email(
     )
 
 
+# --- 100 % alert emails (docs/16 §5.10, §19 Q16; FR-PLT-020, FR-PLT-021; D70) ---------------
+
+LIMIT_EMAILS: Final = {
+    "billing.ai_answers_used_up": "billing.ai_answers_quota",
+    "billing.plan_limit_reached": "billing.plan_limit",
+}
+"""Email template -> the in-app notice template whose values it is sent with."""
+LIMIT_EMAIL_VIA: Final = "limit_alert"
+
+
+def notify_and_email(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    recipients: Sequence[uuid.UUID],
+    template_key: str,
+    params: Mapping[str, Any],
+    dedupe_key: str,
+    email_template: str,
+) -> int:
+    """:func:`notify` (with ``dedupe_key``), and queue ``email_template`` for each recipient whose
+    notice is new, in the same transaction (D70). The notice's dedupe key therefore makes the
+    email once per recipient and key: reruns create no notice and queue no email. Recipients
+    without an active membership or an address get the notice only. A failure to queue an
+    email is logged (codes only) and rolled back to a savepoint: the notice is kept. Returns how
+    many notices were created."""
+    if LIMIT_EMAILS.get(email_template) != template_key:
+        raise templates.TemplateError(f"{email_template!r} is not sent with {template_key!r}")
+    created = _create(
+        session,
+        tenant_id=tenant_id,
+        recipients=recipients,
+        template_key=template_key,
+        params=params,
+        resource_id=None,
+        dedupe_key=dedupe_key,
+    )
+    if created and get_settings().email_enabled:
+        for member, notification_id in created:
+            _queue_limit_email(session, tenant_id, member, notification_id, email_template)
+    return len(created)
+
+
+def _queue_limit_email(
+    session: Session,
+    tenant_id: uuid.UUID,
+    membership_id: uuid.UUID,
+    notification_id: uuid.UUID,
+    email_template: str,
+) -> None:
+    try:
+        with session.begin_nested():
+            user_id = identity.user_id_for_membership(session, membership_id)
+            user = identity.get_user(session, user_id) if user_id is not None else None
+            problem = _limit_email_problem(user)
+            if user is None or problem is not None:
+                log.info("notifications.email.skipped", action=email_template, outcome=problem)
+                return
+            request_email(
+                session,
+                tenant_id=tenant_id,
+                user_id=user.id,
+                template_key=email_template,
+                via=LIMIT_EMAIL_VIA,
+                actor_type="system",
+                notification_id=notification_id,
+            )
+    except Exception as exc:  # the email only; the in-app notice stays
+        log.warning(
+            "notifications.email.queue_failed",
+            action=email_template,
+            error_type=type(exc).__name__,
+        )
+
+
+def _limit_email_problem(user: UserOut | None) -> str | None:
+    if user is None:
+        return "no_member"
+    if user.status != "active":
+        return "not_active"
+    if not user.email or user.contact_hidden:
+        return "email_missing"
+    return None
+
+
+def _limit_email_params(
+    session: Session, user: UserOut, template_key: str, notification_id: uuid.UUID | None
+) -> tuple[dict[str, Any] | None, str]:
+    """(values, "") for a 100 % alert email, else (None, outcome code)."""
+    problem = _limit_email_problem(user)
+    if problem is not None:
+        return None, problem
+    notice = (
+        repo.get_for_recipient(session, user.membership_id, notification_id)
+        if notification_id is not None
+        else None
+    )
+    if notice is None or notice["template_key"] != LIMIT_EMAILS[template_key]:
+        return None, "no_notification"
+    values = dict(notice["params"])
+    if template_key == "billing.ai_answers_used_up":
+        return {"level": values["level"], "included": values["included"]}, ""
+    return {"metric": values["metric"]}, ""
+
+
 def _app_url(path: str) -> str:
     base = (get_settings().email_app_url or "").rstrip("/")
     return f"{base}{path}"
@@ -419,28 +556,45 @@ def send_requested_email(
     user_id: uuid.UUID,
     template_key: str,
     *,
+    notification_id: uuid.UUID | None = None,
     sender: email.EmailSender | None = None,
     now: dt.datetime | None = None,
 ) -> str:
     """Worker (outbox ``notification.email.requested``): render and send one email.
 
     Returns an outcome code (``sent``, ``disabled``, ``no_member``, ``not_invited``,
-    ``invitation_expired``, ``email_missing``); raises :class:`email.EmailUnavailable` for the
-    task to retry and :class:`email.EmailRejected` when the provider refuses for good. Only IDs
-    and codes are logged.
+    ``invitation_expired``, ``email_missing``; for a 100 % alert email also ``not_active`` and
+    ``no_notification``); raises :class:`email.EmailUnavailable` for the task to retry and
+    :class:`email.EmailRejected` when the provider refuses for good. Only IDs and codes are
+    logged.
     """
+    if template_key != INVITATION_TEMPLATE and template_key not in LIMIT_EMAILS:
+        raise templates.TemplateError(f"no email parameters for {template_key!r}")
     provider = sender or email.get_sender()
     if provider is None:
         return "disabled"
     moment = now or dt.datetime.now(dt.UTC)
+    limit_values: dict[str, Any] | None = None
     with tenant_session(tenant_id) as session:
         try:
             user = identity.get_user(session, user_id)
         except NotFound:
             return "no_member"
         school = tenancy.get_tenant(session)
-    if template_key != INVITATION_TEMPLATE:
-        raise templates.TemplateError(f"no email parameters for {template_key!r}")
+        if template_key in LIMIT_EMAILS:
+            limit_values, skipped = _limit_email_params(
+                session, user, template_key, notification_id
+            )
+            if limit_values is None:
+                log.info("notifications.email.skipped", action=template_key, outcome=skipped)
+                return skipped
+    if limit_values is not None and user.email:
+        content = email.render_email(
+            template_key,
+            {**limit_values, "school": school.name, "sign_in_url": _app_url("/")},
+            user.preferred_language,
+        )
+        return _deliver(provider, user, template_key, user.email, content)
     problem = _invitation_problem(user, moment)
     if problem is not None or not user.email:
         outcome = problem or "email_missing"
@@ -455,16 +609,26 @@ def send_requested_email(
         "expires_on": expires.strftime(_DATE_FORMATS[school.settings.date_format]),
     }
     content = email.render_email(template_key, params, user.preferred_language)
+    return _deliver(provider, user, template_key, user.email, content)
+
+
+def _deliver(
+    provider: email.EmailSender,
+    user: UserOut,
+    template_key: str,
+    address: str,
+    content: email.EmailContent,
+) -> str:
     provider.send(
         email.EmailMessage(
-            to=user.email,
+            to=address,
             subject=content.subject,
             text=content.text,
             template_key=template_key,
             language=content.language,
         )
     )
-    log.info("notifications.email.sent", action=template_key, user_id=user_id, outcome="sent")
+    log.info("notifications.email.sent", action=template_key, user_id=user.id, outcome="sent")
     return "sent"
 
 
@@ -531,6 +695,7 @@ __all__ = [
     "EMAIL_EVENT",
     "EMAIL_TASK",
     "INVITATION_TEMPLATE",
+    "LIMIT_EMAILS",
     "OWNER_INVITED_EVENT",
     "OWNER_INVITE_RESENT_EVENT",
     "READ_RETENTION_CATEGORY",
@@ -542,6 +707,7 @@ __all__ = [
     "mark_all_read",
     "mark_read",
     "notify",
+    "notify_and_email",
     "purge_read",
     "purge_tenant_data",
     "queue_invitation_email",

@@ -3,7 +3,8 @@
 - ``notifications.purge_read`` (daily): per school, delete notifications read more than
   ``retention.read_days`` (90) days ago, each school in its own ``tenant_session``.
 - ``notifications.send_email`` (queue ``maintenance``): consumer of the outbox event
-  ``notification.email.requested`` (IDs only); renders and sends one email through the
+  ``notification.email.requested`` (IDs only; a 100 % alert email also names its in-app
+  notice, D70); renders and sends one email through the
   configured provider (``app.notifications.email``). Retries with backoff while the provider is
   unavailable; a permanent refusal is logged with its code and not retried. Addresses and
   message text are never logged or returned.
@@ -62,8 +63,14 @@ def purge_read() -> dict[str, int]:
 def send_email(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dict[str, Any]) -> str:
     user_id = uuid.UUID(str(payload["user_id"]))
     template_key = str(payload["template_key"])
+    notice = payload.get("notification_id")
     try:
-        return service.send_requested_email(uuid.UUID(str(tenant_id)), user_id, template_key)
+        return service.send_requested_email(
+            uuid.UUID(str(tenant_id)),
+            user_id,
+            template_key,
+            notification_id=uuid.UUID(str(notice)) if notice else None,
+        )
     except email.EmailRejected as exc:
         log.error("notifications.email.rejected", action=template_key, error_code=exc.code)
         return "rejected"

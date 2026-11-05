@@ -14,6 +14,12 @@ previous period's crossings must not be lost at the roll (D57). Idempotent per r
 through the notification ``dedupe_key`` (period, metric and threshold): repeated sweeps add
 nothing. Alert only: nothing is switched off at 100 % and limits never block school work.
 
+At 100 % only (D70), the same transaction also queues an e-mail to each owner and principal whose
+notice is new (``notifications.notify_and_email``: active members with an address, through the
+existing e-mail path; the worker reads the counts from the notice). The notice's dedupe key makes
+it once per kind, billing period and recipient, across reruns and the previous-period read. 80 %
+stays in-app only; nothing goes to parents; the control plane sends no e-mail.
+
 Shared deployment only: a dedicated host has no control plane. This is the only file of
 ``app.notifications`` that imports the control plane (import-linter contract
 ``tenant-side-without-control-plane``).
@@ -42,6 +48,12 @@ log = get_logger(__name__)
 
 TEMPLATE: Final = "billing.ai_answers_quota"
 PLAN_LIMIT_TEMPLATE: Final = "billing.plan_limit"
+# E-mailed at 100 % only (D70): the in-app notice template -> its e-mail template.
+EMAIL_TEMPLATES: Final = {
+    TEMPLATE: "billing.ai_answers_used_up",
+    PLAN_LIMIT_TEMPLATE: "billing.plan_limit_reached",
+}
+EMAIL_THRESHOLD: Final = 100
 # The school's owner and principal (system roles), never the whole billing audience.
 RECIPIENT_ROLES: Final = frozenset({"owner", "principal"})
 TENANT_STATUSES: Final = ("active", "suspended")
@@ -73,8 +85,13 @@ def _owner_and_principal(session: Session) -> list[uuid.UUID]:
             return out
 
 
-def _notify(tenant_id: uuid.UUID, items: list[tuple[str, dict[str, Any]]], template: str) -> int:
-    """Notify the owner and principal once per ``(dedupe_key, params)`` item."""
+Item = tuple[str, dict[str, Any], int]
+"""(dedupe_key, params, threshold)."""
+
+
+def _notify(tenant_id: uuid.UUID, items: list[Item], template: str) -> int:
+    """Notify the owner and principal once per ``dedupe_key``; at 100 % also e-mail each
+    recipient whose notice is new (D70)."""
     if not items:
         return 0
     created = 0
@@ -82,7 +99,18 @@ def _notify(tenant_id: uuid.UUID, items: list[tuple[str, dict[str, Any]]], templ
         recipients = _owner_and_principal(session)
         if not recipients:
             return 0
-        for dedupe_key, params in items:
+        for dedupe_key, params, threshold in items:
+            if threshold >= EMAIL_THRESHOLD:
+                created += notifications.notify_and_email(
+                    session,
+                    tenant_id=tenant_id,
+                    recipients=recipients,
+                    template_key=template,
+                    params=params,
+                    dedupe_key=dedupe_key,
+                    email_template=EMAIL_TEMPLATES[template],
+                )
+                continue
             created += notifications.notify(
                 session,
                 tenant_id=tenant_id,
@@ -101,7 +129,7 @@ def sync_school(tenant_id: uuid.UUID, *, today: dt.date | None = None) -> int:
     if not control_plane_here():
         return 0
     month = (today or dt.datetime.now(IST).date()).replace(day=1)
-    items: list[tuple[str, dict[str, Any]]] = []
+    items: list[Item] = []
     for alert in control_plane.ai_quota_alerts_for_school(tenant_id):
         level = "used_up" if alert.threshold >= 100 else "near"
         if alert.month_start < month:
@@ -110,6 +138,7 @@ def sync_school(tenant_id: uuid.UUID, *, today: dt.date | None = None) -> int:
             (
                 f"billing.ai_quota:{alert.month_start:%Y-%m}:{alert.threshold}",
                 {"level": level, "included": alert.included_answers},
+                alert.threshold,
             )
         )
     created = _notify(tenant_id, items, TEMPLATE)
@@ -124,10 +153,11 @@ def sync_plan_limits(tenant_id: uuid.UUID) -> int:
     metric and threshold. Returns how many notifications were created."""
     if not control_plane_here():
         return 0
-    items: list[tuple[str, dict[str, Any]]] = [
+    items: list[Item] = [
         (
             f"billing.plan_limit:{a.period_start:%Y-%m-%d}:{a.metric}:{a.threshold}",
             {"metric": a.metric, "threshold": a.threshold},
+            a.threshold,
         )
         for a in control_plane.plan_limit_alerts_for_school(tenant_id)
     ]

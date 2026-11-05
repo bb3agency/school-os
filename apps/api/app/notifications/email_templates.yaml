@@ -50,3 +50,69 @@ templates:
         మీ ప్రవేశాన్ని ఎవరూ ఉపయోగించలేరు.
 
         SchoolOS
+
+  # --- 100 % alerts (docs/16 §5.10, §19 Q16; FR-PLT-020, FR-PLT-021; D70) -------------------
+  # Queued by app.notifications.quota_sync with the in-app notice of the same alert, for the
+  # owner and the principal, once per kind, billing period and recipient. The worker fills the
+  # values from that notice (counts and codes only), the school's name and the app's address.
+  # 80 % stays in-app only. Nothing is switched off; no amounts other than the counts.
+  billing.ai_answers_used_up:
+    params: [school, level, included, sign_in_url]
+    en:
+      subject: "{school}: all AI answers in your bundle are used"
+      body: |
+        Hello,
+
+        {level, select, used_up_last_month {Last month, {school} used all {included} answers included in its AI answer bundle.} other {This month, {school} has used all {included} answers included in its AI answer bundle.}}
+
+        Nothing is switched off: Ask keeps answering. Each extra answer is billed on your next invoice at your bundle's price per extra answer.
+
+        To see the count, sign in at {sign_in_url} and open Settings > Plan and billing.
+
+        You get this email because you are the school's owner or principal on SchoolOS.
+
+        SchoolOS
+    te:
+      subject: "{school}: మీ బండిల్‌లోని AI సమాధానాలన్నీ వాడేశారు"
+      body: |
+        నమస్కారం,
+
+        {level, select, used_up_last_month {గత నెల {school} తన AI సమాధానాల బండిల్‌లో ఉన్న {included} సమాధానాలన్నీ వాడేసింది.} other {ఈ నెల {school} తన AI సమాధానాల బండిల్‌లో ఉన్న {included} సమాధానాలన్నీ వాడేసింది.}}
+
+        ఏదీ ఆపివేయబడలేదు: Ask సమాధానాలు ఇస్తూనే ఉంటుంది. ప్రతి అదనపు సమాధానానికి మీ బండిల్ ధర ప్రకారం తదుపరి ఇన్‌వాయిస్‌లో ఛార్జ్ ఉంటుంది.
+
+        లెక్క చూడటానికి {sign_in_url} లో సైన్ ఇన్ చేసి సెట్టింగ్‌లు > ప్లాన్ మరియు బిల్లింగ్ తెరవండి.
+
+        మీరు SchoolOSలో పాఠశాల యజమాని లేదా ప్రిన్సిపాల్ కాబట్టి ఈ ఈమెయిల్ మీకు వచ్చింది.
+
+        SchoolOS
+  billing.plan_limit_reached:
+    params: [school, metric, sign_in_url]
+    en:
+      subject: "{school} has reached its plan's limit for {metric, select, students {active students} staff_users {staff users} documents {documents} storage_gb {storage} ai_tokens_month {AI usage} ai_budget_inr {the AI budget} other {an item}}"
+      body: |
+        Hello,
+
+        {school} has reached its plan's limit for {metric, select, students {active students} staff_users {staff users} documents {documents} storage_gb {storage} ai_tokens_month {AI usage} ai_budget_inr {the AI budget} other {an item}}.
+
+        {metric, select, ai_budget_inr {Apart from Ask, nothing is switched off: until the AI budget renews, Ask shows search results without a written answer, and everything else keeps working.} other {Limits never block work: nothing is switched off and everyone can keep working as usual.}}
+
+        To see your plan, sign in at {sign_in_url} and open Settings > Plan and billing, or ask SchoolOS support about a larger plan.
+
+        You get this email because you are the school's owner or principal on SchoolOS.
+
+        SchoolOS
+    te:
+      subject: "{school}: {metric, select, students {విద్యార్థులు} staff_users {సిబ్బంది వినియోగదారులు} documents {పత్రాలు} storage_gb {నిల్వ} ai_tokens_month {AI వినియోగం} ai_budget_inr {AI బడ్జెట్} other {వినియోగం}} ప్లాన్ పరిమితికి చేరింది"
+      body: |
+        నమస్కారం,
+
+        {school} {metric, select, students {విద్యార్థులు} staff_users {సిబ్బంది వినియోగదారులు} documents {పత్రాలు} storage_gb {నిల్వ} ai_tokens_month {AI వినియోగం} ai_budget_inr {AI బడ్జెట్} other {వినియోగం}} విషయంలో తన ప్లాన్ పరిమితికి చేరింది.
+
+        {metric, select, ai_budget_inr {Ask తప్ప ఏదీ ఆపివేయబడలేదు: బడ్జెట్ మళ్లీ వచ్చే వరకు Ask రాసిన సమాధానం లేకుండా వెతుకులాట ఫలితాలు మాత్రమే చూపిస్తుంది; మిగతావన్నీ పని చేస్తాయి.} other {పరిమితులు పనిని ఎప్పుడూ ఆపవు: ఏదీ ఆపివేయబడలేదు, అందరూ యథావిధిగా పని చేయవచ్చు.}}
+
+        మీ ప్లాన్ చూడటానికి {sign_in_url} లో సైన్ ఇన్ చేసి సెట్టింగ్‌లు > ప్లాన్ మరియు బిల్లింగ్ తెరవండి, లేదా పెద్ద ప్లాన్ గురించి SchoolOS సపోర్ట్‌ను అడగండి.
+
+        మీరు SchoolOSలో పాఠశాల యజమాని లేదా ప్రిన్సిపాల్ కాబట్టి ఈ ఈమెయిల్ మీకు వచ్చింది.
+
+        SchoolOS

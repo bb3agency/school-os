@@ -6,8 +6,8 @@ school, metric and billing period (``platform.usage_threshold_events``) and audi
 read this period's crossings through ``GET /platform/usage/limit-alerts`` and the dashboard tile
 ``plan_limit_alerts``; the hourly school-side pull (``app.notifications.quota_sync``) tells the
 owner and the principal once per period, metric and threshold, reading the previous period too
-so a crossing recorded at the roll is not lost. Limits never block work; no e-mail. Counts and
-metric codes only. Synthetic data only.
+so a crossing recorded at the roll is not lost. Limits never block work; the e-mail at 100 % is
+D70 (test_limit_emails.py). Counts and metric codes only. Synthetic data only.
 """
 
 from __future__ import annotations
