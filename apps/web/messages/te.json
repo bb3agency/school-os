@@ -8119,11 +8119,21 @@
         "due": "బకాయి",
         "dueInr": "బకాయి (₹)",
         "ledgers": "లెడ్జర్లు",
-        "asOf": "తేదీ నాటికి"
+        "asOf": "తేదీ నాటికి",
+        "bills": "Bills"
       },
       "kpiLabel": "Tally బకాయిల సారాంశం",
       "sharedLedger": "{count, plural, one {ఒక తోబుట్టువుతో} other {# మంది తోబుట్టువులతో}} పంచుకున్న ఖాతా",
-      "sharedTotalsNote": "తోబుట్టువులు పంచుకునే కుటుంబ ఖాతా ప్రతి పిల్లల మొత్తంలో ఉంటుంది, కానీ మొత్తం బకాయిలో ఒక్కసారే లెక్కించబడుతుంది."
+      "sharedTotalsNote": "తోబుట్టువులు పంచుకునే కుటుంబ ఖాతా ప్రతి పిల్లల మొత్తంలో ఉంటుంది, కానీ మొత్తం బకాయిలో ఒక్కసారే లెక్కించబడుతుంది.",
+      "billsNone": "No bill-wise details in Tally: the amount is the ledger balance",
+      "billsSummary": "{count, plural, one {# pending bill} other {# pending bills}}",
+      "billsLabel": "Pending bills from Tally",
+      "overdueCount": "{count} overdue: {amount}",
+      "overdue": "Overdue",
+      "billDue": "Due {date}",
+      "billNoDueDate": "No due date in Tally",
+      "billShared": "Shared ledger",
+      "billLedger": "Ledger: {ledger}"
     },
     "connector": {
       "title": "Tally కనెక్టర్",

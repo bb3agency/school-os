@@ -33,7 +33,27 @@ export type LinkedStudent = S["LinkedStudentOut"];
  * and marked `shared_ledger`; the school and class totals count it once. Declared here until the
  * generated client carries these fields (the intersections stay valid after it does).
  */
-export type StudentDues = S["StudentDuesOut"] & { shared_ledger?: boolean; shared_with?: number };
+/**
+ * One pending bill of a linked ledger (bill-wise / term-wise dues, D63): reference, dates and
+ * the pending amount as Tally keeps them; `overdue` is decided by the API (due date before
+ * today, IST). Declared here until the generated client carries `DueBillOut`.
+ */
+export interface DueBill {
+  ledger_name: string;
+  reference: string;
+  bill_date: string | null;
+  due_date: string | null;
+  pending: string;
+  overdue: boolean;
+  shared: boolean;
+}
+export type StudentDues = S["StudentDuesOut"] & {
+  shared_ledger?: boolean;
+  shared_with?: number;
+  bills?: DueBill[];
+  overdue_due?: string;
+  overdue_bills?: number;
+};
 export interface ClassDues {
   class_id: string | null;
   class_name: string | null;

@@ -509,6 +509,60 @@ describe("fee dues (US-1804, FR-TALLY-007)", () => {
     expect(screen.getByText(en.dues.sharedTotalsNote)).toBeInTheDocument();
   });
 
+  it("lists a student's pending Tally bills with due dates and an overdue badge (D63)", async () => {
+    signedIn([FINANCE_READ]);
+    const row = dues().data[0]!;
+    stub.routes["GET /bff/api/v1/tally/dues"] = () =>
+      Response.json(
+        dues({
+          data: [
+            {
+              ...row,
+              overdue_due: "5000.00",
+              overdue_bills: 1,
+              bills: [
+                {
+                  ledger_name: "Synthetic Ledger One",
+                  reference: "Term 1/2026-27",
+                  bill_date: "2026-06-01",
+                  due_date: "2026-07-01",
+                  pending: "5000.00",
+                  overdue: true,
+                  shared: false,
+                },
+                {
+                  ledger_name: "Synthetic Ledger One",
+                  reference: "Term 2/2026-27",
+                  bill_date: "2026-10-01",
+                  due_date: null,
+                  pending: "7500.00",
+                  overdue: false,
+                  shared: false,
+                },
+              ],
+            },
+            {
+              ...row,
+              student_id: "0192f0c1-0000-7000-8000-0000000000b3",
+              display_name: "Synthetic Student Three",
+              bills: [],
+            },
+          ],
+        }),
+      );
+    const user = userEvent.setup();
+    renderWithIntl(<FeeDuesScreen />);
+    const summary = await screen.findByText("2 pending bills");
+    // The badge on the summary says how many are overdue and how much, in words.
+    expect(screen.getByText("1 overdue: ₹5,000.00")).toBeInTheDocument();
+    expect(screen.getByText(en.dues.billsNone)).toBeInTheDocument();
+    await user.click(summary);
+    expect(screen.getByText("Term 1/2026-27")).toBeVisible();
+    expect(screen.getByText("Due 01/07/2026")).toBeInTheDocument();
+    expect(screen.getByText(en.dues.billNoDueDate)).toBeInTheDocument();
+    expect(screen.getAllByText(en.dues.overdue)).toHaveLength(1);
+  });
+
   it("does not show the shared marker when no ledger is shared", async () => {
     signedIn([FINANCE_READ]);
     stub.routes["GET /bff/api/v1/tally/dues"] = () => Response.json(dues());

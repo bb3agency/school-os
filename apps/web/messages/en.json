@@ -8119,11 +8119,21 @@
         "due": "Due",
         "dueInr": "Due (₹)",
         "ledgers": "Ledgers",
-        "asOf": "As of"
+        "asOf": "As of",
+        "bills": "Bills"
       },
       "kpiLabel": "Summary of Tally dues",
       "sharedLedger": "Shared with {count, plural, one {a sibling} other {# siblings}}",
-      "sharedTotalsNote": "A family ledger shared by siblings is in each child's amount, and counted once in the total due."
+      "sharedTotalsNote": "A family ledger shared by siblings is in each child's amount, and counted once in the total due.",
+      "billsNone": "No bill-wise details in Tally: the amount is the ledger balance",
+      "billsSummary": "{count, plural, one {# pending bill} other {# pending bills}}",
+      "billsLabel": "Pending bills from Tally",
+      "overdueCount": "{count} overdue: {amount}",
+      "overdue": "Overdue",
+      "billDue": "Due {date}",
+      "billNoDueDate": "No due date in Tally",
+      "billShared": "Shared ledger",
+      "billLedger": "Ledger: {ledger}"
     },
     "connector": {
       "title": "Tally connector",
