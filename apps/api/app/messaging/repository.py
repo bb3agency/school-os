@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from collections.abc import Collection, Mapping, Sequence
-from typing import Any
+from typing import Any, Final
 
 from sqlalchemy import and_, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import distinct_on, insert
@@ -463,6 +463,36 @@ def pending_events(session: Session, limit: int) -> list[ProviderEvent]:
             .order_by(ProviderEvent.event_at.asc().nulls_first(), ProviderEvent.received_at)
             .limit(limit)
             .with_for_update(skip_locked=True)
+        )
+    )
+
+
+AWAITING_SEND: Final = "awaiting_send"
+
+
+def awaiting_status_events(session: Session, provider_message_id: str) -> list[ProviderEvent]:
+    """Delivery statuses for Meta message ``provider_message_id`` that arrived before its send
+    was recorded (D56): set aside as ``ignored`` with ``error_code = 'awaiting_send'``, or
+    still ``received``. Oldest first, locked and waiting for an inbox run that holds one, so
+    a status the inbox is setting aside right now is seen once it commits."""
+    return list(
+        session.scalars(
+            select(ProviderEvent)
+            .where(
+                ProviderEvent.event_type == "message_status",
+                ProviderEvent.event_key.startswith(
+                    f"status:{provider_message_id}:", autoescape=True
+                ),
+                or_(
+                    ProviderEvent.status == "received",
+                    and_(
+                        ProviderEvent.status == "ignored",
+                        ProviderEvent.error_code == AWAITING_SEND,
+                    ),
+                ),
+            )
+            .order_by(ProviderEvent.event_at.asc().nulls_first(), ProviderEvent.received_at)
+            .with_for_update()
         )
     )
 
