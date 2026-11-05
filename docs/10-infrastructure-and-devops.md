@@ -277,7 +277,7 @@ Values under `kb.queries` are counted by the census but re-encrypted only once t
 | Scenario | Strategy | Target |
 |---|---|---|
 | AZ failure | Multi-AZ RDS and ECS across two AZs (Stage 1+) | Minutes |
-| Data corruption / bad migration | PITR to timestamp before incident; replay safe events from outbox if needed | RPO ≤ 15 min, RTO ≤ 4 h |
+| Data corruption / bad migration | PITR to timestamp before incident; replay safe events from outbox if needed (delivered events are kept 30 days, lead decision D51; `outbox.delivered_retention_days` in `app/ops/config.yaml`, purged nightly by `ops.purge_idempotency_keys`) | RPO ≤ 15 min, RTO ≤ 4 h |
 | Region impairment (ap-south-1) | Restore from snapshot copies + S3 replicas in ap-south-2 via Terraform `envs/dr` | RTO ≤ 24 h (Stage 1), ≤ 4 h with warm standby (Stage 2) |
 | Files deleted or tagged `discarded` by a compromised role | Copy the versions back from the locked replica in ap-south-2 (`modules/s3_replica`, Object Lock GOVERNANCE 90 days; §5) | Any file written in the last 90 days, and any older file still current when the incident started |
 | Account compromise | Cross-account backup vault with separate credentials; Object Lock audit archive | Recover from immutable copies |

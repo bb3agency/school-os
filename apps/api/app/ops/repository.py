@@ -33,6 +33,23 @@ def insert_outbox(
     return event_id
 
 
+def purge_delivered_outbox(session: Session, *, older_than_days: int) -> int:
+    """Delete the current school's events dispatched more than ``older_than_days`` ago (D51).
+    Undelivered events (``dispatched_at IS NULL``) are never touched; the database allows
+    ``sos_app`` to delete dispatched rows only (policy ``outbox_delete_dispatched``, 0072)."""
+    o = m.outbox
+    result = session.execute(
+        delete(o)
+        .where(
+            o.c.tenant_id == func.core.current_tenant(),
+            o.c.dispatched_at.is_not(None),
+            o.c.dispatched_at < func.now() - func.make_interval(0, 0, 0, older_than_days),
+        )
+        .returning(o.c.id)
+    )
+    return len(result.all())
+
+
 def claim_outbox(session: Session, batch: int) -> list[RowMapping]:
     return list(
         session.execute(

@@ -28,6 +28,7 @@ from app.core.db import context_free_session, tenant_session
 from app.core.errors import NotFound
 from app.core.logging import get_logger
 from app.ops import repository as repo
+from app.ops.config import load_config
 from app.ops.idempotency import IdempotencyRecord, check_key, resolve_existing
 from app.tenancy import service as tenancy
 
@@ -428,12 +429,52 @@ def purge_idempotency_keys() -> int:
     return total
 
 
+# Outbox retention runs for these schools: retention is a duty, also while a school is suspended
+# or offboarding (as the other retention purges, docs/16 §5.5).
+OUTBOX_RETENTION_STATUSES: Final = ("active", "suspended", "offboarding")
+
+
+@dataclass(frozen=True, slots=True)
+class OutboxPurgeResult:
+    tenants: int
+    purged: int
+    failed: int
+
+
+def purge_delivered_outbox() -> OutboxPurgeResult:
+    """Nightly (lead decision D51): delete delivered outbox events older than
+    ``outbox.delivered_retention_days`` (``app/ops/config.yaml``), one tenant session per school
+    (RLS stays on). Undelivered events are kept. A school that fails is rolled back, logged (ids
+    and error type only) and counted; the others still run, and its events are due again on the
+    next run."""
+    days = load_config().outbox_delivered_retention_days
+    with context_free_session() as s:
+        tenant_ids = tenancy.list_tenant_ids(s, OUTBOX_RETENTION_STATUSES)
+    purged = failed = 0
+    for tenant_id in tenant_ids:
+        try:
+            with tenant_session(tenant_id) as ts:
+                purged += repo.purge_delivered_outbox(ts, older_than_days=days)
+        except Exception as exc:  # any error: this school only, retried next run
+            failed += 1
+            log.warning(
+                "ops.outbox.purge_failed",
+                tenant_id=str(tenant_id),
+                error_type=type(exc).__name__,
+            )
+    if purged or failed:
+        log.info("ops.outbox.purged", count=purged, outcome="ok" if not failed else "partial")
+    return OutboxPurgeResult(len(tenant_ids), purged, failed)
+
+
 __all__ = [
     "HOLD_COUNTDOWN_SECONDS",
+    "OUTBOX_RETENTION_STATUSES",
     "OUTBOX_ROUTES",
     "RUN_WHILE_SUSPENDED",
     "DispatchResult",
     "JobRun",
+    "OutboxPurgeResult",
     "TenantTask",
     "begin_idempotent",
     "complete_idempotent",
@@ -441,6 +482,7 @@ __all__ = [
     "enqueue_event",
     "fail_job",
     "finish_job",
+    "purge_delivered_outbox",
     "purge_idempotency_keys",
     "purge_tenant_data",
     "register_outbox_route",
