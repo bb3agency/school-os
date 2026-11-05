@@ -548,8 +548,6 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/tally/enrolment-codes"): "returns a one-time code that the replay store "
     "must not keep; an unused code expires in 30 minutes",
     ("POST", "/api/v1/tally/parties/{party_id}/links"): "idempotent by design (the same link)",
-    ("POST", "/api/v1/insights/flags/{flag_id}/actions"): "the answer carries decrypted note "
-    "text (C3) that the replay store would keep for 24 h (round-2 H-01); a repeat is visible",
     ("POST", "/api/v1/users/{user_id}/invitation-email"): "re-sends the same invitation behind "
     "a per-member cool-down; nothing is created",
     ("POST", "/api/v1/circulars/{document_id}/read"): "a state transition (409 "

@@ -19,12 +19,18 @@ export interface AuditQuery {
   to?: string;
 }
 
-/** DD/MM/YYYY (what users type) → YYYY-MM-DD (API); anything else is ignored. */
+/**
+ * DD/MM/YYYY (what users type) or ISO YYYY-MM-DD (a pasted or linked date; D56) → YYYY-MM-DD
+ * (API); anything else, and dates that do not exist, are ignored.
+ */
 export function toIsoDate(value: string | undefined): string | undefined {
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value?.trim() ?? "");
-  if (!match) return undefined;
-  const [, day, month, year] = match;
-  const iso = `${year}-${month}-${day}`;
+  const text = value?.trim() ?? "";
+  const dmy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text);
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  let iso: string;
+  if (dmy) iso = `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  else if (ymd) iso = text;
+  else return undefined;
   const date = new Date(`${iso}T00:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(iso) ? iso : undefined;
 }

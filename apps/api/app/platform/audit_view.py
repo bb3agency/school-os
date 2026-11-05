@@ -7,6 +7,7 @@ import datetime as dt
 import io
 import json
 import uuid
+from typing import Any, Final
 
 from sqlalchemy import select
 
@@ -30,6 +31,19 @@ CSV_COLUMNS = (
     "subject_tenant_id",
     "summary",
 )
+
+# D56: the reopen-told record keeps the channel, never free text. Rows written before D56 hold a
+# ``note``; the chain keeps them as written (append-only), but the viewer and the CSV show the
+# channel only (null for those rows).
+_REOPEN_TOLD: Final = "incident.school_reopen_told"
+
+
+def _shown(row: dict[str, Any]) -> dict[str, Any]:
+    if row["action"] != _REOPEN_TOLD:
+        return row
+    summary = {k: v for k, v in (row["summary"] or {}).items() if k != "note"}
+    summary["channel"] = summary.get("channel")
+    return row | {"summary": summary}
 
 
 def list_events(
@@ -59,7 +73,7 @@ def list_events(
         stmt = stmt.where(t.c.seq < cursor)
     with platform_session() as s:
         rows = list(s.execute(stmt.order_by(t.c.seq.desc()).limit(limit + 1)).mappings())
-    items = [PlatformAuditEventOut.model_validate(dict(r)) for r in rows[:limit]]
+    items = [PlatformAuditEventOut.model_validate(_shown(dict(r))) for r in rows[:limit]]
     return items, (str(rows[limit - 1]["seq"]) if len(rows) > limit else None)
 
 

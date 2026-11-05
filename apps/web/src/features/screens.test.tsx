@@ -265,8 +265,32 @@ describe("school screens wired to the BFF (US-202, US-102, FR-AUD-005)", () => {
   it("toIsoDate only accepts real dates", () => {
     expect(toIsoDate("29/02/2028")).toBe("2028-02-29");
     expect(toIsoDate("29/02/2027")).toBeUndefined();
-    expect(toIsoDate("2026-06-01")).toBeUndefined();
     expect(toIsoDate(undefined)).toBeUndefined();
+  });
+
+  it("FR-AUD-005, D56: toIsoDate takes ISO YYYY-MM-DD as well as DD/MM/YYYY", () => {
+    expect(toIsoDate("2026-06-01")).toBe("2026-06-01");
+    expect(toIsoDate(" 2028-02-29 ")).toBe("2028-02-29");
+    expect(toIsoDate("01/06/2026")).toBe("2026-06-01");
+    // Invalid: days that do not exist, other shapes and mixed separators.
+    expect(toIsoDate("2027-02-29")).toBeUndefined();
+    expect(toIsoDate("2026-13-01")).toBeUndefined();
+    expect(toIsoDate("2026-6-1")).toBeUndefined();
+    expect(toIsoDate("2026/06/01")).toBeUndefined();
+    expect(toIsoDate("01-06-2026")).toBeUndefined();
+    expect(toIsoDate("yesterday")).toBeUndefined();
+  });
+
+  it("FR-AUD-005, D56: an ISO 'To date' also ends at the next day's midnight in IST", () => {
+    expect(auditQuery({ from: "2026-11-03", to: "2026-11-03" })).toEqual({
+      from: "2026-11-03T00:00:00+05:30",
+      to: "2026-11-04T00:00:00+05:30",
+    });
+    expect(auditQuery({ from: "03/11/2026", to: "2026-12-31" })).toEqual({
+      from: "2026-11-03T00:00:00+05:30",
+      to: "2027-01-01T00:00:00+05:30",
+    });
+    expect(auditQuery({ from: "2026-02-30", to: "nonsense" })).toEqual({});
   });
 
   it("FR-AUD-005: the 'To date' day is included (the API's range is [from, to))", () => {

@@ -1523,8 +1523,9 @@ def record_incident_reopen_told(
     data: incidents.IncidentReopenToldIn,
     ctx: Annotated[Ctx, IncidentsManage],
 ) -> incidents.IncidentDetailOut:
-    """Record that a dedicated-host school was told of reopen ``reopen_seq`` by phone or e-mail
-    (it has no pull; D49). The note follows the summary rule (422 otherwise). ``409
+    """Record that a dedicated-host school was told of reopen ``reopen_seq`` (it has no pull;
+    D49). ``channel``: ``phone``, ``email`` or ``in_person``; no free-text note (D56; an extra
+    ``note`` field answers 422). ``409
     school_pulls`` (shared tier), ``reopen_not_pending`` or ``reopen_changed``."""
     return incidents.record_reopen_told(_actor(ctx), incident_id, data)
 

@@ -200,13 +200,16 @@ describe("a dedicated school told of a reopen by phone (D49; FR-DPDP-032)", () =
     );
   });
 
-  it("the note follows the summary rule", () => {
-    expect(reopenToldSchema.safeParse({ note: "Told on 9876543210" }).success).toBe(false);
-    expect(reopenToldSchema.safeParse({ note: "Mail to head@school.example" }).success).toBe(false);
-    expect(reopenToldSchema.safeParse({ note: "Principal told by phone" }).success).toBe(true);
+  it("D56: takes a channel and no free-text note", () => {
+    for (const channel of ["phone", "email", "in_person"]) {
+      expect(reopenToldSchema.safeParse({ channel }).success).toBe(true);
+    }
+    expect(reopenToldSchema.safeParse({ channel: "fax" }).success).toBe(false);
+    expect(reopenToldSchema.safeParse({}).success).toBe(false);
+    expect(reopenToldSchema.safeParse({ note: "Principal told by phone" }).success).toBe(false);
   });
 
-  it("records it from the school's row with the reopen count", async () => {
+  it("records it from the school's row with the reopen count and the channel", async () => {
     setPermissions(["platform.incidents.read", "platform.incidents.manage"]);
     stub.routes[`GET /bff/api/v1/platform/incidents/${INC}`] = () =>
       Response.json(detail("dedicated"));
@@ -216,7 +219,8 @@ describe("a dedicated school told of a reopen by phone (D49; FR-DPDP-032)", () =
     renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
     await user.click(await screen.findByRole("button", { name: im.reopenTold }));
     const dialog = screen.getByRole("dialog");
-    await user.type(within(dialog).getByLabelText(im.reopenToldNote), "Principal told by phone");
+    expect(within(dialog).queryByRole("textbox")).toBeNull();
+    await user.click(within(dialog).getByRole("radio", { name: im.reopenToldChannels.in_person }));
     await user.click(within(dialog).getByRole("button", { name: im.reopenTold }));
     await waitFor(() =>
       expect(stub.callsTo(`POST /bff/api/v1/platform/incidents/${INC}/reopen:told`)).toHaveLength(
@@ -227,7 +231,7 @@ describe("a dedicated school told of a reopen by phone (D49; FR-DPDP-032)", () =
     expect(JSON.parse(call?.body ?? "{}")).toEqual({
       tenant_id: T1,
       reopen_seq: 1,
-      note: "Principal told by phone",
+      channel: "in_person",
     });
   });
 
@@ -241,7 +245,7 @@ describe("a dedicated school told of a reopen by phone (D49; FR-DPDP-032)", () =
     renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
     await user.click(await screen.findByRole("button", { name: im.reopenTold }));
     const dialog = screen.getByRole("dialog");
-    await user.type(within(dialog).getByLabelText(im.reopenToldNote), "Principal told by phone");
+    await user.click(within(dialog).getByRole("radio", { name: im.reopenToldChannels.phone }));
     await user.click(within(dialog).getByRole("button", { name: im.reopenTold }));
     expect(await within(dialog).findByText(im.errors.reopen_changed.title)).toBeInTheDocument();
   });

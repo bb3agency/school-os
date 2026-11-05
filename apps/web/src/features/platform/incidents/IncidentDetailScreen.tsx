@@ -1,5 +1,6 @@
 "use client";
 
+import type { components } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import * as z from "@/lib/zod";
@@ -35,8 +36,10 @@ import {
   reopenTellPending,
   reopenToldSchema,
   reportedSchema,
+  REOPEN_TOLD_CHANNELS,
   type IncidentDetail,
   type IncidentSchool,
+  type ReopenToldBody,
 } from "./data";
 
 /**
@@ -703,9 +706,9 @@ function NotifiedDialog({
 }
 
 /**
- * A dedicated-host school has no pull: after a reopen the operator tells it by phone or e-mail
- * and records that here (D49), which counts as the school's pull. Step-up; the note follows the
- * summary rule.
+ * A dedicated-host school has no pull: after a reopen the operator tells it by phone, e-mail or
+ * in person and records that here (D49), which counts as the school's pull. Step-up; the record
+ * keeps the channel only, never free text (D56).
  */
 function ReopenToldDialog({
   incident,
@@ -729,28 +732,47 @@ function ReopenToldDialog({
       schema={reopenToldSchema}
       invalidate={[INCIDENT_KEYS.all]}
       errorNamespace="platform.incidents"
-      submit={(data) =>
-        unwrap(
+      submit={(data) => {
+        const body: ReopenToldBody = {
+          tenant_id: school.tenant_id,
+          reopen_seq: incident.reopen_count,
+          channel: data.channel,
+        };
+        return unwrap(
           api.POST("/api/v1/platform/incidents/{incident_id}/reopen:told", {
             params: { path: { incident_id: incident.id } },
-            body: {
-              tenant_id: school.tenant_id,
-              reopen_seq: incident.reopen_count,
-              note: data.note,
-            },
+            // D56: the generated client still lists `note`; the lead regenerates it.
+            body: body as unknown as components["schemas"]["IncidentReopenToldIn"],
           }),
-        )
-      }
+        );
+      }}
     >
       {(errors) => (
-        <TextAreaField
-          name="note"
-          label={t("reopenToldNote")}
-          hint={t("reopenToldNoteHint")}
-          error={errors.note}
-          maxLength={200}
-          rows={3}
-        />
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-semibold text-ink">{t("reopenToldChannel")}</legend>
+          {errors.channel ? (
+            <p id="reopen-told-channel-error" className="text-sm font-semibold text-danger">
+              {errors.channel}
+            </p>
+          ) : null}
+          <div className="grid gap-1">
+            {REOPEN_TOLD_CHANNELS.map((channel) => (
+              <label
+                key={channel}
+                className="flex min-h-10 items-center gap-2 py-1 text-sm pointer-coarse:min-h-11"
+              >
+                <input
+                  type="radio"
+                  name="channel"
+                  value={channel}
+                  aria-describedby={errors.channel ? "reopen-told-channel-error" : undefined}
+                  className="size-4 shrink-0 accent-primary"
+                />
+                <span>{t(`reopenToldChannels.${channel}`)}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
       )}
     </ActionDialog>
   );

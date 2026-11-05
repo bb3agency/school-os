@@ -212,5 +212,20 @@ export function reopenTellPending(
   return school.mode === "dedicated" && school.reopen_pulled < incident.reopen_count;
 }
 
-/** How a dedicated school was told of the reopen: the summary's rule, 10 to 200 characters. */
-export const reopenToldSchema = z.object({ note: categoriesAndCounts(200) });
+/** How a dedicated school was told of the reopen (D56): a fixed channel, no free-text note. */
+export const REOPEN_TOLD_CHANNELS = ["phone", "email", "in_person"] as const;
+export type ReopenToldChannel = (typeof REOPEN_TOLD_CHANNELS)[number];
+
+export const reopenToldSchema = z.object({
+  channel: z.enum(REOPEN_TOLD_CHANNELS, { error: "chooseOption" }),
+});
+
+/**
+ * The `reopen:told` request body (D56). Matches the API's `IncidentReopenToldIn`; defined here
+ * until the generated client is regenerated with `channel` in place of `note`.
+ */
+export interface ReopenToldBody {
+  tenant_id: string;
+  reopen_seq: number;
+  channel: ReopenToldChannel;
+}
