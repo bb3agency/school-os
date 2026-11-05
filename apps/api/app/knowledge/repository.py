@@ -575,13 +575,22 @@ def earlier_questions(
 
 
 def count_answers(
-    session: Session, *, start: dt.datetime, end: dt.datetime, statuses: Sequence[str]
+    session: Session,
+    *,
+    start: dt.datetime,
+    end: dt.datetime,
+    statuses: Sequence[str],
+    excluded_routes: Sequence[str] = (),
 ) -> int:
     """The current school's questions in ``[start, end)`` whose status is one of ``statuses``
-    (the billable answers of ``GET /knowledge/usage``; the same rule as the control plane's
-    daily ``platform.usage.ai_counts_on``). A count only: no question, answer or person."""
+    and whose route (if recorded) is not one of ``excluded_routes`` (the billable answers of
+    ``GET /knowledge/usage``; the same rule as the control plane's daily
+    ``platform.usage.ai_counts_on``; D50). A count only: no question, answer or person."""
     stmt = select(func.count()).where(
-        Query.created_at >= start, Query.created_at < end, Query.status.in_(list(statuses))
+        Query.created_at >= start,
+        Query.created_at < end,
+        Query.status.in_(list(statuses)),
+        or_(Query.route.is_(None), Query.route.not_in(list(excluded_routes))),
     )
     return int(session.execute(stmt).scalar_one())
 

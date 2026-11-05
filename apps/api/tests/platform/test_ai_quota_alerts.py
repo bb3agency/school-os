@@ -226,3 +226,48 @@ def test_Q16_school_side_pull_does_nothing_on_a_dedicated_host(
     monkeypatch.setattr(quota_sync, "control_plane_here", lambda settings=None: False)
     assert quota_sync.sync_school(uuid.uuid4()) == 0
     assert quota_sync.sweep_all() == {"tenants": 0, "sent": 0, "failed": 0}
+
+
+def _kb_queries(admin: Engine, tid: uuid.UUID, n: int, *, route: str | None) -> None:
+    """``n`` answered questions today (ids and dummy ciphertext only; synthetic)."""
+    rows = [
+        {
+            "i": uuid.uuid4(),
+            "t": tid,
+            "s": uuid.uuid4(),
+            "u": uuid.uuid4(),
+            "q": b"synthetic-ciphertext",
+            "h": uuid.uuid4().bytes * 2,
+            "r": route,
+        }
+        for _ in range(n)
+    ]
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO kb.queries (id, tenant_id, session_id, user_id, question_ciphertext, "
+                "question_hmac, key_version, mode, route, status) "
+                "VALUES (:i, :t, :s, :u, :q, :h, 1, 'full', :r, 'answered')"
+            ),
+            rows,
+        )
+
+
+def test_D50_quota_alerts_ignore_memory_replies(
+    api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID], admin_engine: Engine
+) -> None:
+    """Replies to "remember this" (route memory) never reach 80 % or 100 % (D50, ADR-0038)."""
+    tid, sub, _subject = _live_school(api, owner, make_plan(), admin_engine)
+    bundle = _set_bundle(api, owner, sub, "ai-lite")
+    included = int(bundle["included_answers"])
+    today = today_ist()
+    _counts_from(sub, today.replace(day=1))
+    _kb_queries(admin_engine, tid, included, route="memory")
+    got = usage.collect_tenant(tid, today)
+    assert (got["ai_queries"], got["ai_answers"]) == (included, 0)
+    assert _events(tid) == []
+    # Normal answers still count towards the alerts.
+    _kb_queries(admin_engine, tid, included, route="documents")
+    got = usage.collect_tenant(tid, today)
+    assert got["ai_answers"] == included
+    assert [t for _m, t, _p in _events(tid)] == [80, 100]

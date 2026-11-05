@@ -56,11 +56,13 @@ _ACTIVE_USERS_SQL = text(
 )
 
 
-# Questions asked and billable AI answers (billing.yaml ai_answers.billable_statuses) that IST
-# day. Counts only: no question, answer or person leaves the school's session.
+# Questions asked and billable AI answers (billing.yaml ai_answers.billable_statuses, minus the
+# rows on an ai_answers.excluded_routes route, D50) that IST day. Counts only: no question,
+# answer or person leaves the school's session.
 _AI_COUNTS_SQL = text(
     "SELECT count(*) AS queries, "
-    "count(*) FILTER (WHERE q.status = ANY(CAST(:billable AS text[]))) AS answers "
+    "count(*) FILTER (WHERE q.status = ANY(CAST(:billable AS text[])) "
+    "AND (q.route IS NULL OR NOT q.route = ANY(CAST(:excluded AS text[])))) AS answers "
     "FROM kb.queries AS q "
     "WHERE q.tenant_id = :t AND q.created_at >= :start AND q.created_at < :end"
 )
@@ -105,11 +107,16 @@ def active_users_on(tenant_id: uuid.UUID, day: dt.date) -> int:
 def ai_counts_on(tenant_id: uuid.UUID, day: dt.date) -> tuple[int, int]:
     """(questions asked, billable AI answers) that IST day, in the school's own session."""
     start, end = _day_bounds(day)
-    billable = [str(v) for v in config()["ai_answers"]["billable_statuses"]]
+    rule = config()["ai_answers"]
+    params = {
+        "t": tenant_id,
+        "start": start,
+        "end": end,
+        "billable": [str(v) for v in rule["billable_statuses"]],
+        "excluded": [str(v) for v in rule["excluded_routes"]],
+    }
     with tenant_session(tenant_id) as s:
-        row = s.execute(
-            _AI_COUNTS_SQL, {"t": tenant_id, "start": start, "end": end, "billable": billable}
-        ).one()
+        row = s.execute(_AI_COUNTS_SQL, params).one()
     return int(row.queries), int(row.answers)
 
 

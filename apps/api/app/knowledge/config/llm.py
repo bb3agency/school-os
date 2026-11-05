@@ -201,6 +201,10 @@ class BundleBudget(ConfigModel):
     """``kb.queries`` statuses that count as one billable AI answer (ADR-0038 decision 4).
     ``GET /knowledge/usage`` counts with these; kept equal to ``app/platform/billing.yaml``
     ``ai_answers.billable_statuses`` (the control plane's daily count; a test pins them)."""
+    excluded_routes: tuple[str, ...]
+    """``kb.queries`` routes never counted as a billable answer whatever their status (D50:
+    ``memory``, a "remember this" reply with no answer model call). Kept equal to
+    ``app/platform/billing.yaml`` ``ai_answers.excluded_routes`` (a test pins them)."""
 
 
 class Budget(ConfigModel):

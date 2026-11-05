@@ -115,15 +115,17 @@ def _queries(
     statuses: list[str],
     *,
     at: dt.datetime | None = None,
+    route: str | None = None,
 ) -> None:
-    """Logged questions (ids and dummy ciphertext only) with these statuses."""
+    """Logged questions (ids and dummy ciphertext only) with these statuses (and route)."""
     with admin.begin() as c:
         for status in statuses:
             c.execute(
                 text(
                     "INSERT INTO kb.queries (id, tenant_id, session_id, user_id, "
-                    "question_ciphertext, question_hmac, key_version, mode, status, created_at) "
-                    "VALUES (:i, :t, :s, :u, :q, :h, 1, :m, :st, COALESCE(:at, now()))"
+                    "question_ciphertext, question_hmac, key_version, mode, route, status, "
+                    "created_at) "
+                    "VALUES (:i, :t, :s, :u, :q, :h, 1, :m, :r, :st, COALESCE(:at, now()))"
                 ),
                 {
                     "i": uuid.uuid4(),
@@ -133,6 +135,7 @@ def _queries(
                     "q": b"synthetic-ciphertext",
                     "h": uuid.uuid4().bytes * 2,
                     "m": "search_only" if status == "search_only" else "full",
+                    "r": route,
                     "st": status,
                     "at": at,
                 },
@@ -209,6 +212,28 @@ def test_FR_KB_040_usage_matches_the_billing_collectors_daily_counts(
         collected += platform_usage.ai_counts_on(a.tenant_id, day)[1]
         day += dt.timedelta(days=1)
     assert _usage(api, a.people["owner"])["answers_used"] == collected
+
+
+def test_FR_KB_040_D50_memory_replies_are_not_billed_in_either_count(
+    world: Any, api: Any, admin_engine: Engine, rt: Any
+) -> None:
+    """A "remember this" reply (route memory) calls no answer model: it is left out of the
+    school's live count and of the collector's billed count (D50, ADR-0038 decision 4)."""
+    a = world.a
+    owner = a.people["owner"]
+    today = dt.datetime.now(dt.UTC).astimezone(IST).date()
+    before = _usage(api, owner)["answers_used"]
+    queries_before, billed_before = platform_usage.ai_counts_on(a.tenant_id, today)
+    _queries(admin_engine, a, owner, ["answered", "answered", "refused"], route="memory")
+    assert _usage(api, owner)["answers_used"] == before
+    queries, billed = platform_usage.ai_counts_on(a.tenant_id, today)
+    assert billed == billed_before
+    assert queries == queries_before + 3  # still questions asked, never billed answers
+    # A normal answer (any other route, or none recorded) still counts in both.
+    _queries(admin_engine, a, owner, ["answered"], route="documents")
+    _queries(admin_engine, a, owner, ["answered"])
+    assert _usage(api, owner)["answers_used"] == before + 2
+    assert platform_usage.ai_counts_on(a.tenant_id, today)[1] == billed_before + 2
 
 
 def test_FR_KB_040_included_answers_and_near_limit_from_the_bundle(

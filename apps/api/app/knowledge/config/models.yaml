@@ -365,6 +365,9 @@ budget:
     # /knowledge/usage (FR-KB-040). Keep equal to app/platform/billing.yaml
     # ai_answers.billable_statuses, which the control plane bills from (a test pins them).
     billable_statuses: [answered]
+    # kb.queries routes never counted (D50): "remember this" replies call no answer model.
+    # Keep equal to app/platform/billing.yaml ai_answers.excluded_routes (a test pins them).
+    excluded_routes: [memory]
   reservation:
     input_tokens: 16000              # 12k tool results + system prompt, tools, question, history
     ttl_s: 600                        # abandoned reservations lapse; > timeout x 3 attempts + backoff
