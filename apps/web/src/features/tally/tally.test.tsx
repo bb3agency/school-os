@@ -138,6 +138,8 @@ function dues(overrides: Partial<DuesPage> = {}): DuesPage {
         as_of: "2026-09-29",
         shared_ledger: false,
         shared_with: 0,
+        overdue_due: "0.00",
+        overdue_bills: 0,
       },
     ],
     next_cursor: null,
