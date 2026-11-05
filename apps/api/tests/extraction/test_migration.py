@@ -272,6 +272,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         "0072_outbox_retention",  # D51 outbox retention
         "0073_admission_no_ci",  # D53
         "0074_tenant_audit_retention",  # D51 for the control plane
+        "0075_breach_retention",  # D58 breach register retention
     }
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
         command.downgrade(cfg, "0017_exports")
