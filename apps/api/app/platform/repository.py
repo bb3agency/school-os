@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, DomainError, Forbidden, NotFound, ValidationFailed
 from app.core.ids import new_id
+from app.core.logging import get_logger
 from app.platform import models as m
 
 # --- error translation ------------------------------------------------------------------------
@@ -60,6 +61,27 @@ _CONSTRAINT_MESSAGES: dict[str, tuple[str, str]] = {
 }
 
 
+_CHECK_DETAIL = "One of the values isn't allowed. Check the form and try again."
+
+
+def _check_refusal(constraint: str) -> ValidationFailed:
+    """An unmapped CHECK refusal (SQLSTATE 23514) answers like the central D55 handler
+    (``core.errors._database_refusal``): 422 ``invalid_value`` on ``body``, with no constraint or
+    table name in the body (D64). The constraint name is logged at warning, never a value."""
+    get_logger(__name__).warning(
+        "db.check_violation",
+        constraint=constraint or "unknown",
+        error_code="invalid_value",
+        error_type="CheckViolation",
+    )
+    refusal = ValidationFailed(
+        [{"field": "body", "code": "invalid_value", "message_key": "errors.invalid_value"}],
+        detail=_CHECK_DETAIL,
+    )
+    refusal.code = "invalid_value"
+    return refusal
+
+
 def translate_db_error(exc: DBAPIError) -> DomainError | None:  # noqa: PLR0911
     orig = exc.orig
     state = getattr(orig, "sqlstate", None)
@@ -76,9 +98,7 @@ def translate_db_error(exc: DBAPIError) -> DomainError | None:  # noqa: PLR0911
     if state == "23505":
         return Conflict("This already exists.", code="duplicate")
     if state == "23514":
-        return ValidationFailed(
-            [{"field": constraint or "body", "code": "invalid", "message_key": "errors.invalid"}]
-        )
+        return _check_refusal(constraint)
     if state == "23503":
         return ValidationFailed(
             [
