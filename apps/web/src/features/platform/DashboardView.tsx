@@ -14,6 +14,9 @@ import { IncidentClockAlerts } from "./incidents/IncidentClockAlerts";
 
 type Counts = Record<string, number> | null | undefined;
 
+/** `plan_limit_alerts` (D57) is not in the generated client yet; matches `DashboardOut`. */
+type DashboardKpis = PlatformDashboard & { plan_limit_alerts?: Counts };
+
 function sum(counts: Counts): number | null {
   if (!counts) return null;
   return Object.values(counts).reduce((total, value) => total + value, 0);
@@ -40,13 +43,14 @@ interface AttentionItem {
  * permission; such tiles are not shown. Counts only, never student data. The "needs
  * attention" list is built from the same numbers (nothing is estimated) and links to the
  * filtered list that explains each one. Holders of `platform.incidents.read` also see the
- * incident clocks that are due soon or overdue (D49 part 2) above the tiles.
+ * incident clocks that are due soon or overdue (D49 part 2) above the tiles. Holders of
+ * `platform.usage.read` see the schools at a plan limit this billing period (D57).
  */
 export function DashboardView({
   kpis,
   notice,
 }: {
-  kpis: PlatformDashboard | null;
+  kpis: DashboardKpis | null;
   /** Shown under the page header, e.g. a load error. */
   notice?: ReactNode;
 }) {
@@ -59,6 +63,7 @@ export function DashboardView({
   const schools = kpis?.schools_by_status;
   const fleet = kpis?.fleet_by_status;
   const tickets = kpis?.open_tickets_by_priority;
+  const planLimits = kpis?.plan_limit_alerts;
   const fleetTotal = sum(fleet);
   const cards: Tile[] = [];
   const add = (present: boolean, tile: Tile) => {
@@ -175,6 +180,16 @@ export function DashboardView({
       : {}),
   });
 
+  // D57 (docs/16 §5.10): schools by their highest plan-limit crossing this billing period.
+  add(planLimits != null, {
+    key: "planLimits",
+    label: t("planLimits"),
+    value: count(planLimits ? (planLimits["100"] ?? 0) : null),
+    ...(planLimits
+      ? { comparison: t("planLimitsHint", { near: count(planLimits["80"] ?? 0) ?? "0" }) }
+      : {}),
+  });
+
   // Needs attention: only non-zero numbers the API returned.
   const attention: AttentionItem[] = [];
   if (kpis) {
@@ -206,6 +221,16 @@ export function DashboardView({
         text: t("attention.sla", { count: kpis.tickets_sla_breached ?? 0 }),
         href: "/platform/support",
         linkLabel: t("attention.openSupport"),
+      });
+    }
+    const atLimit = sum(planLimits) ?? 0;
+    if (atLimit > 0) {
+      attention.push({
+        key: "planLimits",
+        icon: "chart",
+        text: t("attention.planLimits", { count: atLimit }),
+        href: "/platform/usage",
+        linkLabel: t("attention.openUsage"),
       });
     }
     if ((kpis.trials_ending_14d ?? 0) > 0) {

@@ -57,6 +57,7 @@ import { HeartbeatPill } from "./HeartbeatPill";
 import { Figure, Mono, MonoTime, TierTag } from "./pills";
 import { ShowMore } from "./ShowMore";
 import { AiQuotaAlerts } from "./AiQuotaAlerts";
+import { PlanLimitAlerts, loadPlanLimitAlerts } from "./PlanLimitAlerts";
 import { UsageTable } from "./UsageTable";
 
 /* ------------------------------------------------------------------ usage */
@@ -90,6 +91,9 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
   const quotaAlerts = useApiQuery([...PK.usage, "ai-quota-alerts"], () =>
     unwrap(api.GET("/api/v1/platform/usage/ai-quota-alerts")),
   );
+  // D57 (docs/16 §5.10): this billing period's plan-limit crossings per school.
+  const locale = useLocale();
+  const limitAlerts = useApiQuery([...PK.usage, "limit-alerts"], () => loadPlanLimitAlerts(locale));
   return (
     <div className="space-y-6">
       <PageHeader
@@ -97,6 +101,7 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
         description={t("description")}
         breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
       />
+      <PlanLimitAlerts alerts={limitAlerts} schoolName={nameOf} />
       <AiQuotaAlerts alerts={quotaAlerts} schoolName={nameOf} />
       <UsageTable
         toolbar={

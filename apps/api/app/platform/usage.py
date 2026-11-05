@@ -22,7 +22,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import select, text
 
@@ -31,8 +31,16 @@ from app.core.logging import get_logger
 from app.platform import billing
 from app.platform import models as m
 from app.platform import repository as repo
-from app.platform.common import IST, SYSTEM, audit_platform, billing_cfg, config, today_ist
-from app.platform.schemas import AiQuotaAlertOut, HbUsage, UsageDailyOut
+from app.platform.common import (
+    IST,
+    SYSTEM,
+    add_months,
+    audit_platform,
+    billing_cfg,
+    config,
+    today_ist,
+)
+from app.platform.schemas import AiQuotaAlertOut, HbUsage, PlanLimitAlertOut, UsageDailyOut
 from app.tenancy import service as tenancy
 
 log = get_logger(__name__)
@@ -310,18 +318,20 @@ def check_ai_quota(session: Any, tenant_id: uuid.UUID, day: dt.date) -> list[int
     return crossed
 
 
-def _quota_rows(session: Any, month: dt.date, tenant_id: uuid.UUID | None) -> list[Any]:
+def _quota_rows(session: Any, months: list[dt.date], tenant_id: uuid.UUID | None) -> list[Any]:
     t = m.usage_threshold_events
-    stmt = select(t).where(t.c.metric == AI_QUOTA_METRIC, t.c.period_start == month)
+    stmt = select(t).where(t.c.metric == AI_QUOTA_METRIC, t.c.period_start.in_(months))
     if tenant_id is not None:
         stmt = stmt.where(t.c.tenant_id == tenant_id)
-    return list(session.execute(stmt.order_by(t.c.tenant_id, t.c.threshold)).mappings())
+    return list(
+        session.execute(stmt.order_by(t.c.tenant_id, t.c.period_start, t.c.threshold)).mappings()
+    )
 
 
-def _highest(rows: list[Any]) -> dict[uuid.UUID, AiQuotaAlertOut]:
-    out: dict[uuid.UUID, AiQuotaAlertOut] = {}
-    for r in rows:  # ordered by threshold: the last one per school is the highest
-        out[r["tenant_id"]] = AiQuotaAlertOut(
+def _highest(rows: list[Any]) -> dict[tuple[uuid.UUID, dt.date], AiQuotaAlertOut]:
+    out: dict[tuple[uuid.UUID, dt.date], AiQuotaAlertOut] = {}
+    for r in rows:  # ordered by threshold: the last one per school and month is the highest
+        out[(r["tenant_id"], r["period_start"])] = AiQuotaAlertOut(
             tenant_id=r["tenant_id"],
             threshold=int(r["threshold"]),
             month_start=r["period_start"],
@@ -337,7 +347,7 @@ def ai_quota_alerts(month: dt.date | None = None) -> list[AiQuotaAlertOut]:
     calendar month, IST). Counts only, platform tables only."""
     start = (month or today_ist()).replace(day=1)
     with platform_session() as s:
-        return list(_highest(_quota_rows(s, start, None)).values())
+        return list(_highest(_quota_rows(s, [start], None)).values())
 
 
 def ai_quota_alert(
@@ -346,9 +356,113 @@ def ai_quota_alert(
     """One school's highest AI answer quota alert this calendar month (IST), or ``None``."""
     month = (today or today_ist()).replace(day=1)
     if session is not None:
-        return _highest(_quota_rows(session, month, tenant_id)).get(tenant_id)
+        return _highest(_quota_rows(session, [month], tenant_id)).get((tenant_id, month))
     with platform_session() as s:
-        return _highest(_quota_rows(s, month, tenant_id)).get(tenant_id)
+        return _highest(_quota_rows(s, [month], tenant_id)).get((tenant_id, month))
+
+
+def ai_quota_alerts_for_school(
+    tenant_id: uuid.UUID, *, today: dt.date | None = None
+) -> list[AiQuotaAlertOut]:
+    """The school pull (docs/16 §19 Q16, D57): this school's highest AI answer quota alert of
+    the previous and of the current calendar month (IST), oldest month first. The collector
+    records the last day of a month on the 1st under that month, so reading only the current
+    month would lose it; the notification dedupe key (month and threshold) stops repeats."""
+    month = (today or today_ist()).replace(day=1)
+    months = [add_months(month, -1), month]
+    with platform_session() as s:
+        found = _highest(_quota_rows(s, months, tenant_id))
+    return [found[k] for k in sorted(found, key=lambda k: k[1])]
+
+
+# --- plan-limit crossings (docs/16 §5.10, §19 Q16; FR-PLT-021, D57) -----------------------------
+
+PlanLimitPeriod = Literal["current", "previous"]
+
+
+def _billing_periods(
+    session: Any, tenant_id: uuid.UUID | None
+) -> dict[uuid.UUID, tuple[dt.date, dt.date]]:
+    """Each school's live subscription: (previous period start, current period start)."""
+    subs, plans = m.subscriptions, m.plans
+    stmt = (
+        select(
+            subs.c.tenant_id,
+            subs.c.current_period_start,
+            subs.c.billing_anchor_day,
+            plans.c.billing_period,
+        )
+        .join(plans, plans.c.id == subs.c.plan_id)
+        .where(subs.c.status != "cancelled")
+    )
+    if tenant_id is not None:
+        stmt = stmt.where(subs.c.tenant_id == tenant_id)
+    return {
+        r["tenant_id"]: (
+            billing.previous_period_start(r["current_period_start"], r, r["billing_anchor_day"]),
+            r["current_period_start"],
+        )
+        for r in session.execute(stmt).mappings()
+    }
+
+
+def _limit_rows(
+    session: Any, periods: dict[uuid.UUID, tuple[dt.date, dt.date]], which: set[str]
+) -> list[PlanLimitAlertOut]:
+    """Plan-limit crossings (every metric but ``ai_answers``) in the previous and/or current
+    billing period of the schools in ``periods``, newest first."""
+    if not periods:
+        return []
+    t = m.usage_threshold_events
+    rows = session.execute(
+        select(t)
+        .where(
+            t.c.metric != AI_QUOTA_METRIC,
+            t.c.tenant_id.in_(list(periods)),
+            t.c.period_start >= min(p for p, _c in periods.values()),
+        )
+        .order_by(t.c.crossed_at.desc(), t.c.tenant_id, t.c.metric, t.c.threshold)
+    ).mappings()
+    out: list[PlanLimitAlertOut] = []
+    for r in rows:
+        previous, current = periods[r["tenant_id"]]
+        start = r["period_start"]
+        if ("current" in which and start >= current) or (
+            "previous" in which and previous <= start < current
+        ):
+            out.append(PlanLimitAlertOut.model_validate(dict(r)))
+    return out
+
+
+def plan_limit_alerts(period: PlanLimitPeriod = "current") -> list[PlanLimitAlertOut]:
+    """Operators: every plan-limit crossing (80 / 100 %) in each school's current (or previous)
+    billing period, newest first. Platform tables only; counts only. Limits never block work."""
+    with platform_session() as s:
+        return _limit_rows(s, _billing_periods(s, None), {period})
+
+
+def plan_limit_tile(session: Any) -> dict[str, int]:
+    """Dashboard tile: schools by their highest plan-limit crossing this billing period."""
+    highest: dict[uuid.UUID, int] = {}
+    for a in _limit_rows(session, _billing_periods(session, None), {"current"}):
+        highest[a.tenant_id] = max(highest.get(a.tenant_id, 0), a.threshold)
+    counts = {str(int(th)): 0 for th in billing_cfg()["usage_thresholds"]}
+    for threshold in highest.values():
+        counts[str(threshold)] = counts.get(str(threshold), 0) + 1
+    return counts
+
+
+def plan_limit_alerts_for_school(tenant_id: uuid.UUID) -> list[PlanLimitAlertOut]:
+    """The school pull (D57): this school's highest crossing per metric in its previous and
+    current billing period, oldest period first. Counts and codes only."""
+    with platform_session() as s:
+        rows = _limit_rows(s, _billing_periods(s, tenant_id), {"previous", "current"})
+    best: dict[tuple[dt.date, str], PlanLimitAlertOut] = {}
+    for a in rows:
+        key = (a.period_start, a.metric)
+        if key not in best or a.threshold > best[key].threshold:
+            best[key] = a
+    return [best[k] for k in sorted(best)]
 
 
 def usage_for(tenant_id: uuid.UUID | None, start: dt.date, end: dt.date) -> list[UsageDailyOut]:

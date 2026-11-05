@@ -28,9 +28,12 @@ One school's override for other modules and dev tooling: ``set_school_flag_overr
 ``clear_school_flag_override`` (system actor, platform audit chain; any school the database
 knows, shared-tier schools without a deployments row included).
 
-AI answer quota alerts (ADR-0038 follow-up, docs/16 §19 Q16): ``ai_quota_alert_for_school``
-(the highest 80 % / 100 % crossing of this month's included answers; counts only), pulled by the
-school side (``app.notifications.quota_sync``) into in-app notifications.
+AI answer quota alerts (ADR-0038 follow-up, docs/16 §19 Q16): ``ai_quota_alerts_for_school``
+(the highest 80 % / 100 % crossing of the previous and the current month's included answers;
+counts only), and plan-limit crossings (docs/16 §5.10, D57): ``plan_limit_alerts_for_school``
+(the highest crossing per metric in the previous and the current billing period; metric codes
+and counts only). Both are pulled by the school side (``app.notifications.quota_sync``) into
+in-app notifications.
 
 Provisioning helpers for dev tooling: ``invite_school_owner(platform_session, ...)``.
 """
@@ -58,6 +61,7 @@ from app.platform.incidents import SchoolIncidentNotice
 from app.platform.schemas import (
     AiQuotaAlertOut,
     AnnouncementBrief,
+    PlanLimitAlertOut,
     SchoolAiBundle,
     SchoolTicketMessageIn,
     TicketCreateSchool,
@@ -67,6 +71,7 @@ from app.platform.schemas import (
 __all__ = [
     "AiQuotaAlertOut",
     "AnnouncementBrief",
+    "PlanLimitAlertOut",
     "SchoolAiBundle",
     "SchoolBreakGlassRequest",
     "SchoolIncidentNotice",
@@ -74,7 +79,7 @@ __all__ = [
     "TicketCreateSchool",
     "TicketOut",
     "active_announcements",
-    "ai_quota_alert_for_school",
+    "ai_quota_alerts_for_school",
     "breakglass_request_for_school",
     "breakglass_requests_for_school",
     "clear_school_flag_override",
@@ -85,6 +90,7 @@ __all__ = [
     "is_flag_enabled",
     "list_tenant_tickets",
     "open_ticket_from_tenant",
+    "plan_limit_alerts_for_school",
     "record_breakglass_outcome",
     "record_breakglass_session_started",
     "record_incident_notice_pulled",
@@ -144,11 +150,19 @@ def clear_school_flag_override(
     return flags.clear_school_override(key, tenant_id, source=source, request_id=request_id)
 
 
-def ai_quota_alert_for_school(tenant_id: uuid.UUID) -> AiQuotaAlertOut | None:
-    """This month's AI answer quota alert of this school (pulled by the school side): the
-    highest threshold (80 or 100 % of the bundle's included answers) the usage collector has
-    recorded for the current calendar month (IST), or ``None``. Counts only."""
-    return usage.ai_quota_alert(tenant_id)
+def ai_quota_alerts_for_school(tenant_id: uuid.UUID) -> list[AiQuotaAlertOut]:
+    """This school's AI answer quota alerts (pulled by the school side): for the previous and
+    the current calendar month (IST), oldest first, the highest threshold (80 or 100 % of the
+    bundle's included answers) the usage collector has recorded. The previous month is read too
+    because a month's last day is recorded on the 1st (docs/16 §19 Q16, D57). Counts only."""
+    return usage.ai_quota_alerts_for_school(tenant_id)
+
+
+def plan_limit_alerts_for_school(tenant_id: uuid.UUID) -> list[PlanLimitAlertOut]:
+    """This school's plan-limit crossings (pulled by the school side; docs/16 §5.10, D57): the
+    highest threshold (80 or 100 %) per metric in its previous and current billing period,
+    oldest period first. Metric codes and counts only; limits never block school work."""
+    return usage.plan_limit_alerts_for_school(tenant_id)
 
 
 def open_ticket_from_tenant(

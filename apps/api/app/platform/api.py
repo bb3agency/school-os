@@ -91,6 +91,7 @@ from app.platform.schemas import (
     PaymentIn,
     PaymentOut,
     PlanIn,
+    PlanLimitAlertOut,
     PlanOut,
     PlanPatch,
     PlatformAuditEventOut,
@@ -509,6 +510,20 @@ def ai_quota_alerts(
     (ADR-0038 follow-up, docs/16 §19 Q16). Recorded once per school, month and threshold by the
     usage collector. Alert only: nothing is switched off. Counts only."""
     return usage.ai_quota_alerts(month)
+
+
+@router.get("/usage/limit-alerts", response_model=list[PlanLimitAlertOut])
+def plan_limit_alerts(
+    *,
+    ctx: Annotated[Ctx, Depends(require_platform("platform.usage.read"))],
+    period: usage.PlanLimitPeriod = "current",
+) -> list[PlanLimitAlertOut]:
+    """Plan-limit crossings (80 % / 100 % of a plan limit) in each school's current billing
+    period (``period=previous``: the one before), newest first: school, metric, threshold, the
+    value counted, the limit and when it was recorded (docs/16 §5.10, D57; FR-PLT-021).
+    Recorded once per school, metric, threshold and period by the usage collector. Limits never
+    block school work. Counts only; reading is not audited."""
+    return usage.plan_limit_alerts(period)
 
 
 @router.get("/usage", response_model=list[UsageDailyOut])

@@ -159,6 +159,16 @@ def _period_end(start: dt.date, plan: Mapping[Any, Any], anchor: int | None) -> 
     return end.replace(day=min(anchor, calendar.monthrange(end.year, end.month)[1]))
 
 
+def previous_period_start(start: dt.date, plan: Mapping[Any, Any], anchor: int | None) -> dt.date:
+    """The start of the billing period before the one starting on ``start`` (the inverse of
+    ``_period_end`` under the current plan's length; D57: the school pull also reads the
+    previous period so a crossing recorded just before the roll still reaches the school)."""
+    before = add_months(start, -_period_months(plan))
+    if anchor is None:
+        return before
+    return before.replace(day=min(anchor, calendar.monthrange(before.year, before.month)[1]))
+
+
 # --- one-time fee, AI bundles and overage (pure) ----------------------------------------------
 
 ONE_TIME_FEE_TEXT = "Implementation and data verification (one-time)"

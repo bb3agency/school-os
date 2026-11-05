@@ -271,3 +271,34 @@ def test_D50_quota_alerts_ignore_memory_replies(
     got = usage.collect_tenant(tid, today)
     assert got["ai_answers"] == included
     assert [t for _m, t, _p in _events(tid)] == [80, 100]
+
+
+def test_Q16_D57_last_months_alert_recorded_on_the_1st_still_reaches_the_school(
+    api: Api,
+    owner: Operator,
+    make_plan: Callable[..., uuid.UUID],
+    admin_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The collector records a month's last day on the 1st under that month; the pull reads the
+    previous and the current month, and the dedupe key stops repeats."""
+    monkeypatch.setattr(quota_sync, "control_plane_here", lambda settings=None: True)
+    tid, sub, _subject = _live_school(api, owner, make_plan(), admin_engine)
+    bundle = _set_bundle(api, owner, sub, "ai-lite")
+    included = int(bundle["included_answers"])
+    month = today_ist().replace(day=1)
+    last_day = month - dt.timedelta(days=1)
+    last_month = last_day.replace(day=1)
+    _counts_from(sub, last_month)
+    _answers(tid, last_day, included)
+    assert _check(tid, last_day) == [80, 100]  # recorded under last month
+
+    assert quota_sync.sync_school(tid) == 1  # the owner, once (the highest level only)
+    assert quota_sync.sync_school(tid) == 0
+    (notice,) = _notifications(admin_engine, tid)
+    assert notice["params"] == {"level": "used_up_last_month", "included": included}
+    assert notice["dedupe_key"] == f"billing.ai_quota:{last_month:%Y-%m}:100"
+    assert [a.month_start for a in usage.ai_quota_alerts_for_school(tid)] == [last_month]
+    # A month later it is two months back: history, never pulled again.
+    next_month = (month + dt.timedelta(days=40)).replace(day=1)
+    assert usage.ai_quota_alerts_for_school(tid, today=next_month) == []
