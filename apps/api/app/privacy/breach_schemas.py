@@ -134,6 +134,24 @@ class AffectedIn(_In):
         return self
 
 
+RoleKey = Annotated[str, StringConstraints(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")]
+
+
+class AffectedCountIn(_In):
+    """What to count for the affected-people picker (D59): whole classes or sections of the
+    current year, single students, all staff, staff by role or single staff members (ids and role
+    keys only). Nothing is stored; a person picked twice counts once. The school's 1,500 students
+    fit through ``all_students`` or the class and section selectors; single picks are capped."""
+
+    all_students: bool = False
+    class_ids: list[uuid.UUID] = Field(default_factory=list, max_length=200)
+    section_ids: list[uuid.UUID] = Field(default_factory=list, max_length=500)
+    student_ids: list[uuid.UUID] = Field(default_factory=list, max_length=5000)
+    all_staff: bool = False
+    staff_role_keys: list[RoleKey] = Field(default_factory=list, max_length=50)
+    membership_ids: list[uuid.UUID] = Field(default_factory=list, max_length=5000)
+
+
 class DutyOut(_Out):
     key: DutyKey
     due_at: dt.datetime | None = Field(
@@ -227,6 +245,7 @@ class NoticeDraftOut(_Out):
 
 
 __all__ = [
+    "AffectedCountIn",
     "AffectedCountsOut",
     "AffectedIn",
     "AffectedOut",

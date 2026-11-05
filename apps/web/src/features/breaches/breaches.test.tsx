@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { me } from "@/test/records-fixtures";
 import { messages, renderWithIntl } from "@/test/render";
 import { notificationHref } from "@/features/notifications/data";
@@ -261,5 +261,88 @@ describe("US-2702 breach detail", () => {
     renderWithIntl(<BreachDetailScreen breachId={B1} />);
     expect(await screen.findByText(/left on a bus/)).toBeInTheDocument();
     expect(screen.queryByText(bm.detail.reopenedTitle)).toBeNull();
+  });
+});
+
+describe("D59 affected-people picker", () => {
+  const YEAR = "0192f3a4-0000-7000-8000-0000000000a1";
+  const CLASS = "0192f3a4-0000-7000-8000-0000000000c1";
+  const SECTION = "0192f3a4-0000-7000-8000-0000000000d1";
+  const stamp = {
+    version: 1,
+    created_at: "2026-06-01T00:00:00Z",
+    updated_at: "2026-06-01T00:00:00Z",
+  };
+
+  it("counts a picked section and fills the form; only counts are saved", async () => {
+    setMe([READ, MANAGE]);
+    stub.routes[`GET /bff/api/v1/privacy/breaches/${B1}`] = () => Response.json(detail());
+    stub.routes["GET /bff/api/v1/academic-years"] = () =>
+      page([
+        {
+          id: YEAR,
+          label: "2026-27",
+          starts_on: "2026-06-01",
+          ends_on: "2027-03-31",
+          is_current: true,
+          ...stamp,
+        },
+      ]);
+    stub.routes["GET /bff/api/v1/classes"] = () =>
+      page([
+        {
+          id: CLASS,
+          code: "IX",
+          display_en: "Class IX",
+          display_te: "",
+          sort_order: 120,
+          ...stamp,
+        },
+      ]);
+    stub.routes["GET /bff/api/v1/sections"] = () =>
+      page([
+        {
+          id: SECTION,
+          academic_year_id: YEAR,
+          class_id: CLASS,
+          name: "A",
+          class_teacher_membership_id: null,
+          ...stamp,
+        },
+      ]);
+    stub.routes[`POST /bff/api/v1/privacy/breaches/${B1}/affected:count`] = () =>
+      Response.json({ students: 38, guardians: 61, staff: 0 });
+    stub.routes[`PATCH /bff/api/v1/privacy/breaches/${B1}`] = () =>
+      Response.json(detail({ version: 4 }));
+    const user = userEvent.setup();
+    renderWithIntl(<BreachDetailScreen breachId={B1} />);
+    await user.click(await screen.findByRole("button", { name: bm.detail.editFacts }));
+    await user.click(screen.getByRole("button", { name: bm.picker.open }));
+    const picker = screen.getByRole("dialog", { name: bm.picker.title });
+    const use = within(picker).getByRole("button", { name: bm.picker.use });
+    expect(use).toBeDisabled();
+    await user.click(await within(picker).findByRole("checkbox", { name: "Class IX · A" }));
+    await user.click(within(picker).getByRole("button", { name: bm.picker.count }));
+    expect(
+      await within(picker).findByText("38 children, 61 parents and guardians, 0 staff"),
+    ).toBeInTheDocument();
+    const call = stub.callsTo(`POST /bff/api/v1/privacy/breaches/${B1}/affected:count`)[0];
+    const sent = JSON.parse(call?.body ?? "{}") as { section_ids?: string[] };
+    expect(sent.section_ids).toEqual([SECTION]);
+    await user.click(use);
+    await waitFor(() => expect(picker).not.toHaveAttribute("open"));
+    const edit = screen.getByRole("dialog", { name: bm.detail.editFactsTitle });
+    expect(within(edit).getByLabelText(bm.form.approxChildren)).toHaveValue("38");
+    expect(within(edit).getByLabelText(bm.form.approxGuardians)).toHaveValue("61");
+    await user.click(within(edit).getByRole("button", { name: bm.detail.saveFacts }));
+    await waitFor(() =>
+      expect(stub.callsTo(`PATCH /bff/api/v1/privacy/breaches/${B1}`)).toHaveLength(1),
+    );
+    const saved = JSON.parse(
+      stub.callsTo(`PATCH /bff/api/v1/privacy/breaches/${B1}`)[0]?.body ?? "{}",
+    ) as Record<string, unknown>;
+    expect(saved.approx_children).toBe(38);
+    expect(saved.approx_guardians).toBe(61);
+    expect(saved).not.toHaveProperty("section_ids");
   });
 });
