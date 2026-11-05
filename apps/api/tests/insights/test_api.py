@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 from fastapi.routing import APIRoute, iter_route_contexts
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from app.authz.kv import kv_store
 from app.main import create_app
@@ -166,3 +166,62 @@ def test_H_01_behaviour_note_and_flag_replays_keep_no_text_in_valkey(school: Any
         assert again.status_code == 201
         assert again.headers.get("Idempotent-Replayed") == "true"
         assert again.json() == first.json()
+
+
+@pytest.mark.db
+def test_FR_EW_007_D56_flag_action_replay_adds_no_second_action_or_audit(
+    school: Any, api: Any, admin_engine: Engine
+) -> None:
+    """D56: a flag action accepts ``Idempotency-Key``. A replay answers the first result
+    (201, ``Idempotent-Replayed``) and records no second action row or audit event; the record
+    in Valkey keeps no note text (H-01)."""
+    ct = school.people["ct"]
+    flag = api.call(
+        ct,
+        "POST",
+        f"/api/v1/students/{school.ids['a1']}/flags",
+        json={"indicator": "behaviour", "note": "Synthetic flag for the replay of an action."},
+    )
+    assert flag.status_code == 201, flag.text
+    flag_id = flag.json()["id"]
+    path = f"/api/v1/insights/flags/{flag_id}/actions"
+    body = {"kind": "met_parent", "note": "Synthetic action note: met the parent."}
+    key = f"m5-{uuid.uuid4().hex}"
+
+    def counts() -> tuple[int, int]:
+        with admin_engine.connect() as c:
+            n_actions: int = c.execute(
+                text("SELECT count(*) FROM sis.flag_actions WHERE flag_id = :f"), {"f": flag_id}
+            ).scalar_one()
+            n_events: int = c.execute(
+                text(
+                    "SELECT count(*) FROM audit.events WHERE action = "
+                    "'insights.flag_action_added' AND resource_id = :f"
+                ),
+                {"f": flag_id},
+            ).scalar_one()
+        return int(n_actions), int(n_events)
+
+    actions, events = counts()  # raising a flag with a note may log a first action
+    first = api.call(ct, "POST", path, json=body, headers={"Idempotency-Key": key})
+    assert first.status_code == 201, first.text
+    assert first.headers["ETag"]
+    assert counts() == (actions + 1, events + 1)
+    raw = _idem_record(school.tenant_id, ct.user_id, path, key)
+    assert b"Synthetic action note" not in raw
+    assert b'"body"' not in raw
+    again = api.call(ct, "POST", path, json=body, headers={"Idempotency-Key": key})
+    assert again.status_code == 201
+    assert again.headers.get("Idempotent-Replayed") == "true"
+    assert again.json() == first.json()
+    assert again.headers["ETag"] == first.headers["ETag"]
+    assert counts() == (actions + 1, events + 1)
+    # The same key with another body is refused; a new key records a second action.
+    other = api.call(
+        ct, "POST", path, json={"kind": "home_visit"}, headers={"Idempotency-Key": key}
+    )
+    assert other.status_code == 422
+    assert other.json()["code"] == "idempotency_key_reused"
+    fresh = api.call(ct, "POST", path, json=body, headers={"Idempotency-Key": f"{key}-2"})
+    assert fresh.status_code == 201, fresh.text
+    assert counts() == (actions + 2, events + 2)

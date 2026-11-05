@@ -129,12 +129,19 @@ def raise_flag(
 
 @router.post("/insights/flags/{flag_id}/actions", response_model=InsightFlagDetail, status_code=201)
 def add_action(
-    ctx: Actor, db: TenantDB, flag_id: uuid.UUID, body: ActionIn, response: Response
-) -> InsightFlagDetail:
+    ctx: Actor, db: TenantDB, flag_id: uuid.UUID, body: ActionIn, idem: IdempotencyDep
+) -> Response:
     """Record what was done about a flag (``insights.act``): talked with the student, called or
     met a parent, home visit, remedial support, referral, other; optional note. The first
-    action marks the flag actioned. 409 ``flag_closed``."""
-    return _flag_etag(response, service.add_action(db, ctx, flag_id, body))
+    action marks the flag actioned. 409 ``flag_closed``. Accepts ``Idempotency-Key`` (D56):
+    a replay answers the flag as it stands now and records no second action."""
+    return idem.run(
+        db,
+        body,
+        lambda: service.add_action(db, ctx, flag_id, body),
+        headers=lambda out: {"ETag": etag(out.version)},
+        refetch=lambda ref: service.get_flag(db, ctx, ref),  # C3 notes: no body kept
+    )
 
 
 @router.post("/insights/flags/{flag_id}/close", response_model=InsightFlagDetail)
