@@ -731,6 +731,22 @@ def pending_tenant_audit(session: Session) -> tuple[int, dt.datetime | None]:
     return int(row[0]), row[1]
 
 
+def purge_delivered_tenant_audit(session: Session, *, older_than_days: int) -> int:
+    """Delete copies delivered more than ``older_than_days`` ago (D51 for the control plane).
+    Undelivered copies (``delivered_at IS NULL``) are never touched; the database refuses to
+    delete them anyway (trigger ``tenant_audit_outbox_delivered_only``, 0074)."""
+    o = m.tenant_audit_outbox
+    result = session.execute(
+        delete(o)
+        .where(
+            o.c.delivered_at.is_not(None),
+            o.c.delivered_at < func.now() - func.make_interval(0, 0, 0, older_than_days),
+        )
+        .returning(o.c.id)
+    )
+    return len(result.all())
+
+
 # --- provisioning runs (FR-PLT-002, docs/16 §5.4) ----------------------------------------------
 
 

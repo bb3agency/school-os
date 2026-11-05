@@ -207,9 +207,11 @@ def test_ADR_0017_beat_schedule_per_deployment_mode() -> None:
     assert {v["task"] for v in dedicated.values()} == {
         "fleet.send_heartbeat",
         "platform.deliver_tenant_audit",
+        "platform.purge_tenant_audit",  # D51 for the control plane: both modes
     }
     assert "fleet.send_heartbeat" not in {v["task"] for v in shared.values()}
     assert "platform.deliver_tenant_audit" in {v["task"] for v in shared.values()}
+    assert "platform.purge_tenant_audit" in {v["task"] for v in shared.values()}
     assert {"billing.generate_invoices", "usage.collect_daily", "fleet.check_staleness"} <= {
         v["task"] for v in shared.values()
     }

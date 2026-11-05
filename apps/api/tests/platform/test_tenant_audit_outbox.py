@@ -311,8 +311,11 @@ def test_FR_AUD_001_backlog_alert_after_the_configured_minutes(
 
 def test_ADR_0020_outbox_grants(school: uuid.UUID, app_engine: Engine) -> None:
     event_id = _enqueue(school, "tenant.suspended", {"cause": "billing"})
+    # DELETE is granted since 0074 (D51 retention) but refused for an undelivered copy.
+    with pytest.raises(DBAPIError) as exc, platform_session() as s:
+        s.execute(text("DELETE FROM platform.tenant_audit_outbox WHERE id = :i"), {"i": event_id})
+    assert "undelivered school-chain copies cannot be deleted" in str(exc.value)
     for sql in (
-        "DELETE FROM platform.tenant_audit_outbox WHERE id = :i",
         "UPDATE platform.tenant_audit_outbox SET action = 'tenant.deleted' WHERE id = :i",
         "UPDATE platform.tenant_audit_outbox SET summary = '{}' WHERE id = :i",
     ):
