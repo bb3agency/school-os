@@ -872,8 +872,12 @@
         "openSchools": "Open schools",
         "openSupport": "Open support",
         "noneTitle": "Nothing needs attention right now",
-        "noneBody": "No unhealthy deployments, past-due subscriptions or late tickets."
-      }
+        "noneBody": "No unhealthy deployments, past-due subscriptions or late tickets.",
+        "planLimits": "{count, plural, one {# school is} other {# schools are}} at 80% or more of a plan limit this billing period",
+        "openUsage": "Open usage"
+      },
+      "planLimits": "Schools at a plan limit",
+      "planLimitsHint": "{near} more at 80% this billing period"
     },
     "schools": {
       "title": "Schools",
@@ -1475,6 +1479,15 @@
         "near": "80% used",
         "usedUp": "All used",
         "usedOf": "{used} of {included}"
+      },
+      "limitAlerts": {
+        "title": "Plan-limit alerts this billing period",
+        "description": "Each school's crossings of 80% and 100% of its plan limits in its current billing period. The owner and principal are told in the app. Limits never block work. Counts only.",
+        "none": "No school has reached 80% of a plan limit this billing period.",
+        "near": "80% reached",
+        "reached": "Limit reached",
+        "usedOf": "{used} of {limit}",
+        "metric": "{metric, select, students {Students} staff_users {Staff accounts} documents {Documents} storage_gb {Storage (GB)} ai_tokens_month {AI tokens} ai_budget_inr {AI budget (₹)} other {Other}}"
       }
     },
     "flags": {
