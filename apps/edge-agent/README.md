@@ -20,33 +20,85 @@ common firewall rule sets).
 
 ## Install (per school PC)
 
+> **Unsigned builds are not for schools.** A release built without the code-signing secrets is
+> named `schoolos-tally-agent-<version>-x64-unsigned.msi`. Use it only on test PCs. Install only
+> an MSI whose Authenticode signature shows SchoolOS (right-click > Properties > Digital
+> Signatures) and whose SHA-256 matches the `.sha256` file from the same release.
+
 1. In TallyPrime: Help > Settings > Connectivity: "TallyPrime acts as Server", port 9000. In
    Windows Defender Firewall, block inbound 9000 from other machines.
-2. Create a local Windows account for the service (e.g. `SchoolOSAgent`), without admin rights.
-3. Install the signed package (Python runtime + this package + WinSW) into
-   `C:\Program Files\SchoolOS\TallyAgent`.
-4. The school owner creates a one-time code on SchoolOS > Tally connector (it needs a recent MFA
+2. As an administrator, run `schoolos-tally-agent-<version>-x64.msi` (per machine, 64-bit Windows
+   10/11). It installs into `C:\Program Files\SchoolOS\TallyAgent` (Python runtime, this package,
+   WinSW) and registers and starts the service **SchoolOS Tally agent** (`SchoolOSTallyAgent`):
+   virtual account `NT SERVICE\SchoolOSTallyAgent` (no password, nobody can sign in as it),
+   automatic (delayed) start, restart on failure. No account needs creating. Until it is
+   enrolled the service just waits.
+3. The school owner creates a one-time code on SchoolOS > Tally connector (it needs a recent MFA
    sign-in and is valid for 30 minutes).
-5. As the service account: `sos-tally-agent enrol --server https://<school address> --school
-   <school id> --code XXXX-XXXX-XXXX`. The device key is protected with Windows DPAPI for that
-   account only.
-6. `sos-tally-agent.exe install` and `start` (WinSW, `windows/sos-tally-agent.xml`).
-7. The accountant chooses the ledger groups on the Tally connector screen, then links ledgers to
+4. From an **elevated** Command Prompt:
+
+   ```bat
+   "C:\Program Files\SchoolOS\TallyAgent\tally-agent.cmd" enrol --via-service --server https://<school address> --school <school id> --code XXXX-XXXX-XXXX
+   ```
+
+   This leaves the request in the state folder; the service enrols itself within a minute (so
+   the device key is protected with Windows DPAPI for the service account only) and deletes the
+   request whether or not the code worked. Check with `tally-agent.cmd status`; if it still says
+   not enrolled, `agent.log` in the state folder has the error code (create a new code).
+5. The accountant chooses the ledger groups on the Tally connector screen, then links ledgers to
    students.
 
-`sos-tally-agent check-tally` checks Tally's XML server; `status` shows the configuration (never
-the key); `rotate-key` gets a new key (also done automatically every 90 days).
+`tally-agent.cmd check-tally` checks Tally's XML server; `status` shows the configuration (never
+the key). The service syncs every 30 minutes and rotates its key every 90 days (`sync-once` and
+`rotate-key` need the device key, so they work only inside the service).
+
+## Upgrade
+
+No auto-update. When SchoolOS says the agent is outdated (`min_agent_version`), run the new MSI as
+an administrator: it stops the service, replaces the program files, and starts it again.
+Enrolment, configuration and the key in `ProgramData` are kept. Installing an older MSI over a
+newer one is refused.
+
+## Uninstall
+
+Settings > Apps > SchoolOS Tally agent > Uninstall (or `msiexec /x` with the MSI). This stops and
+removes the service and the program files, and **leaves** `C:\ProgramData\SchoolOS\TallyAgent`
+(configuration, device key, logs) so a reinstall keeps working. To remove the PC completely:
+
+1. Revoke the device on SchoolOS > Tally connector (the key stops working at once).
+2. From an elevated prompt: `rmdir /s /q "C:\ProgramData\SchoolOS\TallyAgent"` (and
+   `C:\ProgramData\SchoolOS` if it is empty).
 
 ## What is stored on the PC
 
-- `%LOCALAPPDATA%\SchoolOS\TallyAgent\agent.toml` (service account): SchoolOS address, school
-  id, device id, key id, Tally address. No secrets.
+`C:\ProgramData\SchoolOS\TallyAgent` (MSI install; ACL: the service account and Administrators
+only, nothing inherited; `%LOCALAPPDATA%\SchoolOS\TallyAgent` of the account for a manual run):
+
+- `agent.toml`: SchoolOS address, school id, device id, key id, Tally address. No secrets.
 - `device.key`: the device key, DPAPI-protected (user scope, school id as entropy).
+- `enrol-request.toml`: only between `enrol --via-service` and the service's next check (it holds
+  the one-time code; deleted after one attempt).
 - `agent.log` (rotated, 5 x 1 MB): event names, counts and error codes only. Never ledger names,
-  amounts, the code or the key.
+  amounts, the code or the key. WinSW's own logs are in `logs\`.
 
 Snapshots are kept in memory for one attempt; when SchoolOS is unreachable the agent retries
 with backoff (1 minute doubling to 30 minutes) and takes a fresh snapshot.
+
+## Building the installer
+
+`installer/` (D69): `SchoolOSTallyAgent.wxs` (WiX Toolset v4), `pins.toml` (exact versions and
+SHA-256 of the Python embeddable zip and WinSW, and the WiX version), `build.ps1` (Windows
+PowerShell 5.1; needs uv and the `wix` dotnet tool with `WixToolset.Util.wixext`):
+
+```powershell
+dotnet tool install --global wix --version 4.0.5
+wix extension add --global WixToolset.Util.wixext/4.0.5
+powershell -NoProfile -ExecutionPolicy Bypass -File apps\edge-agent\installer\build.ps1 -Version 2026.11.1
+```
+
+The release workflow (job `edge-agent-msi`) does this on every CalVer tag and signs the MSI when
+the signing secrets exist. The build stops if a pin is a placeholder or a download's SHA-256
+differs. `-StageOnly` stops before WiX.
 
 ## Development
 
