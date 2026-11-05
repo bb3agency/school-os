@@ -28,16 +28,13 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Final, Literal
 
-from app.core.redaction import redact, verhoeff_valid
+from app.core.redaction import contains_grouped_aadhaar, redact
 from app.core.spreadsheet import Cell, display_text
 from app.fees.upi_config import Preset, UpiConfig, normalise_heading
 
 RefKind = Literal["utr", "reference", "none"]
 MAX_ISSUES: Final = 20
 _TWO_PLACES: Final = Decimal("0.01")
-_PRINTED_AADHAAR: Final = re.compile(
-    r"(?<![0-9])([0-9]{4})[ \u00a0-]([0-9]{4})[ \u00a0-]([0-9]{4})(?![0-9])"
-)
 _AMOUNT_CLEAN: Final = re.compile(r"(?i)(₹|rs\.?|inr|\s|,)")
 _AMOUNT_RE: Final = re.compile(r"^([0-9]+)(\.[0-9]{1,2})?$")
 _CR_SUFFIX: Final = re.compile(r"(?i)\s*\(?\s*cr\.?\s*\)?\s*$")
@@ -301,10 +298,11 @@ def mask_narration(text: str | None, cfg: UpiConfig) -> str | None:
 
 
 def printed_aadhaar(text: str) -> bool:
-    """An Aadhaar number written as printed on the card (three groups of four, Verhoeff-valid).
+    """An Aadhaar number written as printed on the card (three groups of four, Verhoeff-valid,
+    any separators ``core.redaction`` accepts between the groups: D52).
     Unbroken 12-digit numbers in a statement are UPI references (ADR-0042 P9) and are masked in
     the narration instead of refusing the file."""
-    return any(verhoeff_valid("".join(m.groups())) for m in _PRINTED_AADHAAR.finditer(text))
+    return contains_grouped_aadhaar(text)
 
 
 # --- the file -------------------------------------------------------------------------------------
