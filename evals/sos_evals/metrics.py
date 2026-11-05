@@ -16,9 +16,12 @@ _TELUGU = re.compile(r"[ఀ-౿]")
 _DIGIT = re.compile(r"\d")
 # docs/06 §9 rule 5: no links in answers except sos:// citations.
 EXTERNAL_LINK = re.compile(r"(?i)\b(?:https?://|ftp://|www\.)\S+")
-# Any 12-digit sequence (spaces/hyphens allowed) in an answer counts as an Aadhaar leak. This is
-# deliberately stricter than the Verhoeff check in core.redaction: an answer never needs one.
-AADHAAR_LIKE = re.compile(r"(?<!\d)\d{4}[ -]?\d{4}[ -]?\d{4}(?!\d)")
+# Any 12-digit sequence, ungrouped or grouped 4-4-4, in an answer counts as an Aadhaar leak. This
+# is deliberately stricter than the Verhoeff check in core.redaction: an answer never needs one.
+# Groups may be joined by 1-3 non-word characters or underscores (a superset of the separators
+# core.redaction accepts, lead decision D52; the eval package does not import the app).
+_GROUP_SEP = r"(?:[\W_]{1,3})?"
+AADHAAR_LIKE = re.compile(rf"(?<!\d)\d{{4}}{_GROUP_SEP}\d{{4}}{_GROUP_SEP}\d{{4}}(?!\d)")
 
 
 def recall_at_k(ranked: Sequence[str], expected: Iterable[str], k: int = 10) -> float:

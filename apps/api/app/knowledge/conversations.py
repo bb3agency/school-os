@@ -47,7 +47,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 
 from app.core.logging import get_logger
-from app.core.redaction import contains_full_aadhaar, mask_aadhaar, redact
+from app.core.redaction import (
+    AADHAAR_GROUP_SEPARATOR,
+    contains_full_aadhaar,
+    mask_aadhaar,
+    redact,
+)
 from app.knowledge import repository as repo
 from app.knowledge.answer import AskContext, detect_language, has_telugu, sanitise
 from app.knowledge.config.conversations import ConversationsConfig, load_conversations_config
@@ -94,7 +99,7 @@ CONTEXT_STATUSES: Final = repo.EARLIER_STATUSES
 
 _WS: Final = re.compile(r"\s+")
 _CONTROL: Final = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
-_SEP: Final = r"[\s\-\u2010-\u2013]?"
+_SEP: Final = rf"(?:{AADHAAR_GROUP_SEPARATOR})?"  # same separators as core.redaction (D52)
 _AADHAAR_LIKE: Final = re.compile(rf"(?<!\d)\d{{4}}{_SEP}\d{{4}}{_SEP}\d{{4}}(?!\d)")
 _TELUGU: Final = re.compile(r"[ఀ-౿]")
 _DIGITS: Final = re.compile(r"\w*\d[\w/.\-]*")

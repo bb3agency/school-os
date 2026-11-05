@@ -6,6 +6,13 @@ import * as z from "@/lib/zod";
 import { AuthRedirectError } from "@/lib/bff/fetch";
 import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
 import type { Loadable } from "@/lib/loadable";
+import { AADHAAR_GROUP_SEPARATOR } from "@/lib/aadhaar";
+
+/** Any 12 digits, ungrouped or 4-4-4 with the separators `lib/aadhaar` accepts (D52). */
+const TWELVE_DIGITS = new RegExp(
+  String.raw`(?<!\d)\d{4}(?:${AADHAAR_GROUP_SEPARATOR})?\d{4}(?:${AADHAAR_GROUP_SEPARATOR})?\d{4}(?!\d)`,
+  "u",
+);
 
 /**
  * Student timeline and early warning (M5; US-1701..US-1709). Attendance and marks are school
@@ -332,7 +339,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** A 12-digit number never goes into a note (the API refuses full Aadhaar numbers too). */
 export function looksLikeAadhaar(text: string): boolean {
-  return /(?<!\d)\d{4}[\s-]?\d{4}[\s-]?\d{4}(?!\d)/.test(text);
+  return TWELVE_DIGITS.test(text);
 }
 
 const freeText = (max: number) =>

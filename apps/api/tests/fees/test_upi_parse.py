@@ -144,6 +144,15 @@ def test_FR_FEE_016_printed_aadhaar_numbers_are_refused() -> None:
     assert not printed_aadhaar("UPI/CR/234567890124/x")
 
 
+@pytest.mark.parametrize(
+    "text",
+    ["2345.6789/0124", "2345 - 6789 - 0124", "2345\u00a0\u00a06789_0124", "2345/ 6789 .0124"],
+)
+def test_FR_FEE_016_D52_printed_aadhaar_with_any_separators_is_refused(text: str) -> None:
+    assert printed_aadhaar(f"ID {text} x")
+    assert not printed_aadhaar(f"ID {text[:-1]}5 x")  # checksum fails
+
+
 def test_FR_FEE_016_more_than_5000_transactions_are_refused() -> None:
     credits = [S.Credit(TODAY, "1.00", f"{n:012d}") for n in range(5001)]
     with pytest.raises(StatementRefused) as err:

@@ -7,6 +7,13 @@ import { AuthRedirectError } from "@/lib/bff/fetch";
 import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
 import { typedDateToIso } from "@/lib/date-format";
 import type { Loadable } from "@/lib/loadable";
+import { AADHAAR_GROUP_SEPARATOR } from "@/lib/aadhaar";
+
+/** Any 12 digits, ungrouped or 4-4-4 with the separators `lib/aadhaar` accepts (D52). */
+const TWELVE_DIGITS = new RegExp(
+  String.raw`(?<!\d)\d{4}(?:${AADHAAR_GROUP_SEPARATOR})?\d{4}(?:${AADHAAR_GROUP_SEPARATOR})?\d{4}(?!\d)`,
+  "u",
+);
 
 /**
  * Circulars, tasks and parent notices (M4; US-1601..US-1606). The AI reading of a circular and
@@ -312,7 +319,7 @@ export function looksPersonal(text: string): boolean {
   return (
     /[\w.%+-]+@[\w-]+(\.[\w-]+)+/.test(text) ||
     /(?<!\d)(?:\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}(?!\d)/.test(text) ||
-    /(?<!\d)\d{4}[\s-]?\d{4}[\s-]?\d{4}(?!\d)/.test(text)
+    TWELVE_DIGITS.test(text)
   );
 }
 
