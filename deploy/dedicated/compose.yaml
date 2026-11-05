@@ -112,7 +112,8 @@ services:
       - /var/lib/schoolos/caddy/config:/config
     tmpfs:
       - /tmp:size=16m,uid=10001,gid=10001
-    networks: [edge]
+    # edge_api: only for the Tally edge-agent routes /api/v1/edge/tally/* (Caddyfile, D61).
+    networks: [edge, edge_api]
     depends_on:
       web:
         condition: service_healthy
@@ -188,7 +189,7 @@ services:
       - /var/lib/schoolos/aws/api:/run/aws:ro
     tmpfs:
       - /tmp:size=128m,uid=10001,gid=10001
-    networks: [app, data, cache]
+    networks: [app, data, cache, edge_api]
     depends_on:
       db:
         condition: service_healthy
@@ -437,6 +438,10 @@ services:
 networks:
   # caddy <-> web only
   edge: {}
+  # caddy <-> api only, for the Tally edge-agent routes (D61; the Caddyfile proxies nothing else to
+  # the api). Internal: no route out of the host; the api reaches the internet through `app`.
+  edge_api:
+    internal: true
   # app tier: outbound internet for S3/KMS/Cognito/LLM providers/heartbeat
   app: {}
   # data tier (Postgres): no route out of the host (internal). web is not on it: it holds no DB
