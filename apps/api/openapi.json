@@ -3163,6 +3163,62 @@
         "title": "Bilingual",
         "type": "object"
       },
+      "BillIn": {
+        "additionalProperties": false,
+        "description": "One pending bill of the ledger (Tally bill-wise allocation; D63).",
+        "properties": {
+          "bill_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bill Date"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "pending": {
+            "anyOf": [
+              {
+                "maximum": 999999999999.99,
+                "minimum": -999999999999.99,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Pending"
+          },
+          "reference": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reference",
+          "pending"
+        ],
+        "title": "BillIn",
+        "type": "object"
+      },
       "BillingAccountIn": {
         "additionalProperties": false,
         "properties": {
@@ -10808,6 +10864,72 @@
           "text"
         ],
         "title": "DraftOut",
+        "type": "object"
+      },
+      "DueBillOut": {
+        "description": "One pending bill (Tally bill-wise allocation) of a linked ledger (D63).",
+        "properties": {
+          "bill_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bill Date"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tally's due date (or bill date + credit period); null when Tally has none",
+            "title": "Due Date"
+          },
+          "ledger_name": {
+            "title": "Ledger Name",
+            "type": "string"
+          },
+          "overdue": {
+            "description": "Pending, and the due date is before today (IST)",
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "pending": {
+            "description": "Positive: still owed to the school",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pending",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Tally's bill name, e.g. the term it was raised for",
+            "title": "Reference",
+            "type": "string"
+          },
+          "shared": {
+            "description": "The ledger is also linked to another student (a family ledger; D54)",
+            "title": "Shared",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ledger_name",
+          "reference",
+          "bill_date",
+          "due_date",
+          "pending",
+          "overdue",
+          "shared"
+        ],
+        "title": "DueBillOut",
         "type": "object"
       },
       "DueLine": {
@@ -23910,6 +24032,15 @@
       "PartyIn": {
         "additionalProperties": false,
         "properties": {
+          "bills": {
+            "description": "Pending bills (D63). Empty: no bill-wise details, dues use the balance.",
+            "items": {
+              "$ref": "#/components/schemas/BillIn"
+            },
+            "maxItems": 100,
+            "title": "Bills",
+            "type": "array"
+          },
           "closing_balance": {
             "anyOf": [
               {
@@ -35342,6 +35473,14 @@
             "title": "As Of",
             "type": "string"
           },
+          "bills": {
+            "description": "Pending bills of this student's ledgers, by due date (D63). Empty when Tally keeps no bill-wise details for them: the total is then the ledgers' balance. The total stays the ledgers' balance either way.",
+            "items": {
+              "$ref": "#/components/schemas/DueBillOut"
+            },
+            "title": "Bills",
+            "type": "array"
+          },
           "class_section": {
             "anyOf": [
               {
@@ -35367,6 +35506,18 @@
           "ledgers": {
             "title": "Ledgers",
             "type": "integer"
+          },
+          "overdue_bills": {
+            "default": 0,
+            "title": "Overdue Bills",
+            "type": "integer"
+          },
+          "overdue_due": {
+            "default": "0.00",
+            "description": "Sum of the overdue bills' pending amounts (a shared ledger in full; D54)",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Overdue Due",
+            "type": "string"
           },
           "shared_ledger": {
             "description": "At least one of this student's ledgers is also linked to another student (a family ledger shared by siblings; D54).",
@@ -71131,6 +71282,7 @@
     },
     "/api/v1/platform/tenants/{tenant_id}/owner-invite:resend": {
       "post": {
+        "description": "Queue the school owner's invitation email again (D62, D65). Allowed while the school is\nprovisioning, active or suspended; 409 ``invalid_state`` once offboarding or deleted. Only\nqueued: the school side sends nothing if the owner already accepted, and keeps the 10-minute\ninvitation cool-down.",
         "operationId": "resend_owner_invite_api_v1_platform_tenants__tenant_id__owner_invite_resend_post",
         "parameters": [
           {
@@ -72198,7 +72350,7 @@
     },
     "/api/v1/privacy/breaches/{breach_id}/affected:count": {
       "post": {
-        "description": "Count the affected students, their guardians and staff picked by class, section, single\nstudent, role or single staff member, for the edit form's counts (D59; permission\n``privacy.breach.manage``). Nothing is stored: the school saves the counts with PATCH. Each\nperson counts once. Only students in the caller's ``student.read_basic`` reach count (a\nsingle student outside it is ``not_found``). Errors: ``not_found`` (422, per list),\n``breach_closed`` (409).",
+        "description": "Count the affected students, their guardians and staff picked by class, section, single\nstudent, role or single staff member, for the edit form's counts (D59; permission\n``privacy.breach.manage`` with step-up, as for every POST under that permission). Nothing\nis stored: the school saves the counts with PATCH. Each person counts once. Only students\nin the caller's ``student.read_basic`` reach count (a single student outside it is\n``not_found``). Errors: ``not_found`` (422, per list), ``breach_closed`` (409).",
         "operationId": "count_affected_api_v1_privacy_breaches__breach_id__affected_count_post",
         "parameters": [
           {

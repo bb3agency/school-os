@@ -7472,7 +7472,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Resend Owner Invite */
+        /**
+         * Resend Owner Invite
+         * @description Queue the school owner's invitation email again (D62, D65). Allowed while the school is
+         *     provisioning, active or suspended; 409 ``invalid_state`` once offboarding or deleted. Only
+         *     queued: the school side sends nothing if the owner already accepted, and keeps the 10-minute
+         *     invitation cool-down.
+         */
         post: operations["resend_owner_invite_api_v1_platform_tenants__tenant_id__owner_invite_resend_post"];
         delete?: never;
         options?: never;
@@ -7714,10 +7720,10 @@ export interface paths {
          * Count Affected
          * @description Count the affected students, their guardians and staff picked by class, section, single
          *     student, role or single staff member, for the edit form's counts (D59; permission
-         *     ``privacy.breach.manage``). Nothing is stored: the school saves the counts with PATCH. Each
-         *     person counts once. Only students in the caller's ``student.read_basic`` reach count (a
-         *     single student outside it is ``not_found``). Errors: ``not_found`` (422, per list),
-         *     ``breach_closed`` (409).
+         *     ``privacy.breach.manage`` with step-up, as for every POST under that permission). Nothing
+         *     is stored: the school saves the counts with PATCH. Each person counts once. Only students
+         *     in the caller's ``student.read_basic`` reach count (a single student outside it is
+         *     ``not_found``). Errors: ``not_found`` (422, per list), ``breach_closed`` (409).
          */
         post: operations["count_affected_api_v1_privacy_breaches__breach_id__affected_count_post"];
         delete?: never;
@@ -11484,6 +11490,20 @@ export interface components {
             /** Te */
             te: string;
         };
+        /**
+         * BillIn
+         * @description One pending bill of the ledger (Tally bill-wise allocation; D63).
+         */
+        BillIn: {
+            /** Bill Date */
+            bill_date?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Pending */
+            pending: number | string;
+            /** Reference */
+            reference: string;
+        };
         /** BillingAccountIn */
         BillingAccountIn: {
             /** Address Line1 */
@@ -14265,6 +14285,41 @@ export interface components {
             text: string;
             /** Title */
             title: string;
+        };
+        /**
+         * DueBillOut
+         * @description One pending bill (Tally bill-wise allocation) of a linked ledger (D63).
+         */
+        DueBillOut: {
+            /** Bill Date */
+            bill_date: string | null;
+            /**
+             * Due Date
+             * @description Tally's due date (or bill date + credit period); null when Tally has none
+             */
+            due_date: string | null;
+            /** Ledger Name */
+            ledger_name: string;
+            /**
+             * Overdue
+             * @description Pending, and the due date is before today (IST)
+             */
+            overdue: boolean;
+            /**
+             * Pending
+             * @description Positive: still owed to the school
+             */
+            pending: string;
+            /**
+             * Reference
+             * @description Tally's bill name, e.g. the term it was raised for
+             */
+            reference: string;
+            /**
+             * Shared
+             * @description The ledger is also linked to another student (a family ledger; D54)
+             */
+            shared: boolean;
         };
         /**
          * DueLine
@@ -18917,6 +18972,11 @@ export interface components {
         };
         /** PartyIn */
         PartyIn: {
+            /**
+             * Bills
+             * @description Pending bills (D63). Empty: no bill-wise details, dues use the balance.
+             */
+            bills?: components["schemas"]["BillIn"][];
             /** Closing Balance */
             closing_balance: number | string;
             /** Group */
@@ -23150,12 +23210,28 @@ export interface components {
              * Format: date
              */
             as_of: string;
+            /**
+             * Bills
+             * @description Pending bills of this student's ledgers, by due date (D63). Empty when Tally keeps no bill-wise details for them: the total is then the ledgers' balance. The total stays the ledgers' balance either way.
+             */
+            bills?: components["schemas"]["DueBillOut"][];
             /** Class Section */
             class_section: string | null;
             /** Display Name */
             display_name: string | null;
             /** Ledgers */
             ledgers: number;
+            /**
+             * Overdue Bills
+             * @default 0
+             */
+            overdue_bills: number;
+            /**
+             * Overdue Due
+             * @description Sum of the overdue bills' pending amounts (a shared ledger in full; D54)
+             * @default 0.00
+             */
+            overdue_due: string;
             /**
              * Shared Ledger
              * @description At least one of this student's ledgers is also linked to another student (a family ledger shared by siblings; D54).
