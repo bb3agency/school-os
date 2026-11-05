@@ -33,6 +33,10 @@ billing:
 # 'answered' row and counts (docs/16 §19 Q15). Schools never see tokens.
 ai_answers:
   billable_statuses: [answered]
+  # kb.queries routes never billed whatever their status (lead decision D50): 'memory' = a
+  # "remember this" reply in Ask, a fixed reply with no answer model call. Keep equal to
+  # app/knowledge/config/models.yaml budget.bundle.excluded_routes (a test pins them).
+  excluded_routes: [memory]
   # Quota alerts (ADR-0038 follow-up, docs/16 §19 Q16): the usage collector records the first
   # crossing of each percentage of a bundle's included answers once per school per calendar month
   # (platform.usage_threshold_events, metric ai_answers; the DB allows 80 and 100 only). Alert

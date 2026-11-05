@@ -115,3 +115,17 @@ Implementation facts (docs/16 §19 Q16, F2); the decision is unchanged.
   Q16): annual plans, anything beyond an alert at 100 %, e-mail to the billing contact, and a
   crossing on the last day of a month, which is recorded under that month on the 1st and is not
   pulled by the school.
+
+## Amendments (2026-11-04)
+
+Lead decision D50 (docs/14) refines decision 4; nothing else changes.
+
+- **"Remember this" replies are not AI answers.** A reply to a "remember that ..." instruction
+  in Ask (`kb.queries.route = 'memory'`, status `answered` when the note is saved) is a fixed
+  reply with no answer model call, so it is left out of both counts: the school's live count
+  (`GET /knowledge/usage`, `knowledge.repository.count_answers`) and the usage collector's billed
+  count (`platform.usage.ai_counts_on`, which the dedicated heartbeat and the 80 %/100 % quota
+  alerts also use). It still counts as a question asked (`ai_queries`). The rule is config in
+  both files, `billing.yaml` → `ai_answers.excluded_routes` and `models.yaml` →
+  `budget.bundle.excluded_routes` (`[memory]`), pinned equal by
+  `tests/knowledge/test_ask_finish_unit.py` like the billable statuses. No migration.

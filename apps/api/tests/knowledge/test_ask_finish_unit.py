@@ -112,6 +112,12 @@ def test_ADR_0038_billable_statuses_equal_the_control_planes() -> None:
     assert CFG.budget.bundle.billable_statuses == billing == ("answered",)
 
 
+def test_D50_excluded_routes_equal_the_control_planes() -> None:
+    """Replies to "remember this" (route memory) are left out of both counts (D50, ADR-0038)."""
+    billing = tuple(str(v) for v in platform_config()["ai_answers"]["excluded_routes"])
+    assert CFG.budget.bundle.excluded_routes == billing == ("memory",)
+
+
 @pytest.mark.parametrize(
     ("mode", "error", "reason"),
     [

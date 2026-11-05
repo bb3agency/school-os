@@ -76,7 +76,11 @@ def school_usage(
     month, start, end = month_bounds(now)
     budget = runtime.llm_config.budget
     used = repo.count_answers(
-        session, start=start, end=end, statuses=budget.bundle.billable_statuses
+        session,
+        start=start,
+        end=end,
+        statuses=budget.bundle.billable_statuses,
+        excluded_routes=budget.bundle.excluded_routes,
     )
     included = tenancy.ai_answer_allowance(session)
     level = _budget_state(runtime, ctx)
