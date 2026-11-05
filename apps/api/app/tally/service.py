@@ -517,7 +517,7 @@ def _student_totals(balances: Iterable[repo.LinkedBalance]) -> dict[uuid.UUID, D
 
 def _ledger_total(balances: Iterable[repo.LinkedBalance], owing: Collection[uuid.UUID]) -> Decimal:
     """The sum of the present ledgers linked to any student in ``owing``, EACH LEDGER ONCE
-    (D54; ADR-0032 §7): a family ledger linked to two siblings is one debt, not two. Used for
+    (D54; ADR-0032 §6): a family ledger linked to two siblings is one debt, not two. Used for
     the school total and for each class total; a student's own total still includes it."""
     seen: dict[uuid.UUID, Decimal] = {}
     for b in balances:

@@ -181,6 +181,20 @@ Why this needs a decision:
   Without a student it returns numbers only (students with dues, total due, unlinked parties).
   Source URIs are `sos://fee/{id}` (an id derived from the school, student and snapshot; no
   names). No other party, name or amount can reach the model (invariants 8, 9).
+- **Shared (family) ledgers in totals** (lead decision D54, 2026-11-04, as built). A ledger
+  linked to several siblings is ONE debt. Each child's own view (the dues row, `get_fee_dues`
+  with a student) still includes it in full and marks it: `shared_ledger` / `shared_with` (how
+  many other students share one of the child's ledgers) on the dues row, "shared with N other
+  students" in the tool block, a "Shared with siblings" marker on the fee dues screen. Totals
+  count each ledger once: the school total is the sum of the present ledgers linked to any
+  student with dues (a student's dues are the net of their linked ledgers, as before), each
+  ledger once; a class total does the same over the students with dues in that class, so a
+  ledger shared by two children of one class counts once in it. A ledger shared across two
+  classes counts once in EACH class it touches and once in the school total, so the school
+  total is not the sum of the class totals (the tool says so when they differ). Students with
+  no current class, or one the caller cannot see, form one group with a null class. Status,
+  `/tally/dues` totals (now with `classes`) and `get_fee_dues` without a student all use this
+  rule; the full data export carries raw tables only, so no total there.
 - Eval gates (docs/06 §13.4, `evals/`): fee figure accuracy = 1.00, fee leakage = 0, fee
   citation validity = 1.00, guessed links = 0 (hard); refusal correctness ≥ 0.95 (hard).
 
