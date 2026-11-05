@@ -556,6 +556,7 @@ Each wave: its stories' ACs pass as automated tests; `make check`-equivalent gre
 | D64 | Contract step after D53 | Drop the exact `students_adm_no` index once `0073` is deployed (the case-insensitive index covers it); the control plane's own CHECK translation answers 422 without naming the constraint, as D55 does | D53; D55; docs/05 |
 | D65 | Re-sending the owner invitation after go-live (D62 gap) | Operators may re-send while the owner is still only invited, in any school status except offboarding; the 10-minute cool-down stays | D62; docs/16 §5.4 |
 | D66 | Browser journeys for the D57-D62 screens | Playwright journeys with the stand-in fixtures and axe on each new screen (plan-limit tile and list, affected-people picker, withdraw, notice PDF, breach draft print page) | docs/13; NFR-A11Y-001 |
+| D67 | Can an invited owner of a suspended school accept the invitation? (D65 gap: `core.accept_invitations` answers only active schools) | Yes, for the owner and principal roles only, matching the suspended-school allowlist (owner decision 2026-09-27, docs/16 §5.5); other invited staff wait until the school is active. A change to a `SECURITY DEFINER` function, so ADR-0056 records it | ADR-0056; ADR-0013; docs/16 §5.5 |
 
 **For the owner (no gate on the build):** whether to reopen D10 for the RTE register (D43), and when to commission the one-time professional review of `docs/legal/` (D30).
 
