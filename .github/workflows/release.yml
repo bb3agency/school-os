@@ -7,6 +7,7 @@
 #   its SHA-256 and the SBOMs (kept for good, not a 90-day workflow artifact).
 # deploy-dedicated.yml verifies the bundle's attestation and hands the hosts the SHA-256 from the
 # GitHub release, so a host never trusts a checksum that sits next to the bundle in S3.
+# Also: the Tally edge agent's MSI (job edge-agent-msi, Windows runner, D69), a workflow artifact.
 #
 # Only this file on a tag may assume the prod deploy role (job_workflow_ref; modules/ci_oidc), and
 # its jobs run in the `production` environment (required reviewers).
@@ -219,3 +220,92 @@ jobs:
             echo "### Release ${VERSION}"
             echo "- bundle: \`$(cut -d' ' -f1 dist/schoolos-dedicated.tar.gz.sha256)\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  edge-agent-msi:
+    # The Tally edge agent's Windows installer (D69, ADR-0032; apps/edge-agent/installer/). Built on
+    # a Windows runner by build.ps1 under Windows PowerShell 5.1 (the PCs' shell): pinned Python
+    # embeddable runtime and WinSW (SHA-256 in pins.toml), the agent wheel, WiX v4. Authenticode
+    # signing only when both signing secrets exist; otherwise the file is named *-unsigned.msi and
+    # is not for schools (apps/edge-agent/README.md). Needs no AWS: only the tag check.
+    #
+    # Secrets (environment `production`, optional):
+    #   WINDOWS_SIGNING_CERT_PFX_BASE64   the code-signing certificate and key (PFX, base64)
+    #   WINDOWS_SIGNING_CERT_PASSWORD     its password
+    # Optional variable: WINDOWS_SIGNING_TIMESTAMP_URL (RFC 3161; default DigiCert's)
+    name: Tally agent MSI (Windows)
+    needs: preflight
+    runs-on: windows-latest
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+    env:
+      WIX_VERSION: "4.0.5" # = [wix] version in apps/edge-agent/installer/pins.toml (a test checks)
+      SIGNING_ENABLED: ${{ secrets.WINDOWS_SIGNING_CERT_PFX_BASE64 != '' && secrets.WINDOWS_SIGNING_CERT_PASSWORD != '' }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.19"
+          enable-cache: false
+      - name: Install WiX Toolset (dotnet tool, pinned)
+        run: |
+          dotnet tool install --global wix --version $env:WIX_VERSION
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          wix extension add --global "WixToolset.Util.wixext/$env:WIX_VERSION"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          wix --version
+      - name: Build the MSI (build.ps1, Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          & .\apps\edge-agent\installer\build.ps1 -Version $env:VERSION -OutDir dist\tally-agent
+          if (-not $?) { exit 1 }
+      - name: Sign (Authenticode, only with the signing secrets)
+        if: env.SIGNING_ENABLED == 'true'
+        env:
+          CERT_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_CERT_PFX_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
+          TIMESTAMP_URL: ${{ vars.WINDOWS_SIGNING_TIMESTAMP_URL || 'http://timestamp.digicert.com' }}
+        run: |
+          $msi = "dist\tally-agent\schoolos-tally-agent-$env:VERSION-x64.msi"
+          $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { Write-Output '::error::signtool.exe not found'; exit 1 }
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_PFX_BASE64))
+            & $signtool.FullName sign /fd SHA256 /td SHA256 /tr $env:TIMESTAMP_URL /d "SchoolOS Tally agent" /f $pfx /p $env:CERT_PASSWORD $msi | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-Output '::error::signing failed'; exit 1 }
+          } finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+          & $signtool.FullName verify /pa $msi
+          if ($LASTEXITCODE -ne 0) { Write-Output '::error::the signature does not verify'; exit 1 }
+          "MSI=$msi" >> $env:GITHUB_ENV
+      - name: Name the unsigned MSI (no signing secrets; not for schools)
+        if: env.SIGNING_ENABLED != 'true'
+        run: |
+          $msi = "dist\tally-agent\schoolos-tally-agent-$env:VERSION-x64.msi"
+          $unsigned = "dist\tally-agent\schoolos-tally-agent-$env:VERSION-x64-unsigned.msi"
+          Move-Item -LiteralPath $msi -Destination $unsigned
+          Write-Output '::warning::The Tally agent MSI is UNSIGNED (no signing secrets). Not for schools.'
+          "MSI=$unsigned" >> $env:GITHUB_ENV
+      - name: SHA-256
+        run: |
+          $hash = (Get-FileHash -LiteralPath $env:MSI -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path -Leaf $env:MSI)" | Out-File -Encoding ascii "$($env:MSI).sha256"
+          "### Tally agent MSI`n- ``$(Split-Path -Leaf $env:MSI)``: ``$hash``" >> $env:GITHUB_STEP_SUMMARY
+      - name: Upload the MSI
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tally-agent-msi
+          path: |
+            dist/tally-agent/schoolos-tally-agent-*.msi
+            dist/tally-agent/schoolos-tally-agent-*.msi.sha256
+          retention-days: 90
+          if-no-files-found: error

@@ -72,7 +72,9 @@ Why this needs a decision:
   for **30 minutes**, for one enrolment, and is stored only as its SHA-256 hash
   (`ops.tally_enrolment_codes`). Creating it is audited (`tally.enrolment_code.created`).
 - On the PC the installer (or IT person) runs `sos-tally-agent enrol --server <url> --school
-  <school id> --code <code>` **as the service account**. The agent calls
+  <school id> --code <code>` **as the service account** (with the MSI, D69, the administrator
+  runs `tally-agent.cmd enrol --via-service ...`: the request waits in the ACL-protected state
+  folder and the service, running as its virtual account, enrols itself). The agent calls
   `POST /api/v1/edge/tally/enrol` (guard `require_edge_agent_enrolment()`): school id header,
   timestamp within ±5 minutes, a fresh nonce, the code in the TLS-protected body. A wrong,
   expired or used code is a plain 401 (no hint which), and at most **10 wrong codes per school and
@@ -204,7 +206,9 @@ Why this needs a decision:
   used by the API). HTTP uses the standard library (`urllib`), configuration TOML (`tomllib`),
   Windows DPAPI through `ctypes` (no pywin32). The Windows service wrapper is **WinSW** (MIT),
   configured by `apps/edge-agent/windows/sos-tally-agent.xml`; it runs `sos-tally-agent run`
-  under a dedicated local account.
+  under the virtual service account `NT SERVICE\SchoolOSTallyAgent` (D69: per-machine MSI from
+  `apps/edge-agent/installer/`, state in `%ProgramData%\SchoolOS\TallyAgent`, ACL that account
+  and Administrators only).
 - **On the PC** only the device credential is sensitive. It is stored with **DPAPI in the service
   account's user scope** (`CryptProtectData`, entropy bound to the school id), so other Windows
   users of the shared office PC cannot read it. The configuration file holds only the server URL,
@@ -238,7 +242,8 @@ the model. The flag is not to be switched on anywhere until this ADR is accepted
 - Bad: a new program on customer PCs to build, sign, support and update; Tally versions differ.
 - Bad: party-to-student linking is manual work for the accountant (about 2,000 links at the
   design partner, once); candidate suggestions reduce it but a person still confirms each.
-- Follow-up: MSI installer and code-signing certificate; bill-wise dues (term-wise) if the PO
+- Follow-up: the code-signing certificate (the MSI is built, D69; unsigned builds are named
+  `-unsigned` and are not for schools); bill-wise dues (term-wise) if the PO
   wants them; staging test against a real TallyPrime; DPIA update (fee data).
 
 ## Alternatives considered

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SchoolOS Tally agent: per-machine x64 MSI (D69, ADR-0032; WiX Toolset v4, built by build.ps1).
+
+  Program Files\SchoolOS\TallyAgent   (read-only for the service; replaced on every upgrade)
+    sos-tally-agent.exe               WinSW (pinned in pins.toml), the service executable
+    sos-tally-agent.xml               WinSW configuration (from ..\windows\)
+    tally-agent.cmd                   the agent's command line for administrators
+    python\                           the pinned Python embeddable runtime, with the agent wheel
+                                      and its locked dependencies in python\Lib\site-packages
+                                      (generated into payload.wxs by build.ps1)
+
+  ProgramData\SchoolOS\TallyAgent     configuration, device key (DPAPI, service-account scope),
+                                      logs. Explicit, protected DACL: the service's virtual account
+                                      (modify) and Administrators (full) only. Permanent: an
+                                      uninstall leaves it (README "Uninstall" says how to remove it).
+
+  The service runs as the virtual account NT SERVICE\SchoolOSTallyAgent (never LocalSystem),
+  starts automatically (delayed) and is restarted on failure. No auto-update: a new MSI replaces
+  the old one (MajorUpgrade).
+
+  Variables (wix build -d): ProductVersion (MSI form of the CalVer tag, e.g. 26.11.1).
+  Bind path (wix build -bindpath stage=...): the staging folder build.ps1 fills.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package Name="SchoolOS Tally agent"
+           Manufacturer="SchoolOS"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="{53A0FDBB-BDDA-4B4B-9A2F-D9D6AE3E85EA}"
+           Scope="perMachine"
+           InstallerVersion="500"
+           Compressed="yes"
+           Language="1033">
+    <SummaryInformation Description="SchoolOS Tally agent (reads the Tally ledger groups the school chose and sends fee balances to SchoolOS)" />
+
+    <!-- Removes the old version before installing (no component rules to keep in step). -->
+    <MajorUpgrade Schedule="afterInstallInitialize"
+                  AllowSameVersionUpgrades="no"
+                  DowngradeErrorMessage="A newer SchoolOS Tally agent is already installed. Uninstall it first if you really need this older one." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Property Id="ARPURLINFOABOUT" Value="https://schoolos.in" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="SchoolOSProgramDir" Name="SchoolOS">
+        <Directory Id="INSTALLFOLDER" Name="TallyAgent">
+          <Directory Id="PYTHONDIR" Name="python" />
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="SchoolOSDataDir" Name="SchoolOS">
+        <Directory Id="STATEFOLDER" Name="TallyAgent" />
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="TallyAgent" Title="SchoolOS Tally agent" Level="1" AllowAbsent="no">
+      <ComponentGroupRef Id="AgentService" />
+      <ComponentGroupRef Id="PythonRuntime" />
+      <ComponentRef Id="StateFolder" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="AgentService" Directory="INSTALLFOLDER">
+      <Component Id="ServiceWrapper" Bitness="always64">
+        <File Id="WinSWExe" Source="!(bindpath.stage)\sos-tally-agent.exe" KeyPath="yes" />
+        <ServiceInstall Id="AgentServiceInstall"
+                        Name="SchoolOSTallyAgent"
+                        DisplayName="SchoolOS Tally agent"
+                        Description="Reads the Tally ledger groups the school chose and sends fee balances to SchoolOS over HTTPS. Opens no port."
+                        Type="ownProcess"
+                        Start="auto"
+                        ErrorControl="normal"
+                        Account="NT SERVICE\SchoolOSTallyAgent"
+                        Vital="yes">
+          <ServiceConfig DelayedAutoStart="yes" OnInstall="yes" OnReinstall="yes" />
+          <util:ServiceConfig FirstFailureActionType="restart"
+                              SecondFailureActionType="restart"
+                              ThirdFailureActionType="restart"
+                              RestartServiceDelayInSeconds="60"
+                              ResetPeriodInDays="1" />
+        </ServiceInstall>
+        <ServiceControl Id="AgentServiceControl"
+                        Name="SchoolOSTallyAgent"
+                        Start="install"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="yes" />
+      </Component>
+      <Component Id="ServiceXml" Bitness="always64">
+        <File Id="WinSWXml" Source="!(bindpath.stage)\sos-tally-agent.xml" KeyPath="yes" />
+      </Component>
+      <Component Id="AdminCommand" Bitness="always64">
+        <File Id="AdminCmd" Source="!(bindpath.stage)\tally-agent.cmd" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!--
+      The state folder. SDDL: protected DACL (no inheritance from ProgramData, so Users get
+      nothing), Administrators full control, the service SID of SchoolOSTallyAgent
+      (S-1-5-80-SHA1 of the upper-case name; the same SID as NT SERVICE\SchoolOSTallyAgent) modify
+      (0x1301bf). Nobody else, not even SYSTEM. Permanent: never removed by an uninstall.
+    -->
+    <Component Id="StateFolder"
+               Directory="STATEFOLDER"
+               Guid="{21100747-C6FD-4D41-8F3A-05E0178E5333}"
+               Bitness="always64"
+               KeyPath="yes"
+               Permanent="yes">
+      <CreateFolder>
+        <PermissionEx Sddl="O:BAG:BAD:PAI(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-80-1838313608-3482187605-4009924510-3684180624-774031005)" />
+      </CreateFolder>
+    </Component>
+  </Fragment>
+</Wix>
