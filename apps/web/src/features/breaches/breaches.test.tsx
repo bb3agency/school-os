@@ -334,6 +334,8 @@ describe("D59 affected-people picker", () => {
     const edit = screen.getByRole("dialog", { name: bm.detail.editFactsTitle });
     expect(within(edit).getByLabelText(bm.form.approxChildren)).toHaveValue("38");
     expect(within(edit).getByLabelText(bm.form.approxGuardians)).toHaveValue("61");
+    // D66: focus lands on the filled count, not back on the picker's trigger.
+    expect(within(edit).getByLabelText(bm.form.approxChildren)).toHaveFocus();
     await user.click(within(edit).getByRole("button", { name: bm.detail.saveFacts }));
     await waitFor(() =>
       expect(stub.callsTo(`PATCH /bff/api/v1/privacy/breaches/${B1}`)).toHaveLength(1),

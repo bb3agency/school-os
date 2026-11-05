@@ -33,6 +33,8 @@ export const R3_DELEGATE = "office";
 const T1 = "0192f3a4-0000-7000-8000-000000000001";
 const YEAR_ID = "0192f3a4-0000-7000-8000-0000000000a1";
 const SECTION_A = "0192f3a4-0000-7000-8000-000000000500";
+/** Section B of the stand-in school structure (stand-in.ts STRUCTURE). */
+const SECTION_B = "0192f3a4-0000-7000-8000-000000000510";
 
 export const R3_IDS = {
   /** R1's student "Synthetica Ravi Sai Kumar" (r1-api.ts R1_IDS.student). */
@@ -44,6 +46,11 @@ export const R3_IDS = {
   purpose: "0192f3a4-0000-7000-8000-0000000003c1",
   snapshot: "0192f3a4-0000-7000-8000-0000000003d1",
   incident: "0192f3a4-0000-7000-8000-0000000003f1",
+  /** D56: a reopened incident with one dedicated-host school still to be told (D66). */
+  reopenedIncident: "0192f3a4-0000-7000-8000-0000000003f2",
+  /** D59 picker (D66): a second student in section A and one in section B. */
+  sectionAPeer: "0192f3a4-0000-7000-8000-00000000f602",
+  sectionBStudent: "0192f3a4-0000-7000-8000-00000000f603",
 } as const;
 
 export const R3_STUDENT = {
@@ -151,6 +158,11 @@ interface R3State {
   calendar: Schemas["CalendarEventOut"];
   consents: Schemas["PurposeConsentEntryOut"][];
   consentVersion: number;
+  /** D60 (D66): notices recorded, and the notice PDFs asked for (GETs since each was asked). */
+  notices: Schemas["PrivacyNoticeOut"][];
+  files: Map<string, { file: Schemas["PrivacyModuleFileOut"]; polls: number }>;
+  /** D56 (D66): the reopened incident; a told school is recorded on it. */
+  reopened: Schemas["IncidentDetailOut"];
 }
 
 const now = () => state.now ?? Date.now();
@@ -382,13 +394,27 @@ function fresh(): R3State {
     calendar: calendarEvent(),
     consents: [],
     consentVersion: 1,
+    notices: [...NOTICES],
+    files: new Map(),
+    reopened: reopenedIncident(),
   };
 }
 
-let state: R3State = fresh();
+// Made at the end of the module (the seeds use constants declared further down).
+let state: R3State;
 
 export function resetR3(): void {
   state = fresh();
+  lastWrite = null;
+}
+
+/**
+ * GET /__e2e/r3/last-write (D66): the last write the API received and its JSON body, so a
+ * journey can check what the screen sent (the browser's fetch body is not visible to it).
+ */
+let lastWrite: { method: string; path: string; body: Body } | null = null;
+export function lastR3Write(): { method: string; path: string; body: Body } | null {
+  return lastWrite;
 }
 
 /** POST /__e2e/r3/clock: the time the stand-in uses for the breach clocks (null: real time). */
@@ -682,6 +708,23 @@ function breachAnswer(method: string, path: string, body: Body): [number, unknow
   if (match && method === "GET") {
     const found = state.breaches.get(match[1] ?? "");
     return found ? [200, withClocks(found)] : notFound;
+  }
+  if (match && method === "PATCH") {
+    const found = state.breaches.get(match[1] ?? "");
+    return found ? [200, withClocks(updateBreach(found, body))] : notFound;
+  }
+  // D59 (D66): the picker's count. Only numbers come back; nothing is stored. The API asks for
+  // step-up here; stand-in sessions are always fresh, as for every other breach write.
+  const counting = /^\/api\/v1\/privacy\/breaches\/([0-9a-f-]{36})\/affected:count$/.exec(path);
+  if (counting && method === "POST") {
+    return state.breaches.has(counting[1] ?? "") ? [200, countAffected(body)] : notFound;
+  }
+  const drafting = /^\/api\/v1\/privacy\/breaches\/([0-9a-f-]{36})\/drafts\/([a-z_]+)$/.exec(path);
+  if (drafting && method === "GET") {
+    const found = state.breaches.get(drafting[1] ?? "");
+    const kind = drafting[2];
+    if (!found || (kind !== "family_notice" && kind !== "board_outline")) return notFound;
+    return [200, breachDraft(found, kind)];
   }
   if (/^\/api\/v1\/privacy\/breaches\/[0-9a-f-]{36}\/affected$/.test(path) && method === "GET") {
     return [
@@ -1097,7 +1140,7 @@ const INCIDENT: Schemas["IncidentDetailOut"] = {
   version: 4,
 };
 
-function incidentAnswer(method: string, path: string): [number, unknown] | undefined {
+function incidentAnswer(method: string, path: string, body: Body): [number, unknown] | undefined {
   if (path === "/api/v1/platform/me" && method === "GET") {
     return [
       200,
@@ -1110,10 +1153,20 @@ function incidentAnswer(method: string, path: string): [number, unknown] | undef
     ];
   }
   if (path === "/api/v1/platform/incidents" && method === "GET") {
-    const summary: Schemas["IncidentOut"] = Object.fromEntries(
-      Object.entries(INCIDENT).filter(([key]) => key !== "schools"),
-    ) as Schemas["IncidentOut"];
-    return [200, page([summary])];
+    const summary = (incident: Schemas["IncidentDetailOut"]) =>
+      Object.fromEntries(
+        Object.entries(incident).filter(([key]) => key !== "schools"),
+      ) as Schemas["IncidentOut"];
+    return [200, page([summary(INCIDENT), summary(state.reopened)])];
+  }
+  if (path === `/api/v1/platform/incidents/${R3_IDS.reopenedIncident}` && method === "GET") {
+    return [200, state.reopened];
+  }
+  if (
+    path === `/api/v1/platform/incidents/${R3_IDS.reopenedIncident}/reopen:told` &&
+    method === "POST"
+  ) {
+    return reopenTold(body);
   }
   // FR-DPDP-031: open reporting clocks, a list. CERT-In is reported and the school told: none.
   if (path === "/api/v1/platform/incidents/clocks" && method === "GET") {
@@ -1134,9 +1187,10 @@ export function r3Answer(
   body: Body,
 ): [number, unknown] | undefined {
   const path = url.pathname;
+  if (method !== "GET") lastWrite = { method, path, body };
   const publicAnswer = publicDisclosureAnswer(method, path);
   if (publicAnswer) return publicAnswer;
-  if (subject === SECURITY_OPERATOR) return incidentAnswer(method, path);
+  if (subject === SECURITY_OPERATOR) return incidentAnswer(method, path, body);
   if (!SCHOOL_SUBJECTS.includes(subject)) return undefined;
   if (path === "/api/v1/me" && method === "GET") return [200, me(subject)];
   if (path === "/api/v1/students/search" && method === "POST") {
@@ -1162,8 +1216,12 @@ export function r3Answer(
     ];
   }
   if (path === "/api/v1/privacy/templates" && method === "GET") return [200, TEMPLATES];
-  if (path === "/api/v1/privacy/notices" && method === "GET") return [200, NOTICES];
+  if (path === "/api/v1/privacy/notices" && method === "GET") return [200, state.notices];
+  if (path === "/api/v1/students" && method === "GET") {
+    return [200, page(studentSearch(url.searchParams.get("query") ?? ""))];
+  }
   return (
+    noticeAnswer(method, url, subject, body) ??
     privacyAnswer(method, url, subject, body) ??
     breachAnswer(method, path, body) ??
     disclosureAnswer(method, url) ??
@@ -1192,3 +1250,235 @@ export function r3Decorate(
   if (status !== 200 || !/^\/api\/v1\/dq\/readiness\/[a-z0-9-]+$/.test(path)) return answer;
   return [status, { ...(payload as object), next_window: nextWindow() }];
 }
+
+/* ------------------------------------------------------------------ D57-D62 screens (D66) */
+
+/** The picker's student search (GET /students?query=): the R3 student and two others. */
+const PICKER_STUDENTS = [
+  { id: R3_IDS.student, name: R3_STUDENT.name, adm: R3_STUDENT.admissionNo, section: SECTION_A },
+  {
+    id: R3_IDS.sectionAPeer,
+    name: "Synthetica Anusha Devi",
+    adm: "SYN-2026-302",
+    section: SECTION_A,
+  },
+  {
+    id: R3_IDS.sectionBStudent,
+    name: "Synthetica Kiran Teja",
+    adm: "SYN-2026-303",
+    section: SECTION_B,
+  },
+] as const;
+/** Each picked student has two guardians on record; the school has four staff. */
+const GUARDIANS_PER_STUDENT = 2;
+const ALL_STAFF = 4;
+
+function studentSearch(query: string): Schemas["StudentSummary"][] {
+  const needle = query.trim().toLowerCase();
+  if (needle.length < 2) return [];
+  return PICKER_STUDENTS.filter(
+    (s) => s.name.toLowerCase().includes(needle) || s.adm.toLowerCase().includes(needle),
+  ).map((s) => ({
+    id: s.id,
+    display_name: s.name,
+    admission_no: s.adm,
+    class_section: s.section === SECTION_A ? "6-A" : "6-B",
+    section_id: s.section,
+    status: "active",
+    match: { field: "name", score: 1 },
+  }));
+}
+
+/** POST /privacy/breaches/{id}/affected:count: each person once; numbers only (D59, D41). */
+function countAffected(body: Body): Schemas["AffectedCountsOut"] {
+  const list = (key: string) =>
+    Array.isArray(body[key]) ? (body[key] as unknown[]).map(String) : [];
+  const students = new Set<string>();
+  const sections = list("section_ids");
+  for (const s of PICKER_STUDENTS) {
+    if (body.all_students === true || sections.includes(s.section)) students.add(s.id);
+  }
+  list("student_ids").forEach((id) => students.add(id));
+  const staff =
+    body.all_staff === true
+      ? ALL_STAFF
+      : Math.min(ALL_STAFF, new Set([...list("staff_role_keys"), ...list("membership_ids")]).size);
+  return { students: students.size, guardians: students.size * GUARDIANS_PER_STUDENT, staff };
+}
+
+/** PATCH /privacy/breaches/{id}: the facts the edit dialog saves (D59 counts included). */
+function updateBreach(breach: Schemas["BreachDetailOut"], body: Body): Schemas["BreachDetailOut"] {
+  const update = body as Schemas["BreachUpdate"];
+  const updated: Schemas["BreachDetailOut"] = {
+    ...breach,
+    ...(typeof update.description === "string" ? { description: update.description } : {}),
+    ...(Array.isArray(update.categories) ? { categories: update.categories } : {}),
+    ...(typeof update.approx_children === "number"
+      ? { approx_children: update.approx_children }
+      : {}),
+    ...(typeof update.approx_guardians === "number"
+      ? { approx_guardians: update.approx_guardians }
+      : {}),
+    ...(typeof update.approx_staff === "number" ? { approx_staff: update.approx_staff } : {}),
+    ...("containment" in body ? { containment: update.containment ?? null } : {}),
+    ...(update.status === "open" || update.status === "contained" ? { status: update.status } : {}),
+    version: breach.version + 1,
+  };
+  state.breaches.set(breach.id, updated);
+  return updated;
+}
+
+/** GET /privacy/breaches/{id}/drafts/{draft}: filled from the record (synthetic). */
+function breachDraft(
+  breach: Schemas["BreachDetailOut"],
+  kind: "family_notice" | "board_outline",
+): Schemas["DraftOut"] {
+  const noticed = isoDate(new Date(breach.noticed_at).getTime());
+  const text =
+    kind === "family_notice"
+      ? [
+          "Dear parent or guardian,",
+          `On ${noticed} the school found this: ${breach.description ?? "[not set]"}`,
+          `What we did: ${breach.containment ?? "[not set]"}`,
+          "Questions: Synthetica Principal, privacy.contact@school.example.",
+          "Yours sincerely,\nThe Principal",
+        ].join("\n\n")
+      : [
+          "Outline of the report to the Data Protection Board",
+          `1. When it was noticed: ${noticed}`,
+          `2. What happened: ${breach.description ?? "[not set]"}`,
+          `3. People affected (about): ${breach.approx_children} children, ${breach.approx_guardians} parents and guardians, ${breach.approx_staff} staff`,
+          `4. Steps taken: ${breach.containment ?? "[not set]"}`,
+        ].join("\n");
+  return {
+    draft: kind,
+    template_version: "2026-10",
+    title: kind === "family_notice" ? "Notice to families" : "Board report outline",
+    text,
+  };
+}
+
+/** Notices (D60): record a notice, make its PDF, poll it, its download link. */
+function noticeAnswer(
+  method: string,
+  url: URL,
+  subject: string,
+  body: Body,
+): [number, unknown] | undefined {
+  const path = url.pathname;
+  if (path === "/api/v1/privacy/notices" && method === "POST") {
+    const input = body as Partial<Schemas["PrivacyNoticeIn"]>;
+    if (!input.template_key || !input.channel || !input.issued_on) {
+      return problem(422, "validation_failed");
+    }
+    const notice: Schemas["PrivacyNoticeOut"] = {
+      id: `0192f3a4-0000-7000-8000-0000000003a${state.notices.length + 10}`,
+      template_key: input.template_key,
+      template_version: input.template_version ?? "2026-10",
+      audience: input.audience ?? "parents",
+      channel: input.channel,
+      language: input.language ?? "en",
+      issued_on: input.issued_on,
+      document_id: null,
+      recorded_at: new Date().toISOString(),
+      recorded_by_name: MEMBERS[subject]?.name ?? null,
+    };
+    state.notices = [notice, ...state.notices];
+    return [201, notice];
+  }
+  const pdf = /^\/api\/v1\/privacy\/templates\/(notice_parents|notice_staff)\/pdf$/.exec(path);
+  if (pdf && method === "POST") {
+    const exportId = `0192f3a4-0000-7000-8000-0000000004${String(state.files.size + 1).padStart(2, "0")}`;
+    const file: Schemas["PrivacyModuleFileOut"] = {
+      export_id: exportId,
+      status: "queued",
+      created_at: new Date().toISOString(),
+      finished_at: null,
+      expires_at: null,
+      error_code: null,
+    };
+    state.files.set(exportId, { file, polls: 0 });
+    return [202, file];
+  }
+  const fileMatch = /^\/api\/v1\/privacy\/files\/([0-9a-f-]{36})(\/download-url)?$/.exec(path);
+  if (!fileMatch || method !== "GET") return undefined;
+  const stored = state.files.get(fileMatch[1] ?? "");
+  if (!stored) return notFound;
+  if (fileMatch[2]) {
+    if (stored.file.status !== "ready") return problem(409, "file_not_ready");
+    return [
+      200,
+      {
+        url: `${url.origin}/e2e-files/privacy-notice-${stored.file.export_id.slice(-4)}.pdf`,
+        filename: "privacy-notice-parents.pdf",
+        content_type: "application/pdf",
+        expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+      } satisfies Schemas["PrivacyDownloadOut"],
+    ];
+  }
+  // The stand-in's worker is quick: the first poll finds the PDF made.
+  stored.polls += 1;
+  stored.file = {
+    ...stored.file,
+    status: "ready",
+    finished_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + DAY).toISOString(),
+  };
+  return [200, stored.file];
+}
+
+/** A reopened incident (D48) with a dedicated-host school not told yet (D49, D56). */
+function reopenedIncident(): Schemas["IncidentDetailOut"] {
+  return {
+    ...INCIDENT,
+    id: R3_IDS.reopenedIncident,
+    summary: "Synthetic: a support export held school contact lists for an hour.",
+    status: "contained",
+    reopen_count: 1,
+    last_reopened_at: "2026-11-02T05:00:00Z",
+    schools: [
+      {
+        tenant_id: "0192f3a4-0000-7000-8000-000000000002",
+        school_name: "Vidya Nilayam",
+        tenant_code: "vn",
+        mode: "dedicated",
+        approx_people: 35,
+        categories: ["contact"],
+        window_from: "2026-10-31T02:00:00Z",
+        window_to: "2026-10-31T03:00:00Z",
+        school_notified_at: "2026-10-31T06:00:00Z",
+        notice_due_at: "2026-11-01T04:30:00Z",
+        pulled_at: null,
+        reopen_pulled: 0,
+        reopen_pulled_at: null,
+      },
+    ],
+    version: 7,
+  };
+}
+
+/** POST /platform/incidents/{id}/reopen:told: the channel only, never a free-text note (D56). */
+function reopenTold(body: Body): [number, unknown] {
+  const input = body as Partial<Schemas["IncidentReopenToldIn"]>;
+  const incident = state.reopened;
+  if (!input.channel || !["phone", "email", "in_person"].includes(input.channel)) {
+    return problem(422, "validation_failed");
+  }
+  if ("note" in body) return problem(422, "validation_failed");
+  const school = incident.schools.find((row) => row.tenant_id === input.tenant_id);
+  if (!school || school.mode !== "dedicated") return notFound;
+  if (input.reopen_seq !== incident.reopen_count) return problem(409, "reopen_seq_stale");
+  const now = new Date().toISOString();
+  state.reopened = {
+    ...incident,
+    schools: incident.schools.map((row) =>
+      row === school
+        ? { ...row, reopen_pulled: incident.reopen_count, reopen_pulled_at: now }
+        : row,
+    ),
+    version: incident.version + 1,
+  };
+  return [200, state.reopened];
+}
+
+state = fresh();
