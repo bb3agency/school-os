@@ -35,7 +35,20 @@ def dispatch_outbox(batch: int = 100) -> dict[str, int]:
 
 @shared_task(name="ops.purge_idempotency_keys", acks_late=True)
 def purge_idempotency_keys() -> dict[str, int]:
-    return {"purged": service.purge_idempotency_keys()}
+    """The nightly ops retention run: expired idempotency keys, then delivered outbox events
+    older than ``outbox.delivered_retention_days`` (lead decision D51). Each purge runs every
+    school on its own; one failing purge does not stop the other."""
+    result: dict[str, int] = {}
+    try:
+        result["purged"] = service.purge_idempotency_keys()
+    except Exception as exc:  # listing schools failed: the outbox purge still runs
+        log.warning("ops.idempotency.purge_failed", error_type=type(exc).__name__)
+        result["purged"] = 0
+    outbox = service.purge_delivered_outbox()
+    result.update(
+        outbox_tenants=outbox.tenants, outbox_purged=outbox.purged, outbox_failed=outbox.failed
+    )
+    return result
 
 
 def beat_schedule() -> dict[str, dict[str, Any]]:
