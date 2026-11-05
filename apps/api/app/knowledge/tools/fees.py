@@ -10,9 +10,11 @@ re-checks both when it runs. Two shapes:
   that student by a person. One block: the total and each linked ledger's closing balance with
   its Tally group, the Tally as-of date and when it was synced. Ledger names are NOT sent (the
   amount and group suffice; CLAUDE.md §11 "send only the field needed"). No link: the block says
-  SchoolOS has no fee figure for the student; it never guesses a ledger by name.
+  SchoolOS has no fee figure for the student; it never guesses a ledger by name. A ledger also
+  linked to a sibling is marked "shared with N other students" (D54).
 - without a student: ``tally.service.fee_summary``: numbers only (students with dues, total,
-  unlinked ledgers), no names.
+  per-class totals, unlinked ledgers), no names; each ledger counted once in the school total and
+  once in each class it touches (D54).
 
 Sources are ``sos://fee/{id}#s{scope}`` (id derived from the school, the student or "summary",
 and the as-of date and sync time; ``scope`` fingerprints the caller's ``finance.read`` reach,
@@ -239,16 +241,23 @@ class GetFeeDuesTool:
             )
             return SearchResultBlock(source=source, title=title, text=text)
         parts = [
-            f"ledger {i} in group {ledger.group_name}: {inr(ledger.closing_balance)}"
+            f"ledger {i} in group {ledger.group_name}{_shared(ledger.shared_with)}: "
+            f"{inr(ledger.closing_balance)}"
             for i, ledger in enumerate(dues.ledgers, start=1)
         ]
         count = len(dues.ledgers)
         text = (
             f"Fee due for {who}: {inr(dues.total_due)} in total, from {count} linked Tally "
             f"ledger{'s' if count != 1 else ''} ({'; '.join(parts)}). A negative amount is an "
-            f"advance paid. Tally figures as of {_date(dues.as_of)}, synced "
-            f"{_synced(dues.synced_at)}."
+            f"advance paid."
         )
+        if any(ledger.shared_with for ledger in dues.ledgers):
+            text += (
+                " A ledger shared with a sibling is one family account: its amount is owed once "
+                "by the family, not once per child."
+            )
+        text += f" Tally figures as of {_date(dues.as_of)}, synced {_synced(dues.synced_at)}."
+
         return SearchResultBlock(source=source, title=title, text=text)
 
     def _summary(
@@ -258,7 +267,23 @@ class GetFeeDuesTool:
         text = (
             f"Fee dues from Tally, linked ledgers only: {summary.students_with_dues} "
             f"student{'s' if summary.students_with_dues != 1 else ''} with dues, "
-            f"{inr(summary.total_due)} in total. {summary.unlinked_parties} Tally ledger"
+            f"{inr(summary.total_due)} in total, each ledger counted once (a family ledger "
+            f"shared by siblings is counted once)."
+        )
+        if summary.classes:
+            rows = [
+                f"{c.class_name or 'no class recorded'}: {c.students_with_dues} student"
+                f"{'s' if c.students_with_dues != 1 else ''}, {inr(c.total_due)}"
+                for c in summary.classes
+            ]
+            text += f" By class: {'; '.join(rows)}."
+            if sum((c.total_due for c in summary.classes), Decimal(0)) != summary.total_due:
+                text += (
+                    " A family ledger shared by children in different classes counts in each of "
+                    "those classes, so the class totals do not add up to the school total."
+                )
+        text += (
+            f" {summary.unlinked_parties} Tally ledger"
             f"{'s are' if summary.unlinked_parties != 1 else ' is'} not linked to a student and "
             f"not counted. Tally figures as of {_date(summary.as_of)}, synced "
             f"{_synced(summary.synced_at)}."
@@ -266,6 +291,13 @@ class GetFeeDuesTool:
         return SearchResultBlock(
             source=source, title="Fee dues from Tally · school totals", text=text
         )
+
+
+def _shared(others: int) -> str:
+    """The D54 marker on one ledger: shared with how many other students."""
+    if not others:
+        return ""
+    return f" (shared with {others} other student{'s' if others != 1 else ''})"
 
 
 __all__ = ["NAME", "FeeArgs", "GetFeeDuesTool", "inr"]

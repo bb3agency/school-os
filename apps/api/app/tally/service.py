@@ -30,7 +30,7 @@ import hashlib
 import secrets
 import uuid
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Final
@@ -68,6 +68,7 @@ from app.tally.schemas import (
     AgentConfigOut,
     CatalogIn,
     CatalogOut,
+    ClassDuesOut,
     ConnectorStatus,
     DeviceOut,
     DuesPage,
@@ -304,10 +305,9 @@ def status(session: Session, ctx: UserContext) -> ConnectorStatus:
     fees = can_read_fees(ctx)
     total: Decimal | None = None
     if fees:
-        total = sum(
-            (t for t in _student_totals(repo.linked_balances(session, None)).values() if t > 0),
-            ZERO,
-        )
+        balances = repo.linked_balances(session, None)
+        owing = {sid for sid, t in _student_totals(balances).items() if t > 0}
+        total = _ledger_total(balances, owing)
     return ConnectorStatus(
         devices_active=len(devices),
         silent=any(_device_out(d, now).silent for d in devices),
@@ -515,16 +515,83 @@ def _student_totals(balances: Iterable[repo.LinkedBalance]) -> dict[uuid.UUID, D
     return dict(totals)
 
 
+def _ledger_total(balances: Iterable[repo.LinkedBalance], owing: Collection[uuid.UUID]) -> Decimal:
+    """The sum of the present ledgers linked to any student in ``owing``, EACH LEDGER ONCE
+    (D54; ADR-0032 §7): a family ledger linked to two siblings is one debt, not two. Used for
+    the school total and for each class total; a student's own total still includes it."""
+    seen: dict[uuid.UUID, Decimal] = {}
+    for b in balances:
+        if b.present and b.student_id in owing:
+            seen[b.party_id] = b.closing_balance
+    return sum(seen.values(), ZERO)
+
+
+def _sharing(balances: Iterable[repo.LinkedBalance]) -> dict[uuid.UUID, int]:
+    """Per linked student: how many OTHER students share one of its present ledgers (D54)."""
+    by_party: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
+    for b in balances:
+        if b.present:
+            by_party[b.party_id].add(b.student_id)
+    others: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
+    for ids in by_party.values():
+        for sid in ids:
+            others[sid] |= ids - {sid}
+    return {sid: len(o) for sid, o in others.items()}
+
+
+@dataclass(frozen=True, slots=True)
+class ClassDues:
+    class_id: uuid.UUID | None
+    class_name: str | None
+    students_with_dues: int
+    total_due: Decimal
+
+
+def _class_totals(
+    session: Session,
+    balances: Sequence[repo.LinkedBalance],
+    owing: Collection[uuid.UUID],
+    section_of: Mapping[uuid.UUID, uuid.UUID | None],
+) -> list[ClassDues]:
+    """Totals per class (D54): a ledger shared by children of one class counts once in it; a
+    ledger shared across two classes counts once in EACH class it touches (and once in the
+    school total, which is therefore not the sum of the class totals). Students with no current
+    class (or none the caller can see) form one group with ``class_id`` null, listed last."""
+    classes = {c.id: c for c in tenancy.list_classes(session)}
+    class_of = {s.id: s.class_id for s in tenancy.list_sections(session)}
+    groups: dict[uuid.UUID | None, set[uuid.UUID]] = defaultdict(set)
+    for sid in owing:
+        section = section_of.get(sid)
+        groups[class_of.get(section) if section is not None else None].add(sid)
+
+    def order(key: uuid.UUID | None) -> tuple[bool, int, str]:
+        c = classes.get(key) if key is not None else None
+        return (c is None, c.sort_order if c else 0, c.display_en if c else str(key))
+
+    return [
+        ClassDues(
+            class_id=key,
+            class_name=classes[key].display_en if key in classes else None,
+            students_with_dues=len(groups[key]),
+            total_due=_ledger_total(balances, groups[key]),
+        )
+        for key in sorted(groups, key=order)
+    ]
+
+
 def list_dues(
     session: Session, ctx: UserContext, *, limit: int = 50, cursor: str | None = None
 ) -> DuesPage:
     """Students with dues (sum of their linked ledgers' positive total), highest first, and the
-    school totals (FR-TALLY-007). Only students the caller can see are listed."""
+    school and class totals (FR-TALLY-007). Only students the caller can see are listed. A
+    student's total includes a ledger shared with siblings (marked ``shared_ledger``); the
+    school and class totals count each ledger once (D54)."""
     _require_on(session, ctx)
     if not can_read_fees(ctx):
         raise Forbidden()
     balances = [b for b in repo.linked_balances(session, None) if b.present]
     totals = _student_totals(balances)
+    shared = _sharing(balances)
     visible = students.summaries(session, ctx, totals)
     ledgers: dict[uuid.UUID, int] = defaultdict(int)
     as_of: dict[uuid.UUID, dt.date] = {}
@@ -541,6 +608,8 @@ def list_dues(
                 total_due=total,
                 ledgers=ledgers[sid],
                 as_of=as_of[sid],
+                shared_ledger=shared.get(sid, 0) > 0,
+                shared_with=shared.get(sid, 0),
             )
             for sid, total in totals.items()
             if total > 0 and sid in visible
@@ -553,15 +622,28 @@ def list_dues(
         raise _field_error("cursor", "invalid")
     page = rows[offset : offset + limit]
     counts = repo.party_counts(session)
+    owing = {r.student_id for r in rows}
+    by_class = _class_totals(
+        session, balances, owing, {sid: visible[sid].section_id for sid in owing}
+    )
     return DuesPage(
         data=page,
         next_cursor=encode_cursor({"o": offset + limit}) if offset + limit < len(rows) else None,
         totals=DuesTotals(
             students_with_dues=len(rows),
-            total_due=sum((r.total_due for r in rows), ZERO),
+            total_due=_ledger_total(balances, owing),
             unlinked_parties=counts.unlinked,
             unlinked_due=counts.unlinked_due,
             as_of=counts.as_of,
+            classes=[
+                ClassDuesOut(
+                    class_id=c.class_id,
+                    class_name=c.class_name,
+                    students_with_dues=c.students_with_dues,
+                    total_due=c.total_due,
+                )
+                for c in by_class
+            ],
         ),
     )
 
@@ -572,6 +654,8 @@ class LedgerDue:
     group_name: str
     closing_balance: Decimal
     as_of: dt.date
+    shared_with: int = 0
+    """Other students this ledger is also linked to (a family ledger; D54)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -597,6 +681,8 @@ class FeeSummary:
     unlinked_parties: int
     as_of: dt.date | None
     synced_at: dt.datetime | None
+    classes: tuple[ClassDues, ...] = ()
+    """Per class, each ledger once in each class it touches (D54)."""
 
 
 def _tool_guard(session: Session, ctx: UserContext) -> None:
@@ -613,13 +699,21 @@ def student_fee_dues(session: Session, ctx: UserContext, student_id: uuid.UUID) 
     if summary is None:
         raise NotFound("Student not found")
     present = [b for b in repo.linked_balances(session, [student_id]) if b.present]
+    links = repo.links_of(session, [b.party_id for b in present])
     return StudentFeeDues(
         student_id=student_id,
         display_name=summary.display_name,
         admission_no=summary.admission_no,
         class_section=summary.class_section,
         ledgers=tuple(
-            LedgerDue(b.ledger_name, b.group_name, b.closing_balance, b.as_of) for b in present
+            LedgerDue(
+                b.ledger_name,
+                b.group_name,
+                b.closing_balance,
+                b.as_of,
+                shared_with=len(set(links.get(b.party_id, ())) - {student_id}),
+            )
+            for b in present
         ),
         total_due=sum((b.closing_balance for b in present), ZERO),
         as_of=max((b.as_of for b in present), default=None),
@@ -628,18 +722,22 @@ def student_fee_dues(session: Session, ctx: UserContext, student_id: uuid.UUID) 
 
 
 def fee_summary(session: Session, ctx: UserContext) -> FeeSummary:
-    """School totals over linked ledgers (for ``get_fee_dues`` without a student)."""
+    """School and class totals over linked ledgers (for ``get_fee_dues`` without a student),
+    each ledger once (D54)."""
     _tool_guard(session, ctx)
-    totals = _student_totals(repo.linked_balances(session, None))
+    balances = [b for b in repo.linked_balances(session, None) if b.present]
+    owing = {sid for sid, t in _student_totals(balances).items() if t > 0}
     counts = repo.party_counts(session)
     latest = repo.latest_sync(session)
-    due = [t for t in totals.values() if t > 0]
+    visible = students.summaries(session, ctx, owing)
+    section_of = {sid: s.section_id for sid, s in visible.items()}
     return FeeSummary(
-        students_with_dues=len(due),
-        total_due=sum(due, ZERO),
+        students_with_dues=len(owing),
+        total_due=_ledger_total(balances, owing),
         unlinked_parties=counts.unlinked,
         as_of=counts.as_of,
         synced_at=latest.received_at if latest else None,
+        classes=tuple(_class_totals(session, balances, owing, section_of)),
     )
 
 
