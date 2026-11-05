@@ -480,7 +480,7 @@ All **built** (modules `app/academics` and `app/insights`, docs/05 §5.8, purpos
 | GET | `/tally/parties/{party_id}` | `tally.configure` (school); one ledger with its links and up to 5 suggested students in the caller's scope (suggestions only) (FR-TALLY-006) |
 | POST | `/tally/parties/{party_id}/links` (`student_id`) | `tally.configure` (school); 201; idempotent; 409 `party_gone`; 422 `student_id` `not_found` (FR-TALLY-006) |
 | DELETE | `/tally/parties/{party_id}/links/{student_id}` | `tally.configure` (school); 204 (FR-TALLY-006) |
-| GET | `/tally/dues` (cursor, `limit`) | `finance.read` (school); students with dues from linked ledgers, highest first, only students the caller can see, with totals (FR-TALLY-007) |
+| GET | `/tally/dues` (cursor, `limit`) | `finance.read` (school); students with dues from linked ledgers, highest first, only students the caller can see; each row has `shared_ledger` and `shared_with` (a family ledger shared with siblings stays in each child's total); `totals` (school) and `totals.classes` (per class) count each ledger once, a ledger shared across two classes once in each (ADR-0032 §6, D54) (FR-TALLY-007) |
 
 **Edge agent routes** (`/api/v1/edge/tally/*`; no user session; not reachable through the BFF). Guards `require_edge_agent_enrolment()` (enrol) and `require_edge_agent_signature()` (the rest; headers `X-SOS-Tenant`, `X-SOS-Device`, `X-SOS-Key-Id`, `X-SOS-Timestamp`, `X-SOS-Nonce`, `X-SOS-Signature: v1=<hex>`; canonical string in ADR-0032 §3). The route-enumeration test allows these guards on exactly these five routes. Failures: 401 (unknown, revoked or bad signature: no detail), 404 (flag off), 409 `replay`, 413, 429.
 

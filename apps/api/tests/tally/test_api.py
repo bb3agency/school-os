@@ -745,6 +745,91 @@ def test_FR_TALLY_006_a_person_links_ledgers_and_dues_follow_the_links(
     assert [p["ledger_name"] for p in found] == ["Synthetica Sita Devi T-902"]
 
 
+def test_FR_TALLY_007_a_family_ledger_shared_by_siblings_counts_once_in_totals(
+    api: Any, admin_engine: Engine
+) -> None:
+    """D54 (ADR-0032 §7): a family ledger linked to three siblings (two in Class IX, one in
+    Class X) is in each child's own total and marked shared, but the school total counts it once,
+    each class total counts it once, and the school total is not the sum of the class totals."""
+    school, agent = _ready(api, admin_engine)
+    ravi = T.SW.create(school, name="Synthetica Ravi", section_key="section_9a", admission_no="S1")
+    sita = T.SW.create(school, name="Synthetica Sita", section_key="section_9c", admission_no="S2")
+    arjun = T.SW.create(
+        school, name="Synthetica Arjun", section_key="section_10a", admission_no="S3"
+    )
+    priya = T.SW.create(
+        school, name="Synthetica Priya", section_key="section_10a", admission_no="S4"
+    )
+    res = T.snapshot(
+        api,
+        agent,
+        [
+            T.party("Synthetica Ravi 9A", "15000.00"),
+            T.party("Synthetica Sita 9C", "4500.25"),
+            T.party("Synthetica Family Ledger", "1000.00"),
+            T.party("Synthetica Priya 10A", "300.00"),
+        ],
+    )
+    assert res.status_code == 200, res.text
+    accountant = school.people["accountant"]
+    parties = api.call(accountant, "GET", "/api/v1/tally/parties").json()["data"]
+    by_name = {p["ledger_name"]: p["id"] for p in parties}
+    for ledger, student in (
+        ("Synthetica Ravi 9A", ravi),
+        ("Synthetica Sita 9C", sita),
+        ("Synthetica Family Ledger", ravi),
+        ("Synthetica Family Ledger", sita),
+        ("Synthetica Family Ledger", arjun),
+        ("Synthetica Priya 10A", priya),
+    ):
+        res = api.call(
+            accountant,
+            "POST",
+            f"/api/v1/tally/parties/{by_name[ledger]}/links",
+            json={"student_id": str(student)},
+        )
+        assert res.status_code == 201, res.text
+
+    dues = api.call(accountant, "GET", "/api/v1/tally/dues").json()
+    rows = {uuid.UUID(d["student_id"]): d for d in dues["data"]}
+    # Each child's own view keeps the shared ledger in full, marked as shared.
+    assert {
+        sid: (r["total_due"], r["shared_ledger"], r["shared_with"]) for sid, r in rows.items()
+    } == {
+        ravi: ("16000.00", True, 2),
+        sita: ("5500.25", True, 2),
+        arjun: ("1000.00", True, 2),
+        priya: ("300.00", False, 0),
+    }
+    totals = dues["totals"]
+    assert totals["students_with_dues"] == 4
+    assert totals["total_due"] == "20800.25"  # not 22800.25: the family ledger once
+    assert [
+        (c["class_id"], c["class_name"], c["students_with_dues"], c["total_due"])
+        for c in totals["classes"]
+    ] == [
+        (str(school.ids["class_ix"]), "Class IX", 2, "20500.25"),
+        (str(school.ids["class_x"]), "Class X", 2, "1300.00"),
+    ]
+    status = api.call(accountant, "GET", "/api/v1/tally/status").json()
+    assert status["total_due"] == "20800.25"
+
+    ctx = T.SW.ctx_for(school.tenant_id, accountant, "accountant")
+    with tenant_session(school.tenant_id, accountant.user_id) as db:
+        summary = service.fee_summary(db, ctx)
+        ravi_dues = service.student_fee_dues(db, ctx, ravi)
+    assert (summary.students_with_dues, str(summary.total_due)) == (4, "20800.25")
+    assert [(c.class_name, str(c.total_due)) for c in summary.classes] == [
+        ("Class IX", "20500.25"),
+        ("Class X", "1300.00"),
+    ]
+    assert str(ravi_dues.total_due) == "16000.00"
+    assert sorted((str(x.closing_balance), x.shared_with) for x in ravi_dues.ledgers) == [
+        ("1000.00", 2),
+        ("15000.00", 0),
+    ]
+
+
 def test_FR_TALLY_007_status_totals_only_for_finance_readers(
     api: Any, admin_engine: Engine
 ) -> None:

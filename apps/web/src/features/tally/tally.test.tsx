@@ -136,6 +136,8 @@ function dues(overrides: Partial<DuesPage> = {}): DuesPage {
         total_due: "12500.00",
         ledgers: 1,
         as_of: "2026-09-29",
+        shared_ledger: false,
+        shared_with: 0,
       },
     ],
     next_cursor: null,
@@ -480,6 +482,40 @@ describe("fee dues (US-1804, FR-TALLY-007)", () => {
       "href",
       "/settings/tally/ledgers",
     );
+  });
+
+  it("marks a student whose ledger is shared with siblings (D54)", async () => {
+    signedIn([FINANCE_READ]);
+    const base = dues();
+    const row = base.data[0]!;
+    stub.routes["GET /bff/api/v1/tally/dues"] = () =>
+      Response.json(
+        dues({
+          data: [
+            { ...row, shared_ledger: true, shared_with: 2 },
+            {
+              ...row,
+              student_id: "0192f0c1-0000-7000-8000-0000000000b2",
+              display_name: "Synthetic Student Two",
+              shared_ledger: false,
+              shared_with: 0,
+            },
+          ],
+        }),
+      );
+    renderWithIntl(<FeeDuesScreen />);
+    await screen.findByRole("link", { name: "Synthetic Student Two" });
+    expect(screen.getAllByText("Shared with 2 siblings")).toHaveLength(1);
+    expect(screen.getByText(en.dues.sharedTotalsNote)).toBeInTheDocument();
+  });
+
+  it("does not show the shared marker when no ledger is shared", async () => {
+    signedIn([FINANCE_READ]);
+    stub.routes["GET /bff/api/v1/tally/dues"] = () => Response.json(dues());
+    renderWithIntl(<FeeDuesScreen />);
+    await screen.findByRole("link", { name: "Synthetic Student One" });
+    expect(screen.queryByText(/Shared with/)).toBeNull();
+    expect(screen.queryByText(en.dues.sharedTotalsNote)).toBeNull();
   });
 
   it("does not offer linking to a finance reader who cannot link", async () => {

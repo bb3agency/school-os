@@ -10,6 +10,7 @@ never a guess by name; another school's student is an error result. Synthetic da
 
 from __future__ import annotations
 
+import datetime as dt
 import importlib.util
 import sys
 import uuid
@@ -26,6 +27,7 @@ from app.core.db import tenant_session
 from app.knowledge import composition
 from app.knowledge.config.tools import load_tools_config
 from app.knowledge.tools.fees import GetFeeDuesTool, inr
+from app.tally import service as tally
 
 pytestmark = pytest.mark.db
 
@@ -197,3 +199,48 @@ def test_FR_TALLY_008_the_tool_rechecks_permission_and_flag_when_it_runs(
 )
 def test_FR_TALLY_008_amounts_use_indian_grouping(amount: str, text: str) -> None:
     assert inr(Decimal(amount)) == text
+
+
+def test_FR_TALLY_008_a_shared_family_ledger_is_marked_and_counted_once() -> None:
+    """D54: a ledger shared with siblings is marked in the child's block; the school block
+    gives the each-ledger-once total and per-class totals that need not add up to it."""
+    tool = GetFeeDuesTool(load_tools_config().tools["get_fee_dues"])
+    tenant = uuid.uuid4()
+    day = dt.date(2026, 9, 28)
+    synced = dt.datetime(2026, 9, 28, 6, 0, tzinfo=dt.UTC)
+    child = tally.StudentFeeDues(
+        student_id=uuid.uuid4(),
+        display_name="Synthetica Ravi",
+        admission_no="S1",
+        class_section="Class IX A",
+        ledgers=(
+            tally.LedgerDue("Synthetica Ravi 9A", "Sundry Debtors", Decimal("15000.00"), day),
+            tally.LedgerDue(
+                "Synthetica Family", "Sundry Debtors", Decimal("1000.00"), day, shared_with=2
+            ),
+        ),
+        total_due=Decimal("16000.00"),
+        as_of=day,
+        synced_at=synced,
+    )
+    text = tool._student(tenant, child, "0123456789abcdef").text
+    assert "₹16,000.00 in total" in text
+    assert "(shared with 2 other students): ₹1,000.00" in text
+    assert "owed once by the family" in text
+    assert "Synthetica Family" not in text
+
+    summary = tally.FeeSummary(
+        students_with_dues=3,
+        total_due=Decimal("20500.25"),
+        unlinked_parties=0,
+        as_of=day,
+        synced_at=synced,
+        classes=(
+            tally.ClassDues(uuid.uuid4(), "Class IX", 2, Decimal("20500.25")),
+            tally.ClassDues(uuid.uuid4(), "Class X", 1, Decimal("1000.00")),
+        ),
+    )
+    text = tool._summary(tenant, summary, "0123456789abcdef").text
+    assert "₹20,500.25 in total, each ledger counted once" in text
+    assert "By class: Class IX: 2 students, ₹20,500.25; Class X: 1 student, ₹1,000.00." in text
+    assert "do not add up to the school total" in text

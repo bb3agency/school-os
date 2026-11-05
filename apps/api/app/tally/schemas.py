@@ -165,17 +165,45 @@ class StudentDuesOut(_Out):
     display_name: str | None
     admission_no: str | None
     class_section: str | None
-    total_due: Decimal
+    total_due: Decimal = Field(
+        description="Sum of this student's linked ledgers, a shared (family) ledger included in "
+        "full (D54)."
+    )
     ledgers: int
     as_of: dt.date
+    shared_ledger: bool = Field(
+        description="At least one of this student's ledgers is also linked to another student "
+        "(a family ledger shared by siblings; D54)."
+    )
+    shared_with: int = Field(
+        description="How many other students share one of this student's ledgers (0 if none)."
+    )
+
+
+class ClassDuesOut(_Out):
+    class_id: uuid.UUID | None = Field(
+        description="Null for students with no current class or one the caller cannot see."
+    )
+    class_name: str | None
+    students_with_dues: int
+    total_due: Decimal = Field(
+        description="Each ledger once: a ledger shared by children of this class counts once (D54)."
+    )
 
 
 class DuesTotals(_Out):
     students_with_dues: int
-    total_due: Decimal
+    total_due: Decimal = Field(
+        description="Each ledger once (D54): a family ledger linked to several children counts "
+        "once, so this is not the sum of the students' totals nor of the class totals."
+    )
     unlinked_parties: int
     unlinked_due: Decimal
     as_of: dt.date | None
+    classes: list[ClassDuesOut] = Field(
+        description="Totals per class, in class order. A ledger shared across two classes "
+        "counts once in each, and once in the school total (D54)."
+    )
 
 
 class DuesPage(_Out):
@@ -278,6 +306,7 @@ __all__ = [
     "CatalogGroupIn",
     "CatalogIn",
     "CatalogOut",
+    "ClassDuesOut",
     "ConnectorStatus",
     "DeviceOut",
     "DeviceStatus",
