@@ -23,7 +23,9 @@ and ``sos_app`` connections, so the copy goes through a transactional outbox:
    ``platform.purge_tenant_audit``, nightly, both modes) deletes copies delivered more than
    ``tenant_audit.delivered_retention_days`` ago. Only delivered rows go (the database refuses
    the others), and the deliverer only ever claims undelivered rows, so a purge can never cause
-   a redelivery or a duplicate in a school chain.
+   a redelivery or a duplicate in a school chain. Lead decision D68: ``delivered_at`` is set
+   once (trigger, migration 0079), and a delivered copy is deleted only after its
+   ``platform_event_id`` is confirmed in that school's chain; the others are kept and counted.
 
 5. Tenant-side reactions (lead decision D62): after writing a copy, the deliverer runs the hooks
    registered for its action (``audit.on_platform_event``) in the same tenant transaction, so
@@ -300,23 +302,112 @@ def retention_days(raw: Mapping[str, Any] | None = None) -> int:
     return days
 
 
-def purge_delivered() -> int:
-    """Nightly (D51 for the control plane): delete copies delivered more than
-    ``tenant_audit.delivered_retention_days`` ago, in one platform transaction. Undelivered
-    copies are kept. Audited as ``tenant_audit.copies_purged`` (system, count only) like the
-    other platform purges; logs the count only."""
+@dataclass(frozen=True, slots=True)
+class PurgeResult:
+    purged: int = 0
+    kept_unconfirmed: int = 0
+
+
+PURGE_BATCH: Final = 500
+
+_CONFIRMED_SQL = text(
+    "SELECT e.summary ->> 'platform_event_id' FROM audit.events AS e "
+    "WHERE e.tenant_id = :t AND e.actor_type = 'platform' AND e.occurred_at >= :since "
+    "AND e.summary ->> 'platform_event_id' = ANY(CAST(:ks AS text[]))"
+)
+
+
+def _confirmed_in_school_chain(tenant_id: uuid.UUID, rows: list[RowMapping]) -> set[uuid.UUID]:
+    """The copies among ``rows`` whose ``platform_event_id`` is in the school's chain (D68).
+
+    Read-only, in the school's own ``tenant_session`` (RLS applies). The chain is append-only,
+    so a copy confirmed here stays confirmed until it is deleted.
+    """
+    since = min(r["created_at"] for r in rows) - _LOOKBACK
+    with tenant_session(tenant_id) as ts:
+        keys: set[str] = set(
+            ts.execute(
+                _CONFIRMED_SQL,
+                {"t": tenant_id, "since": since, "ks": [str(r["id"]) for r in rows]},
+            ).scalars()
+        )
+    return {r["id"] for r in rows if str(r["id"]) in keys}
+
+
+def _confirm_school(tenant_id: uuid.UUID, days: int) -> tuple[list[uuid.UUID], int]:
+    """(copies confirmed in the school's chain, copies kept unconfirmed), in batches by seq."""
+    confirmed: list[uuid.UUID] = []
+    kept = 0
+    after = 0
+    while True:
+        with platform_session() as ps:
+            rows = repo.purgeable_tenant_audit_batch(
+                ps, tenant_id, older_than_days=days, after_seq=after, limit=PURGE_BATCH
+            )
+        if not rows:
+            break
+        after = int(rows[-1]["seq"])
+        try:
+            ok = _confirmed_in_school_chain(tenant_id, rows)
+        except Exception as exc:  # the school could not be read: keep every copy, count them
+            log.error(
+                "platform.tenant_audit.confirm_failed",
+                tenant_id=str(tenant_id),
+                count=len(rows),
+                error_type=type(exc).__name__,
+            )
+            ok = set()
+        confirmed.extend(r["id"] for r in rows if r["id"] in ok)
+        kept += len(rows) - len(ok)
+        if len(rows) < PURGE_BATCH:
+            break
+    return confirmed, kept
+
+
+def purge_delivered() -> PurgeResult:
+    """Nightly (D51 for the control plane; D68): delete copies delivered more than
+    ``tenant_audit.delivered_retention_days`` ago **whose ``platform_event_id`` is confirmed in
+    that school's own audit chain**.
+
+    Per school, in batches of :data:`PURGE_BATCH` by ``seq``: candidates are read in the
+    platform session and looked up (read-only) in the school's ``tenant_session``. A copy that
+    cannot be confirmed (marked delivered but missing from the chain, or the school could not be
+    read) is kept and counted; the log line ``platform.tenant_audit.kept_unconfirmed`` carries
+    the school id and the count only. Undelivered copies are never candidates. The confirmed
+    copies are deleted in one platform transaction together with ``tenant_audit.copies_purged``
+    (system; ``count``, ``kept_unconfirmed``, ``retention_days``).
+    """
     days = retention_days()
     with platform_session() as ps:
-        count = repo.purge_delivered_tenant_audit(ps, older_than_days=days)
-        if count:
+        tenants = repo.tenants_with_purgeable_tenant_audit(ps, older_than_days=days)
+    confirmed: list[uuid.UUID] = []
+    kept = 0
+    for tenant_id in tenants:
+        ids, school_kept = _confirm_school(tenant_id, days)
+        confirmed.extend(ids)
+        kept += school_kept
+        if school_kept:
+            log.warning(
+                "platform.tenant_audit.kept_unconfirmed",
+                tenant_id=str(tenant_id),
+                count=school_kept,
+                outcome="kept",
+            )
+    count = 0
+    with platform_session() as ps:
+        for i in range(0, len(confirmed), PURGE_BATCH):
+            count += repo.purge_delivered_tenant_audit(
+                ps, confirmed[i : i + PURGE_BATCH], older_than_days=days
+            )
+        if count or kept:
             audit_platform(
                 ps,
                 SYSTEM,
                 "tenant_audit.copies_purged",
                 "tenant_audit_outbox",
                 None,
-                {"count": count, "retention_days": days},
+                {"count": count, "kept_unconfirmed": kept, "retention_days": days},
             )
-    if count:
+    if count or kept:
         log.info("platform.tenant_audit.purged", count=count, outcome="ok")
-    return count
+    return PurgeResult(count, kept)
