@@ -7701,6 +7701,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/privacy/breaches/{breach_id}/affected:count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Count Affected
+         * @description Count the affected students, their guardians and staff picked by class, section, single
+         *     student, role or single staff member, for the edit form's counts (D59; permission
+         *     ``privacy.breach.manage``). Nothing is stored: the school saves the counts with PATCH. Each
+         *     person counts once. Only students in the caller's ``student.read_basic`` reach count (a
+         *     single student outside it is ``not_found``). Errors: ``not_found`` (422, per list),
+         *     ``breach_closed`` (409).
+         */
+        post: operations["count_affected_api_v1_privacy_breaches__breach_id__affected_count_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/privacy/breaches/{breach_id}/drafts/{draft}": {
         parameters: {
             query?: never;
@@ -10415,6 +10440,35 @@ export interface components {
             status: "pending" | "approved" | "rejected" | "withdrawn";
             /** Version */
             version: number;
+        };
+        /**
+         * AffectedCountIn
+         * @description What to count for the affected-people picker (D59): whole classes or sections of the
+         *     current year, single students, all staff, staff by role or single staff members (ids and role
+         *     keys only). Nothing is stored; a person picked twice counts once. The school's 1,500 students
+         *     fit through ``all_students`` or the class and section selectors; single picks are capped.
+         */
+        AffectedCountIn: {
+            /**
+             * All Staff
+             * @default false
+             */
+            all_staff: boolean;
+            /**
+             * All Students
+             * @default false
+             */
+            all_students: boolean;
+            /** Class Ids */
+            class_ids?: string[];
+            /** Membership Ids */
+            membership_ids?: string[];
+            /** Section Ids */
+            section_ids?: string[];
+            /** Staff Role Keys */
+            staff_role_keys?: string[];
+            /** Student Ids */
+            student_ids?: string[];
         };
         /** AffectedCountsOut */
         AffectedCountsOut: {
@@ -43686,6 +43740,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AffectedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    count_affected_api_v1_privacy_breaches__breach_id__affected_count_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                breach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AffectedCountIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectedCountsOut"];
                 };
             };
             /** @description Validation Error */

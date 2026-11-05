@@ -917,6 +917,71 @@
         "title": "AdjustmentOut",
         "type": "object"
       },
+      "AffectedCountIn": {
+        "additionalProperties": false,
+        "description": "What to count for the affected-people picker (D59): whole classes or sections of the\ncurrent year, single students, all staff, staff by role or single staff members (ids and role\nkeys only). Nothing is stored; a person picked twice counts once. The school's 1,500 students\nfit through ``all_students`` or the class and section selectors; single picks are capped.",
+        "properties": {
+          "all_staff": {
+            "default": false,
+            "title": "All Staff",
+            "type": "boolean"
+          },
+          "all_students": {
+            "default": false,
+            "title": "All Students",
+            "type": "boolean"
+          },
+          "class_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "title": "Class Ids",
+            "type": "array"
+          },
+          "membership_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "title": "Membership Ids",
+            "type": "array"
+          },
+          "section_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Section Ids",
+            "type": "array"
+          },
+          "staff_role_keys": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9_]+$",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Staff Role Keys",
+            "type": "array"
+          },
+          "student_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "title": "Student Ids",
+            "type": "array"
+          }
+        },
+        "title": "AffectedCountIn",
+        "type": "object"
+      },
       "AffectedCountsOut": {
         "properties": {
           "guardians": {
@@ -72126,6 +72191,84 @@
           }
         },
         "summary": "Set Affected",
+        "tags": [
+          "breaches"
+        ]
+      }
+    },
+    "/api/v1/privacy/breaches/{breach_id}/affected:count": {
+      "post": {
+        "description": "Count the affected students, their guardians and staff picked by class, section, single\nstudent, role or single staff member, for the edit form's counts (D59; permission\n``privacy.breach.manage``). Nothing is stored: the school saves the counts with PATCH. Each\nperson counts once. Only students in the caller's ``student.read_basic`` reach count (a\nsingle student outside it is ``not_found``). Errors: ``not_found`` (422, per list),\n``breach_closed`` (409).",
+        "operationId": "count_affected_api_v1_privacy_breaches__breach_id__affected_count_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "breach_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Breach Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AffectedCountIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffectedCountsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Count Affected",
         "tags": [
           "breaches"
         ]
