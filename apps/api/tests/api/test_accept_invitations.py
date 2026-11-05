@@ -1,7 +1,8 @@
 """Invitation acceptance on first sign-in (ADR-0019, FR-IAM-013, US-102, FR-TEN-003).
 
 An invited membership becomes active only when the invitee signs in with the IdP subject the
-invite was made for, within 30 days; only `invited` memberships in active schools change.
+invite was made for, within 30 days; only `invited` memberships in active schools change (and, in a
+suspended school, an invited owner or principal: D67, ADR-0056).
 """
 
 from __future__ import annotations

@@ -519,7 +519,8 @@ def respond_to_invitation(
     request_id: str | None = None,
 ) -> InvitationAnswerOut:
     """Accept or decline one of the signed-in person's own open invitations (DL-09, ADR-0023
-    amendment). Anything else (someone else's, already answered, expired, school not active) is
+    amendment). Anything else (someone else's, already answered, expired, school not active, or
+    suspended and the invitation is not for the owner or principal: D67, ADR-0056) is
     404 ``invitation_not_found``. Audit, in the inviting school's chain and the same transaction:
     ``membership.invitation_accepted`` or ``membership.invitation_declined``."""
     with context_free_session() as session:
