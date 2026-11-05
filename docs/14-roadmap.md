@@ -552,6 +552,10 @@ Each wave: its stories' ACs pass as automated tests; `make check`-equivalent gre
 | D60 | Breach drafts and the privacy screens' open items | A print page (A4) for breach notice drafts; "Mark as withdrawn" on a privacy request in the web (the API already accepts it); the optional PDF in the notice-issue dialog | ADR-0048; ADR-0050 |
 | D61 | Tally edge routes outside the app (docs/10 §13) | `/api/v1/edge/tally/*` exposed on the shared ALB and the dedicated Caddyfile by an explicit path rule with a per-IP rate limit; nothing else of the API is opened by it | ADR-0032; docs/10 §13 |
 | D62 | Owner invitations by e-mail | The school owner's invitation at provisioning goes by e-mail through the existing SES invitation path, like staff invitations; approvals stay in-app (no approval e-mails) | docs/10 §5.2; FR-PLT-002 |
+| D63 | Term-wise (bill-wise) dues from Tally (M6 open item) | The edge agent also reads the pending bills (bill-wise allocations) of linked ledgers, read-only; dues show per bill with its due date and overdue state; a ledger without bill-wise details falls back to its balance as today; the agent sends an explicit SchoolOS User-Agent | ADR-0032 |
+| D64 | Contract step after D53 | Drop the exact `students_adm_no` index once `0073` is deployed (the case-insensitive index covers it); the control plane's own CHECK translation answers 422 without naming the constraint, as D55 does | D53; D55; docs/05 |
+| D65 | Re-sending the owner invitation after go-live (D62 gap) | Operators may re-send while the owner is still only invited, in any school status except offboarding; the 10-minute cool-down stays | D62; docs/16 §5.4 |
+| D66 | Browser journeys for the D57-D62 screens | Playwright journeys with the stand-in fixtures and axe on each new screen (plan-limit tile and list, affected-people picker, withdraw, notice PDF, breach draft print page) | docs/13; NFR-A11Y-001 |
 
 **For the owner (no gate on the build):** whether to reopen D10 for the RTE register (D43), and when to commission the one-time professional review of `docs/legal/` (D30).
 
