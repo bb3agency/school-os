@@ -130,3 +130,4 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0053](ADR-0053-portal-calendar-and-readiness-reminders.md) | Portal calendar and readiness reminders | Accepted (lead, 2026-10-21; owner may revisit; D45) |
 | [ADR-0054](ADR-0054-english-consent-forms-and-locked-closed-incidents.md) | English consent forms while Telugu is off; closed SchoolOS incidents locked, two-operator reopen (amends ADR-0049, ADR-0050) | Accepted (owner, 2026-11-01; D47, D48) |
 | [ADR-0055](ADR-0055-records-and-readiness-entry-tier.md) | "Records & Readiness" entry tier sold beside an existing ERP (would amend ADR-0015, ADR-0038; reopens D8) | Proposed |
+| [ADR-0056](ADR-0056-invited-owner-of-suspended-school-may-accept.md) | An invited owner or principal of a suspended school may accept the invitation (migration 0078; D67) | Accepted (lead, 2026-11-05; owner may revisit; D67) |
