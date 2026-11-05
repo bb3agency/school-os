@@ -24,6 +24,7 @@ import platform
 import signal
 import sys
 import threading
+import tomllib
 import uuid
 from collections.abc import Sequence
 from pathlib import Path
@@ -43,7 +44,9 @@ from sos_edge_agent.config import (
     ConfigError,
     default_state_dir,
     load,
+    quote,
     save,
+    write_atomic,
 )
 from sos_edge_agent.credentials import CredentialError, CredentialStore, default_store, reconcile
 from sos_edge_agent.sync import Agent
@@ -55,6 +58,8 @@ from sos_edge_agent.tally_xml import (
     parse_groups,
 )
 
+ENROL_REQUEST = "enrol-request.toml"
+ENROL_POLL_SECONDS = 10.0
 EXIT_OK = 0
 EXIT_FAILED = 1
 log = logging.getLogger("sos_edge_agent")
@@ -139,12 +144,10 @@ class Runtime:
         return Agent(server, tally, on_key_rotated=rotated)
 
 
-def cmd_enrol(rt: Runtime, args: argparse.Namespace) -> int:
-    config = AgentConfig(
-        server_url=args.server, tenant_id=uuid.UUID(args.school), tally_url=args.tally_url
-    )
+def _enrol(rt: Runtime, server: str, school: str, code: str, tally_url: str) -> None:
+    config = AgentConfig(server_url=server, tenant_id=uuid.UUID(school), tally_url=tally_url)
     store = rt.store(config.tenant_id)
-    out = SchoolOSClient(config, lambda: b"", rt.transport).enrol(args.code, _platform())
+    out = SchoolOSClient(config, lambda: b"", rt.transport).enrol(code, _platform())
     secret = base64.urlsafe_b64decode(str(out["secret"]) + "=" * (-len(str(out["secret"])) % 4))
     enrolled = config.replace(
         device_id=uuid.UUID(str(out["device_id"])),
@@ -154,11 +157,74 @@ def cmd_enrol(rt: Runtime, args: argparse.Namespace) -> int:
     store.save(secret, device_id=enrolled.device_id, key_id=enrolled.key_id)
     save(enrolled, rt.config_path)
     log.info("tally.agent.enrolled", extra={"code": "enrolled"})
+
+
+def cmd_enrol(rt: Runtime, args: argparse.Namespace) -> int:
+    if args.via_service:
+        # The installed service runs as its virtual account (NT SERVICE\SchoolOSTallyAgent, D69),
+        # which nobody can sign in as: an administrator leaves the request in the state folder
+        # (ACL: that account and Administrators only) and the service enrols itself, so the
+        # device key is protected with the service account's DPAPI key.
+        AgentConfig(
+            server_url=args.server, tenant_id=uuid.UUID(args.school), tally_url=args.tally_url
+        )
+        fields = (
+            ("server", args.server),
+            ("school", args.school),
+            ("code", args.code),
+            ("tally_url", args.tally_url),
+        )
+        body = "".join(f"{key} = {quote(str(value))}\n" for key, value in fields)
+        write_atomic(rt.state_dir / ENROL_REQUEST, body.encode("utf-8"))
+        log.info("tally.agent.enrol_requested", extra={"code": "via_service"})
+        sys.stdout.write(
+            "The service will enrol this PC within a minute. Check with `status`; if it still "
+            "says not enrolled, see agent.log in the same folder.\n"
+        )
+        return EXIT_OK
+    _enrol(rt, args.server, args.school, args.code, args.tally_url)
     sys.stdout.write(
         "Enrolled. This PC's Tally agent can now sync. Choose the ledger groups on the Tally "
         "connector screen in SchoolOS.\n"
     )
     return EXIT_OK
+
+
+def enrol_from_request(rt: Runtime) -> bool:
+    """Enrol from a request left by ``enrol --via-service``, if there is one. The request file is
+    deleted whatever happens (the one-time code is single-use); returns whether the PC is now
+    enrolled."""
+    request = rt.state_dir / ENROL_REQUEST
+    if not request.is_file():
+        return False
+    try:
+        raw = tomllib.loads(request.read_text(encoding="utf-8"))
+        _enrol(rt, str(raw["server"]), str(raw["school"]), str(raw["code"]), str(raw["tally_url"]))
+    except AgentError as err:
+        log.warning("tally.agent.enrol_failed", extra={"code": err.code})
+        return False
+    except (KeyError, ValueError, CredentialError) as err:
+        log.warning("tally.agent.enrol_failed", extra={"code": type(err).__name__})
+        return False
+    finally:
+        request.unlink(missing_ok=True)
+    return True
+
+
+def wait_for_enrolment(
+    rt: Runtime, stop: threading.Event, *, poll_seconds: float = ENROL_POLL_SECONDS
+) -> bool:
+    """The service before enrolment: wait (without failing, so it is not restarted in a loop)
+    until ``agent.toml`` exists or a request from ``enrol --via-service`` enrols the PC."""
+    waiting_logged = False
+    while not stop.is_set():
+        if rt.config_path.is_file() or enrol_from_request(rt):
+            return True
+        if not waiting_logged:
+            log.info("tally.agent.waiting_for_enrolment", extra={"code": "not_enrolled"})
+            waiting_logged = True
+        stop.wait(poll_seconds)
+    return False
 
 
 def cmd_sync_once(rt: Runtime, args: argparse.Namespace) -> int:
@@ -178,6 +244,9 @@ def cmd_run(rt: Runtime, args: argparse.Namespace) -> int:
         if sig is not None:
             signal.signal(sig, _stop)
     log.info("tally.agent.started", extra={"code": __version__})
+    if not wait_for_enrolment(rt, stop):
+        log.info("tally.agent.stopped", extra={"code": "stopped"})
+        return EXIT_OK
     rt.agent().run(stop)
     log.info("tally.agent.stopped", extra={"code": "stopped"})
     return EXIT_OK
@@ -230,6 +299,11 @@ def build_parser() -> argparse.ArgumentParser:
     enrol.add_argument("--school", required=True, help="the school id shown with the code")
     enrol.add_argument("--code", required=True, help="the one-time code (XXXX-XXXX-XXXX)")
     enrol.add_argument("--tally-url", default="http://127.0.0.1:9000")
+    enrol.add_argument(
+        "--via-service",
+        action="store_true",
+        help="installed service (MSI): leave the request for the service to enrol itself",
+    )
     enrol.set_defaults(handler=cmd_enrol)
     commands.add_parser("run", help="sync every 30 minutes (the service)").set_defaults(
         handler=cmd_run

@@ -94,7 +94,7 @@ class AgentConfig:
         return dataclasses.replace(self, **changes)  # type: ignore[arg-type]
 
 
-def _quote(value: str) -> str:
+def quote(value: str) -> str:
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     if any(ch in escaped for ch in "\n\r\t"):
         raise ConfigError("configuration values cannot contain line breaks")
@@ -104,16 +104,16 @@ def _quote(value: str) -> str:
 def save(config: AgentConfig, path: Path) -> None:
     lines = [
         "# SchoolOS Tally agent (ADR-0032). No secrets here: the device key is kept by Windows.",
-        f"server_url = {_quote(config.server_url)}",
-        f"tenant_id = {_quote(str(config.tenant_id))}",
-        f"tally_url = {_quote(config.tally_url)}",
+        f"server_url = {quote(config.server_url)}",
+        f"tenant_id = {quote(str(config.tenant_id))}",
+        f"tally_url = {quote(config.tally_url)}",
     ]
     if config.device_id is not None:
-        lines.append(f"device_id = {_quote(str(config.device_id))}")
+        lines.append(f"device_id = {quote(str(config.device_id))}")
     if config.key_id is not None:
-        lines.append(f"key_id = {_quote(config.key_id)}")
+        lines.append(f"key_id = {quote(config.key_id)}")
     if config.key_rotated_at is not None:
-        lines.append(f"key_rotated_at = {_quote(config.key_rotated_at.isoformat())}")
+        lines.append(f"key_rotated_at = {quote(config.key_rotated_at.isoformat())}")
     write_atomic(path, ("\n".join(lines) + "\n").encode("utf-8"))
 
 
@@ -163,6 +163,7 @@ __all__ = [
     "check_tally_url",
     "default_state_dir",
     "load",
+    "quote",
     "save",
     "write_atomic",
 ]
