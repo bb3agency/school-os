@@ -512,3 +512,54 @@ def test_H_01_guardian_create_replay_keeps_no_phone_or_address_in_valkey(
     assert again.headers.get("Idempotent-Replayed") == "true"
     assert again.headers["ETag"] == first.headers["ETag"]
     assert again.json() == first.json()
+
+
+def test_FR_STU_001_admission_number_differing_only_in_case_is_a_duplicate_over_http(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """D53 (BR-01; 0073_admission_no_ci): ``adm/x`` and ``ADM/X`` are one admission number per
+    school. Creating or editing a student with a case variant gives the same 409
+    ``duplicate_admission_no`` as an exact duplicate (the unique index is the only check, so
+    this is also the concurrent-request path); another school may still use the number."""
+    admin = world.person("office_admin")
+    upper = f"ADM/{uuid.uuid4().hex[:6].upper()}"
+    lower = upper.lower()
+
+    def with_adm(name: str, number: str) -> dict[str, Any]:
+        body = new_body(name)
+        body["values"].append(
+            {"attribute_key": "admission_no", "source": "admission_register", "value": number}
+        )
+        return body
+
+    first = api.call(admin, "POST", BASE, json=with_adm("Synthetica Case One", upper))
+    assert first.status_code == 201, first.text
+    before = count_students(admin_engine, world.a.tenant_id)
+
+    exact = api.call(admin, "POST", BASE, json=with_adm("Synthetica Case Exact", upper))
+    variant = api.call(admin, "POST", BASE, json=with_adm("Synthetica Case Two", lower))
+    for res in (exact, variant):
+        assert res.status_code == 409, res.text
+        assert res.json()["code"] == "duplicate_admission_no"
+        assert upper not in res.text  # never echoes the value
+        assert lower not in res.text
+    assert count_students(admin_engine, world.a.tenant_id) == before
+
+    # Editing: recording the case variant on another student is refused the same way.
+    other = api.call(admin, "POST", BASE, json=new_body("Synthetica Case Three")).json()["id"]
+    edit = api.call(
+        admin,
+        "POST",
+        f"{BASE}/{other}/values",
+        json={"attribute_key": "admission_no", "source": "admission_register", "value": lower},
+    )
+    assert edit.status_code == 409, edit.text
+    assert edit.json()["code"] == "duplicate_admission_no"
+    with admin_engine.connect() as c:
+        stored: str | None = c.execute(
+            text("SELECT admission_no FROM sis.students WHERE id = :s"), {"s": other}
+        ).scalar_one()
+    assert stored is None
+
+    # Another school may use either spelling.
+    SW.create(world.b, name="Synthetica Case Other", section_key=None, admission_no=lower)
