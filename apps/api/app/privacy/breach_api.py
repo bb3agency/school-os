@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/v1/privacy", tags=["breaches"])
 Reader = Annotated[UserContext, Depends(require(service.READ, scope="school"))]
 Manager = Annotated[UserContext, Depends(require(service.MANAGE, scope="school", step_up=True))]
 # A read for the edit form (D59): the manage permission, without step-up (PATCH asks for it).
-Counter = Annotated[UserContext, Depends(require(service.MANAGE, scope="school"))]
+Counter = Annotated[UserContext, Depends(require(service.MANAGE, scope="school", step_up=True))]
 
 
 def _headers(item: BreachDetailOut) -> dict[str, str]:
@@ -115,10 +115,10 @@ def count_affected(
 ) -> AffectedCountsOut:
     """Count the affected students, their guardians and staff picked by class, section, single
     student, role or single staff member, for the edit form's counts (D59; permission
-    ``privacy.breach.manage``). Nothing is stored: the school saves the counts with PATCH. Each
-    person counts once. Only students in the caller's ``student.read_basic`` reach count (a
-    single student outside it is ``not_found``). Errors: ``not_found`` (422, per list),
-    ``breach_closed`` (409)."""
+    ``privacy.breach.manage`` with step-up, as for every POST under that permission). Nothing
+    is stored: the school saves the counts with PATCH. Each person counts once. Only students
+    in the caller's ``student.read_basic`` reach count (a single student outside it is
+    ``not_found``). Errors: ``not_found`` (422, per list), ``breach_closed`` (409)."""
     return service.count_affected(db, ctx, breach_id, body)
 
 

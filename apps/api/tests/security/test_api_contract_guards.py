@@ -498,6 +498,9 @@ IDEMPOTENCY_EXEMPT = {
     "the consent register: a repeat answers 409 consent_not_given",
     ("POST", "/api/v1/privacy/breaches/{breach_id}/notice-draft"): "each call makes a new "
     "draft on purpose (the AI draft may be redone); nothing is sent",
+    # D59: counting the affected people stores nothing; a repeat gives the same counts.
+    ("POST", "/api/v1/privacy/breaches/{breach_id}/affected:count"): "a read: nothing is "
+    "stored, a repeat answers the same counts",
     ("POST", "/api/v1/platform/incidents/{incident_id}/schools"): "an upsert keyed by the "
     "school; repeating it changes nothing",
     # R3-2F (D48): the first step of a two-operator reopen on an existing incident.

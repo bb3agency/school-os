@@ -197,6 +197,9 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
             "/drafts/board_outline"
         ),
         ("POST", "/api/v1/privacy/breaches/{breach_id}/notice-draft"): on_breach("/notice-draft"),
+        ("POST", "/api/v1/privacy/breaches/{breach_id}/affected:count"): on_breach(
+            "/affected:count", {"all_staff": True}
+        ),
         ("POST", "/api/v1/privacy/requests/{request_id}/consent-withdrawal"): withdraw,
     }
 
@@ -232,6 +235,7 @@ BOLA_BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/privacy/breaches/{breach_id}"): {"approx_staff": 1},
     ("PUT", "/api/v1/privacy/breaches/{breach_id}/affected"): {"student_ids": []},
     ("POST", "/api/v1/privacy/breaches/{breach_id}/notice-draft"): None,
+    ("POST", "/api/v1/privacy/breaches/{breach_id}/affected:count"): {"all_staff": True},
     ("POST", "/api/v1/privacy/requests/{request_id}/consent-withdrawal"): {
         "purpose_id": "0192f3a4-0000-7000-8000-000000000b01",
         "relationship": "mother",

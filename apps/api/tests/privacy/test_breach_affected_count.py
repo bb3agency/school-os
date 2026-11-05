@@ -52,8 +52,10 @@ def test_FR_DPDP_033_D59_count_needs_manage_and_other_school_is_404(world: Any, 
     for role in ("office_admin", "auditor_readonly", "class_teacher", "accountant"):
         res = api.call(world.person(role), "POST", _path(out["id"]), json=body)
         assert res.status_code == 403, (role, res.text)
-    # A read for the form: no step-up (the PATCH that saves the counts asks for it).
-    ok = api.call(world.person("principal"), "POST", _path(out["id"]), json=body, auth_age_s=301)
+    # Every POST under privacy.breach.manage asks for step-up (SEC-005), the count too.
+    stale = api.call(world.person("principal"), "POST", _path(out["id"]), json=body, auth_age_s=301)
+    assert stale.status_code == 428, stale.text
+    ok = api.call(world.person("principal"), "POST", _path(out["id"]), json=body)
     assert ok.status_code == 200, ok.text
     b_owner = world.b.people["owner"]
     assert api.call(b_owner, "POST", _path(out["id"]), json=body).status_code == 404
