@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.core.ids import new_id
 from app.core.record_tables import dump_table
 from app.core.records import RecordTable
-from app.tally.models import Device, EnrolmentCode, Group, Party, PartyLink, Sync
+from app.tally.models import Bill, Device, EnrolmentCode, Group, Party, PartyLink, Sync
 
 
 def current_tenant_id(session: Session) -> uuid.UUID:
@@ -302,6 +302,39 @@ def mark_parties_missing(
         )
 
 
+def replace_bills(
+    session: Session, party_ids: Collection[uuid.UUID], rows: Sequence[Mapping[str, Any]]
+) -> None:
+    """The bills of ``party_ids`` become ``rows`` (each with ``party_id`` and ``sync_id``): a
+    snapshot replaces a ledger's bills as a whole (D63)."""
+    if party_ids:
+        session.execute(delete(Bill).where(Bill.party_id.in_(list(party_ids))))
+    if rows:
+        tenant_id = current_tenant_id(session)
+        session.execute(insert(Bill), [{"tenant_id": tenant_id, "id": new_id(), **r} for r in rows])
+
+
+def bills_of(session: Session, party_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, list[Bill]]:
+    """Pending bills per party, by due date (no due date last), bill date, reference."""
+    if not party_ids:
+        return {}
+    out: dict[uuid.UUID, list[Bill]] = {}
+    stmt = (
+        select(Bill)
+        .where(Bill.party_id.in_(list(party_ids)))
+        .order_by(
+            Bill.party_id,
+            Bill.due_date.asc().nulls_last(),
+            Bill.bill_date.asc().nulls_last(),
+            Bill.reference,
+            Bill.id,
+        )
+    )
+    for bill in session.scalars(stmt):
+        out.setdefault(bill.party_id, []).append(bill)
+    return out
+
+
 def get_party(session: Session, party_id: uuid.UUID, *, lock: bool = False) -> Party | None:
     stmt = select(Party).where(Party.id == party_id)
     if lock:
@@ -456,7 +489,8 @@ def party_counts(session: Session) -> PartyCounts:
 
 
 def delete_old_syncs(session: Session, before: dt.datetime) -> int:
-    """Sync records older than ``before`` that no party still points to."""
+    """Sync records older than ``before`` that no party still points to; their bills go with
+    them (``tally_bills_sync_fk`` ON DELETE CASCADE; D63)."""
     referenced = select(Party.last_sync_id).where(Party.last_sync_id == Sync.id).exists()
     result = session.execute(
         delete(Sync).where(Sync.received_at < before, ~referenced).returning(Sync.id)
@@ -484,6 +518,7 @@ def export_tables(session: Session) -> list[RecordTable]:
         dump_table(session, Sync.__table__, name="tally_syncs"),
         dump_table(session, Party.__table__, name="tally_parties"),
         dump_table(session, PartyLink.__table__, name="tally_party_links"),
+        dump_table(session, Bill.__table__, name="tally_bills"),
     ]
 
 
@@ -492,6 +527,7 @@ __all__ = [
     "LinkedBalance",
     "PartyCounts",
     "PartyFilter",
+    "bills_of",
     "count_active_devices",
     "current_tenant_id",
     "delete_link",
@@ -519,6 +555,7 @@ __all__ = [
     "parties_of_company",
     "party_counts",
     "present_parties",
+    "replace_bills",
     "selected_groups",
     "set_selection",
     "silent_devices",

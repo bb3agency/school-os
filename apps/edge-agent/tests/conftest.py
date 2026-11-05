@@ -1,7 +1,8 @@
 """Fakes for the edge agent tests: Tally's XML server and the SchoolOS agent API (synthetic data).
 
 - :class:`FakeTally` answers export envelopes from ``fixtures/`` by collection type (and the
-  ``CHILDOF`` group for ledgers), and records every body it received.
+  ``CHILDOF`` group for ledgers; ``bills.xml`` for the pending bills, D63), and records every
+  body it received.
 - :class:`FakeServer` plays ``/api/v1/edge/tally/*``: it checks every signed request with its OWN
   HMAC code (so a drift in the agent's signing fails here), records the JSON bodies and answers
   like the API (config, catalog, idempotent syncs by ``batch_id``, key rotation).
@@ -35,9 +36,10 @@ def fixture(name: str) -> bytes:
 
 
 class FakeTally:
-    def __init__(self, *, down: bool = False) -> None:
+    def __init__(self, *, down: bool = False, bills: bytes | None = None) -> None:
         self.bodies: list[bytes] = []
         self.down = down
+        self.bills = bills if bills is not None else fixture("bills.xml")
 
     def request(
         self, method: str, url: str, headers: Mapping[str, str], body: bytes | None
@@ -55,6 +57,8 @@ class FakeTally:
             return HttpResponse(200, {}, fixture("companies.xml"))
         if kind == "Group":
             return HttpResponse(200, {}, fixture("groups.xml"))
+        if kind == "Bills":
+            return HttpResponse(200, {}, self.bills)
         group = (root.findtext(".//COLLECTION/CHILDOF") or "").lower().replace(" ", "_")
         path = FIXTURES / f"ledgers_{group}.xml"
         data = path.read_bytes() if path.is_file() else b"<ENVELOPE><BODY/></ENVELOPE>"

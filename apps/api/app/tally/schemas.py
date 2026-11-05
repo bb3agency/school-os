@@ -160,6 +160,22 @@ class LinkIn(_In):
     student_id: uuid.UUID
 
 
+class DueBillOut(_Out):
+    """One pending bill (Tally bill-wise allocation) of a linked ledger (D63)."""
+
+    ledger_name: str
+    reference: str = Field(description="Tally's bill name, e.g. the term it was raised for")
+    bill_date: dt.date | None
+    due_date: dt.date | None = Field(
+        description="Tally's due date (or bill date + credit period); null when Tally has none"
+    )
+    pending: Decimal = Field(description="Positive: still owed to the school")
+    overdue: bool = Field(description="Pending, and the due date is before today (IST)")
+    shared: bool = Field(
+        description="The ledger is also linked to another student (a family ledger; D54)"
+    )
+
+
 class StudentDuesOut(_Out):
     student_id: uuid.UUID
     display_name: str | None
@@ -178,6 +194,17 @@ class StudentDuesOut(_Out):
     shared_with: int = Field(
         description="How many other students share one of this student's ledgers (0 if none)."
     )
+    bills: list[DueBillOut] = Field(
+        default_factory=list,
+        description="Pending bills of this student's ledgers, by due date (D63). Empty when "
+        "Tally keeps no bill-wise details for them: the total is then the ledgers' balance. "
+        "The total stays the ledgers' balance either way.",
+    )
+    overdue_due: Decimal = Field(
+        default=Decimal("0.00"),
+        description="Sum of the overdue bills' pending amounts (a shared ledger in full; D54)",
+    )
+    overdue_bills: int = 0
 
 
 class ClassDuesOut(_Out):
@@ -258,11 +285,25 @@ class CatalogOut(_Out):
     selected: int
 
 
+class BillIn(_In):
+    """One pending bill of the ledger (Tally bill-wise allocation; D63)."""
+
+    reference: TallyName
+    bill_date: dt.date | None = None
+    due_date: dt.date | None = None
+    pending: Amount
+
+
 class PartyIn(_In):
     guid: Annotated[str, Field(pattern=r"^[0-9A-Za-z-]{1,80}$")] | None = None
     name: TallyName
     group: TallyName
     closing_balance: Amount
+    bills: list[BillIn] = Field(
+        default_factory=list,
+        max_length=100,
+        description="Pending bills (D63). Empty: no bill-wise details, dues use the balance.",
+    )
 
 
 class SyncIn(_In):
@@ -303,6 +344,7 @@ class KeyRotationOut(_Out):
 
 __all__ = [
     "AgentConfigOut",
+    "BillIn",
     "CatalogGroupIn",
     "CatalogIn",
     "CatalogOut",
@@ -310,6 +352,7 @@ __all__ = [
     "ConnectorStatus",
     "DeviceOut",
     "DeviceStatus",
+    "DueBillOut",
     "DuesPage",
     "DuesTotals",
     "EnrolIn",

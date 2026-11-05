@@ -244,3 +244,49 @@ def test_FR_TALLY_008_a_shared_family_ledger_is_marked_and_counted_once() -> Non
     assert "₹20,500.25 in total, each ledger counted once" in text
     # No class breakdown in the school answer: a one-student class would leak that figure.
     assert "By class" not in text
+
+
+def _child_with_bills(bills: tuple[tally.BillDue, ...]) -> tally.StudentFeeDues:
+    day = dt.date(2026, 9, 28)
+    return tally.StudentFeeDues(
+        student_id=uuid.uuid4(),
+        display_name="Synthetica Ravi",
+        admission_no="S1",
+        class_section="Class IX A",
+        ledgers=(
+            tally.LedgerDue(
+                "Synthetica Ravi 9A", "Sundry Debtors", Decimal("15000.00"), day, bills=bills
+            ),
+        ),
+        total_due=Decimal("15000.00"),
+        as_of=day,
+        synced_at=dt.datetime(2026, 9, 28, 6, 0, tzinfo=dt.UTC),
+    )
+
+
+def test_FR_TALLY_008_D63_overdue_bills_are_named_by_reference_and_due_date() -> None:
+    """D63: for one student, the overdue Tally bills are named by reference and due date with
+    the pending amount as stored; bills not yet due are not listed; the total stays the
+    balance; no ledger name."""
+    tool = GetFeeDuesTool(load_tools_config().tools["get_fee_dues"])
+    bills = (
+        tally.BillDue(
+            "Term 1/2026-27", dt.date(2026, 6, 1), dt.date(2026, 7, 1), Decimal("5000.00"), True
+        ),
+        tally.BillDue(
+            "Term 2/2026-27", dt.date(2026, 10, 1), dt.date(2099, 1, 1), Decimal("10000.00"), False
+        ),
+    )
+    text = tool._student(uuid.uuid4(), _child_with_bills(bills), "0123456789abcdef").text
+    assert "₹15,000.00 in total" in text
+    assert "Overdue Tally bill (₹5,000.00 in all, part of the total above)" in text
+    assert "bill Term 1/2026-27 of ledger 1, due 01/07/2026: ₹5,000.00" in text
+    assert "Term 2/2026-27" not in text
+    assert "Synthetica Ravi 9A" not in text
+
+    not_due = (bills[1],)
+    text = tool._student(uuid.uuid4(), _child_with_bills(not_due), "0123456789abcdef").text
+    assert "No Tally bill of these ledgers is past its due date." in text
+    # Without bill-wise details nothing is said about bills.
+    text = tool._student(uuid.uuid4(), _child_with_bills(()), "0123456789abcdef").text
+    assert "bill" not in text.casefold()

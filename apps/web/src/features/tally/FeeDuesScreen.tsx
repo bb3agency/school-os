@@ -23,6 +23,74 @@ import { Amount, TallyGate } from "./parts";
  */
 type DuesRow = DuesPage["data"][number];
 
+/**
+ * Bill-wise dues (D63): the pending bills of the student's linked ledgers in a native
+ * disclosure (keyboard and screen-reader friendly, Baseline), with due dates and an "Overdue"
+ * pill that repeats the text, never colour alone. Without bill-wise details in Tally the cell
+ * says the amount is the ledger balance.
+ */
+function BillsCell({ row }: { row: DuesRow }) {
+  const t = useTranslations("tally.dues");
+  const locale = useLocale() as Locale;
+  const bills = row.bills ?? [];
+  if (bills.length === 0) {
+    return <span className="text-sm text-ink-muted">{t("billsNone")}</span>;
+  }
+  const overdue = row.overdue_bills ?? bills.filter((b) => b.overdue).length;
+  return (
+    <details className="group min-w-56">
+      <summary className="inline-flex min-h-6 cursor-pointer flex-wrap items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline">
+        {t("billsSummary", { count: bills.length })}
+        {overdue > 0 ? (
+          <Pill variant="negative" icon={null}>
+            {t("overdueCount", {
+              count: overdue,
+              amount: formatInr(row.overdue_due ?? "0", locale) ?? "",
+            })}
+          </Pill>
+        ) : null}
+      </summary>
+      <ul className="mt-2 space-y-2" aria-label={t("billsLabel")}>
+        {bills.map((bill, index) => (
+          <li
+            key={`${bill.ledger_name}-${bill.reference}-${index}`}
+            className="rounded-md border border-border-soft p-2 text-sm"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-semibold text-ink [overflow-wrap:anywhere]">
+                {bill.reference}
+              </span>
+              <Amount value={bill.pending} />
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-ink-muted">
+              <span className="num">
+                {bill.due_date
+                  ? t("billDue", { date: formatDate(bill.due_date) ?? "" })
+                  : t("billNoDueDate")}
+              </span>
+              {bill.overdue ? (
+                <Pill variant="negative" icon={null}>
+                  {t("overdue")}
+                </Pill>
+              ) : null}
+              {bill.shared ? (
+                <Pill variant="tag" icon={null}>
+                  {t("billShared")}
+                </Pill>
+              ) : null}
+            </div>
+            {bills.some((b) => b.ledger_name !== bill.ledger_name) ? (
+              <p className="mt-1 text-xs text-ink-muted [overflow-wrap:anywhere]">
+                {t("billLedger", { ledger: bill.ledger_name })}
+              </p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function FeeDuesScreen() {
   const t = useTranslations("tally.dues");
   const tn = useTranslations("school.nav");
@@ -84,6 +152,12 @@ export function FeeDuesScreen() {
           ) : (
             <Amount value={row.total_due} />
           ),
+      },
+      {
+        key: "bills",
+        name: t("columns.bills"),
+        header: t("columns.bills"),
+        cell: (row) => <BillsCell row={row} />,
       },
       {
         key: "ledgers",

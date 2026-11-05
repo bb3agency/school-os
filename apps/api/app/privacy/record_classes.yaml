@@ -428,8 +428,8 @@ classes:
   tally_ledgers:
     label: Tally ledgers
     owner: tally
-    tables: [ops.tally_parties, ops.tally_party_links, ops.tally_groups, ops.tally_devices,
-             ops.tally_enrolment_codes]
+    tables: [ops.tally_parties, ops.tally_bills, ops.tally_party_links, ops.tally_groups,
+             ops.tally_devices, ops.tally_enrolment_codes]
     classification: C2
     docs_row: Tally party ledgers and links
     retention: "While the connector is on: the latest snapshot per ledger"

@@ -5,8 +5,12 @@ Do not install at a school until the ADR is accepted.**
 
 A small Windows service on the office PC that runs TallyPrime. It reads the ledger groups the
 school's accountant selected in SchoolOS and sends each party ledger's closing balance to
-SchoolOS. It talks to Tally only on this PC (`127.0.0.1`, XML over HTTP, export requests only)
-and to SchoolOS only over outbound HTTPS, signing every request with its device key.
+SchoolOS, with the ledger's pending bills (bill-wise allocations: bill name, bill date, due
+date, pending amount) when Tally keeps them (D63; bills of other ledgers never leave the PC). It
+talks to Tally only on this PC (`127.0.0.1`, XML over HTTP, export requests only) and to
+SchoolOS only over outbound HTTPS, signing every request with its device key. Every request
+carries `User-Agent: SchoolOS-Edge-Agent/<version>` (urllib's default agent is blocked by
+common firewall rule sets).
 
 | Topic | Where |
 |---|---|

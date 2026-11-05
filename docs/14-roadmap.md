@@ -311,7 +311,7 @@ Built on the M6 branch, **behind flag; ADR Proposed** (not yet merged; migration
 - **Ask**: `get_fee_dues` (06 §7), school-wide `finance.read` only, linked ledgers only; eval gates in 06 §13.4 all pass on `app-fake`.
 - **Web**: `/settings/tally` (status, agents, groups), `/settings/tally/ledgers` (linking), `/fees` (dues), EN and TE; menu items only while the connector answers.
 
-Not built: the MSI installer and code signing; signed auto-update; exposure of `/api/v1/edge/tally/*` in the ALB and the dedicated Caddyfile (10 §13); bill-wise (term-wise) dues; a live-model fee eval; an e2e run of the new screens (listed in the responsive suite, not run in this change); the human exit criterion (the accountant confirms the figures match Tally at the design partner).
+Not built: the MSI installer and code signing; signed auto-update; exposure of `/api/v1/edge/tally/*` in the ALB and the dedicated Caddyfile (10 §13); a live-model fee eval; an e2e run of the new screens (listed in the responsive suite, not run in this change); the human exit criterion (the accountant confirms the figures match Tally at the design partner). Built since (D63): bill-wise (term-wise) dues: the agent sends each linked ledger's pending bills, dues show per bill with due date and overdue state, `get_fee_dues` names overdue bills (`0077_tally_bills`).
 
 **Questions for the PO and security review**: the ten questions of ADR-0032 (Tally version and ledger layout at the design partner, HMAC vs Ed25519, C2 vs C3 for fee data, who enrols, updates, an Excel fallback, bill-wise dues, the 48-hour silence window, class-teacher access).
 

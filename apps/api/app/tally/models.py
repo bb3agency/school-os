@@ -1,4 +1,4 @@
-"""Tally connector tables (migration 0036_tally; docs/05 §7.4; ADR-0032 Proposed).
+"""Tally connector tables (0036_tally, 0077_tally_bills; docs/05 §7.4; ADR-0032 Proposed).
 
 Typed mappings for queries only; DDL (RLS, CHECKs, composite FKs, column grants, the offboarding
 purge policy) lives in the migration.
@@ -130,4 +130,22 @@ class PartyLink(Base):
     linked_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
 
 
-__all__ = ["Device", "EnrolmentCode", "Group", "Party", "PartyLink", "Sync"]
+class Bill(Base):
+    """A pending bill (Tally bill-wise allocation) of a party ledger, from the snapshot that last
+    updated the ledger (0077_tally_bills; D63). Replaced as a whole per snapshot."""
+
+    __tablename__ = "tally_bills"
+    __table_args__ = {"schema": "ops"}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    party_id: Mapped[uuid.UUID]
+    sync_id: Mapped[uuid.UUID]
+    reference: Mapped[str] = mapped_column(Text)
+    bill_date: Mapped[dt.date | None] = mapped_column(Date)
+    due_date: Mapped[dt.date | None] = mapped_column(Date)
+    pending: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+
+
+__all__ = ["Bill", "Device", "EnrolmentCode", "Group", "Party", "PartyLink", "Sync"]
