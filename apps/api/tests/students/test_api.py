@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import sys
 import uuid
 from typing import Any
@@ -91,7 +92,8 @@ def test_US_301_AC3_sensitive_fields_hidden_or_masked(
         "conflicts": [],
     }
     assert admin["values"]["aadhaar_last4"][0]["value"] == "••••"
-    assert "4821" not in str(admin)
+    # Random UUIDs in the payload may contain the digits; check the text without them.
+    assert "4821" not in re.sub(r"[0-9a-f]{8}-[0-9a-f-]{27}", "", str(admin))
     assert "asthma" not in str(admin)
     history = api.call(world.person("office_staff"), "GET", f"{BASE}/{shared['s9a']}/values")
     assert {v["attribute_key"] for v in history.json()}.isdisjoint(
