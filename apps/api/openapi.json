@@ -23497,6 +23497,27 @@
         "title": "ParentDocumentLinkOut",
         "type": "object"
       },
+      "ParentDocumentPreparingOut": {
+        "additionalProperties": false,
+        "description": "D71 (FR-PUB-009): the notice's PDF is being made again by the worker (its stored render\nexpired); the page asks the parent to try again after ``retry_after_s`` (also the\n``Retry-After`` header of the 202).",
+        "properties": {
+          "retry_after_s": {
+            "title": "Retry After S",
+            "type": "integer"
+          },
+          "status": {
+            "const": "preparing",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "retry_after_s"
+        ],
+        "title": "ParentDocumentPreparingOut",
+        "type": "object"
+      },
       "ParentDueInstalmentOut": {
         "additionalProperties": false,
         "properties": {
@@ -74207,7 +74228,7 @@
     },
     "/api/v1/public/links/current/document": {
       "get": {
-        "description": "The PDF of a notice or receipt link, presigned for at most 5 minutes (FR-PUB-009); 404\nwhile there is none (a cancelled receipt, a notice whose files were removed). Audited by\nthe owning module. Not a view.",
+        "description": "The PDF of a notice or receipt link, presigned for at most 5 minutes (FR-PUB-009); 404\nwhile there is none (a cancelled receipt, a withdrawn notice). A notice whose stored render\nexpired (``render_keep_days``) or is still being made answers 202 ``preparing`` with\n``Retry-After``: the worker renders it again (queued once; repeated requests while it is\nqueued queue nothing more; D71). Audited by the owning module. Not a view.",
         "operationId": "current_document_api_v1_public_links_current_document_get",
         "responses": {
           "200": {
@@ -74219,6 +74240,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentDocumentPreparingOut"
+                }
+              }
+            },
+            "description": "The notice's PDF is being made again; try again after Retry-After."
           },
           "404": {
             "description": "Unknown, expired or revoked link (always the same body)."

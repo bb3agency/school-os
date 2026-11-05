@@ -8307,8 +8307,10 @@ export interface paths {
         /**
          * Current Document
          * @description The PDF of a notice or receipt link, presigned for at most 5 minutes (FR-PUB-009); 404
-         *     while there is none (a cancelled receipt, a notice whose files were removed). Audited by
-         *     the owning module. Not a view.
+         *     while there is none (a cancelled receipt, a withdrawn notice). A notice whose stored render
+         *     expired (``render_keep_days``) or is still being made answers 202 ``preparing`` with
+         *     ``Retry-After``: the worker renders it again (queued once; repeated requests while it is
+         *     queued queue nothing more; D71). Audited by the owning module. Not a view.
          */
         get: operations["current_document_api_v1_public_links_current_document_get"];
         put?: never;
@@ -18748,6 +18750,21 @@ export interface components {
             expires_at: string;
             /** Url */
             url: string;
+        };
+        /**
+         * ParentDocumentPreparingOut
+         * @description D71 (FR-PUB-009): the notice's PDF is being made again by the worker (its stored render
+         *     expired); the page asks the parent to try again after ``retry_after_s`` (also the
+         *     ``Retry-After`` header of the 202).
+         */
+        ParentDocumentPreparingOut: {
+            /** Retry After S */
+            retry_after_s: number;
+            /**
+             * Status
+             * @constant
+             */
+            status: "preparing";
         };
         /** ParentDueInstalmentOut */
         ParentDueInstalmentOut: {
@@ -45086,6 +45103,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ParentDocumentLinkOut"];
+                };
+            };
+            /** @description The notice's PDF is being made again; try again after Retry-After. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentDocumentPreparingOut"];
                 };
             };
             /** @description Unknown, expired or revoked link (always the same body). */
