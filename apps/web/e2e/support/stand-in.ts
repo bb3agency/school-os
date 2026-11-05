@@ -13,7 +13,14 @@ import { askAnswer, askEvents, resetAsk } from "./ask-api";
 import { FILES_PREFIX, journeyAnswer, resetJourney } from "./journey-api";
 import { OFFICE, r1Answer, resetR1 } from "./r1-api";
 import { lastReceiptRequest, r2Answer, resetR2 } from "./r2-api";
-import { isR3SchoolSubject, r3Answer, r3Decorate, resetR3, setR3Clock } from "./r3-api";
+import {
+  isR3SchoolSubject,
+  lastR3Write,
+  r3Answer,
+  r3Decorate,
+  resetR3,
+  setR3Clock,
+} from "./r3-api";
 import { resetSheets, sheetAnswer } from "./sheet-api";
 
 export const IDP_PORT = Number(process.env.E2E_IDP_PORT ?? 8089);
@@ -605,6 +612,28 @@ const OPERATOR_PERMISSIONS = [
   "platform.audit.read",
 ];
 
+/** D57 plan-limit crossings (counts only): one school at its limit, one at 80 %. */
+export const PLAN_LIMIT_ALERTS = [
+  {
+    tenant_id: T1,
+    metric: "students",
+    threshold: 100,
+    period_start: "2026-11-01",
+    usage_value: "1500",
+    limit_value: "1500",
+    crossed_at: "2026-11-04T05:30:00Z",
+  },
+  {
+    tenant_id: T3,
+    metric: "storage_gb",
+    threshold: 80,
+    period_start: "2026-11-01",
+    usage_value: "41.5",
+    limit_value: "50",
+    crossed_at: "2026-11-03T05:30:00Z",
+  },
+] satisfies components["schemas"]["PlanLimitAlertOut"][];
+
 const AUDIT_NOT_VERIFIED = {
   ok: null,
   checked: 0,
@@ -808,8 +837,15 @@ function apiAnswer(method: string, path: string, subject: string): [number, unkn
         ai_spend_mtd_inr: "3200.50",
         open_tickets_by_priority: { p2: 1, p3: 2 },
         tickets_sla_breached: 0,
+        // D57 (D66): schools by their highest plan-limit crossing this billing period.
+        plan_limit_alerts: { "80": 1, "100": 1 },
       },
     ];
+  // D57 (D66): this billing period's plan-limit crossings, a plain list (PlanLimitAlertOut).
+  if (path === "/api/v1/platform/usage/limit-alerts") return [200, PLAN_LIMIT_ALERTS];
+  // The usage page's other lists are plain lists too (the paged fallback below broke the page).
+  if (path === "/api/v1/platform/usage/ai-quota-alerts") return [200, []];
+  if (path === "/api/v1/platform/usage") return [200, []];
   if (path === "/api/v1/platform/tenants" && method === "GET")
     return [200, page([TENANT_SUMMARY, provisioningSummary()])];
   if (path === "/api/v1/platform/plans") return [200, page([PLAN])];
@@ -847,6 +883,9 @@ async function startApi(): Promise<Server> {
       const { now } = JSON.parse(raw || "{}") as { now?: string | null };
       setR3Clock(now ?? null);
       return send(response, 204, "");
+    }
+    if (url.pathname === "/__e2e/r3/last-write" && method === "GET") {
+      return send(response, 200, JSON.stringify(lastR3Write()));
     }
     if (url.pathname === "/__e2e/r2/receipt-request" && method === "GET") {
       return send(response, 200, JSON.stringify(lastReceiptRequest()));

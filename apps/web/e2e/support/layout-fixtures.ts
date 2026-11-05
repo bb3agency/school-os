@@ -2134,6 +2134,20 @@ const ROUTES: Array<[RegExp, Handler]> = [
         crossed_at: at(20 + i),
       })),
   ],
+  // D57: plan-limit crossings this billing period, a list (both thresholds, money and counts).
+  [
+    re("/platform/usage/limit-alerts"),
+    (): Schemas["PlanLimitAlertOut"][] =>
+      SCHOOLS.slice(0, 3).map(([tenant_id], i) => ({
+        tenant_id,
+        metric: pick(["students", "ai_budget_inr", "storage_gb"], i),
+        threshold: i === 0 ? 100 : 80,
+        period_start: date(9, 1),
+        usage_value: pick(["1500", "41250.75", "41.5"], i),
+        limit_value: pick(["1500", "50000.00", "50"], i),
+        crossed_at: at(20 + i),
+      })),
+  ],
   [
     re("/platform/usage"),
     () => SCHOOLS.slice(0, 10).map(([tenant_id], i) => usageRow(tenant_id, 28 - (i % 3), i)),
