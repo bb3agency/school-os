@@ -34,8 +34,8 @@ output "web_target_group_arn_suffix" {
 }
 
 output "api_target_group_arn" {
-  description = "API target group (fleet heartbeat only; null otherwise)."
-  value       = var.expose_fleet_heartbeat ? aws_lb_target_group.api[0].arn : null
+  description = "API target group (fleet heartbeat and/or Tally edge routes; null when neither is exposed)."
+  value       = local.api_routed ? aws_lb_target_group.api[0].arn : null
 }
 
 output "web_acl_arn" {

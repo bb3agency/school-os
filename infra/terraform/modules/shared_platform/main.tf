@@ -314,6 +314,7 @@ module "alb" {
   access_logs_bucket      = module.s3.logs_bucket
   waf_rate_limit_per_5min = var.waf_rate_limit_per_5min
   expose_fleet_heartbeat  = var.expose_fleet_heartbeat
+  expose_tally_edge       = var.expose_tally_edge
   log_kms_key_arn         = local.kms_logs
   tags                    = var.tags
 }
@@ -607,9 +608,10 @@ module "api" {
 
   ingress_from_security_groups = merge(
     { web = module.web.security_group_id },
-    var.expose_fleet_heartbeat ? { alb = module.alb.security_group_id } : {},
+    var.expose_fleet_heartbeat || var.expose_tally_edge ? { alb = module.alb.security_group_id } : {},
   )
-  attach_load_balancer           = var.expose_fleet_heartbeat
+  # The ALB reaches the API only for the fleet heartbeat and /api/v1/edge/tally/* (D61).
+  attach_load_balancer           = var.expose_fleet_heartbeat || var.expose_tally_edge
   load_balancer_target_group_arn = module.alb.api_target_group_arn
   service_connect = {
     namespace_arn     = module.cluster.service_connect_namespace_arn

@@ -47,6 +47,12 @@ variable "expose_fleet_heartbeat" {
   default     = false
 }
 
+variable "expose_tally_edge" {
+  description = "Route the signed Tally edge-agent routes /api/v1/edge/tally/* (GET, POST, PUT) to the API (ADR-0032, D61). Nothing else of the API is routed by it."
+  type        = bool
+  default     = false
+}
+
 variable "api_port" {
   description = "API container port."
   type        = number

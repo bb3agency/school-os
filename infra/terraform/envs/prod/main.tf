@@ -53,6 +53,7 @@ module "platform" {
 
   services               = var.services
   expose_fleet_heartbeat = true
+  expose_tally_edge      = true
 
   alarm_emails       = var.alarm_emails
   monthly_budget_usd = var.monthly_budget_usd

@@ -1,5 +1,6 @@
 # SchoolOS dedicated host edge (TB1). Automatic HTTPS (ACME) for the platform host name and the
-# school's optional custom domain; HTTP only redirects. Only the web/BFF is proxied: the API is reachable
+# school's optional custom domain; HTTP only redirects. The web/BFF is proxied; of the API only the
+# device-signed Tally edge-agent routes /api/v1/edge/tally/* are (D61). The rest of the API is reachable
 # solely on the internal container network, and fleet/metrics paths are never exposed here.
 {
 	email {$SOS_ACME_EMAIL}
@@ -45,21 +46,48 @@
 	import security_headers
 	encode zstd gzip
 
-	# Never exposed on a school host: control-plane fleet API and metrics.
-	@internal path /api/v1/fleet /api/v1/fleet/* /metrics /metrics/*
-	respond @internal "Not found" 404
-
-	request_body {
-		max_size 25MB
+	# Tally edge agent (ADR-0032, D61; docs/10 §13): the only API path proxied straight to the API.
+	# Device-signed requests; the API's signature checks (app/tally/agent_auth.py) are the authority.
+	# Body limit = the agent's and the API's 1 MiB. Per-IP rate limit: the stock Caddy image has no
+	# rate limiter (caddy-ratelimit is a third-party plugin, not used), so the API's own fail-closed
+	# per-IP layer (machine_path_prefixes in app/core/rate_limits.yaml) and per-device route windows
+	# apply. Caddy sets X-Forwarded-For itself (no trusted_proxies), so the API sees the client address.
+	# The path matcher compares the cleaned path: dot segments cannot climb out of this prefix.
+	@tally_edge {
+		path /api/v1/edge/tally/*
+		method GET POST PUT
+	}
+	handle @tally_edge {
+		request_body {
+			max_size 1MiB
+		}
+		reverse_proxy api:8000 {
+			header_up -X-Service-Token
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 60s
+			}
+		}
 	}
 
-	reverse_proxy web:3000 {
-		health_uri /healthz
-		health_interval 15s
-		header_up -X-Service-Token
-		transport http {
-			dial_timeout 5s
-			response_header_timeout 120s
+	# Everything else goes to the web/BFF; the rest of the API stays on the internal network.
+	handle {
+		# Never exposed on a school host: control-plane fleet API and metrics.
+		@internal path /api/v1/fleet /api/v1/fleet/* /metrics /metrics/*
+		respond @internal "Not found" 404
+
+		request_body {
+			max_size 25MB
+		}
+
+		reverse_proxy web:3000 {
+			health_uri /healthz
+			health_interval 15s
+			header_up -X-Service-Token
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 120s
+			}
 		}
 	}
 
