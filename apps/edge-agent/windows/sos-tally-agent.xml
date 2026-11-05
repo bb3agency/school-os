@@ -1,16 +1,21 @@
 <!--
-  SchoolOS Tally agent as a Windows service (ADR-0032 §7), with WinSW (MIT licence,
-  https://github.com/winsw/winsw). Put WinSW's exe next to this file as sos-tally-agent.exe, with
-  the agent's Python runtime in .\python (the installer bundles both), then:
+  SchoolOS Tally agent as a Windows service (ADR-0032 §7, D69), with WinSW (MIT licence,
+  https://github.com/winsw/winsw; the version and SHA-256 are pinned in ..\installer\pins.toml).
+  The MSI (..\installer\) installs WinSW as sos-tally-agent.exe next to this file, with the
+  agent's Python runtime in .\python, and registers the service itself:
 
-    sos-tally-agent.exe install
-    sos-tally-agent.exe start
+    - account: the virtual account NT SERVICE\SchoolOSTallyAgent (no password, no sign-in,
+      never LocalSystem), so the DPAPI-protected device key is readable by that account only;
+    - start: automatic (delayed); on failure: restart after 60 seconds (reset after a day).
 
-  The service runs under a dedicated local account (not LocalSystem and not the accountant's
-  account) so its DPAPI-protected device key is readable by that account only. Enrol AS that
-  account before starting it:
+  Do not run `sos-tally-agent.exe install` on an MSI install (it would register the service a
+  second time under another account). The service id below must stay SchoolOSTallyAgent (the
+  MSI's service name and the virtual account's name).
 
-    runas /user:.\SchoolOSAgent "python\python.exe -m sos_edge_agent.cli enrol --server https://<school>.schoolos.in --school <school id> --code XXXX-XXXX-XXXX"
+  State (configuration, device key, logs) lives in %ProgramData%\SchoolOS\TallyAgent, whose ACL
+  the MSI sets to the service account and Administrators only. Enrol from an elevated prompt
+  with tally-agent.cmd (README "Install": the enrol command with its via-service option).
+  No double hyphen may appear in this comment: XML forbids it and WinSW would not start.
 
   The agent opens no port. It needs outbound HTTPS to the SchoolOS address and Tally's XML
   server on 127.0.0.1 (TallyPrime: Help > Settings > Connectivity > TallyPrime acts as Server,
@@ -21,19 +26,12 @@
   <name>SchoolOS Tally agent</name>
   <description>Reads the Tally ledger groups the school chose and sends fee balances to SchoolOS over HTTPS. Opens no port.</description>
   <executable>%BASE%\python\python.exe</executable>
-  <arguments>-m sos_edge_agent.cli run</arguments>
-  <workingdirectory>%BASE%</workingdirectory>
-  <serviceaccount>
-    <username>.\SchoolOSAgent</username>
-    <allowservicelogon>true</allowservicelogon>
-  </serviceaccount>
-  <startmode>Automatic</startmode>
-  <delayedAutoStart>true</delayedAutoStart>
-  <onfailure action="restart" delay="60 sec"/>
-  <onfailure action="restart" delay="5 min"/>
-  <resetfailure>1 hour</resetfailure>
+  <!-- -I: isolated mode (no PYTHON* variables, no user site-packages, no current directory). -->
+  <arguments>-I -m sos_edge_agent.cli --state-dir "%ProgramData%\SchoolOS\TallyAgent" run</arguments>
+  <workingdirectory>%ProgramData%\SchoolOS\TallyAgent</workingdirectory>
   <stopparentprocessfirst>true</stopparentprocessfirst>
   <stoptimeout>30 sec</stoptimeout>
+  <logpath>%ProgramData%\SchoolOS\TallyAgent\logs</logpath>
   <log mode="roll-by-size">
     <sizeThreshold>1024</sizeThreshold>
     <keepFiles>5</keepFiles>

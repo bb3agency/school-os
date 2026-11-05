@@ -1,0 +1,30 @@
+# Pinned third-party downloads of the Tally agent installer (D69). build.ps1 downloads each file
+# by exact version and refuses it unless its SHA-256 is the value below. Change a pin only in a
+# reviewed pull request: take the SHA-256 from the publisher (python.org release page or its
+# Sigstore bundle; the WinSW GitHub release) AND from your own download, and check they agree.
+#
+# A value that is not 64 lowercase hex characters is a placeholder: the build stops with a message
+# naming the pin. (The values below could not be confirmed when D69 was built; fill them in.)
+
+[python]
+# The last CPython 3.12 release with a Windows embeddable package (later 3.12 releases are
+# source-only). The agent requires Python 3.12 (apps/edge-agent/pyproject.toml).
+version = "3.12.10"
+file = "python-3.12.10-embed-amd64.zip"
+url = "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip"
+sha256 = "REPLACE-WITH-SHA256-OF-python-3.12.10-embed-amd64.zip"
+# Published on https://www.python.org/downloads/release/python-31210/ (checked as well).
+md5 = "fe8ef205f2e9c3ba44d0cf9954e1abd3"
+
+[winsw]
+# WinSW 2.x for .NET Framework 4.6.1+ (Windows 10/11 ship 4.8, serviced by Windows Update);
+# 2.12.0 is the latest stable release. MIT licence.
+version = "2.12.0"
+file = "WinSW.NET461.exe"
+url = "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW.NET461.exe"
+sha256 = "REPLACE-WITH-SHA256-OF-WinSW.NET461.exe-v2.12.0"
+
+[wix]
+# WiX Toolset v4 (dotnet tool `wix` and WixToolset.Util.wixext at the same version), installed by
+# the release workflow (job edge-agent-msi). Nothing is downloaded by build.ps1 for it.
+version = "4.0.5"
