@@ -86,7 +86,13 @@ from app.core.pdf import PdfRenderer, PrintDocument, get_renderer, render_docume
 from app.documents import service as documents
 from app.dq import service as dq
 from app.exports import repository as repo
-from app.exports.config import ExportsConfig, Language, ProfileLayout, load_config
+from app.exports.config import (
+    STRUCTURE_COLUMNS,
+    ExportsConfig,
+    Language,
+    ProfileLayout,
+    load_config,
+)
 from app.exports.models import Export
 from app.exports.report import (
     FindingLine,
@@ -1236,6 +1242,57 @@ def _attr_label(catalog: Mapping[str, Any], key: str | None, lang: Language) -> 
     return label
 
 
+_STRUCTURE_LABELS: Final = {
+    "class": "col_class",
+    "section": "col_section",
+    "roll_no": "col_roll_no",
+}
+# Pre-check findings the export itself adds (FR-EXP-008): no value recorded for a coded field,
+# or a value the board's code map has no code for.
+CODE_MISSING_RULE: Final = "EXP-001"
+CODE_UNMAPPED_RULE: Final = "EXP-002"
+
+
+def _structure_value(place: _Placement | None, key: str) -> str | None:
+    if place is None:
+        return None
+    if key == "class":
+        return place.class_code
+    if key == "section":
+        return place.section
+    return place.roll_no
+
+
+def _code_finding(
+    cfg: ExportsConfig,
+    catalog: Mapping[str, Any],
+    lang: Language,
+    *,
+    student_id: uuid.UUID,
+    key: str,
+    severity: str,
+    missing: bool,
+    source: str | None,
+    admission_no: str | None,
+    student: str | None,
+    class_section: str | None,
+) -> FindingLine:
+    """A value the board's code map cannot fill: listed, never guessed (FR-EXP-008). The value
+    itself is not repeated (restricted fields are masked here as in every finding)."""
+    return FindingLine(
+        student_id=student_id,
+        severity=severity,
+        admission_no=admission_no,
+        student=student,
+        class_section=class_section,
+        rule_id=CODE_MISSING_RULE if missing else CODE_UNMAPPED_RULE,
+        field=_attr_label(catalog, key, lang),
+        values="" if source is None else f"{cfg.source_label(source, lang)}: {MASK}",
+        explanation=cfg.label("code_missing" if missing else "code_unmapped", lang),
+        route=cfg.label("code_route", lang),
+    )
+
+
 def _build_precheck(
     session: Session, ctx: UserContext, snap: _Snapshot, ids: Sequence[uuid.UUID]
 ) -> tuple[PrecheckInput, ExportsConfig]:
@@ -1256,18 +1313,51 @@ def _build_precheck(
     )
     places = _placements(session, ids)
     ready: list[ReadyLine] = []
+    code_findings: list[FindingLine] = []
     for sid in ids:
         per = canon.get(sid, {})
+        place = places.get(sid)
+        name = per["full_name"].value if "full_name" in per else None
         values: list[str | None] = []
         for key in fields:
+            if key in STRUCTURE_COLUMNS:
+                values.append(_structure_value(place, key))
+                continue
             if key in sensitive_fields and not snap.include_sensitive:
+                # Masked: the clerk enters it from the record (the summary says so); the code
+                # check below would hint at the hidden value, so it runs only when shown.
                 values.append(MASK)
                 continue
             cv = per.get(key)
+            raw = cv.value if cv is not None else None
+            coded = layout.coded_values.get(key)
+            if coded is not None:
+                # FR-EXP-008: the board's code from the explicit map, never a guess.
+                code = coded.codes.get(raw) if raw is not None else None
+                values.append(code)
+                if code is None:
+                    code_findings.append(
+                        _code_finding(
+                            cfg,
+                            catalog,
+                            lang,
+                            student_id=sid,
+                            key=key,
+                            severity=coded.severity,
+                            missing=raw is None,
+                            source=cv.source if cv is not None else None,
+                            admission_no=per["admission_no"].value
+                            if "admission_no" in per
+                            else None,
+                            student=name,
+                            class_section=place.class_section if place else None,
+                        )
+                    )
+                continue
             attr = catalog.get(key)
             values.append(
                 _format_value(
-                    cv.value if cv is not None else None,
+                    raw,
                     key=key,
                     data_type=attr.data_type if attr is not None else "text",
                     date_format=layout.date_format,
@@ -1275,8 +1365,6 @@ def _build_precheck(
                     cfg=cfg,
                 )
             )
-        place = places.get(sid)
-        name = per["full_name"].value if "full_name" in per else None
         ready.append(
             ReadyLine(
                 student_id=sid,
@@ -1306,6 +1394,7 @@ def _build_precheck(
                 route="; ".join(r.te if lang == "te" else r.en for r in f.routes),
             )
         )
+    findings.extend(code_findings)
     data = PrecheckInput(
         language=lang,
         school=tenancy.get_tenant(session).name,
@@ -1313,7 +1402,12 @@ def _build_precheck(
         export_ref=snap.id,
         generated_at=_now_ist(),
         scope_label=_scope_label(session, snap.scope, cfg, lang),
-        field_labels=tuple(_attr_label(catalog, k, lang) or k for k in fields),
+        field_labels=tuple(
+            cfg.label(_STRUCTURE_LABELS[k], lang)
+            if k in STRUCTURE_COLUMNS
+            else (_attr_label(catalog, k, lang) or k)
+            for k in fields
+        ),
         findings=tuple(findings),
         ready=tuple(ready),
         sensitive_masked=bool(sensitive_fields) and not snap.include_sensitive,

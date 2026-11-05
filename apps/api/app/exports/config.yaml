@@ -52,19 +52,24 @@ profiles:
     fields: [admission_no, full_name, dob, gender, father_name, mother_name, apaar_id]
     value_maps:
       gender: {female: F, male: M, transgender: T}
+  # layout_version 2 (completeness check, tests/exports/test_completeness.py): the PwD/CWSN
+  # column the CBSE form asks for (board_fields: disability; restricted, masked unless
+  # included).
   cbse-registration-2027:
     kind: board
-    layout_version: 1
+    layout_version: 2
     date_format: "%d/%m/%Y"
-    fields: [admission_no, full_name, mother_name, father_name, dob, gender, category, apaar_id]
+    fields: [admission_no, full_name, mother_name, father_name, dob, gender, category, disability,
+             apaar_id]
     value_maps:
       gender: {female: Female, male: Male, transgender: Transgender}
       category: {general: General, ews: General, obc: OBC, sc: SC, st: ST}
   cbse-loc-2027:
     kind: board
-    layout_version: 1
+    layout_version: 2
     date_format: "%d/%m/%Y"
-    fields: [admission_no, full_name, mother_name, father_name, dob, gender, category, apaar_id]
+    fields: [admission_no, full_name, mother_name, father_name, dob, gender, category, disability,
+             apaar_id]
     value_maps:
       gender: {female: Female, male: Male, transgender: Transgender}
       category: {general: General, ews: General, obc: OBC, sc: SC, st: ST}
@@ -74,31 +79,51 @@ profiles:
   # birth, gender, caste and category, religion, mother tongue, PEN, Aadhaar reference).
   # aadhaar_last4 is shown only as "XXXX XXXX 1234" (PRV-014) and, like caste and religion, is
   # restricted (C3): masked unless the export includes restricted values.
+  # layout_version 2 (audit follow-up): category is written as the board's code from
+  # coded_values.category, never as the SchoolOS value. AP uses OC / BC-A..BC-E / SC / ST; the
+  # BC group is not derivable from "obc", and EWS has no separate code in the public guides, so
+  # obc and ews have no code: the cell stays empty and the pre-check lists EXP-002 (EXP-001
+  # when no category is recorded). The check runs only when restricted values are included
+  # (category is C3; a masked cell is entered from the record). UNVERIFIED (owner decision
+  # D3): confirm the codes against the current BSEAP nominal-roll format.
   bseap-ssc-2027:
     kind: board
-    layout_version: 1
+    layout_version: 2
     verified: false
     date_format: "%d/%m/%Y"
     fields: [admission_no, full_name, father_name, mother_name, dob, gender, category, caste,
              religion, mother_tongue, udise_pen, aadhaar_last4]
     value_maps:
       gender: {female: Female, male: Male, transgender: Transgender}
+    coded_values:
+      category:
+        version: 1
+        verified: false
+        severity: high
+        codes: {general: OC, sc: SC, st: ST}
+        no_code: [obc, ews]
   # layout_version 2 (ADR-0037, FR-EXP-005): UDISE+ PEN and APAAR ID columns, empty when
   # unknown. The typed APAAR ID is written unmasked; every other cell keeps the Aadhaar mask.
   # layout_version 3 (ADR-0039, FR-EXP-006): the 2026-27 Student Module order (general profile,
   # then enrolment profile, then identifiers) for every field SchoolOS holds; the profile's
   # portal_fields list the rest. From public sources, verified: false (owner decision D3).
   # religion and disability are restricted (C3): masked unless the export includes them.
+  # layout_version 4 (completeness check): class, section and roll number of the enrolment
+  # profile, from the current-year placement. The address stays out (omitted below).
   udise-plus:
     kind: portal
-    layout_version: 3
+    layout_version: 4
     date_format: "%d/%m/%Y"
     fields: [full_name, gender, dob, mother_name, father_name, mother_tongue, category,
-             religion, disability, nationality, admission_no, admission_date, udise_pen,
-             apaar_id]
+             religion, disability, nationality, admission_no, admission_date, class, section,
+             roll_no, udise_pen, apaar_id]
     value_maps:
       gender: {female: Female, male: Male, transgender: Transgender}
       category: {general: General, ews: EWS, obc: OBC, sc: SC, st: ST}
+    omitted:
+      address: >-
+        Restricted contact data (C3) kept out of the pre-check sheet (data minimisation); the
+        clerk enters it on the portal from the student record.
 
 # Generic student list (student.export, step-up): any attribute of the catalog except
 # `never_exported`, plus these structure columns. Restricted (C3) attributes need
@@ -162,3 +187,7 @@ labels:
   severity_low: {en: Low, te: తక్కువ}
   severity_info: {en: Information, te: సమాచారం}
   page: {en: Page, te: పేజీ}
+  # FR-EXP-008: a coded field (coded_values) the sheet cannot fill. Never a guess.
+  code_missing: {en: "No value is recorded, so the board's code cannot be filled in.", te: "విలువ నమోదు కాలేదు, కాబట్టి బోర్డు కోడ్ నింపలేము."}
+  code_unmapped: {en: "The recorded value has no board code in this format. SchoolOS does not guess one.", te: "నమోదైన విలువకు ఈ ఫార్మాట్‌లో బోర్డు కోడ్ లేదు. SchoolOS ఊహించదు."}
+  code_route: {en: "Check the student record and choose the board's code on the portal, or correct the record and run the pre-check again.", te: "విద్యార్థి రికార్డు చూసి పోర్టల్‌లో బోర్డు కోడ్ ఎంచుకోండి, లేదా రికార్డు సరిచేసి మళ్లీ తనిఖీ చేయండి."}
