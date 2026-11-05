@@ -10532,7 +10532,8 @@
       "makeNoticeConsequence": "Nothing is sent. SchoolOS never sends a breach notice by itself.",
       "noticeMadeTitle": "Notice draft made",
       "noticeMadeBody": "Open it in Notices to complete it and send it for approval.",
-      "openNotice": "Open the notice draft"
+      "openNotice": "Open the notice draft",
+      "printPage": "Open the print page"
     },
     "errors": {
       "breach_closed": {
@@ -10547,6 +10548,13 @@
         "title": "SchoolOS notices arrive by themselves",
         "body": "Record only breaches on the school's side here."
       }
+    },
+    "print": {
+      "crumb": "Print draft",
+      "title": "Print: {draft}",
+      "description": "One A4 page with the school's name. Check every line before you print it.",
+      "print": "Print",
+      "schoolFallback": "Our school"
     }
   },
   "portalCalendar": {
@@ -11157,7 +11165,12 @@
       "fieldVersionHint": "The version printed at the foot of the notice.",
       "fieldLanguage": "Language",
       "fieldIssuedOn": "Issued on",
-      "fieldChannel": "How it was given out"
+      "fieldChannel": "How it was given out",
+      "makePdf": "Also make the PDF of this notice",
+      "makePdfHint": "The notice as it is now, filled from the school's settings, as an A4 PDF to keep or print.",
+      "recordedTitle": "Notice recorded",
+      "recordedBody": "It is in the list of notices the school issued.",
+      "recordedPdfBody": "It is in the list of notices the school issued. The PDF is being made: download it below when it is ready."
     },
     "audience": {
       "parents": "Notice for parents",
@@ -11267,6 +11280,13 @@
         "title": "Not a consent withdrawal",
         "body": "Only a consent withdrawal request about a student records a withdrawal."
       }
+    },
+    "withdraw": {
+      "action": "Mark as withdrawn",
+      "title": "Mark this request as withdrawn?",
+      "body": "Use this when the person who asked takes the request back.",
+      "confirm": "Mark as withdrawn",
+      "consequence": "The request is closed as withdrawn and cannot be opened again. Log a new request if they ask again."
     }
   }
 }

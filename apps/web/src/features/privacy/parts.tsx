@@ -114,19 +114,22 @@ function usePrivacyFile(exportId: string) {
 /**
  * "Download PDF" of a notice template: POST makes the PDF (202), the file is polled until it is
  * ready, then the presigned link is fetched when the button is pressed and opened at once
- * (never kept).
+ * (never kept). `initialFile`: a PDF already asked for (the notice-issue dialog, D60), shown
+ * as it is made.
  */
 export function NoticePdfButton({
   templateKey,
   label,
+  initialFile = null,
 }: {
   templateKey: TemplateKey;
   label: string;
+  initialFile?: PrivacyFile | null;
 }) {
   const t = useTranslations("privacy.pdf");
   const tc = useTranslations("common");
   const api = useBffClient("staff");
-  const [file, setFile] = useState<PrivacyFile | null>(null);
+  const [file, setFile] = useState<PrivacyFile | null>(initialFile);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
 

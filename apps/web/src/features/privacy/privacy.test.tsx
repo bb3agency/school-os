@@ -3,13 +3,14 @@ import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { notificationHref } from "@/features/notifications/data";
-import { installBffStub, page, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { ID, NOW, fakeAadhaar, me } from "@/test/records-fixtures";
 import { messages, renderWithIntl } from "@/test/render";
 import { NewRequestScreen, buildRequestSchema, toCreateBody } from "./NewRequestScreen";
+import { NoticesScreen, buildNoticeSchema, recordNotice } from "./NoticesScreen";
 import { PrivacyContactFooter } from "./PrivacyContactFooter";
 import { privacyContactSchema } from "./PrivacySettingsScreen";
-import { RequestDetailScreen, workPatch } from "./RequestDetailScreen";
+import { RequestDetailScreen, canWithdraw, workPatch } from "./RequestDetailScreen";
 import { RequestsScreen } from "./RequestsScreen";
 import {
   chosenCount,
@@ -17,6 +18,8 @@ import {
   parseTab,
   searchBody,
   type ErasurePlanRow,
+  type PrivacyFile,
+  type PrivacyNotice,
   type PrivacyRequest,
   type PrivacyRequestRow,
 } from "./types";
@@ -455,5 +458,214 @@ describe("FR-DPDP-004 privacy contact in the footer", () => {
     first.unmount();
     renderWithIntl(<PrivacyContactFooter contact={null} />);
     expect(screen.queryByText(pm.footer.label)).toBeNull();
+  });
+});
+
+describe("D60 FR-DPDP-005 mark a request as withdrawn", () => {
+  const withdrawCall = `PATCH /bff/api/v1/privacy/requests/${REQUEST}`;
+  const can = (permissions: readonly string[]) => (permission: string) =>
+    permissions.includes(permission);
+
+  it("is offered only while open, not decided, and with privacy.request.manage", () => {
+    for (const status of ["received", "in_progress", "waiting_for_requester"] as const) {
+      expect(canWithdraw({ status }, can(MANAGE))).toBe(true);
+      expect(canWithdraw({ status }, can(READ))).toBe(false);
+    }
+    for (const status of ["decided", "closed", "withdrawn"] as const) {
+      expect(canWithdraw({ status }, can(DECIDE))).toBe(false);
+    }
+  });
+
+  it("hides the button from readers and on decided or withdrawn requests", async () => {
+    staff(READ);
+    stub.routes[`GET /bff/api/v1/privacy/requests/${REQUEST}`] = () =>
+      Response.json(detail({ kind: "other", report: null }));
+    const first = renderWithIntl(<RequestDetailScreen requestId={REQUEST} />);
+    expect(await screen.findByText(pm.detail.requestTitle)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: pm.withdraw.action })).toBeNull();
+    first.unmount();
+
+    staff(MANAGE);
+    stub.routes[`GET /bff/api/v1/privacy/requests/${REQUEST}`] = () =>
+      Response.json(detail({ kind: "other", report: null, status: "decided" }));
+    const second = renderWithIntl(<RequestDetailScreen requestId={REQUEST} />);
+    expect(await screen.findByText(pm.detail.requestTitle)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: pm.withdraw.action })).toBeNull();
+    second.unmount();
+
+    stub.routes[`GET /bff/api/v1/privacy/requests/${REQUEST}`] = () =>
+      Response.json(detail({ kind: "other", report: null, status: "withdrawn" }));
+    renderWithIntl(<RequestDetailScreen requestId={REQUEST} />);
+    expect(await screen.findByText(pm.detail.requestTitle)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: pm.withdraw.action })).toBeNull();
+  });
+
+  it("confirms, sends status withdrawn with If-Match, and reloads the request", async () => {
+    staff(MANAGE);
+    let status: PrivacyRequest["status"] = "in_progress";
+    stub.routes[`GET /bff/api/v1/privacy/requests/${REQUEST}`] = () =>
+      Response.json(detail({ kind: "other", report: null, status }));
+    stub.routes[withdrawCall] = () => {
+      status = "withdrawn";
+      return Response.json(detail({ kind: "other", report: null, status, version: 3 }));
+    };
+    const user = userEvent.setup();
+    renderWithIntl(<RequestDetailScreen requestId={REQUEST} />);
+    await user.click(await screen.findByRole("button", { name: pm.withdraw.action }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(pm.withdraw.consequence)).toBeInTheDocument();
+    expect(stub.callsTo(withdrawCall)).toHaveLength(0);
+    await user.click(within(dialog).getByRole("button", { name: pm.withdraw.confirm }));
+    await waitFor(() => expect(stub.callsTo(withdrawCall)).toHaveLength(1));
+    const call = stub.callsTo(withdrawCall)[0];
+    expect(call?.headers.get("If-Match")).toBe('W/"2"');
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({ status: "withdrawn" });
+    // Refreshed: the request now shows as withdrawn and the button is gone.
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: pm.withdraw.action })).toBeNull(),
+    );
+    expect(screen.getAllByText(pm.status.withdrawn).length).toBeGreaterThan(0);
+  });
+
+  it("explains a 409 request_decided and a 412 in the dialog", async () => {
+    staff(MANAGE);
+    stub.routes[`GET /bff/api/v1/privacy/requests/${REQUEST}`] = () =>
+      Response.json(detail({ kind: "other", report: null }));
+    stub.routes[withdrawCall] = () => problem(409, "request_decided");
+    const user = userEvent.setup();
+    renderWithIntl(<RequestDetailScreen requestId={REQUEST} />);
+    await user.click(await screen.findByRole("button", { name: pm.withdraw.action }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: pm.withdraw.confirm }));
+    expect(await within(dialog).findByText(pm.errors.request_decided.title)).toBeInTheDocument();
+
+    stub.routes[withdrawCall] = () => problem(412, "precondition_failed");
+    await user.click(within(dialog).getByRole("button", { name: pm.withdraw.confirm }));
+    expect(
+      await within(dialog).findByText(messages.en.errors.api.precondition_failed.title),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("D60 FR-DPDP-003 the notice-issue dialog's optional PDF", () => {
+  const FILE = "0192f3a4-0000-7000-8000-00000000e201";
+  const notice: PrivacyNotice = {
+    id: "0192f3a4-0000-7000-8000-00000000e301",
+    template_key: "notice_parents",
+    template_version: "1.0",
+    audience: "parents",
+    language: "en",
+    issued_on: "2026-10-20",
+    channel: "paper",
+    document_id: null,
+    recorded_by_name: "Office Clerk",
+    recorded_at: NOW,
+  };
+  const file = (status: PrivacyFile["status"]): PrivacyFile => ({
+    export_id: FILE,
+    status,
+    error_code: null,
+    created_at: NOW,
+    finished_at: status === "ready" ? NOW : null,
+    expires_at: null,
+  });
+
+  it("reads the tick as a boolean", () => {
+    const base = {
+      template_key: "notice_parents",
+      template_version: "1.0",
+      issued_on: "20/10/2026",
+      channel: "paper",
+    };
+    const ticked = buildNoticeSchema("2026-10-21").safeParse({ ...base, make_pdf: "on" });
+    expect(ticked.success && ticked.data.make_pdf).toBe(true);
+    const plain = buildNoticeSchema("2026-10-21").safeParse(base);
+    expect(plain.success && plain.data.make_pdf).toBe(false);
+  });
+
+  it("keeps the recorded notice when the PDF request fails", async () => {
+    const plain = await recordNotice(() => Promise.resolve(notice), null);
+    expect(plain).toEqual({ notice, pdfAsked: false, file: null, pdfError: undefined });
+    const made = await recordNotice(
+      () => Promise.resolve(notice),
+      () => Promise.resolve(file("queued")),
+    );
+    expect(made.file?.export_id).toBe(FILE);
+    const failure = new Error("offline");
+    const failed = await recordNotice(
+      () => Promise.resolve(notice),
+      () => Promise.reject(failure),
+    );
+    expect(failed).toEqual({ notice, pdfAsked: true, file: null, pdfError: failure });
+    // A notice that was not recorded asks for no PDF at all.
+    const pdf = vi.fn(() => Promise.resolve(file("queued")));
+    await expect(recordNotice(() => Promise.reject(failure), pdf)).rejects.toBe(failure);
+    expect(pdf).not.toHaveBeenCalled();
+  });
+
+  function noticeRoutes() {
+    stub.routes["GET /bff/api/v1/privacy/templates"] = () =>
+      Response.json([
+        {
+          key: "notice_parents",
+          template_version: "1.0",
+          audience: "parents",
+          languages: ["en"],
+          placeholders: [],
+          unfilled: [],
+          last_issued_version: null,
+          newer_version_available: false,
+        },
+      ]);
+    stub.routes["GET /bff/api/v1/privacy/notices"] = () => Response.json([]);
+    stub.routes["POST /bff/api/v1/privacy/notices"] = () => Response.json(notice, { status: 201 });
+    stub.routes["POST /bff/api/v1/privacy/templates/notice_parents/pdf"] = () =>
+      Response.json(file("queued"), { status: 202 });
+    stub.routes[`GET /bff/api/v1/privacy/files/${FILE}`] = () => Response.json(file("ready"));
+  }
+
+  async function recordWith(tick: boolean) {
+    const user = userEvent.setup();
+    renderWithIntl(<NoticesScreen />);
+    await user.click(await screen.findByRole("button", { name: pm.notices.record }));
+    const dialog = await screen.findByRole("dialog");
+    await user.selectOptions(within(dialog).getByLabelText(pm.notices.fieldChannel), "paper");
+    if (tick) await user.click(within(dialog).getByRole("checkbox", { name: /PDF/ }));
+    await user.click(within(dialog).getByRole("button", { name: pm.notices.recordConfirm }));
+    return dialog;
+  }
+
+  it("records the notice, asks for its PDF and offers the download when ready", async () => {
+    staff(MANAGE);
+    noticeRoutes();
+    const dialog = await recordWith(true);
+    expect(await within(dialog).findByText(pm.notices.recordedTitle)).toBeInTheDocument();
+    expect(stub.callsTo("POST /bff/api/v1/privacy/notices")).toHaveLength(1);
+    expect(stub.callsTo("POST /bff/api/v1/privacy/templates/notice_parents/pdf")).toHaveLength(1);
+    expect(
+      await within(dialog).findByRole("button", { name: new RegExp(pm.pdf.download) }),
+    ).toBeInTheDocument();
+  });
+
+  it("asks for no PDF when the box is not ticked", async () => {
+    staff(MANAGE);
+    noticeRoutes();
+    const dialog = await recordWith(false);
+    expect(await within(dialog).findByText(pm.notices.recordedBody)).toBeInTheDocument();
+    expect(stub.callsTo("POST /bff/api/v1/privacy/notices")).toHaveLength(1);
+    expect(stub.callsTo("POST /bff/api/v1/privacy/templates/notice_parents/pdf")).toHaveLength(0);
+  });
+
+  it("says when the PDF could not be asked for, and offers to make it", async () => {
+    staff(MANAGE);
+    noticeRoutes();
+    stub.routes["POST /bff/api/v1/privacy/templates/notice_parents/pdf"] = () =>
+      problem(409, "conflict");
+    const dialog = await recordWith(true);
+    expect(await within(dialog).findByText(pm.notices.recordedTitle)).toBeInTheDocument();
+    expect(within(dialog).getByText(messages.en.errors.api.conflict.title)).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: new RegExp(pm.pdf.make) }),
+    ).toBeInTheDocument();
   });
 });

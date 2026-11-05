@@ -6,6 +6,7 @@ import { useId, useState } from "react";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
+import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { TextField } from "@/components/ui/Input";
@@ -26,6 +27,7 @@ import {
   PRIVACY_MANAGE,
   PRIVACY_READ,
   templatePreviewHref,
+  type PrivacyFile,
   type PrivacyNotice,
   type PrivacyTemplate,
   type TemplateKey,
@@ -46,6 +48,11 @@ export function buildNoticeSchema(today = todayInIndia()) {
       language: z.enum(["en", "te"], { error: "chooseOption" }).default("en"),
       issued_on: z.string().trim().min(1, { error: "required" }),
       channel: z.enum(NOTICE_CHANNELS, { error: "chooseOption" }),
+      // D60: also make the notice's PDF once it is recorded (checkbox: "on" when ticked).
+      make_pdf: z
+        .string()
+        .optional()
+        .transform((value) => value === "on"),
     })
     .superRefine((data, context) => {
       const iso = typedDateToIso(data.issued_on);
@@ -239,6 +246,31 @@ export function NoticesScreen() {
   );
 }
 
+/** What the dialog's submit gives back: the notice, and the PDF when it was asked for. */
+export interface RecordedNotice {
+  notice: PrivacyNotice;
+  pdfAsked: boolean;
+  file: PrivacyFile | null;
+  pdfError: unknown;
+}
+
+/**
+ * Records the notice, then (when ticked) asks for its PDF. The notice stands even when the
+ * PDF request fails: the error is kept for the result view, which offers "Make the PDF".
+ */
+export async function recordNotice(
+  record: () => Promise<PrivacyNotice>,
+  makePdf: (() => Promise<PrivacyFile>) | null,
+): Promise<RecordedNotice> {
+  const notice = await record();
+  if (!makePdf) return { notice, pdfAsked: false, file: null, pdfError: undefined };
+  try {
+    return { notice, pdfAsked: true, file: await makePdf(), pdfError: undefined };
+  } catch (failure) {
+    return { notice, pdfAsked: true, file: null, pdfError: failure };
+  }
+}
+
 function RecordNoticeDialog({
   open,
   onOpenChange,
@@ -272,20 +304,53 @@ function RecordNoticeDialog({
       errorNamespace="privacy"
       submit={(input, idempotencyKey) => {
         const audience = input.template_key === "notice_staff" ? "staff" : "parents";
-        return unwrap(
-          api.POST("/api/v1/privacy/notices", {
-            headers: { "Idempotency-Key": idempotencyKey },
-            body: {
-              template_key: input.template_key,
-              template_version: input.template_version,
-              audience,
-              language: input.language,
-              issued_on: typedDateToIso(input.issued_on) ?? input.issued_on,
-              channel: input.channel,
-            },
-          }),
+        return recordNotice(
+          () =>
+            unwrap(
+              api.POST("/api/v1/privacy/notices", {
+                headers: { "Idempotency-Key": idempotencyKey },
+                body: {
+                  template_key: input.template_key,
+                  template_version: input.template_version,
+                  audience,
+                  language: input.language,
+                  issued_on: typedDateToIso(input.issued_on) ?? input.issued_on,
+                  channel: input.channel,
+                },
+              }),
+            ),
+          input.make_pdf
+            ? () =>
+                unwrap(
+                  api.POST("/api/v1/privacy/templates/{key}/pdf", {
+                    params: { path: { key: input.template_key } },
+                  }),
+                )
+            : null,
         );
       }}
+      renderResult={(result, close) => (
+        <div className="space-y-4">
+          <Alert tone="success" live title={t("recordedTitle")}>
+            {result.pdfAsked ? t("recordedPdfBody") : t("recordedBody")}
+          </Alert>
+          {result.pdfAsked ? (
+            <div className="space-y-2">
+              <ApiErrorAlert error={result.pdfError} namespace="privacy" />
+              <NoticePdfButton
+                templateKey={result.notice.template_key}
+                label={ta(result.notice.audience)}
+                initialFile={result.file}
+              />
+            </div>
+          ) : null}
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={close}>
+              {tc("close")}
+            </Button>
+          </div>
+        </div>
+      )}
     >
       {(errors) => (
         <div className="space-y-4">
@@ -344,6 +409,13 @@ function RecordNoticeDialog({
             placeholder={tc("chooseOne")}
             options={NOTICE_CHANNELS.map((value) => ({ value, label: tch(value) }))}
           />
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" name="make_pdf" className="mt-1 size-4 accent-primary" />
+            <span>
+              {t("makePdf")}
+              <span className="block text-ink-muted">{t("makePdfHint")}</span>
+            </span>
+          </label>
         </div>
       )}
     </ActionDialog>

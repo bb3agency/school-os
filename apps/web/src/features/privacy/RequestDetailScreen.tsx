@@ -934,7 +934,60 @@ function ClosePanel({ request }: { request: PrivacyRequest }) {
           </ActionDialog>
         ) : null}
         {decision ? <DecideNote request={request} action="close" /> : null}
+        <WithdrawAction request={request} />
       </div>
     </Card>
+  );
+}
+
+/**
+ * Whether "Mark as withdrawn" is offered (R3-1A open item, D60): the person withdrew the
+ * request. Only while it is open and not decided (the API answers 409 `request_decided` or
+ * `request_closed` otherwise), and only with `privacy.request.manage` (no step-up).
+ */
+export function canWithdraw(
+  request: Pick<PrivacyRequest, "status">,
+  can: (permission: string) => boolean,
+): boolean {
+  return isOpen(request.status) && request.status !== "decided" && can(PRIVACY_MANAGE);
+}
+
+/**
+ * PATCH status `withdrawn` with If-Match. A 409 (`request_closed`, `request_decided`) or 412
+ * (someone changed it first) shows its message in the dialog; closing the dialog reloads the
+ * request, so the page then shows it as it is now.
+ */
+function WithdrawAction({ request }: { request: PrivacyRequest }) {
+  const t = useTranslations("privacy.withdraw");
+  const api = useBffClient("staff");
+  const can = useStaffCan();
+  const queryClient = useQueryClient();
+  if (!canWithdraw(request, can)) return null;
+  return (
+    <ActionDialog
+      triggerLabel={t("action")}
+      triggerVariant="secondary"
+      onOpenChange={(open) => {
+        if (open) return;
+        void queryClient.invalidateQueries({ queryKey: PRIVACY_KEYS.request(request.id) });
+      }}
+      title={t("title")}
+      description={t("body")}
+      confirmLabel={t("confirm")}
+      confirmVariant="danger"
+      consequence={t("consequence")}
+      schema={emptySchema}
+      invalidate={[PRIVACY_KEYS.all]}
+      errorNamespace="privacy"
+      submit={() =>
+        unwrap(
+          api.PATCH("/api/v1/privacy/requests/{request_id}", {
+            params: { path: { request_id: request.id } },
+            headers: { "If-Match": ifMatch(request.version) },
+            body: { status: "withdrawn" },
+          }),
+        )
+      }
+    />
   );
 }
