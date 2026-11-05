@@ -86,6 +86,8 @@ export function AffectedPicker({
   const manageUsers = can(USER_MANAGE);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  /** Counts chosen with "Use these counts", handed over when the picker has closed. */
+  const usedCounts = useRef<AffectedCounts | null>(null);
   const titleId = useId();
   const descriptionId = useId();
   const [open, setOpen] = useState(false);
@@ -152,7 +154,9 @@ export function AffectedPicker({
 
   function use() {
     if (!counts) return;
-    onUse(counts);
+    // Filled once the picker has closed (onClose): closing returns focus to the trigger, which
+    // would otherwise take it back from the count field `onUse` focuses (D66 journey).
+    usedCounts.current = counts;
     close();
   }
 
@@ -180,7 +184,10 @@ export function AffectedPicker({
       onClose={(event) => {
         event.stopPropagation();
         setOpen(false);
-        triggerRef.current?.focus();
+        const used = usedCounts.current;
+        usedCounts.current = null;
+        if (used) onUse(used);
+        else triggerRef.current?.focus();
       }}
       className="dialog-motion m-auto max-h-[calc(100dvh-2rem)] w-[min(44rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover"
     >
