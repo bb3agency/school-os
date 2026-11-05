@@ -240,6 +240,15 @@ describe("GET /p/document and the payment status", () => {
     );
     answer = () => json({ code: "not_found" }, 404);
     expect((await documentRedirect(rt, request)).headers.get("location")).toBe("/p/view?pdf=0");
+    // D71: an expired notice PDF is being made again by the worker (202 + Retry-After).
+    answer = () =>
+      new Response(JSON.stringify({ status: "preparing", retry_after_s: 60 }), {
+        status: 202,
+        headers: { "content-type": "application/json", "retry-after": "60" },
+      });
+    expect((await documentRedirect(rt, request)).headers.get("location")).toBe(
+      "/p/view?pdf=preparing",
+    );
     answer = () => json({ url: "javascript:alert(1)", expires_at: "x" });
     expect((await documentRedirect(rt, request)).headers.get("location")).toBe("/p/view?pdf=0");
     const noCookie = new Request(`${PUBLIC}/p/document`);

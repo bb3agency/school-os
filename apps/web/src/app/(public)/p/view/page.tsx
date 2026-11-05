@@ -19,6 +19,7 @@ function notice(query: Record<string, string | string[] | undefined>): PageNotic
     return { kind: "pay", error: pay as PayError };
   }
   if (query.pdf === "0") return { kind: "pdf" };
+  if (query.pdf === "preparing") return { kind: "pdfPreparing" };
   if (query.saved === "1") return { kind: "saved", ok: true };
   if (query.saved === "0") return { kind: "saved", ok: false };
   return null;

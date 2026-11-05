@@ -31,7 +31,10 @@ type T = ReturnType<typeof parentTranslator>;
 
 /** A one-line message from the page's own forms (reason codes from the query). */
 export type PageNotice =
-  { kind: "pay"; error: PayError } | { kind: "pdf" } | { kind: "saved"; ok: boolean };
+  | { kind: "pay"; error: PayError }
+  | { kind: "pdf" }
+  | { kind: "pdfPreparing" }
+  | { kind: "saved"; ok: boolean };
 
 /** The self-hosted Telugu font, only on Telugu pages (ADR-0044 decision 3). */
 function TeluguFont({ language }: { language: ParentLanguage }) {
@@ -104,10 +107,17 @@ function NoticeSheet({ notice, t, flash }: { notice: Notice; t: T; flash: PageNo
           {t("common.pdfUnavailable")}
         </Banner>
       ) : null}
+      {flash?.kind === "pdfPreparing" ? (
+        // D71: the worker is making the expired PDF again; a polite status, not an alert.
+        <p className="public-banner public-banner-amber" role="status" aria-live="polite">
+          <PublicIcon name="clock" />
+          <span>{t("common.pdfPreparing")}</span>
+        </p>
+      ) : null}
       {notice.has_pdf ? (
         // eslint-disable-next-line @next/next/no-html-link-for-pages -- a plain link: the parent pages ship no client router (docs/17 §5.8)
         <a className="public-button" href="/p/document">
-          {t("common.openPdf")}
+          {flash?.kind === "pdfPreparing" ? t("common.tryAgain") : t("common.openPdf")}
         </a>
       ) : null}
     </section>

@@ -161,6 +161,16 @@ describe("notice page (US-2401)", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("could not be opened");
     expect(screen.queryByRole("link", { name: "Open the PDF" })).toBeNull();
   });
+
+  it("says politely that an expired PDF is being prepared and offers to try again (D71)", () => {
+    render(<LinkFrame envelope={notice} notice={{ kind: "pdfPreparing" }} />);
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("The PDF is being prepared. Try again in a minute.");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("link", { name: "Try again" })).toHaveAttribute("href", "/p/document");
+    expect(screen.queryByRole("link", { name: "Open the PDF" })).toBeNull();
+  });
 });
 
 describe("receipt page (US-2402)", () => {

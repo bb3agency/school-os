@@ -4,7 +4,9 @@
     "pdfNotReady": "The PDF is not ready yet. Open this page again later.",
     "pdfUnavailable": "The PDF could not be opened just now. Try again in a few minutes.",
     "back": "Back to the page",
-    "rupees": "₹{amount}"
+    "rupees": "₹{amount}",
+    "pdfPreparing": "The PDF is being prepared. Try again in a minute.",
+    "tryAgain": "Try again"
   },
   "notice": {
     "dated": "Dated {date}"
