@@ -1,8 +1,9 @@
 """Database access for the breach register (0067_consents_breach; ADR-0050).
 
 Callers inside ``app.privacy`` only. Every function runs in a ``core.db.tenant_session``: RLS
-limits each statement to that school. Records are never deleted by the app; affected lists are
-replaced as a whole; reminders are insert-once.
+limits each statement to that school. Records are deleted only by the nightly retention run
+(:func:`purge_closed`; lead decision D58: closed more than the configured years ago, never an open
+or reopened one); affected lists are replaced as a whole; reminders are insert-once.
 """
 
 from __future__ import annotations
@@ -246,6 +247,46 @@ def reminders_sent(
         BreachReminder.breach_id.in_(list(breach_ids))
     )
     return {(b, r) for b, r in session.execute(stmt)}
+
+
+# --- retention (lead decision D58) ---------------------------------------------------------------
+
+
+def purge_closed(session: Session, *, years: int) -> dict[str, int]:
+    """Delete the current school's breaches closed more than ``years`` ago, with their affected
+    lists and sent reminders (children first). An open or reopened breach has ``closed_at`` NULL
+    (CHECK ``breach_records_closed``) and is never selected. The breaches are locked first, so a
+    SchoolOS reopen committing meanwhile is re-checked (Read Committed) and keeps its children.
+    The database adds the floor: policy ``breach_records_delete_expired`` (0075)."""
+    cutoff: dt.datetime = session.execute(
+        text("SELECT now() - make_interval(years => :years)"), {"years": years}
+    ).scalar_one()
+    ids = list(
+        session.execute(
+            select(BreachRecord.id)
+            .where(BreachRecord.status == "closed", BreachRecord.closed_at < cutoff)
+            .order_by(BreachRecord.id)
+            .with_for_update()
+        ).scalars()
+    )
+    if not ids:
+        return {"breaches": 0, "affected": 0, "reminders": 0}
+    reminders = session.execute(
+        delete(BreachReminder).where(BreachReminder.breach_id.in_(ids)).returning(BreachReminder.id)
+    ).all()
+    affected = session.execute(
+        delete(BreachAffected).where(BreachAffected.breach_id.in_(ids)).returning(BreachAffected.id)
+    ).all()
+    breaches = session.execute(
+        delete(BreachRecord)
+        .where(
+            BreachRecord.id.in_(ids),
+            BreachRecord.status == "closed",
+            BreachRecord.closed_at < cutoff,
+        )
+        .returning(BreachRecord.id)
+    ).all()
+    return {"breaches": len(breaches), "affected": len(affected), "reminders": len(reminders)}
 
 
 # --- full data export -----------------------------------------------------------------------

@@ -17,6 +17,12 @@ clocks:
 sweep_interval_seconds: 60
 # PUT /privacy/breaches/{id}/affected: at most this many ids in one list.
 max_affected: 5000
+# Lead decision D58 (ADR-0050; docs/08 §11): a closed breach, its affected list and its sent
+# reminders are deleted by the nightly retention run (privacy.breach_purge) this many years after
+# closed_at. An open or reopened breach is never deleted. At least 3: the database policy
+# breach_records_delete_expired (0075_breach_retention) refuses deleting anything closed for less.
+retention:
+  closed_years: 3
 
 category_labels:
   identity: names and identity details

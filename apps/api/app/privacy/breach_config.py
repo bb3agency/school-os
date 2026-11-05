@@ -1,7 +1,8 @@
 """Breach register configuration and drafts (``breach_templates.yaml``; ADR-0050; FR-DPDP-034..036).
 
-Pure module (no database or web): clocks, category labels and the app copies of the breach
-runbook's templates B (families) and C (Board outline), filled by :func:`fill`.
+Pure module (no database or web): clocks, category labels, the retention of closed breaches
+(lead decision D58) and the app copies of the breach runbook's templates B (families) and C
+(Board outline), filled by :func:`fill`.
 """
 
 from __future__ import annotations
@@ -60,6 +61,12 @@ class Clocks(_Model):
     reminders: Reminders
 
 
+class Retention(_Model):
+    # Lead decision D58: never below the floor of the database policy
+    # ``breach_records_delete_expired`` (0075_breach_retention: closed more than 3 years ago).
+    closed_years: int = Field(ge=3, le=30)
+
+
 class Template(_Model):
     title: str = Field(min_length=5, max_length=200)
     body: str = Field(min_length=20, max_length=4000)
@@ -70,6 +77,7 @@ class BreachConfig(_Model):
     clocks: Clocks
     sweep_interval_seconds: int = Field(ge=10, le=3600)
     max_affected: int = Field(ge=1, le=20000)
+    retention: Retention
     category_labels: dict[str, str]
     templates: dict[DraftKey, Template]
 
@@ -111,6 +119,7 @@ __all__ = [
     "Category",
     "DraftKey",
     "ReminderKey",
+    "Retention",
     "fill",
     "load_config",
 ]

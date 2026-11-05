@@ -26,6 +26,10 @@
   into an M4 parent notice draft (``circulars.service``; approval needed); the draft sent to the
   notice writer carries no description, phone number or e-mail address. SchoolOS never sends a
   breach notice by itself.
+- **Retention (lead decision D58).** :func:`purge_expired` (nightly ``privacy.breach_purge``)
+  deletes a breach closed more than ``retention.closed_years`` ago (3) with its affected list and
+  sent reminders; an open or reopened breach (``closed_at`` NULL) is never deleted. Audit
+  ``privacy.breach.retention_purged`` (counts only, actor ``system``).
 """
 
 from __future__ import annotations
@@ -739,6 +743,28 @@ def send_reminders(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> i
     return sent
 
 
+# --- retention (lead decision D58) ---------------------------------------------------------------
+
+
+def purge_expired(session: Session) -> int:
+    """Nightly, in the school's own ``tenant_session``: delete its breaches closed more than
+    ``retention.closed_years`` ago with their affected lists and sent reminders. One audit event
+    ``privacy.breach.retention_purged`` (actor ``system``; counts only) in the same transaction
+    when anything was deleted, like the other tenant retention purges. Returns the breaches
+    deleted."""
+    counts = repo.purge_closed(session, years=settings().retention.closed_years)
+    if counts["breaches"]:
+        audit.record(
+            session,
+            action="privacy.breach.retention_purged",
+            resource_type="tenant",
+            resource_id=repo.current_tenant_id(session),
+            summary={**counts, "closed_years": settings().retention.closed_years},
+            actor_type="system",
+        )
+    return counts["breaches"]
+
+
 # --- DEK rotation (SEC-012) ---------------------------------------------------------------------
 
 
@@ -807,6 +833,7 @@ __all__ = [
     "get_affected",
     "get_breach",
     "list_breaches",
+    "purge_expired",
     "purge_tenant_data",
     "record_processor_reopen",
     "reencrypt_batch",

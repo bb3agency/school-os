@@ -250,7 +250,8 @@ def create_celery() -> Celery:
             **ai_quota_beat_schedule(),
             # FR-OPS-004: break-glass pull, expiry and outcome reporting (every minute).
             **breakglass_beat_schedule(),
-            # FR-DPDP-032, FR-DPDP-035: breach notice pull and 24 h / 60 h reminders (every minute).
+            # FR-DPDP-032, FR-DPDP-035: breach notice pull and 24 h / 60 h reminders (every minute);
+            # D58: nightly retention of breaches closed 3 years ago (03:15 IST).
             **breach_beat_schedule(),
             # FR-DOC-007: purge expired upload intents and staging objects.
             **documents_beat_schedule(),
