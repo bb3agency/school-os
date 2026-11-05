@@ -10547,6 +10547,36 @@
         "title": "SchoolOS notices arrive by themselves",
         "body": "Record only breaches on the school's side here."
       }
+    },
+    "picker": {
+      "open": "Count from the school's records",
+      "title": "Count the people affected",
+      "description": "Pick the sections, students and staff whose data was involved. SchoolOS counts them, each person once, with the students' parents and guardians. Only the numbers are kept, never the list.",
+      "studentsTitle": "Students",
+      "allStudents": "All students of the school",
+      "sectionsHint": "Tick whole sections, or find single students below.",
+      "noSections": "No sections in the current academic year.",
+      "studentSearch": "Find a student by name or admission number",
+      "find": "Find",
+      "searchTooShort": "Type at least 2 letters.",
+      "resultsCount": "{count, plural, =0 {No students found} one {1 student found} other {# students found}}",
+      "results": "Students found",
+      "add": "Add",
+      "added": "Added",
+      "addStudent": "Add {name}",
+      "remove": "Remove {name}",
+      "pickedStudents": "{count, plural, one {1 student picked} other {# students picked}}",
+      "staffTitle": "Staff",
+      "allStaff": "All staff of the school",
+      "staffNeedsUsers": "To pick staff by role or by name you need permission to manage users. You can still count all staff.",
+      "byRole": "By role",
+      "oneStaff": "One staff member",
+      "pickedStaff": "{count, plural, one {1 staff member picked} other {# staff members picked}}",
+      "countHint": "Count again after you change what is picked.",
+      "count": "Count",
+      "countAgain": "The picks changed. Count again to see the numbers.",
+      "result": "{students} children, {guardians} parents and guardians, {staff} staff",
+      "use": "Use these counts"
     }
   },
   "portalCalendar": {

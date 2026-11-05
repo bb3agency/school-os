@@ -19,6 +19,8 @@ import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
 import { formatCount, formatDateTime } from "@/lib/format";
 import { formList } from "@/lib/forms";
+import type { AffectedCounts } from "./affected-count";
+import { AffectedPicker } from "./AffectedPicker";
 import { PeopleCounts } from "./BreachesScreen";
 import { CategoryChecklist, CountFields } from "./fields";
 import { BreachStatusPill, DutyClockPill, OriginPill, useCategoryNames } from "./parts";
@@ -399,6 +401,19 @@ function EditFactsDialog({ breach }: { breach: BreachDetail }) {
   const ts = useTranslations("breaches.status");
   const api = useBffClient("staff");
   const idFor = (field: string) => `breach-edit-${field}`;
+  // The picker's counts go into the form's count fields; the school still saves with PATCH.
+  const fill = (counts: AffectedCounts) => {
+    const values: Record<string, number> = {
+      approx_children: counts.students,
+      approx_guardians: counts.guardians,
+      approx_staff: counts.staff,
+    };
+    for (const [field, value] of Object.entries(values)) {
+      const input = document.getElementById(idFor(field));
+      if (input instanceof HTMLInputElement) input.value = String(value);
+    }
+    document.getElementById(idFor("approx_children"))?.focus();
+  };
   return (
     <ActionDialog
       triggerLabel={t("editFacts")}
@@ -459,6 +474,7 @@ function EditFactsDialog({ breach }: { breach: BreachDetail }) {
             selected={breach.categories}
           />
           <CountFields idFor={idFor} errors={errors} values={breach} />
+          <AffectedPicker breachId={breach.id} onUse={fill} />
           <TextAreaField
             id={idFor("containment")}
             name="containment"
