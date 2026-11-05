@@ -55,4 +55,17 @@ describe("ApiErrorAlert for the 2026-10-06 decisions", () => {
       screen.getByText("ఈ సంఖ్య లేదా తేదీ చాలా పెద్దది. దాన్ని చూసి మళ్లీ ప్రయత్నించండి."),
     ).toBeTruthy();
   });
+
+  it("invalid_value (422, D55) says a value isn't allowed and to check the form", () => {
+    const error = new ApiError(422, "invalid_value", {
+      status: 422,
+      code: "invalid_value",
+      request_id: "req_synth",
+    } as never);
+    expect(describeApiError(error)).toMatchObject({ key: "invalid_value", status: 422 });
+    renderWithIntl(<ApiErrorAlert error={error} />);
+    expect(
+      screen.getByText("One of the values isn't allowed. Check the form and try again."),
+    ).toBeTruthy();
+  });
 });
