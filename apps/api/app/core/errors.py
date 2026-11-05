@@ -7,10 +7,14 @@ from __future__ import annotations
 
 from typing import Any
 
+import psycopg
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from app.core.logging import get_logger
 
 PROBLEM_JSON = "application/problem+json"
 ERROR_TYPE_BASE = "https://docs.schoolos.example/errors/"
@@ -174,43 +178,94 @@ def install_error_handlers(app: FastAPI) -> None:
         code = {404: "not_found", 405: "method_not_allowed"}.get(exc.status_code, "http_error")
         return problem(request, status=exc.status_code, code=code, title=str(exc.detail))
 
+    async def _database(request: Request, exc: Exception) -> JSONResponse:
+        # Runs inside the middleware (Starlette's ExceptionMiddleware), so the request-context
+        # middleware sees the 422 instead of answering 500 itself (D55). Anything else is
+        # re-raised and stays a logged 500 (a genuine server bug must stay visible).
+        response = _database_refusal(request, exc)
+        if response is None:
+            raise exc
+        return response
+
+    app.add_exception_handler(DBAPIError, _database)
+    app.add_exception_handler(psycopg.Error, _database)
+
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
-        if _is_nul_refusal(exc):
-            return problem(
-                request,
-                status=422,
-                code="invalid_characters",
-                title="Validation failed",
-                detail="Remove the invisible NUL character from the text and try again.",
-                extra={
-                    "errors": [
-                        {
-                            "field": "body",
-                            "code": "invalid_characters",
-                            "message_key": "errors.invalid_characters",
-                        }
-                    ]
-                },
-            )
-        if _is_out_of_range(exc):
-            return problem(
-                request,
-                status=422,
-                code="value_out_of_range",
-                title="Validation failed",
-                detail="A number or date is too large. Use a smaller value and try again.",
-                extra={
-                    "errors": [
-                        {
-                            "field": "body",
-                            "code": "value_out_of_range",
-                            "message_key": "errors.value_out_of_range",
-                        }
-                    ]
-                },
-            )
+        response = _database_refusal(request, exc)
+        if response is not None:
+            return response
         return problem(request, status=500, code="internal_error", title="Something went wrong")
+
+
+def _refusal_422(request: Request, code: str, detail: str) -> JSONResponse:
+    return problem(
+        request,
+        status=422,
+        code=code,
+        title="Validation failed",
+        detail=detail,
+        extra={"errors": [{"field": "body", "code": code, "message_key": f"errors.{code}"}]},
+    )
+
+
+def _database_refusal(request: Request, exc: BaseException) -> JSONResponse | None:
+    """A database refusal of a value the request supplied (and the input checks missed), as a
+    422; ``None`` for anything else. A module's own translation of the same SQLSTATE (for
+    example ``platform.repository.translate_db_error``) raises a ``DomainError`` before this
+    runs, so it keeps precedence. The transaction has already been rolled back by the session
+    scope (``core.db``), together with any audit event written in it."""
+    if _is_nul_refusal(exc):
+        return _refusal_422(
+            request,
+            "invalid_characters",
+            "Remove the invisible NUL character from the text and try again.",
+        )
+    if _is_out_of_range(exc):
+        return _refusal_422(
+            request,
+            "value_out_of_range",
+            "A number or date is too large. Use a smaller value and try again.",
+        )
+    violation = _check_violation(exc)
+    if violation is not None:
+        # The constraint name only: never the values, the SQL or its parameters (invariant 5).
+        # It is not in the response either (no schema details for the caller).
+        get_logger(__name__).warning(
+            "db.check_violation",
+            constraint=_constraint_name(violation),
+            error_code="invalid_value",
+            error_type=type(violation).__name__,
+        )
+        return _refusal_422(
+            request,
+            "invalid_value",
+            "One of the values isn't allowed. Check the form and try again.",
+        )
+    return None
+
+
+# SQLSTATE 23514 check_violation.
+_CHECK_VIOLATION = "23514"
+
+
+def _check_violation(exc: BaseException) -> BaseException | None:
+    """The driver error for a CHECK constraint refusal (SQLSTATE 23514), raised directly or
+    wrapped by SQLAlchemy (``IntegrityError``); D55."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if getattr(current, "sqlstate", None) == _CHECK_VIOLATION:
+            return current
+        orig = getattr(current, "orig", None)
+        current = orig if isinstance(orig, BaseException) else current.__cause__
+    return None
+
+
+def _constraint_name(error: BaseException) -> str:
+    name = getattr(getattr(error, "diag", None), "constraint_name", None)
+    return name if isinstance(name, str) and name else "unknown"
 
 
 # SQLSTATE 22003 numeric_value_out_of_range, 22008 datetime_field_overflow.

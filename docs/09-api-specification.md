@@ -117,7 +117,7 @@ The shared ALB's WAF adds coarse per-IP rules in front (docs/10 §5); dedicated 
 | 409 | State conflict (e.g., approving a non-pending request) |
 | 412 | ETag mismatch |
 | 413 / 415 | File too large / unsupported type |
-| 422 | Validation errors |
+| 422 | Validation errors. Database refusals of a value the input checks missed are mapped centrally (`app/core/errors.py`, school and control-plane routes alike): a CHECK constraint (SQLSTATE 23514) → `invalid_value` (D55; logged at warning as `db.check_violation` with the constraint name only, never in the body), NUL in text → `invalid_characters`, number or date out of range (22003/22008) → `value_out_of_range`. A module's own mapping of the same SQLSTATE (e.g. the platform translator, `duplicate`, field-level codes) keeps precedence; other integrity errors (23505, 23503) without one stay 500 |
 | 428 | Step-up authentication required (`code: step_up_required`): MFA and `auth_time` within 5 minutes; the BFF re-authenticates with `prompt=login` |
 | 429 | Rate limited (`code: rate_limited`, with `Retry-After` and `retry_after` in seconds, §2.7), AI question limit (`ai_rate_limited`) / budget exhausted (`ai_budget_exhausted`) |
 | 5xx | Server errors, no internals exposed |
