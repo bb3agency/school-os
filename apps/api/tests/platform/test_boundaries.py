@@ -63,6 +63,9 @@ TENANT_SIDE_IMPORTS: dict[str, frozenset[str] | None] = {
     "app.tenancy.schemas": frozenset({"TenantProvisionIn"}),
     # Registers the system-role cloning hook for provision_dedicated (no names used).
     "app.identity.service": None,
+    # Registers the owner-invitation email hook (audit.PLATFORM_EVENT_HOOKS) for
+    # provision_dedicated (no names used; lead decision D62, ADR-0020 amendment 2026-11-05).
+    "app.notifications.service": None,
     # Operator token verification and step-up (identity infrastructure, no tenant data).
     "app.identity.principal": frozenset(
         {"Principal", "get_operator_principal", "require_recent_auth"}

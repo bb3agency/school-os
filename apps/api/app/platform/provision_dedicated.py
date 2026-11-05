@@ -19,7 +19,8 @@ Steps (each resumable; a re-run continues where an interrupted run stopped):
    ``provisioning``) + platform event ``tenant.provisioned``;
 2. ``tenancy.initialise_tenant``: wrapped DEK + HMAC key (KMS on hosts) and the system roles;
 3. ``platform.service.invite_school_owner``: the invited owner (MFA required, ``owner`` role) +
-   platform event ``tenant.owner_invite_created`` + school-chain ``tenant.provisioned``;
+   platform event ``tenant.owner_invite_created`` + school-chain ``tenant.owner_invited`` (its
+   delivery queues the owner's invitation email tenant-side, D62) and ``tenant.provisioned``;
 4. ``tenancy.activate_tenant`` + platform and school-chain ``tenant.activated``.
 
 Platform events are ``actor_type = system``; school-chain events are ``actor_type = platform``,
@@ -41,7 +42,11 @@ from pydantic import ValidationError
 
 # Registers the system-role cloning hook in tenancy.POST_PROVISION_HOOKS (as in the worker), so
 # step 2 gives the school its roles and the owner invite gets the ``owner`` role.
-import app.identity.service  # noqa: F401  isort: skip
+import app.identity.service  # isort: skip
+
+# Registers the owner-invitation email hook for the school-chain event ``tenant.owner_invited``
+# (audit.PLATFORM_EVENT_HOOKS, D62), so step 3's inline delivery queues the owner's email.
+import app.notifications.service  # noqa: F401  isort: skip
 from app.core.config import DeploymentMode, Settings, get_settings
 from app.core.crypto import KeyWrapper, get_key_wrapper
 from app.core.db import context_free_session, platform_session
@@ -121,7 +126,7 @@ def _invite_owner(
     """Invite the first owner; ``existing`` when an earlier run already did (resume)."""
     try:
         with platform_session() as s, db_errors():
-            _user_id, membership_id, role_assigned = platform_service.invite_school_owner(
+            user_id, membership_id, role_assigned = platform_service.invite_school_owner(
                 s,
                 tenant_id=tenant_id,
                 subject=owner.idp_subject,
@@ -137,6 +142,14 @@ def _invite_owner(
                 membership_id,
                 {"owner_role_assigned": role_assigned},
                 tenant_id=tenant_id,
+            )
+            tenant_audit.enqueue_owner_invited(
+                s,
+                tenant_id,
+                SYSTEM,
+                user_id=user_id,
+                membership_id=membership_id,
+                owner_role_assigned=role_assigned,
             )
             tenant_audit.enqueue(
                 s,

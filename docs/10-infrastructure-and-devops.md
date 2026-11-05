@@ -162,7 +162,9 @@ Enabling it (per environment, manual steps in order):
 4. Set `email_from` (`"SchoolOS <no-reply@<email_domain>>"`) and `email_provider = "ses"`, apply, and send one invitation to a test inbox.
 5. Confirm the alarm topic subscription receives the SES reputation alarms (they start `INSUFFICIENT_DATA` until mail is sent).
 
-Dedicated hosts send no email yet (their compose file does not set the email settings; off by default).
+The **school owner's invitation** at provisioning (FR-PLT-002, lead decision D62; docs/16 §5.4) uses this same path and template: the control plane queues the school-chain event `tenant.owner_invited` (IDs only) with the invite, and the school side queues the email when that event reaches the school's chain, once per invite (resumes never send twice). Operators re-send it with `owner-invite:resend` (staff invitation cool-down). Approvals stay in-app; there are no approval emails.
+
+Dedicated hosts send no email yet (their compose file does not set the email settings; off by default). The provisioning command (`app.platform.provision_dedicated`) already queues the owner's invitation email the same way, so it goes out once email is configured on the host.
 
 ### 5.3 Valkey access control (audit 2026-10-05 P2-06)
 
