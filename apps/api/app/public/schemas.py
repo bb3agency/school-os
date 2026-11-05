@@ -145,6 +145,15 @@ class ParentDocumentLinkOut(_Out):
     expires_at: dt.datetime
 
 
+class ParentDocumentPreparingOut(_Out):
+    """D71 (FR-PUB-009): the notice's PDF is being made again by the worker (its stored render
+    expired); the page asks the parent to try again after ``retry_after_s`` (also the
+    ``Retry-After`` header of the 202)."""
+
+    status: Literal["preparing"]
+    retry_after_s: int
+
+
 class ParentPayIn(_In):
     """The instalments the parent ticked on the dues page."""
 
@@ -178,6 +187,7 @@ __all__ = [
     "LinkExchangeIn",
     "LinkExchangeOut",
     "ParentDocumentLinkOut",
+    "ParentDocumentPreparingOut",
     "ParentDueInstalmentOut",
     "ParentDuesOut",
     "ParentLanguage",

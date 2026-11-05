@@ -18,6 +18,7 @@ import importlib.util
 import json
 import sys
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -26,6 +27,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
+from app.circulars import service as circulars
+from app.core import pdf
 from app.core import ratelimit as rl
 from app.core.db import tenant_session
 from app.fees import online
@@ -227,6 +230,129 @@ def test_FR_PUB_011_wrong_target_type_kind_and_school_are_the_uniform_404(
         _same_404(
             public_client, P.public_call(public_client, method, path, token=unknown, body=body)
         )
+
+
+def _render_events(admin: Engine, notice_id: uuid.UUID) -> int:
+    with admin.connect() as c:
+        count: int = c.execute(
+            text(
+                "SELECT count(*) FROM ops.outbox WHERE event_type = :e "
+                "AND payload ->> 'notice_id' = CAST(:n AS text)"
+            ),
+            {"e": circulars.RENDER_EVENT, "n": str(notice_id)},
+        ).scalar_one()
+    return count
+
+
+def _age_render(admin: Engine, notice_id: uuid.UUID, days: int) -> None:
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "UPDATE ops.parent_notices SET rendered_at = now() - make_interval(days => :d) "
+                "WHERE id = :i"
+            ),
+            {"d": days, "i": notice_id},
+        )
+
+
+class _FakePdf:
+    def render(self, html: str) -> bytes:
+        del html
+        return b"%PDF-1.7 synthetic notice"
+
+    def render_png(self, html: str, *, width_px: int) -> bytes:
+        del html, width_px
+        return b"\x89PNG\r\n\x1a\nsynthetic"
+
+
+@pytest.fixture
+def fake_pdf() -> Iterator[_FakePdf]:
+    fake = _FakePdf()
+    pdf.set_renderer(fake)
+    pdf.set_image_renderer(fake)
+    yield fake
+    pdf.set_renderer(None)
+    pdf.set_image_renderer(None)
+
+
+def test_D71_FR_PUB_009_an_expired_notice_pdf_is_rendered_again_on_request(
+    world: Any, admin_engine: Engine, public_client: TestClient, fake_pdf: Any
+) -> None:
+    """D71: a notice whose stored render is older than ``render_keep_days`` keeps its PDF
+    button; asking for it queues one re-render (the worker renders, never the API) and answers
+    202 "being prepared" with ``Retry-After``; asking again while it is queued queues nothing
+    more; once the worker has rendered, the PDF opens."""
+    _, guardian = P.student_with_guardian(world.a)
+    owner = world.a.people["owner"]
+    with tenant_session(world.a.tenant_id, owner.user_id) as db:
+        notice_id = P.approved_notice(db, owner.user_id, pdf=True)
+    _age_render(admin_engine, notice_id, 7)
+    key = _link(world.a, "parent_notice", notice_id, guardian)
+    page = P.current(public_client, key)
+    assert page.status_code == 200, page.text
+    assert page.json()["notice"]["has_pdf"] is True
+    before = _render_events(admin_engine, notice_id)
+    for _ in range(3):
+        res = P.public_call(public_client, "GET", DOCUMENT, token=key)
+        assert res.status_code == 202, res.text
+        assert res.json() == {"status": "preparing", "retry_after_s": 60}
+        assert res.headers["retry-after"] == "60"
+        assert "no-store" in res.headers.get("cache-control", "")
+        assert key not in res.text
+    assert _render_events(admin_engine, notice_id) == before + 1
+    requested = _audit(admin_engine, world.a.tenant_id, "notice.render_requested", notice_id)
+    assert len(requested) == 1
+    assert requested[0]["summary"]["via"] == "parent_link"
+    assert not _audit(admin_engine, world.a.tenant_id, "notice.downloaded", notice_id)
+    # The worker renders it (queue pdf); the next request opens the fresh PDF.
+    assert circulars.render_notice(world.a.tenant_id, notice_id) == "ready"
+    doc = P.public_call(public_client, "GET", DOCUMENT, token=key)
+    assert doc.status_code == 200, doc.text
+    assert set(doc.json()) == {"url", "expires_at"}
+    assert _audit(admin_engine, world.a.tenant_id, "notice.downloaded", notice_id)
+
+
+def test_D71_a_notice_still_being_rendered_is_being_prepared_without_a_new_job(
+    world: Any, admin_engine: Engine, public_client: TestClient
+) -> None:
+    """A notice approved a moment ago (render queued by the approval) offers the PDF and
+    answers "being prepared" without queuing a second render."""
+    _, guardian = P.student_with_guardian(world.a)
+    owner = world.a.people["owner"]
+    with tenant_session(world.a.tenant_id, owner.user_id) as db:
+        notice_id = P.approved_notice(db, owner.user_id)
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE ops.parent_notices SET render_status = 'queued' WHERE id = :i"),
+            {"i": notice_id},
+        )
+    key = _link(world.a, "parent_notice", notice_id, guardian)
+    assert P.current(public_client, key).json()["notice"]["has_pdf"] is True
+    res = P.public_call(public_client, "GET", DOCUMENT, token=key)
+    assert res.status_code == 202, res.text
+    assert _render_events(admin_engine, notice_id) == 0
+    assert not _audit(admin_engine, world.a.tenant_id, "notice.render_requested", notice_id)
+
+
+def test_D71_a_withdrawn_notice_is_the_uniform_404_and_queues_no_render(
+    world: Any, admin_engine: Engine, public_client: TestClient
+) -> None:
+    _, guardian = P.student_with_guardian(world.a)
+    owner = world.a.people["owner"]
+    with tenant_session(world.a.tenant_id, owner.user_id) as db:
+        notice_id = P.approved_notice(db, owner.user_id, pdf=True)
+    _age_render(admin_engine, notice_id, 7)
+    key = _link(world.a, "parent_notice", notice_id, guardian)
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "UPDATE ops.parent_notices SET status = 'withdrawn', withdrawn_by = approved_by, "
+                "withdrawn_at = now(), withdraw_reason = 'Synthetic reason' WHERE id = :i"
+            ),
+            {"i": notice_id},
+        )
+    _same_404(public_client, P.public_call(public_client, "GET", DOCUMENT, token=key))
+    assert _render_events(admin_engine, notice_id) == 0
 
 
 # --- receipt ------------------------------------------------------------------------------------

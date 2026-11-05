@@ -12,7 +12,9 @@ import { parentToken } from "./view";
  * FR-PUB-009, FR-PAY-005, FR-LANG-003). Plain HTML forms and links, no client JavaScript:
  *
  * - `GET /p/document`: the notice or receipt PDF. The API gives a presigned link (at most
- *   5 minutes) and this answers 303 to it; without one, back to the page saying so.
+ *   5 minutes) and this answers 303 to it; without one, back to the page saying so. A notice
+ *   PDF whose stored render expired is made again by the worker (API 202, D71): back to the
+ *   page saying it is being prepared (`?pdf=preparing`).
  * - `POST /p/pay`: "Pay online". The ticked instalments go to the API, which makes or reuses
  *   the payment link on the school's own Razorpay account; this answers 303 to Razorpay's page
  *   (https on rzp.io / razorpay.com only). Any refusal goes back to the page with a reason code.
@@ -101,6 +103,11 @@ export async function documentRedirect(
   } catch {
     logEvent("public_api_unreachable_document", {}, "error");
     return see(`${PUBLIC_VIEW_PATH}?pdf=0`);
+  }
+  if (upstream.status === 202) {
+    // D71: the notice's PDF expired and the worker is making it again; the page says so.
+    await upstream.body?.cancel();
+    return see(`${PUBLIC_VIEW_PATH}?pdf=preparing`);
   }
   if (upstream.status !== 200) {
     await upstream.body?.cancel();
