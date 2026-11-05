@@ -4,6 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useId, useMemo, useState } from "react";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
+import { Pill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard } from "@/components/ui/StatCard";
@@ -72,7 +73,17 @@ export function FeeDuesScreen() {
         name: t("columns.due"),
         header: t("columns.dueInr"),
         numeric: true,
-        cell: (row) => <Amount value={row.total_due} />,
+        cell: (row) =>
+          row.shared_ledger ? (
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <Amount value={row.total_due} />
+              <Pill variant="tag" icon={null}>
+                {t("sharedLedger", { count: row.shared_with ?? 1 })}
+              </Pill>
+            </span>
+          ) : (
+            <Amount value={row.total_due} />
+          ),
       },
       {
         key: "ledgers",
@@ -158,6 +169,9 @@ export function FeeDuesScreen() {
                     {t("listTitle")}
                   </h2>
                   <p className="text-sm text-ink-muted">{t("listDescription")}</p>
+                  {page.data.some((row) => row.shared_ledger) ? (
+                    <p className="text-sm text-ink-muted">{t("sharedTotalsNote")}</p>
+                  ) : null}
                 </div>
                 <DataTableV2
                   id="tally-dues"

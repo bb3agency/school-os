@@ -28,8 +28,23 @@ export type Group = S["GroupOut"];
 export type Party = S["PartyOut"];
 export type PartyDetail = S["PartyDetail"];
 export type LinkedStudent = S["LinkedStudentOut"];
-export type DuesPage = S["DuesPage"];
-export type StudentDues = S["StudentDuesOut"];
+/**
+ * Shared family ledgers (D54): a ledger linked to several siblings is in each child's own total
+ * and marked `shared_ledger`; the school and class totals count it once. Declared here until the
+ * generated client carries these fields (the intersections stay valid after it does).
+ */
+export type StudentDues = S["StudentDuesOut"] & { shared_ledger?: boolean; shared_with?: number };
+export interface ClassDues {
+  class_id: string | null;
+  class_name: string | null;
+  students_with_dues: number;
+  total_due: string;
+}
+export type DuesTotals = Omit<S["DuesTotals"], "classes"> & { classes?: ClassDues[] };
+export type DuesPage = Omit<S["DuesPage"], "data" | "totals"> & {
+  data: StudentDues[];
+  totals: DuesTotals;
+};
 export type LinkFilter = "all" | "linked" | "unlinked";
 
 export interface Paged<T> {

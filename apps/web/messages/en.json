@@ -8097,7 +8097,9 @@
         "ledgers": "Ledgers",
         "asOf": "As of"
       },
-      "kpiLabel": "Summary of Tally dues"
+      "kpiLabel": "Summary of Tally dues",
+      "sharedLedger": "Shared with {count, plural, one {a sibling} other {# siblings}}",
+      "sharedTotalsNote": "A family ledger shared by siblings is in each child's amount, and counted once in the total due."
     },
     "connector": {
       "title": "Tally connector",
