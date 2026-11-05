@@ -5,8 +5,9 @@ FR-DPDP-031, FR-DPDP-032).
    incident clock that is due soon or overdue on the dashboard and on ``/incidents/clocks``,
    from the same rules as the beat alerts; other operators get no tile (``null``).
 2. A dedicated-host school told of a reopen by phone (D49 open item): an operator with
-   ``platform.incidents.manage`` (step-up) records it; it counts as the school's pull and is
-   audited ``incident.school_reopen_told``. Synthetic data only.
+   ``platform.incidents.manage`` (step-up) records it with a channel (D56: phone, email,
+   in_person; no free-text note); it counts as the school's pull and is audited
+   ``incident.school_reopen_told``. Synthetic data only.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from typing import Any
 import pytest
 from sqlalchemy import text
 
+from app.audit import service as audit
 from app.core.db import platform_session
 from app.platform import incident_alerts, incidents
 
@@ -230,7 +232,7 @@ def _reopened(api: Api, first: Any, second: Any, mode: str) -> tuple[str, uuid.U
 
 
 def _told(api: Api, op: Any, iid: str, tenant_id: uuid.UUID, **kw: Any) -> Any:
-    body = {"tenant_id": str(tenant_id), "reopen_seq": 1, "note": "Principal told by phone"}
+    body = {"tenant_id": str(tenant_id), "reopen_seq": 1, "channel": "phone"}
     return api.call(
         "POST", f"/incidents/{iid}/reopen:told", op, json=body | kw.pop("body", {}), **kw
     )
@@ -263,11 +265,7 @@ def test_D49_FR_DPDP_032_dedicated_school_told_of_reopen_by_phone_is_recorded(
     assert school["reopen_pulled"] == 1
     assert school["reopen_pulled_at"] is not None
     (event,) = _events("incident.school_reopen_told", iid)
-    assert event["summary"] == {
-        "source": "operator",
-        "reopen": 1,
-        "note": "Principal told by phone",
-    }
+    assert event["summary"] == {"source": "operator", "reopen": 1, "channel": "phone"}
     assert event["subject_tenant_id"] == tenant_id
     assert event["actor_id"] == second.id
     # Treated as received: nothing pending any more, and a late report of the reopen adds nothing.
@@ -304,16 +302,78 @@ def test_D49_FR_DPDP_032_reopen_told_needs_something_pending_and_the_current_cou
 
 
 @pytest.mark.parametrize(
-    "note",
-    ["Told on 9876543210", "Mail sent to head@school.example", "x" * 201, "ok"],
+    "body",
+    [
+        {"channel": "fax"},
+        {"channel": ""},
+        {"channel": None},
+        {"channel": "phone", "note": "Principal told by phone"},
+    ],
 )
-def test_D49_FR_DPDP_030_reopen_told_note_follows_the_summary_rule(
-    api: Api, make_operator: MakeOperator, note: str
+def test_D56_FR_DPDP_030_reopen_told_takes_a_channel_and_no_note(
+    api: Api, make_operator: MakeOperator, body: dict[str, Any]
 ) -> None:
     first, second = make_operator("platform_owner"), make_operator("platform_engineer")
     iid, tenant_id = _reopened(api, first, second, "dedicated")
-    res = _told(api, first, iid, tenant_id, body={"note": note})
+    res = _told(api, first, iid, tenant_id, body=body)
     assert res.status_code == 422, res.text
+    assert _events("incident.school_reopen_told", iid) == []
+
+
+def test_D56_FR_DPDP_030_reopen_told_requires_a_channel(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    first, second = make_operator("platform_owner"), make_operator("platform_engineer")
+    iid, tenant_id = _reopened(api, first, second, "dedicated")
+    res = api.call(
+        "POST",
+        f"/incidents/{iid}/reopen:told",
+        first,
+        json={"tenant_id": str(tenant_id), "reopen_seq": 1},
+    )
+    assert res.status_code == 422, res.text
+
+
+def test_D56_FR_PLT_029_audit_viewer_shows_the_channel_never_an_old_note(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    """A row written before D56 keeps its note in the chain (append-only), but the viewer and
+    its CSV answer ``channel: null`` and no note."""
+    first, second = make_operator("platform_owner"), make_operator("platform_engineer")
+    iid, tenant_id = _reopened(api, first, second, "dedicated")
+    with platform_session() as s:
+        audit.record_platform(
+            s,
+            action="incident.school_reopen_told",
+            resource_type="incident",
+            resource_id=uuid.UUID(iid),
+            summary={"source": "operator", "reopen": 1, "note": "Old synthetic told note"},
+            actor_id=first.id,
+            subject_tenant_id=tenant_id,
+        )
+    assert _told(api, second, iid, tenant_id).status_code == 200
+    viewer = make_operator("platform_viewer")
+    query = f"/audit/events?tenant_id={tenant_id}&action=incident.school_reopen_told"
+    events = api.call("GET", query, viewer).json()["data"]
+    assert [e["summary"] for e in events] == [
+        {"source": "operator", "reopen": 1, "channel": "phone"},
+        {"source": "operator", "reopen": 1, "channel": None},
+    ]
+    csv = api.call("GET", query, viewer, headers={"Accept": "text/csv"})
+    assert "Old synthetic told note" not in csv.text
+    assert "phone" in csv.text
+
+
+@pytest.mark.parametrize("channel", ["email", "in_person"])
+def test_D56_FR_DPDP_032_reopen_told_records_each_channel(
+    api: Api, make_operator: MakeOperator, channel: str
+) -> None:
+    first, second = make_operator("platform_owner"), make_operator("platform_engineer")
+    iid, tenant_id = _reopened(api, first, second, "dedicated")
+    res = _told(api, first, iid, tenant_id, body={"channel": channel})
+    assert res.status_code == 200, res.text
+    (event,) = _events("incident.school_reopen_told", iid)
+    assert event["summary"]["channel"] == channel
 
 
 def test_D49_FR_DPDP_032_reopen_told_needs_manage_and_step_up(
