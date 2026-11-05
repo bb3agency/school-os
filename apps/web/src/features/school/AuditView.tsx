@@ -205,7 +205,7 @@ export function AuditView({
                 name="from"
                 label={t("filterFrom")}
                 inputMode="numeric"
-                pattern="\d{2}/\d{2}/\d{4}"
+                pattern="\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2}"
                 placeholder="DD/MM/YYYY"
                 defaultValue={filters.from ?? ""}
                 autoComplete="off"
@@ -214,7 +214,7 @@ export function AuditView({
                 name="to"
                 label={t("filterTo")}
                 inputMode="numeric"
-                pattern="\d{2}/\d{2}/\d{4}"
+                pattern="\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2}"
                 placeholder="DD/MM/YYYY"
                 defaultValue={filters.to ?? ""}
                 autoComplete="off"
