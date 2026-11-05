@@ -41,6 +41,7 @@ from app.public.guards import PublicNotFound
 from app.public.schemas import (
     LanguageChoice,
     ParentDocumentLinkOut,
+    ParentDocumentPreparingOut,
     ParentDueInstalmentOut,
     ParentDuesOut,
     ParentNoticeOut,
@@ -214,11 +215,19 @@ def payment(session: Session, handle: HandleView, intent_ref: str | None) -> Par
 # --- documents ----------------------------------------------------------------------------------
 
 
-def document(session: Session, handle: HandleView) -> ParentDocumentLinkOut:
-    """The notice's or receipt's PDF (presigned, at most 5 minutes), else 404."""
+def document(
+    session: Session, handle: HandleView
+) -> ParentDocumentLinkOut | ParentDocumentPreparingOut:
+    """The notice's or receipt's PDF (presigned, at most 5 minutes), else 404. A notice whose
+    stored render expired answers "being prepared" while the worker renders it again (D71)."""
     found: tuple[object, object] | None
     if handle.kind == "parent_notice":
-        found = circulars.parent_notice_pdf(session, target(handle, "parent_notice"))
+        notice_pdf = circulars.parent_notice_pdf(session, target(handle, "parent_notice"))
+        if notice_pdf == circulars.PDF_PREPARING:
+            return ParentDocumentPreparingOut(
+                status="preparing", retry_after_s=rules().document_retry_after_s
+            )
+        found = None if isinstance(notice_pdf, str) else notice_pdf
     elif handle.kind == "parent_receipt":
         _receipt(session, handle)
         found = fees.parent_receipt_pdf(session, target(handle, "parent_receipt"))

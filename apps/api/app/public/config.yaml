@@ -42,3 +42,8 @@ replay_window_hours: 72
 # provider's host (local and CI; .test never resolves on the internet). The web CSP form-action
 # lists the same hosts (apps/web/src/lib/public-surface.ts).
 pay_redirect_hosts: [rzp.io, razorpay.com, rzp.example.test]
+
+# D71 (FR-PUB-009): a notice PDF whose stored render expired is made again by the worker; the
+# document route answers 202 with this Retry-After (seconds) and the page says "try again in a
+# minute".
+document_retry_after_s: 60

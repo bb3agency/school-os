@@ -62,6 +62,7 @@ class PublicConfig(_Model):
     webhook_providers: dict[WebhookProvider, WebhookProviderConfig]
     replay_window_hours: int = Field(ge=1, le=24 * 30)
     pay_redirect_hosts: tuple[str, ...] = Field(min_length=1)
+    document_retry_after_s: int = Field(ge=10, le=600)
 
     @field_validator("pay_redirect_hosts")
     @classmethod

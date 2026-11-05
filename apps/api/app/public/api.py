@@ -13,7 +13,8 @@ after the resolve still wins. Every key that does not open a page gets the same 
 - ``GET /public/links/current``: the cookie's page: kind, expiry, language, school name and the
   content block of its kind (R2-3H, ``app.public.pages``). Counts a view; the first one is
   audited. A link whose content cannot be shown is the same 404 (and not counted).
-- ``GET /public/links/current/document``: the notice or receipt PDF (presigned, at most 5 min).
+- ``GET /public/links/current/document``: the notice or receipt PDF (presigned, at most 5 min);
+  202 ``preparing`` while the worker renders an expired notice PDF again (D71).
 - ``POST /public/links/current/pay``: "Pay online" on a dues link: creates or reuses the payment
   link on the school's own Razorpay account; only new links spend ``public_pay`` (5 a day).
 - ``GET /public/links/current/payment``: the status of that link (the return page polls it).
@@ -29,6 +30,7 @@ import datetime as dt
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core import ratelimit
@@ -42,6 +44,7 @@ from app.public.schemas import (
     LinkExchangeIn,
     LinkExchangeOut,
     ParentDocumentLinkOut,
+    ParentDocumentPreparingOut,
     ParentLanguage,
     ParentOptinIn,
     ParentOptinOut,
@@ -141,15 +144,32 @@ def current_link(caller: ByCookieToken) -> LinkEnvelopeOut:
 
 
 @router.get(
-    "/public/links/current/document", response_model=ParentDocumentLinkOut, responses=_NOT_FOUND
+    "/public/links/current/document",
+    response_model=ParentDocumentLinkOut,
+    responses={
+        **_NOT_FOUND,
+        202: {
+            "model": ParentDocumentPreparingOut,
+            "description": "The notice's PDF is being made again; try again after Retry-After.",
+        },
+    },
 )
-def current_document(caller: DocumentToken) -> ParentDocumentLinkOut:
+def current_document(caller: DocumentToken) -> ParentDocumentLinkOut | JSONResponse:
     """The PDF of a notice or receipt link, presigned for at most 5 minutes (FR-PUB-009); 404
-    while there is none (a cancelled receipt, a notice whose files were removed). Audited by
-    the owning module. Not a view."""
+    while there is none (a cancelled receipt, a withdrawn notice). A notice whose stored render
+    expired (``render_keep_days``) or is still being made answers 202 ``preparing`` with
+    ``Retry-After``: the worker renders it again (queued once; repeated requests while it is
+    queued queue nothing more; D71). Audited by the owning module. Not a view."""
     with tenant_session(caller.tenant_id) as session:
         handle, _ = _parent_handle(session, caller)
-        return pages.document(session, handle)
+        out = pages.document(session, handle)
+    if isinstance(out, ParentDocumentPreparingOut):
+        return JSONResponse(
+            status_code=202,
+            content=out.model_dump(mode="json"),
+            headers={"Retry-After": str(out.retry_after_s)},
+        )
+    return out
 
 
 @router.post(
