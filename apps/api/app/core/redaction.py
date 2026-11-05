@@ -25,9 +25,10 @@ Public API
 Detection rules (defined and tested in ``tests/core/test_redaction.py``)
 -----------------------------------------------------------------------
 Text is NFC-normalised. A *run* is a sequence of digit *groups* joined by a short separator
-(1-3 whitespace or zero-width characters of any kind, or a hyphen/dash/minus with up to 2 of
-them on each side; dots, slashes and commas are not separators, so structured numbers such
-as invoice numbers ``SOS/2026-27/000123`` and dates stay intact). Input checks also collapse every
+(1-3 whitespace or invisible format (Cf) characters of any kind, or a hyphen/dash/minus with
+up to 2 of them on each side; dots, slashes, underscores and commas are not run separators, so
+structured numbers such as invoice numbers ``SOS/2026-27/000123`` and dates stay intact; rule 4
+covers them for numbers grouped 4-4-4). Input checks also collapse every
 whitespace run first, as stored text is (``contains_full_aadhaar``). Digits in any script
 (ASCII, Telugu, Devanagari, ...) count via ``unicodedata.digit``. Candidates are windows of
 consecutive whole groups inside a run, so:
@@ -41,10 +42,14 @@ consecutive whole groups inside a run, so:
 2. Mobile (``redact`` only): a 10-digit window starting 6-9, optionally with ``0``/``91``/``+91``
    prefix, masked as ``XXXXXX1234``.
 3. Email (``redact`` only): replaced by ``[redacted-email]``.
-4. Punctuated Aadhaar (separate check, audit 2026-10-04 data-layer note 11): exactly three
-   4-digit groups joined by the same one of ``.`` ``/`` ``,`` (``1234.5678.9012``), not part of
-   a longer run of digits and those characters, and Verhoeff-valid. Refused by
-   ``contains_full_aadhaar``, masked like rule 1, located by ``find_aadhaar``.
+4. Grouped Aadhaar (separate check; audit 2026-10-04 data-layer note 11, lead decision D52):
+   exactly three 4-digit groups, each pair joined by 1-3 characters from whitespace (incl. NBSP,
+   narrow NBSP and every other Zs), hyphens and Unicode dashes, ``.`` ``/`` ``_`` and invisible
+   format characters (Cf) in any mix (``2345.6789/0124``, ``2345 - 6789 - 0124``,
+   ``2345/ 6789 .0124``), or by a single ``,``; Verhoeff-valid; no group inside a longer
+   contiguous digit block, and not continued by another digit group joined only by ``.`` ``/``
+   ``,`` ``_``. Refused by ``contains_full_aadhaar`` and ``contains_grouped_aadhaar``, masked
+   like rule 1, located by ``find_aadhaar``. Over-masking is accepted, under-masking is not.
 
 Masking repeats until nothing changes, so ``redact(redact(x)) == redact(x)``.
 """
@@ -56,9 +61,11 @@ import unicodedata
 from dataclasses import dataclass, field
 
 __all__ = [
+    "AADHAAR_GROUP_SEPARATOR",
     "EMAIL_MASK",
     "AadhaarMatch",
     "contains_full_aadhaar",
+    "contains_grouped_aadhaar",
     "find_aadhaar",
     "mask_aadhaar",
     "redact",
@@ -137,8 +144,13 @@ def verhoeff_check_digit(digits: str) -> str:
 # number (invariant 4).
 # Invisible format characters (category Cf: soft hyphen, zero-width and bidi marks, invisible
 # operators) show nothing on screen or in print, so they count as gaps too: "2345<LRM>6789..."
-# reads as a full number.
-_INVISIBLE = r"\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff"
+# reads as a full number. This is every Cf character of Unicode 15.0 (D52; a test checks it
+# against the running interpreter's ``unicodedata``).
+_INVISIBLE = (
+    r"\u00ad\u0600-\u0605\u061c\u06dd\u070f\u0890-\u0891\u08e2\u180e\u200b-\u200f\u202a-\u202e"
+    r"\u2060-\u2064\u2066-\u206f\ufeff\ufff9-\ufffb\U000110bd\U000110cd\U00013430-\U0001343f"
+    r"\U0001bca0-\U0001bca3\U0001d173-\U0001d17a\U000e0001\U000e0020-\U000e007f"
+)
 _GAP = rf"[\s{_INVISIBLE}]"
 _DASH = r"[-\u2010-\u2015\u2212\ufe58\ufe63\uff0d]"
 _SEP = rf"(?:{_GAP}{{1,3}}|{_GAP}{{0,2}}{_DASH}{_GAP}{{0,2}})"
@@ -166,7 +178,9 @@ def _scan_view(text: str) -> str:
     return _HEX32_RE.sub(blank, _UUID_RE.sub(blank, text))
 
 
-_EMAIL_RE = re.compile(r"[\w.%+\-]+@[\w\-]+(?:\.[\w\-]+)+")
+# The lookbehind starts a match only at the start of a local-part run: a long run of word
+# characters and dots with no ``@`` is then tried once, not from every position (linear).
+_EMAIL_RE = re.compile(r"(?<![\w.%+\-])[\w.%+\-]+@[\w\-]+(?:\.[\w\-]+)+")
 _AADHAAR_CONTEXT_RE = re.compile(
     r"a{1,2}dha{1,2}r|(?<![a-z])uid(?:ai)?(?![a-z])|ఆధార్|आधार", re.IGNORECASE
 )
@@ -285,20 +299,33 @@ def _mobile_regions(groups: list[_Group], taken: set[int]) -> list[tuple[int, in
     return regions
 
 
-# Dot, slash or comma separated form (audit 2026-10-04 data-layer note 11): exactly three
-# 4-digit groups joined by the SAME one of ``.`` ``/`` ``,``, not part of a longer run of digits
-# and those separators (so ``SOS/2026-27/000123``, dates and amounts never match), and only when
-# the 12 digits pass Verhoeff (no keyword rule here: these characters are too common).
-_PUNCT_RE = re.compile(r"(?<!\d)(?<!\d[./,])(\d{4})([./,])(\d{4})\2(\d{4})(?![./,]?\d)")
+# Grouped form with any separators (audit 2026-10-04 data-layer note 11; lead decision D52):
+# exactly three 4-digit groups, each pair joined by 1-3 characters from space and every other
+# whitespace (NBSP, narrow NBSP, all Zs), hyphen and Unicode dashes, dot, slash, underscore and
+# invisible format characters (Cf), in any mix, or by a single comma; masked when the 12 digits
+# pass Verhoeff (no keyword rule here: these characters are too common). Over-masking is
+# accepted, under-masking is not. Boundaries: a group is never part of a longer contiguous digit
+# block, and the three groups are not continued by another digit group joined only by dots,
+# slashes, commas or underscores (``1234.5678.9012.3456``), so ``SOS/2026-27/000123``, dates and
+# amounts never match. Windows may overlap (zero-width lookahead); every quantifier is bounded,
+# so the scan is linear in the text length.
+_WIDE_SEP = rf"(?:[\s{_INVISIBLE}\-\u2010-\u2015\u2212\ufe58\ufe63\uff0d._/]{{1,3}}|,)"
+_TIGHT = r"[./,_]"
+AADHAAR_GROUP_SEPARATOR = _WIDE_SEP
+"""Regex fragment for what may join two 4-digit groups (rule 4); other maskers reuse it."""
+_PUNCT_RE = re.compile(
+    rf"(?<!\d)(?<!\d{_TIGHT})(?<!\d{_TIGHT}{{2}})(?<!\d{_TIGHT}{{3}})"
+    rf"(?=(\d{{4}}){_WIDE_SEP}(\d{{4}}){_WIDE_SEP}(\d{{4}})(?!{_TIGHT}{{0,3}}\d))"
+)
 
 
 def _punctuated(view: str) -> list[tuple[int, int, str]]:
-    """``(start, end, digits)`` of every Verhoeff-valid punctuated 12-digit number."""
+    """``(start, end, digits)`` of every Verhoeff-valid grouped 12-digit number (may overlap)."""
     found: list[tuple[int, int, str]] = []
     for m in _PUNCT_RE.finditer(view):
-        digits = "".join(str(unicodedata.digit(c)) for c in m.group(1) + m.group(3) + m.group(4))
+        digits = "".join(str(unicodedata.digit(c)) for c in m.group(1) + m.group(2) + m.group(3))
         if verhoeff_valid(digits):
-            found.append((m.start(), m.end(), digits))
+            found.append((m.start(1), m.end(3), digits))
     return found
 
 
@@ -306,9 +333,17 @@ def _mask_punctuated(text: str) -> tuple[str, bool]:
     found = _punctuated(_scan_view(text))
     if not found:
         return text, False
+    # Overlapping windows (``a.b.c.d`` with two valid windows) merge into one masked region that
+    # keeps the last four digits of its last window.
+    regions: list[tuple[int, int, str]] = []
+    for start, end, digits in sorted(found):
+        if regions and start < regions[-1][1]:
+            regions[-1] = (regions[-1][0], end, digits)
+        else:
+            regions.append((start, end, digits))
     pieces: list[str] = []
     cursor = 0
-    for start, end, digits in found:
+    for start, end, digits in regions:
         pieces.append(text[cursor:start])
         pieces.append(f"XXXX XXXX {digits[-4:]}")
         cursor = end
@@ -469,6 +504,14 @@ def contains_full_aadhaar(text: str) -> bool:
 _COLLAPSE_RE = re.compile(rf"[\s{_INVISIBLE}]+")
 
 
+def contains_grouped_aadhaar(text: str) -> bool:
+    """True if ``text`` holds a Verhoeff-valid number grouped 4-4-4 (rule 4 separators).
+
+    For inputs where unbroken 12-digit numbers are legitimate (bank statement UPI references,
+    ADR-0042 P9) but an Aadhaar number written as printed on the card is not."""
+    return bool(_punctuated(_scan_view(unicodedata.normalize("NFC", text))))
+
+
 def _has_valid_window(text: str) -> bool:
     normalised = _scan_view(text)
     if _punctuated(normalised):
@@ -508,5 +551,10 @@ def find_aadhaar(text: str) -> list[AadhaarMatch]:
         groups = _groups(view, run)
         for i, j, digits, valid in _aadhaar_windows(groups, spans):
             found.append(AadhaarMatch(groups[i].start, groups[j].end, digits, valid))
-    found.extend(AadhaarMatch(s, e, digits, True) for s, e, digits in _punctuated(view))
+    seen = {(m.start, m.end) for m in found}
+    found.extend(
+        AadhaarMatch(s, e, digits, True)
+        for s, e, digits in _punctuated(view)
+        if (s, e) not in seen  # a whitespace-grouped number matches both rules
+    )
     return sorted(found, key=lambda m: (m.start, m.end))

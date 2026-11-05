@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import random
 import re
+import sys
+import time
 import unicodedata
 import uuid
 
@@ -18,6 +20,7 @@ from hypothesis import strategies as st
 from app.core.redaction import (
     AadhaarMatch,
     contains_full_aadhaar,
+    contains_grouped_aadhaar,
     find_aadhaar,
     mask_aadhaar,
     redact,
@@ -550,14 +553,15 @@ def test_DL_hardening_11_punctuated_telugu_digits_are_masked(sep: str) -> None:
 
 
 @pytest.mark.parametrize("sep", PUNCT_SEPARATORS)
-def test_DL_hardening_11_punctuated_needs_verhoeff_and_one_separator(sep: str) -> None:
+def test_DL_hardening_11_punctuated_needs_verhoeff_but_separators_may_mix(sep: str) -> None:
+    """D52 widened the rule: the two separators no longer have to be the same character."""
     invalid = f"Ref {punctuated(INVALID, sep)}"
     assert not contains_full_aadhaar(invalid)
     assert redact(invalid) == invalid
     other = "/" if sep != "/" else "."
     mixed = f"Ref {VALID[:4]}{sep}{VALID[4:8]}{other}{VALID[8:]}"
-    assert not contains_full_aadhaar(mixed)
-    assert redact(mixed) == mixed
+    assert contains_full_aadhaar(mixed)
+    assert redact(mixed) == f"Ref {masked(VALID)}"
 
 
 @pytest.mark.parametrize("sep", PUNCT_SEPARATORS)
@@ -612,3 +616,131 @@ def test_DL_hardening_11_invoice_and_receipt_serials_never_flagged() -> None:
         ):
             assert not contains_full_aadhaar(text), text
             assert redact(text) == text
+
+
+# --- D52: any mix of 1-3 separators between 4-digit groups -----------------------------------
+
+D52_SEPARATORS = [
+    ("{a}.{b}/{c}", "dot then slash"),
+    ("{a} - {b} - {c}", "spaced hyphens"),
+    ("{a}\u00a0\u00a0{b}_{c}", "two no-break spaces then underscore"),
+    ("{a}/ {b} .{c}", "slash-space then space-dot"),
+    ("{a}_{b}_{c}", "underscores"),
+    ("{a}--{b}--{c}", "double hyphens"),
+    ("{a}\u2014\u2014{b}\u2013{c}", "em dashes then en dash"),
+    ("{a}\u202f{b}\u2009/{c}", "narrow no-break space, thin space and slash"),
+    ("{a}\u200b.\u200b{b}\u2060_{c}", "zero-width characters around a dot"),
+    ("{a}\u2212{b}\u2212{c}", "minus signs"),
+    ("{a}._/{b}/._{c}", "three punctuation characters"),
+    ("{a}\u00ad/\u00ad{b}.{c}", "soft hyphens around a slash"),
+]
+
+
+def d52(template: str, number: str) -> str:
+    return template.format(a=number[:4], b=number[4:8], c=number[8:])
+
+
+@pytest.mark.parametrize(("template", "label"), D52_SEPARATORS)
+def test_PRV_015_D52_grouped_number_with_mixed_separators_is_masked(
+    template: str, label: str
+) -> None:
+    """Invariant 4 / lead decision D52: 4-4-4 groups joined by 1-3 characters from whitespace
+    (incl. NBSP and other Zs), dashes, dot, slash, underscore and Cf, in any mix, pass the
+    Verhoeff check -> refused, masked, located."""
+    number = d52(template, VALID)
+    text = f"Guardian ID {number} on file."
+    assert contains_full_aadhaar(text), label
+    assert contains_grouped_aadhaar(text), label
+    assert mask_aadhaar(text) == f"Guardian ID {masked(VALID)} on file.", label
+    assert redact(text) == f"Guardian ID {masked(VALID)} on file.", label
+    assert masked(VALID) in redact_log(text), label
+    assert redact(redact(text)) == redact(text), label
+    matches = find_aadhaar(text)
+    assert matches, label
+    start = text.index(number)
+    assert (min(m.start for m in matches), max(m.end for m in matches)) == (
+        start,
+        start + len(number),
+    ), label
+    assert all(m.digits == VALID and m.verhoeff for m in matches), label
+
+
+@pytest.mark.parametrize(("template", "label"), D52_SEPARATORS)
+def test_PRV_015_D52_non_verhoeff_number_with_mixed_separators_stays(
+    template: str, label: str
+) -> None:
+    text = f"Ref {d52(template, INVALID)} end"
+    assert not contains_full_aadhaar(text), label
+    assert not contains_grouped_aadhaar(text), label
+    assert mask_aadhaar(text) == text, label
+    assert redact(text) == text, label
+    assert find_aadhaar(text) == [], label
+
+
+def test_PRV_015_D52_brief_examples() -> None:
+    for template in ("{a}.{b}/{c}", "{a} - {b} - {c}", "{a}\u00a0\u00a0{b}_{c}", "{a}/ {b} .{c}"):
+        assert mask_aadhaar(d52(template, VALID)) == masked(VALID), ascii(template)
+        assert mask_aadhaar(d52(template, INVALID)) == d52(template, INVALID), ascii(template)
+    assert mask_aadhaar(VALID) == masked(VALID)
+    assert mask_aadhaar(INVALID) == INVALID
+
+
+def test_PRV_015_D52_four_separator_characters_are_not_a_group_join() -> None:
+    """The rule is 1 to 3 characters; a wider gap of punctuation is not joined (whitespace runs
+    are still collapsed by the input check, rule DL-01)."""
+    text = f"Ref {VALID[:4]}._/.{VALID[4:8]}._/.{VALID[8:]}"
+    assert not contains_full_aadhaar(text)
+    assert mask_aadhaar(text) == text
+
+
+def test_PRV_015_D52_every_format_character_is_a_gap() -> None:
+    """Every Unicode Cf character known to this interpreter joins groups (no invisible gap)."""
+    cf = [chr(c) for c in range(sys.maxunicode + 1) if unicodedata.category(chr(c)) == "Cf"]
+    assert cf
+    text = "".join(f"{VALID[:4]}{mark}{VALID[4:8]}{mark}{VALID[8:]} " for mark in cf)
+    assert mask_aadhaar(text).count(masked(VALID)) == len(cf)
+
+
+def test_PRV_015_D52_longer_digit_blocks_keep_their_boundaries() -> None:
+    """Digits inside a 13+ digit block are not a group; existing semantics are kept."""
+    for text in (
+        f"No 9{d52('{a}.{b}/{c}', VALID)}",
+        f"No {d52('{a}.{b}/{c}', VALID)}9",
+        f"No {d52('{a}_{b}_{c}', VALID)}_1234",
+        f"No 1234/{d52('{a}/{b}/{c}', VALID)}",
+    ):
+        assert not contains_full_aadhaar(text), text
+        assert mask_aadhaar(text) == text, text
+
+
+def test_PRV_015_D52_overlapping_windows_merge() -> None:
+    """``a - b_c - d`` where ``b c d`` is also Verhoeff-valid: both windows are masked as one
+    region keeping only the last four digits."""
+    extra = next(f"{n:04d}" for n in range(10000) if verhoeff_valid(VALID[4:] + f"{n:04d}"))
+    text = f"Ref {VALID[:4]} - {VALID[4:8]}_{VALID[8:]} - {extra} end"
+    out = mask_aadhaar(text)
+    assert out == f"Ref XXXX XXXX {extra} end"
+    assert contains_grouped_aadhaar(text)
+    assert len(find_aadhaar(text)) == 2
+
+
+ADVERSARIAL = {
+    "dot-joined groups": "1234." * 20000,
+    "spaced hyphens": "1234 -" * 20000,
+    "punctuation and zero-width": "1234._/\u200b" * 15000,
+    "one long digit block": "1" * 100000,
+    "huge gap": "1234" + " " * 100000 + "5678",
+    "five-digit groups": "12345." * 10000 + "x",
+    "four no-break spaces": "1234\u00a0\u00a0\u00a0\u00a0" * 15000,
+}
+
+
+@pytest.mark.parametrize("name", sorted(ADVERSARIAL))
+def test_PRV_015_D52_adversarial_input_is_scanned_in_linear_time(name: str) -> None:
+    """No catastrophic backtracking: every quantifier is bounded."""
+    adversarial = ADVERSARIAL[name]
+    started = time.perf_counter()
+    mask_aadhaar(adversarial)
+    contains_full_aadhaar(adversarial)
+    redact(adversarial)
+    assert time.perf_counter() - started < 5.0
