@@ -21,9 +21,17 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
 
 from app.core import db as core_db
-from app.core.config import DeploymentMode, Environment, KeyWrapperKind, Settings
+from app.core.config import (
+    DeploymentMode,
+    EmailProviderKind,
+    Environment,
+    KeyWrapperKind,
+    Settings,
+)
 from app.core.crypto import LocalDevKeyWrapper
 from app.core.db import context_free_session
+from app.notifications import email
+from app.notifications import service as notifications
 from app.platform import provision_dedicated as cli
 from app.platform import service as platform_service
 from app.tenancy import service as tenancy
@@ -275,3 +283,34 @@ def test_FR_PLT_003_one_school_per_host(host: Host) -> None:
     assert result.code == cli.EXIT_REFUSED
     assert result.stderr == "refused: host_has_other_tenant\n"
     assert host.scalar("SELECT count(*) FROM core.tenants") == 1
+
+
+def test_FR_PLT_002_dedicated_owner_invite_is_emailed_once(
+    host: Host, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D62: the dedicated host's owner invite goes by email like the shared tier's, once, even
+    when the command is run again (the school-chain event and its email request are written
+    together, exactly once)."""
+    on = Settings(
+        email_provider=EmailProviderKind.FAKE,
+        email_from="SchoolOS <no-reply@example.test>",
+        email_app_url="https://app.example.test",
+    )
+    monkeypatch.setattr(notifications, "get_settings", lambda: on)
+    monkeypatch.setattr(email, "get_settings", lambda: on)
+    tid = uuid.uuid4()
+    settings = host_settings(tid)
+    assert run(argv(tid), settings).code == cli.EXIT_OK
+    assert run(argv(tid), settings).code == cli.EXIT_OK
+    owner = host.scalar("SELECT user_id FROM core.memberships WHERE tenant_id = :t", t=tid)
+    payloads = host.column(
+        "SELECT payload FROM ops.outbox WHERE tenant_id = :t AND event_type = :e",
+        t=tid,
+        e=notifications.EMAIL_EVENT,
+    )
+    assert [(p["user_id"], p["template_key"]) for p in payloads] == [
+        (str(owner), notifications.INVITATION_TEMPLATE)
+    ]
+    chain = host.column("SELECT action FROM audit.events WHERE tenant_id = :t ORDER BY seq", t=tid)
+    assert chain.count("tenant.owner_invited") == 1
+    assert chain.count("notification.email_requested") == 1

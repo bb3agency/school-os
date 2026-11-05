@@ -17,9 +17,11 @@ migration ``0020_provisioning_runs``)::
    such as system roles) in the school's own session. Idempotent: an existing key is kept, the
    hooks are idempotent and serialised per school. The run becomes ``initialised``.
 3. **Invite and finish** (one platform transaction): ``core.create_owner_invite``, platform event
-   ``tenant.owner_invite_created``, ``tenant.provisioned`` queued for the school's own chain
-   (``platform.tenant_audit.enqueue``, ADR-0020) and the run ``completed`` with the owner
-   parameters cleared. All or nothing, so the school-chain event is queued exactly once.
+   ``tenant.owner_invite_created``, ``tenant.owner_invited`` and ``tenant.provisioned`` queued
+   for the school's own chain (``platform.tenant_audit.enqueue``, ADR-0020) and the run
+   ``completed`` with the owner parameters cleared. All or nothing, so the school-chain events
+   are queued exactly once. Delivering ``tenant.owner_invited`` into the school's chain queues
+   the owner's invitation email tenant-side, in that same school transaction (D62).
 
 Idempotency and retries:
 
@@ -449,6 +451,14 @@ def _invite_and_finish(
                 row["membership_id"],
                 {"owner_role_assigned": bool(row["owner_role_assigned"])},
                 tenant_id=tenant_id,
+            )
+            tenant_audit.enqueue_owner_invited(
+                s,
+                tenant_id,
+                actor,
+                user_id=row["user_id"],
+                membership_id=row["membership_id"],
+                owner_role_assigned=bool(row["owner_role_assigned"]),
             )
             tenant_audit.enqueue(
                 s,

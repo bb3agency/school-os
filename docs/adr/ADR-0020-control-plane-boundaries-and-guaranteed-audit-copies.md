@@ -155,3 +155,21 @@ before `set_school_flag_override` / `clear_school_flag_override` write `platform
 `list_tenant_ids` was already in `TENANCY_ALLOWED` (`apps/api/tests/platform/test_boundaries.py`);
 no new tenant access, `tenant_session` or tenant relation in SQL.
 
+## Amendments (2026-11-05)
+
+Implementation facts only; the decision stands.
+
+**B6 · Tenant-side reactions to school-chain copies (lead decision D62).** The owner's invitation
+email at provisioning must be queued tenant-side, exactly once, without the control plane
+reading the owner's address. `platform.tenant_audit` now runs the hooks registered for a copy's
+action (`app.audit.service.on_platform_event`, a registry in the shared `audit` module because
+tenant-side modules may not import `app.platform`) in the same `tenant_session` transaction that
+writes the copy, so a reaction happens exactly when the copy is written, once. New school-chain
+events `tenant.owner_invited` (shared and dedicated provisioning, in the invite's platform
+transaction) and `tenant.owner_invite_resent` (`owner-invite:resend`) carry IDs only; their hooks
+in `app.notifications.service` queue the ordinary invitation email. Both are fail-closed hooked
+actions (`HOOKED_ACTIONS`): a process without the hook leaves them undelivered (`hook_missing`).
+`app.platform.provision_dedicated` imports `app.notifications.service` for its side effect only
+(hook registration, like its existing `app.identity.service` import); pinned in
+`apps/api/tests/platform/test_boundaries.py` (`TENANT_SIDE_IMPORTS`). No new `tenant_session`
+file, tenant relation in SQL or `tenancy` call.

@@ -25,6 +25,14 @@ and ``sos_app`` connections, so the copy goes through a transactional outbox:
    the others), and the deliverer only ever claims undelivered rows, so a purge can never cause
    a redelivery or a duplicate in a school chain.
 
+5. Tenant-side reactions (lead decision D62): after writing a copy, the deliverer runs the hooks
+   registered for its action (``audit.on_platform_event``) in the same tenant transaction, so
+   they happen exactly once with the copy. ``tenant.owner_invited`` (the school owner's invite at
+   provisioning) queues the owner's invitation email this way, and ``tenant.owner_invite_resent``
+   (an operator's re-send) queues it again. Actions in :data:`HOOKED_ACTIONS`
+   fail closed: a process without their hook leaves the copy undelivered (``hook_missing``) for
+   one that has it (the worker), instead of delivering it without its reaction.
+
 Payloads are IDs, codes and counts only (never names, emails or free text). The control plane
 reads nothing from the school except whether that one event already exists.
 """
@@ -71,6 +79,19 @@ _EXISTING_SQL = text(
 )
 _LOCK_SQL = text("SELECT pg_catalog.pg_advisory_xact_lock(:k)")
 
+OWNER_INVITED: Final = "tenant.owner_invited"
+"""School-chain event for the owner's invite at provisioning (resource: the owner's user ID;
+summary: ``membership_id``, ``owner_role_assigned``). Its hook queues the invitation email."""
+OWNER_INVITE_RESENT: Final = "tenant.owner_invite_resent"
+"""School-chain event for an operator's ``owner-invite:resend`` (resource: the school; no
+summary). Its hook emails the school's invited owner again (staff invitation cool-down)."""
+HOOKED_ACTIONS: Final = frozenset({OWNER_INVITED, OWNER_INVITE_RESENT})
+"""Actions that must not be delivered by a process without their tenant-side hook."""
+
+
+class HookMissing(RuntimeError):
+    """This process has no hook for an action in :data:`HOOKED_ACTIONS`; another will deliver."""
+
 
 def enqueue(
     session: Session,
@@ -114,6 +135,29 @@ def enqueue(
     return event_id
 
 
+def enqueue_owner_invited(
+    session: Session,
+    tenant_id: uuid.UUID,
+    actor: Actor,
+    *,
+    user_id: uuid.UUID,
+    membership_id: uuid.UUID,
+    owner_role_assigned: bool,
+) -> uuid.UUID:
+    """Queue :data:`OWNER_INVITED` in the platform transaction that created the owner's invite
+    (shared and dedicated provisioning). IDs and a flag only: the address is read tenant-side
+    when the email is sent."""
+    return enqueue(
+        session,
+        tenant_id,
+        actor,
+        OWNER_INVITED,
+        {"membership_id": str(membership_id), "owner_role_assigned": owner_role_assigned},
+        resource_type="user",
+        resource_id=user_id,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class DeliveryResult:
     delivered: int = 0
@@ -128,6 +172,9 @@ def _lock_key(event_id: uuid.UUID) -> int:
 def _copy_into_school_chain(row: RowMapping) -> bool:
     """Write the event into the school's chain unless it is already there. True = written."""
     event_id: uuid.UUID = row["id"]
+    hooks = audit.platform_event_hooks(row["action"])
+    if row["action"] in HOOKED_ACTIONS and not hooks:
+        raise HookMissing(row["action"])
     with tenant_session(row["tenant_id"]) as ts:
         ts.execute(_LOCK_SQL, {"k": _lock_key(event_id)})
         found = ts.execute(
@@ -151,10 +198,14 @@ def _copy_into_school_chain(row: RowMapping) -> bool:
             actor_id=row["actor_id"],
             request_id=row["request_id"],
         )
+        for hook in hooks:
+            hook(ts, row["tenant_id"], row["resource_id"], dict(row["summary"]))
     return True
 
 
 def _error_code(exc: Exception) -> str:
+    if isinstance(exc, HookMissing):
+        return "hook_missing"
     if isinstance(exc, SummaryError | ValidationError):
         return "summary_rejected"
     if isinstance(exc, audit.AuditContextError):

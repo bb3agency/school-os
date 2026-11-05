@@ -545,5 +545,9 @@ def resend_owner_invite(actor: Actor, tenant_id: uuid.UUID) -> None:
         audit_platform(
             s, actor, "tenant.owner_invite_sent", "tenant", tenant_id, {}, tenant_id=tenant_id
         )
-    # Delivery (email via the notifications module) is not built yet; the event is the record.
+        # D62: the school side sends the email (to the school's invited owner, with the staff
+        # invitation cool-down) when this event reaches the school's chain; the control plane
+        # never reads the owner's address.
+        tenant_audit.enqueue(s, tenant_id, actor, tenant_audit.OWNER_INVITE_RESENT, {})
+    tenant_audit.deliver_now(tenant_id)
     log.info("platform.owner_invite.resend", tenant_id=str(tenant_id), outcome="queued")

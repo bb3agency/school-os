@@ -31,10 +31,14 @@ from app.audit.schemas import (
 from app.core.ids import new_id
 
 __all__ = [
+    "PLATFORM_EVENT_HOOKS",
     "AuditContextError",
     "AuditEvent",
     "PlatformAuditEvent",
+    "PlatformEventHook",
     "VerifyResult",
+    "on_platform_event",
+    "platform_event_hooks",
     "record",
     "record_platform",
     "verify_chain",
@@ -45,6 +49,27 @@ __all__ = [
 
 class AuditContextError(RuntimeError):
     """``record``/``verify_chain`` was called outside a matching ``tenant_session``."""
+
+
+PlatformEventHook = Callable[[Session, uuid.UUID, uuid.UUID | None, Mapping[str, Any]], None]
+PLATFORM_EVENT_HOOKS: dict[str, list[PlatformEventHook]] = {}
+"""Tenant-side reactions to a control-plane event copied into a school's chain (ADR-0020;
+lead decision D62). ``hook(session, tenant_id, resource_id, summary)`` runs in the school's own
+``tenant_session``, in the same transaction that writes the copy, exactly once per event (the
+deliverer, ``platform.tenant_audit``, never writes a copy twice). Hooks register by action from
+tenant-side modules (which may not import ``app.platform``); see :func:`on_platform_event`."""
+
+
+def on_platform_event(action: str, hook: PlatformEventHook) -> None:
+    """Register ``hook`` for the school-chain copy of platform event ``action`` (idempotent)."""
+    hooks = PLATFORM_EVENT_HOOKS.setdefault(action, [])
+    if hook not in hooks:
+        hooks.append(hook)
+
+
+def platform_event_hooks(action: str) -> tuple[PlatformEventHook, ...]:
+    """The hooks registered in this process for ``action`` (empty when none)."""
+    return tuple(PLATFORM_EVENT_HOOKS.get(action, ()))
 
 
 def _now() -> datetime:

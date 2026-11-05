@@ -18,7 +18,11 @@ Email (``app.notifications.email``; off unless ``SOS_EMAIL_PROVIDER`` is set):
 transaction and audits ``notification.email_requested``; the worker task
 ``notifications.send_email`` (:func:`send_requested_email`) resolves the address, language and
 template values and sends after commit. Staff invitation emails are queued when a person is
-invited (``identity.INVITED_HOOKS``) and on request (:func:`resend_invitation_email`).
+invited (``identity.INVITED_HOOKS``) and on request (:func:`resend_invitation_email`). The
+school owner's invitation at provisioning (FR-PLT-002, D62) is queued the same way when the
+control plane's school-chain event ``tenant.owner_invited`` is written into the school's chain
+(``audit.on_platform_event``; exactly once, in that tenant transaction): the control plane never
+reads the owner's address.
 """
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
-from app.audit.schemas import SummaryError, sanitize_summary
+from app.audit.schemas import ActorType, SummaryError, sanitize_summary
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.kv import KVUnavailable, kv_store
@@ -59,6 +63,12 @@ _USER_PAGE = 200
 EMAIL_EVENT: Final = "notification.email.requested"
 EMAIL_TASK: Final = "notifications.send_email"
 INVITATION_TEMPLATE: Final = "invitation.staff"
+OWNER_INVITED_EVENT: Final = "tenant.owner_invited"
+"""School-chain copy of the control plane's owner invite (``platform.tenant_audit.OWNER_INVITED``;
+tenant-side modules may not import ``app.platform``, a test keeps the two equal)."""
+OWNER_INVITE_RESENT_EVENT: Final = "tenant.owner_invite_resent"
+"""School-chain copy of an operator's owner-invite re-send (``platform.tenant_audit``)."""
+_OWNER_ROLE: Final = "owner"
 ops.register_outbox_route(EMAIL_EVENT, EMAIL_TASK)
 _DATE_FORMATS: Final = {
     "DD/MM/YYYY": "%d/%m/%Y",
@@ -254,13 +264,15 @@ def request_email(
     user_id: uuid.UUID,
     template_key: str,
     via: str,
+    actor_type: ActorType = "user",
 ) -> bool:
     """Queue one email to a member of the current school, sent by the worker after commit.
 
     Returns False (nothing queued or audited) when email is off. The outbox payload and the
     audit event ``notification.email_requested`` carry IDs and codes only; the address, the
     language and the template values are read by the worker when it sends. ``via`` says what
-    asked for it (a code, e.g. ``invite`` or ``resend``).
+    asked for it (a code, e.g. ``invite``, ``resend`` or ``owner_invite``). ``actor_type`` is
+    ``system`` when no signed-in person asked (the owner invite at provisioning).
     """
     if template_key not in email.email_catalog():
         raise templates.TemplateError(f"unknown email template {template_key!r}")
@@ -280,6 +292,7 @@ def request_email(
         resource_type="user",
         resource_id=user_id,
         summary={"message_id": message_id, "template_key": template_key, "via": via},
+        actor_type=actor_type,
         request_id=_request_id(),
     )
     log.info("notifications.email.requested", action=template_key, resource_id=message_id)
@@ -315,7 +328,14 @@ def _invitation_problem(user: UserOut, now: dt.datetime) -> str | None:
     return None
 
 
-def queue_invitation_email(session: Session, tenant_id: uuid.UUID, user_id: uuid.UUID) -> None:
+def queue_invitation_email(
+    session: Session,
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    *,
+    via: str = "invite",
+    actor_type: ActorType = "user",
+) -> None:
     """``identity.INVITED_HOOKS``: email a newly invited person who has an address."""
     if not get_settings().email_enabled:
         return
@@ -328,8 +348,24 @@ def queue_invitation_email(session: Session, tenant_id: uuid.UUID, user_id: uuid
         tenant_id=tenant_id,
         user_id=user_id,
         template_key=INVITATION_TEMPLATE,
-        via="invite",
+        via=via,
+        actor_type=actor_type,
     )
+
+
+def queue_owner_invitation_email(
+    session: Session,
+    tenant_id: uuid.UUID,
+    resource_id: uuid.UUID | None,
+    _summary: Mapping[str, Any],
+) -> None:
+    """``audit.on_platform_event("tenant.owner_invited")`` (FR-PLT-002, D62): queue the school
+    owner's invitation email in the tenant transaction that copies the control plane's owner
+    invite into the school's chain (once per invite). ``resource_id`` is the owner's user ID."""
+    if resource_id is None:
+        log.warning("notifications.email.owner_invite_without_user", outcome="skipped")
+        return
+    queue_invitation_email(session, tenant_id, resource_id, via="owner_invite", actor_type="system")
 
 
 _INVITATION_PROBLEMS: Final = {
@@ -432,9 +468,49 @@ def send_requested_email(
     return "sent"
 
 
+def _invited_owners(session: Session) -> list[UserOut]:
+    out: list[UserOut] = []
+    after: uuid.UUID | None = None
+    while True:
+        users, after = identity.list_users(session, limit=_USER_PAGE, after=after)
+        out.extend(u for u in users if u.status == "invited" and _OWNER_ROLE in u.roles)
+        if after is None:
+            return out
+
+
+def queue_owner_invitation_resend(
+    session: Session,
+    tenant_id: uuid.UUID,
+    _resource_id: uuid.UUID | None,
+    _summary: Mapping[str, Any],
+) -> None:
+    """``audit.on_platform_event("tenant.owner_invite_resent")`` (FR-PLT-002, D62): an operator
+    asked to send the owner's invitation again. Emails this school's invited owner(s) unless one
+    was sent within the staff invitation cool-down (then skipped, logged as ``cooldown``)."""
+    if not get_settings().email_enabled:
+        return
+    moment = dt.datetime.now(dt.UTC)
+    for user in _invited_owners(session):
+        if _invitation_problem(user, moment) is not None:
+            continue
+        if not _cooldown(user.membership_id):
+            log.info("notifications.email.skipped", action=INVITATION_TEMPLATE, outcome="cooldown")
+            continue
+        request_email(
+            session,
+            tenant_id=tenant_id,
+            user_id=user.id,
+            template_key=INVITATION_TEMPLATE,
+            via="owner_resend",
+            actor_type="system",
+        )
+
+
 def _register_hooks() -> None:
     if queue_invitation_email not in identity.INVITED_HOOKS:
         identity.INVITED_HOOKS.append(queue_invitation_email)
+    audit.on_platform_event(OWNER_INVITED_EVENT, queue_owner_invitation_email)
+    audit.on_platform_event(OWNER_INVITE_RESENT_EVENT, queue_owner_invitation_resend)
 
 
 _register_hooks()
@@ -444,6 +520,8 @@ __all__ = [
     "EMAIL_EVENT",
     "EMAIL_TASK",
     "INVITATION_TEMPLATE",
+    "OWNER_INVITED_EVENT",
+    "OWNER_INVITE_RESENT_EVENT",
     "READ_RETENTION_CATEGORY",
     "PermissionSelector",
     "Recipients",
@@ -456,6 +534,8 @@ __all__ = [
     "purge_read",
     "purge_tenant_data",
     "queue_invitation_email",
+    "queue_owner_invitation_email",
+    "queue_owner_invitation_resend",
     "request_email",
     "resend_invitation_email",
     "send_requested_email",
