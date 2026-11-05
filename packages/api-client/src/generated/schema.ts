@@ -4612,7 +4612,8 @@ export interface paths {
          * Add Action
          * @description Record what was done about a flag (``insights.act``): talked with the student, called or
          *     met a parent, home visit, remedial support, referral, other; optional note. The first
-         *     action marks the flag actioned. 409 ``flag_closed``.
+         *     action marks the flag actioned. 409 ``flag_closed``. Accepts ``Idempotency-Key`` (D56):
+         *     a replay answers the flag as it stands now and records no second action.
          */
         post: operations["add_action_api_v1_insights_flags__flag_id__actions_post"];
         delete?: never;
@@ -6567,8 +6568,9 @@ export interface paths {
         put?: never;
         /**
          * Record Incident Reopen Told
-         * @description Record that a dedicated-host school was told of reopen ``reopen_seq`` by phone or e-mail
-         *     (it has no pull; D49). The note follows the summary rule (422 otherwise). ``409
+         * @description Record that a dedicated-host school was told of reopen ``reopen_seq`` (it has no pull;
+         *     D49). ``channel``: ``phone``, ``email`` or ``in_person``; no free-text note (D56; an extra
+         *     ``note`` field answers 422). ``409
          *     school_pulls`` (shared tier), ``reopen_not_pending`` or ``reopen_changed``.
          */
         post: operations["record_incident_reopen_told_api_v1_platform_incidents__incident_id__reopen_told_post"];
@@ -7585,6 +7587,30 @@ export interface paths {
          *     usage collector. Alert only: nothing is switched off. Counts only.
          */
         get: operations["ai_quota_alerts_api_v1_platform_usage_ai_quota_alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/usage/limit-alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Plan Limit Alerts
+         * @description Plan-limit crossings (80 % / 100 % of a plan limit) in each school's current billing
+         *     period (``period=previous``: the one before), newest first: school, metric, threshold, the
+         *     value counted, the limit and when it was recorded (docs/16 §5.10, D57; FR-PLT-021).
+         *     Recorded once per school, metric, threshold and period by the usage collector. Limits never
+         *     block school work. Counts only; reading is not audited.
+         */
+        get: operations["plan_limit_alerts_api_v1_platform_usage_limit_alerts_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -12894,6 +12920,23 @@ export interface components {
             /** Sort Order */
             sort_order: number;
         };
+        /** ClassDuesOut */
+        ClassDuesOut: {
+            /**
+             * Class Id
+             * @description Null for students with no current class or one the caller cannot see.
+             */
+            class_id: string | null;
+            /** Class Name */
+            class_name: string | null;
+            /** Students With Dues */
+            students_with_dues: number;
+            /**
+             * Total Due
+             * @description Each ledger once: a ledger shared by children of this class counts once (D54).
+             */
+            total_due: string;
+        };
         /** ClassOut */
         ClassOut: {
             /**
@@ -13524,6 +13567,13 @@ export interface components {
             past_due_amount_inr?: string | null;
             /** Past Due Count */
             past_due_count?: number | null;
+            /**
+             * Plan Limit Alerts
+             * @description Schools whose plan-limit crossings this billing period reached 80 or 100 % at their highest, keyed by that threshold ('80', '100'); only for holders of platform.usage.read (docs/16 §5.10, D57). Limits never block school work.
+             */
+            plan_limit_alerts?: {
+                [key: string]: number;
+            } | null;
             /** Schools By Status */
             schools_by_status?: {
                 [key: string]: number;
@@ -14253,9 +14303,17 @@ export interface components {
         DuesTotals: {
             /** As Of */
             as_of: string | null;
+            /**
+             * Classes
+             * @description Totals per class, in class order. A ledger shared across two classes counts once in each, and once in the school total (D54).
+             */
+            classes: components["schemas"]["ClassDuesOut"][];
             /** Students With Dues */
             students_with_dues: number;
-            /** Total Due */
+            /**
+             * Total Due
+             * @description Each ledger once (D54): a family ledger linked to several children counts once, so this is not the sum of the students' totals nor of the class totals.
+             */
             total_due: string;
             /** Unlinked Due */
             unlinked_due: string;
@@ -16062,13 +16120,17 @@ export interface components {
         };
         /**
          * IncidentReopenToldIn
-         * @description A dedicated-host school was told of reopen ``reopen_seq`` by phone or e-mail (it has no
-         *     pull; D49). ``note``: how it was told, in the summary's rule (no names, long numbers,
-         *     e-mail addresses or Aadhaar numbers).
+         * @description A dedicated-host school was told of reopen ``reopen_seq`` (it has no pull; D49).
+         *     ``channel``: how it was told (D56: a fixed choice, no free-text note; ``note`` is refused
+         *     with 422 like any unknown field).
          */
         IncidentReopenToldIn: {
-            /** Note */
-            note: string;
+            /**
+             * Channel
+             * @description How the school was told: phone, email, in_person.
+             * @enum {string}
+             */
+            channel: "phone" | "email" | "in_person";
             /**
              * Reopen Seq
              * @description The incident's reopen count the school was told of.
@@ -19207,6 +19269,42 @@ export interface components {
              * @default 30
              */
             trial_days: number;
+        };
+        /**
+         * PlanLimitAlertOut
+         * @description A school crossed 80 % or 100 % of one of its plan's limits in a billing period (docs/16
+         *     §5.10, §19 Q16; FR-PLT-021, D57). Counts only: the metric code, the value counted when the
+         *     crossing was recorded and the plan's limit; never a record or a person. Recorded once per
+         *     school, metric, threshold and billing period by the usage collector. Limits never block
+         *     school work: nothing is switched off at 100 %.
+         */
+        PlanLimitAlertOut: {
+            /**
+             * Crossed At
+             * Format: date-time
+             */
+            crossed_at: string;
+            /** Limit Value */
+            limit_value: string;
+            /** Metric */
+            metric: string;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /**
+             * Threshold
+             * @enum {integer}
+             */
+            threshold: 80 | 100;
+            /** Usage Value */
+            usage_value: string;
         };
         /** PlanLimits */
         PlanLimits: {
@@ -23005,11 +23103,24 @@ export interface components {
             /** Ledgers */
             ledgers: number;
             /**
+             * Shared Ledger
+             * @description At least one of this student's ledgers is also linked to another student (a family ledger shared by siblings; D54).
+             */
+            shared_ledger: boolean;
+            /**
+             * Shared With
+             * @description How many other students share one of this student's ledgers (0 if none).
+             */
+            shared_with: number;
+            /**
              * Student Id
              * Format: uuid
              */
             student_id: string;
-            /** Total Due */
+            /**
+             * Total Due
+             * @description Sum of this student's linked ledgers, a shared (family) ledger included in full (D54).
+             */
             total_due: string;
         };
         /**
@@ -43268,6 +43379,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiQuotaAlertOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    plan_limit_alerts_api_v1_platform_usage_limit_alerts_get: {
+        parameters: {
+            query?: {
+                period?: "current" | "previous";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanLimitAlertOut"][];
                 };
             };
             /** @description Validation Error */
