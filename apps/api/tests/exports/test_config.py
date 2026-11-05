@@ -89,3 +89,25 @@ def test_FR_EXP_001_bad_configs_are_rejected() -> None:
     raw["download_url_ttl_s"] = 3600
     with pytest.raises(ValidationError):
         parse_config(raw)
+
+
+def test_FR_EXP_008_bad_code_maps_are_rejected() -> None:
+    raw = _raw()
+    raw["profiles"]["bseap-ssc-2027"]["value_maps"]["category"] = {"general": "OC"}
+    with pytest.raises(ValidationError, match="both value_maps and coded_values"):
+        parse_config(raw)
+    raw = _raw()
+    raw["profiles"]["bseap-ssc-2027"]["coded_values"]["category"]["no_code"] = ["obc", "sc"]
+    with pytest.raises(ValidationError, match="both coded and without a code"):
+        parse_config(raw)
+    raw = _raw()
+    raw["profiles"]["bseap-ssc-2027"]["coded_values"]["religion_code"] = {
+        "version": 1,
+        "codes": {"x": "X"},
+    }
+    with pytest.raises(ValidationError, match="coded_values for fields not in the layout"):
+        parse_config(raw)
+    raw = _raw()
+    raw["profiles"]["udise-plus"]["omitted"]["full_name"] = "no"
+    with pytest.raises(ValidationError, match="both in the layout and omitted"):
+        parse_config(raw)

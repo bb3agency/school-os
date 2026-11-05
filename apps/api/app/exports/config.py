@@ -68,8 +68,15 @@ REQUIRED_LABELS: Final = frozenset(
         "severity_low",
         "severity_info",
         "page",
+        "code_missing",
+        "code_unmapped",
+        "code_route",
     }
 )
+# Columns of a pre-check sheet or the student list that come from the student's placement in
+# the current academic year, not from an attribute.
+STRUCTURE_COLUMNS: Final = frozenset({"class", "section", "roll_no"})
+Severity = Literal["blocker", "high", "medium", "low", "info"]
 
 
 class _Model(BaseModel):
@@ -91,6 +98,32 @@ def _check_date_format(value: str) -> str:
     return value
 
 
+class CodedValues(_Model):
+    """An explicit, versioned map from SchoolOS values to the board's own codes (FR-EXP-008).
+
+    Unlike ``value_maps`` (where a value without an entry is written as it is), a value without
+    a code is never guessed: the cell stays empty and the pre-check lists a finding (rule
+    ``EXP-002``; ``EXP-001`` when no value is recorded). ``no_code`` names the SchoolOS values
+    that deliberately have no code, so every allowed value of the attribute is accounted for
+    (tests/exports/test_completeness.py). ``verified: false`` until a school confirms the codes
+    against the board's current format (owner decision D3)."""
+
+    version: int = Field(ge=1)
+    verified: bool = False
+    severity: Severity = "high"
+    codes: dict[str, str] = Field(min_length=1)
+    no_code: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _disjoint(self) -> CodedValues:
+        both = set(self.codes) & set(self.no_code)
+        if both:
+            raise ValueError(f"values both coded and without a code: {sorted(both)}")
+        if any(not code.strip() for code in self.codes.values()):
+            raise ValueError("codes must not be empty")
+        return self
+
+
 class ProfileLayout(_Model):
     kind: LayoutKind
     layout_version: int = Field(ge=1)
@@ -98,8 +131,14 @@ class ProfileLayout(_Model):
     # confirms the board's or portal's own template.
     verified: bool = False
     date_format: str
+    # Attribute keys (canonical values) or structure columns (class, section, roll_no).
     fields: tuple[str, ...] = Field(min_length=1, max_length=60)
     value_maps: dict[str, dict[str, str]] = Field(default_factory=dict)
+    coded_values: dict[str, CodedValues] = Field(default_factory=dict)
+    # Fields the board's or portal's form asks for (the DQ profile's board_fields or
+    # portal_fields) that SchoolOS holds but deliberately leaves out of this sheet, with the
+    # reason (tests/exports/test_completeness.py).
+    omitted: dict[str, str] = Field(default_factory=dict)
 
     _date = field_validator("date_format")(_check_date_format)
 
@@ -115,6 +154,18 @@ class ProfileLayout(_Model):
         unknown = set(self.value_maps) - set(self.fields)
         if unknown:
             raise ValueError(f"value_maps for fields not in the layout: {sorted(unknown)}")
+        unknown = set(self.coded_values) - set(self.fields)
+        if unknown:
+            raise ValueError(f"coded_values for fields not in the layout: {sorted(unknown)}")
+        both = set(self.coded_values) & set(self.value_maps)
+        if both:
+            raise ValueError(f"fields with both value_maps and coded_values: {sorted(both)}")
+        structure = (set(self.coded_values) | set(self.value_maps)) & STRUCTURE_COLUMNS
+        if structure:
+            raise ValueError(f"structure columns cannot be mapped: {sorted(structure)}")
+        listed = set(self.omitted) & set(self.fields)
+        if listed:
+            raise ValueError(f"fields both in the layout and omitted: {sorted(listed)}")
         return self
 
 
@@ -191,7 +242,9 @@ def load_config() -> ExportsConfig:
 
 
 __all__ = [
+    "STRUCTURE_COLUMNS",
     "Bilingual",
+    "CodedValues",
     "ExportsConfig",
     "Language",
     "LayoutKind",

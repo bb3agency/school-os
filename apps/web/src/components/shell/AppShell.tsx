@@ -462,14 +462,19 @@ export function AppShell({
                             {crumbs.item.label}
                           </span>
                         ) : (
+                          // WCAG 2.5.8: at least a 24×24 target (44px on touch), also on a
+                          // tablet where the label is cut to one line and in Telugu, whose
+                          // taller glyphs need the room; the label truncates inside the link.
                           <Link
                             href={crumbs.item.href}
                             className={cn(
-                              "rounded-sm font-semibold underline-offset-4 hover:underline",
+                              "inline-flex min-h-6 min-w-6 max-w-full items-center rounded-sm font-semibold underline-offset-4 hover:underline pointer-coarse:min-h-11",
                               theme === "platform" ? "text-platform-ink" : "text-accent",
                             )}
                           >
-                            {crumbs.item.label}
+                            <span className="min-w-0 max-lg:truncate lg:break-anywhere">
+                              {crumbs.item.label}
+                            </span>
                           </Link>
                         )}
                       </li>

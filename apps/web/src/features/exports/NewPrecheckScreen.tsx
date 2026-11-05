@@ -37,6 +37,7 @@ import {
   PROFILE_KEY_PATTERN,
   PROFILE_PERMISSION,
   RESTRICTED_CLASSIFICATION,
+  isStructureColumn,
   type Export,
   type ExportProfile,
 } from "./types";
@@ -114,7 +115,10 @@ export function NewPrecheckScreen({ params }: { params: NewPrecheckParams }) {
   // Offer the opt-in only to read_sensitive holders, and only when the profile has restricted
   // fields (shown too while the field list cannot be read, so it is never silently missing).
   const offerSensitive = canSensitive && (!attributes.data || restricted.length > 0);
-  const fieldName = (key: string) => attributeLabel(attributes.data, key, locale) ?? key;
+  const tcol = useTranslations("exports.columns");
+  // Class, section and roll number come from the placement, not the attribute catalogue.
+  const fieldName = (key: string) =>
+    isStructureColumn(key) ? tcol(key) : (attributeLabel(attributes.data, key, locale) ?? key);
 
   const form = useApiForm({
     schema: precheckSchema,

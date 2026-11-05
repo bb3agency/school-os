@@ -269,6 +269,84 @@ def test_portal_precheck_masks_c3_unless_included(
     assert "Synthetica Aad" not in "".join(EX.FAKE.pages)
 
 
+def test_FR_EXP_008_bseap_category_is_the_boards_code_or_a_finding_never_a_guess(
+    school: Any, section: str
+) -> None:
+    coded = {
+        "Synthetica Code General": "general",
+        "Synthetica Code Sc": "sc",
+        "Synthetica Code Obc": "obc",  # no BSEAP code: BC group unknown
+        "Synthetica Code None": None,  # nothing recorded
+    }
+    ids: dict[str, uuid.UUID] = {}
+    for roll, (name, value) in enumerate(coded.items(), start=1):
+        extra = (
+            [ValueIn(attribute_key="category", source="parent_form", value=value)] if value else []
+        )
+        ids[name] = EX.student(
+            school, section_key=section, roll_no=str(roll), name=name, extra=extra
+        )
+    admin = school.people["office_admin"]
+    shown = EX.request_precheck(
+        school,
+        admin,
+        "office_admin",
+        profile_key="bseap-ssc-2027",
+        section_keys=(section,),
+        include_sensitive=True,
+    )
+    assert EX.run(school, shown.id) == "ready"
+    wb = _xlsx(shown.id)
+    ready = _sheet(wb, 2)
+    col = ready[0].index("Social category")
+    by_name = {r[1]: r for r in ready[1:]}
+    assert by_name["Synthetica Code General"][col] == "OC"
+    assert by_name["Synthetica Code Sc"][col] == "SC"
+    assert by_name["Synthetica Code Obc"][col] is None, "never the SchoolOS value, never a guess"
+    assert by_name["Synthetica Code None"][col] is None
+    findings = _sheet(wb, 1)
+    rules = {(r[2], r[4]) for r in findings[1:] if str(r[4]).startswith("EXP-")}
+    assert rules == {
+        ("Synthetica Code Obc", "EXP-002"),
+        ("Synthetica Code None", "EXP-001"),
+    }
+    for r in findings[1:]:
+        if str(r[4]).startswith("EXP-"):
+            assert r[0] == "High"
+            assert r[5] == "Social category"
+            assert "obc" not in str(r[6]).lower(), "the restricted value is not repeated"
+    assert by_name["Synthetica Code Obc"][-1] != "Ready"
+
+    # Masked (restricted values not included): no code check, the cell is masked.
+    masked = EX.request_precheck(
+        school, admin, "office_admin", profile_key="bseap-ssc-2027", section_keys=(section,)
+    )
+    EX.run(school, masked.id)
+    wb = _xlsx(masked.id)
+    ready = _sheet(wb, 2)
+    assert {r[ready[0].index("Social category")] for r in ready[1:]} == {"••••"}
+    assert not [r for r in _sheet(wb, 1)[1:] if str(r[4]).startswith("EXP-")]
+
+
+def test_completeness_udise_sheet_has_class_section_and_roll_number(
+    school: Any, section: str
+) -> None:
+    EX.student(school, section_key=section, roll_no="7", name="Synthetica Placed")
+    admin = school.people["office_admin"]
+    out = EX.request_precheck(
+        school, admin, "office_admin", profile_key="udise-plus", section_keys=(section,)
+    )
+    EX.run(school, out.id)
+    ready = _sheet(_xlsx(out.id), 2)
+    header = ready[0]
+    assert {"Class", "Section", "Roll number"} <= set(header)
+    assert "Address" not in header  # omitted with a reason (config.yaml)
+    row = ready[1]
+    assert row[header.index("Class")] == "IX"
+    assert str(row[header.index("Section")]).startswith("T")  # the fixture's fresh section
+    assert row[header.index("Roll number")] == "7"
+
+
 def test_include_sensitive_needs_permission_and_step_up(school: Any, section: str) -> None:
     EX.student(school, section_key=section)
     coordinator = school.people["exam_coordinator"]
