@@ -255,7 +255,9 @@ test.describe("app shell on the office PC: one sidebar, compact mode (NFR-A11Y-0
       expect(box?.x).toBe(0);
       expect(box?.height).toBe(768);
       await page.mouse.wheel(0, 600);
-      expect((await sidebar.boundingBox())?.y).toBe(0);
+      // Within a pixel: at the very bottom of a page whose content height is fractional the
+      // sticky column ends with its row, up to one sub-pixel above the top (e.g. -0.41).
+      expect(Math.abs((await sidebar.boundingBox())?.y ?? 99)).toBeLessThan(1);
       // The menu scrolls inside the sidebar, never the page sideways.
       const nav = sidebar.getByRole("navigation", { name: mainName });
       expect(await nav.evaluate((el) => getComputedStyle(el).overflowY)).toBe("auto");
