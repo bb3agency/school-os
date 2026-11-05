@@ -203,7 +203,7 @@ def test_FR_TALLY_008_amounts_use_indian_grouping(amount: str, text: str) -> Non
 
 def test_FR_TALLY_008_a_shared_family_ledger_is_marked_and_counted_once() -> None:
     """D54: a ledger shared with siblings is marked in the child's block; the school block
-    gives the each-ledger-once total and per-class totals that need not add up to it."""
+    gives the each-ledger-once total and no per-class figures."""
     tool = GetFeeDuesTool(load_tools_config().tools["get_fee_dues"])
     tenant = uuid.uuid4()
     day = dt.date(2026, 9, 28)
@@ -242,5 +242,5 @@ def test_FR_TALLY_008_a_shared_family_ledger_is_marked_and_counted_once() -> Non
     )
     text = tool._summary(tenant, summary, "0123456789abcdef").text
     assert "₹20,500.25 in total, each ledger counted once" in text
-    assert "By class: Class IX: 2 students, ₹20,500.25; Class X: 1 student, ₹1,000.00." in text
-    assert "do not add up to the school total" in text
+    # No class breakdown in the school answer: a one-student class would leak that figure.
+    assert "By class" not in text

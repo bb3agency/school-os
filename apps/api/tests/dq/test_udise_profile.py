@@ -44,7 +44,7 @@ def test_FR_EXP_006_portal_fields_map_to_what_schoolos_holds() -> None:
 def test_FR_EXP_006_ready_sheet_covers_every_mapped_attribute_in_portal_order() -> None:
     profile = load_profiles()["udise-plus"]
     layout = load_config().profiles["udise-plus"]
-    assert layout.layout_version == 3
+    assert layout.layout_version == 4
     attributes = [
         f.maps_to for f in profile.portal_fields if f.maps_to and f.maps_to not in STRUCTURE
     ]

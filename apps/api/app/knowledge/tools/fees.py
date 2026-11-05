@@ -270,18 +270,8 @@ class GetFeeDuesTool:
             f"{inr(summary.total_due)} in total, each ledger counted once (a family ledger "
             f"shared by siblings is counted once)."
         )
-        if summary.classes:
-            rows = [
-                f"{c.class_name or 'no class recorded'}: {c.students_with_dues} student"
-                f"{'s' if c.students_with_dues != 1 else ''}, {inr(c.total_due)}"
-                for c in summary.classes
-            ]
-            text += f" By class: {'; '.join(rows)}."
-            if sum((c.total_due for c in summary.classes), Decimal(0)) != summary.total_due:
-                text += (
-                    " A family ledger shared by children in different classes counts in each of "
-                    "those classes, so the class totals do not add up to the school total."
-                )
+        # No class breakdown here: a class with one student with dues would state that student's
+        # figure in a school-wide answer (fee eval leakage gate; D54 keeps it on /tally/dues).
         text += (
             f" {summary.unlinked_parties} Tally ledger"
             f"{'s are' if summary.unlinked_parties != 1 else ' is'} not linked to a student and "
