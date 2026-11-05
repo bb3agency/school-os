@@ -37,6 +37,9 @@ MAX_RESPONSE_BYTES: Final = 8 * 1024 * 1024
 MAX_REQUEST_BYTES: Final = 1024 * 1024
 """The server's ``MAX_BODY_BYTES`` (app/tally/agent_auth.py): a larger body is refused."""
 TIMEOUT_S: Final = 30.0
+USER_AGENT: Final = f"SchoolOS-Edge-Agent/{__version__}"
+"""Sent on every request (D63): urllib's default ``Python-urllib/x.y`` is blocked by common
+web-application-firewall rule sets (e.g. the AWS managed CommonRuleSet)."""
 
 log = logging.getLogger("sos_edge_agent")
 
@@ -79,7 +82,8 @@ class UrllibTransport:
     ) -> HttpResponse:
         if urlsplit(url).scheme not in ("http", "https"):
             raise TransientError("unsupported URL scheme")
-        req = urllib.request.Request(url, data=body, headers=dict(headers), method=method)  # noqa: S310
+        sent = {"User-Agent": USER_AGENT, **dict(headers)}
+        req = urllib.request.Request(url, data=body, headers=sent, method=method)  # noqa: S310
         try:
             with self._opener.open(req, timeout=self._timeout) as res:
                 data = res.read(MAX_RESPONSE_BYTES + 1)
@@ -249,6 +253,7 @@ class SchoolOSClient:
             "X-SOS-Timestamp": str(int(now if now is not None else time.time())),
             "X-SOS-Nonce": new_nonce(),
             "X-SOS-Agent-Version": __version__,
+            "User-Agent": USER_AGENT,
         }
         res = self._transport.request("POST", self._url("/enrol"), headers, body)
         _raise_for(res, now)
@@ -283,6 +288,7 @@ class SchoolOSClient:
         )
         if payload is not None:
             headers["Content-Type"] = "application/json"
+        headers["User-Agent"] = USER_AGENT
         res = self._transport.request(method, self._url(route), headers, body or None)
         _raise_for(res, self._clock() if self._clock is not None else None)
         return _json(res)
@@ -312,7 +318,7 @@ class TallyClient:
 
     def export(self, envelope: bytes) -> bytes:
         assert_export_only(envelope)
-        headers = {"Content-Type": "text/xml; charset=utf-8"}
+        headers = {"Content-Type": "text/xml; charset=utf-8", "User-Agent": USER_AGENT}
         try:
             res = self._transport.request("POST", self._url, headers, envelope)
         except TransientError as err:
@@ -332,6 +338,7 @@ class TallyUnavailable(AgentError):
 
 __all__ = [
     "API_PREFIX",
+    "USER_AGENT",
     "AgentError",
     "ClockSkew",
     "ConnectorOff",

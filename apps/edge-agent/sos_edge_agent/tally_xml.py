@@ -11,6 +11,11 @@ Responses are parsed with :mod:`defusedxml` (no DTDs, entities or external refer
 - removing characters and character references that XML 1.0 does not allow (Tally is known to
   emit e.g. ``&#4;`` inside names).
 
+Pending bills (bill-wise allocations; D63) come from one ``Bills`` collection export per company
+(bill name, parent ledger, bill date, credit period, pending amount at ``SVTODATE``); the due
+date is Tally's credit period applied to the bill date (``30 Days``), or the date Tally gives
+instead; without either there is no due date (never guessed).
+
 Amounts are :class:`~decimal.Decimal`, never floats, normalised to "what the party owes the
 school" (positive = due, negative = advance): in Tally's XML a debit is written as a negative
 number (``-5000.00``), and some reports write ``5000.00 Dr`` / ``5000.00 Cr``.
@@ -31,6 +36,9 @@ COLLECTION_ID: Final = "SOSCollection"
 _INVALID_REF: Final = re.compile(r"&#(x[0-9a-fA-F]+|[0-9]+);")
 _INVALID_CHARS: Final = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 _AMOUNT: Final = re.compile(r"^(-?)([0-9]+(?:\.[0-9]+)?)(?:\s*(Dr|Cr))?$", re.IGNORECASE)
+_DAYS: Final = re.compile(r"^([0-9]{1,4})\s*Days?$", re.IGNORECASE)
+_ISO_DAY: Final = re.compile(r"^([0-9]{4})([0-9]{2})([0-9]{2})$")
+_TALLY_DAY: Final = re.compile(r"^([0-9]{1,2})-([A-Za-z]{3})-([0-9]{2,4})$")
 _CURRENCY: Final = re.compile(r"(₹|Rs\.?|INR|₹)", re.IGNORECASE)
 _MONTHS: Final = (
     "Jan",
@@ -65,6 +73,18 @@ class TallyLedger:
     guid: str | None
     owed: Decimal
     """What the party owes the school: positive = due, negative = advance."""
+
+
+@dataclass(frozen=True, slots=True)
+class TallyBill:
+    """A pending bill of a party ledger (Tally bill-wise allocation; D63)."""
+
+    ledger: str
+    reference: str
+    bill_date: dt.date | None
+    due_date: dt.date | None
+    pending: Decimal
+    """What is still owed on this bill: positive = due, negative = paid in advance."""
 
 
 # --- requests -------------------------------------------------------------------------------------
@@ -127,6 +147,17 @@ def ledgers_request(company: str, group: str, to_date: dt.date) -> bytes:
         ("Name", "Parent", "ClosingBalance", "GUID"),
         company=company,
         child_of=group,
+        to_date=to_date,
+    )
+
+
+def bills_request(company: str, to_date: dt.date) -> bytes:
+    """The company's pending bills (bill-wise allocations) at ``to_date``: bill name, parent
+    ledger, bill date, credit period and pending amount. Read only (an export)."""
+    return _envelope(
+        "Bills",
+        ("Name", "Parent", "BillDate", "BillCreditPeriod", "ClosingBalance"),
+        company=company,
         to_date=to_date,
     )
 
@@ -258,18 +289,76 @@ def parse_ledgers(raw: bytes) -> list[TallyLedger]:
     return out
 
 
+def parse_date(value: str | None) -> dt.date | None:
+    """Tally's dates: ``20260401`` (XML) or ``1-Apr-2026``; None when absent or unreadable."""
+    if value is None or not value.strip():
+        return None
+    text = value.strip()
+    try:
+        if match := _ISO_DAY.match(text):
+            return dt.date(int(match[1]), int(match[2]), int(match[3]))
+        if match := _TALLY_DAY.match(text):
+            month = [m.casefold() for m in _MONTHS].index(match[2].casefold()) + 1
+            year = int(match[3]) + (2000 if len(match[3]) == 2 else 0)
+            return dt.date(year, month, int(match[1]))
+    except ValueError:  # 31-Feb, an unknown month
+        return None
+    return None
+
+
+def due_date(bill_date: dt.date | None, credit_period: str | None) -> dt.date | None:
+    """The credit period applied to the bill date (``30 Days``), or the due date Tally wrote
+    instead of a period; None without either (overdue is never guessed)."""
+    if credit_period is None or not credit_period.strip():
+        return None
+    text = credit_period.strip()
+    if match := _DAYS.match(text):
+        return bill_date + dt.timedelta(days=int(match[1])) if bill_date else None
+    return parse_date(text)
+
+
+def parse_bills(raw: bytes) -> list[TallyBill]:
+    """Pending bills; settled ones (nothing pending) are left out."""
+    root = _root(raw)
+    out: list[TallyBill] = []
+    for element in root.iter("BILL"):
+        reference = _name(element)
+        ledger = _text(element, "PARENT")
+        if not reference or not ledger:
+            continue
+        pending = parse_amount(_text(element, "CLOSINGBALANCE"))
+        if pending == 0:
+            continue
+        bill_date = parse_date(_text(element, "BILLDATE"))
+        out.append(
+            TallyBill(
+                ledger=ledger,
+                reference=reference,
+                bill_date=bill_date,
+                due_date=due_date(bill_date, _text(element, "BILLCREDITPERIOD")),
+                pending=pending,
+            )
+        )
+    return out
+
+
 __all__ = [
     "COLLECTION_ID",
+    "TallyBill",
     "TallyGroup",
     "TallyLedger",
     "TallyXmlError",
     "assert_export_only",
+    "bills_request",
     "companies_request",
     "decode",
+    "due_date",
     "groups_request",
     "ledgers_request",
     "parse_amount",
+    "parse_bills",
     "parse_companies",
+    "parse_date",
     "parse_groups",
     "parse_ledgers",
     "tally_date",
