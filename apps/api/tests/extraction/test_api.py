@@ -112,6 +112,46 @@ def test_FR_IMP_020_batch_input_is_checked(world: Any, api: Any, admin_engine: E
     assert again.json()["errors"][0]["code"] == "already_extracted"
 
 
+def test_YS_04_FR_IMP_020_two_clerks_submitting_one_photo_at_once_make_one_batch(
+    world: Any, admin_engine: Engine
+) -> None:
+    """YS-04: the "already extracted" check read without a lock, so two submits of the same
+    photo at the same moment both passed it: two batches, the OCR twice and every register line
+    twice in the review queue. The second submit now waits for the first and sees its batch."""
+    import threading
+
+    from app.core.db import tenant_session
+    from app.core.errors import ValidationFailed
+    from app.extraction.schemas import BatchCreate
+
+    a = world.a
+    person = a.people["office_admin"]
+    doc = X.register_scan(admin_engine, a.tenant_id, a.people["owner"].user_id, X.page_png([]))
+    outcome: dict[str, Any] = {}
+
+    def second_clerk() -> None:
+        try:
+            with tenant_session(a.tenant_id, person.user_id) as s:
+                outcome["batch"] = service.create_batch(
+                    s, X.ctx(a), BatchCreate(document_ids=[doc])
+                ).id
+        except ValidationFailed as exc:
+            outcome["code"] = exc.errors[0]["code"]
+
+    with tenant_session(a.tenant_id, person.user_id) as s:
+        service.create_batch(s, X.ctx(a), BatchCreate(document_ids=[doc]))
+        worker = threading.Thread(target=second_clerk)
+        worker.start()
+        worker.join(timeout=3)  # the first batch is not committed yet
+    worker.join(timeout=30)
+    assert outcome == {"code": "already_extracted"}, outcome
+    with admin_engine.connect() as c:
+        pages = c.execute(
+            text("SELECT count(*) FROM sis.extraction_pages WHERE document_id = :d"), {"d": doc}
+        ).scalar_one()
+    assert pages == 1
+
+
 def test_class_teacher_cannot_reach_documents_outside_scope(world: Any, api: Any) -> None:
     """Scoped roles never hold import.run (docs/07 §6.2): the route answers 403."""
     res = api.call(
