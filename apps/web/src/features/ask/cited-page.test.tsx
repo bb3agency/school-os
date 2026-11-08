@@ -97,7 +97,8 @@ describe("cited page chip (D73)", () => {
     expect(citedPageUrl(link({ url: "not a url" }), 1)).toBeNull();
   });
 
-  it("the label starts with the visible text", () => {
-    expect(A.openPage.startsWith("page {page}")).toBe(true);
+  it("the hint follows the visible text, so the name starts with it in every language", () => {
+    expect(A.openPageHint).not.toContain("{page}");
+    expect(A.openPageHint).toContain("{title}");
   });
 });

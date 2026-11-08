@@ -296,10 +296,11 @@ export function AffectedPicker({
                               size="sm"
                               variant="secondary"
                               disabled={added}
-                              aria-label={t("addStudent", { name: studentLabel(item) })}
                               onClick={() => addStudent(item)}
                             >
                               {added ? t("added") : t("add")}
+                              {/* WCAG 2.5.3: the visible word first, then whose row it is. */}{" "}
+                              <span className="sr-only">{studentLabel(item)}</span>
                             </Button>
                           </li>
                         );

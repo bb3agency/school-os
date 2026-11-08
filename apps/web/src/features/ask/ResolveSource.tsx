@@ -97,10 +97,11 @@ export function CitedPageButton({
       type="button"
       onClick={() => void open()}
       disabled={opening}
-      aria-label={t("openPage", { page, title: name })}
       className="inline-flex min-h-6 items-center gap-1 rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-xs font-semibold text-ink-muted underline-offset-4 hover:border-accent hover:bg-accent-soft hover:text-accent-strong hover:underline disabled:opacity-60 motion-safe:transition-colors"
     >
       {t("page", { page })}
+      {/* WCAG 2.5.3: the accessible name starts with the visible text in every language. */}{" "}
+      <span className="sr-only">{t("openPageHint", { title: name })}</span>
     </button>
   );
 }
