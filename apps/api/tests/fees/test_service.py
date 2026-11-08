@@ -757,6 +757,70 @@ def test_US_2104_adjustment_and_late_fee_waiver_maker_checker(school: Any) -> No
         )
 
 
+def test_FR_FEE_007_YF_04_manual_adjustment_stays_within_the_due_and_the_plan(
+    school: Any,
+) -> None:
+    """YF-04 (lead decision 2026-11-09): a manual negative adjustment may not take a line below
+    zero (409 ``adjustment_exceeds_due``, when asked and again when approved), and its head must
+    be a head of the account's plan (422 ``invalid`` on ``head_id``). Credits after a plan lowers
+    a fee go through plan-change adjustments."""
+    setup = F.ensure_setup(school)
+    account_id = F.account(school)
+    due = _line(_account(school, account_id), 1, setup.tui).due
+
+    def ask(amount: Decimal, head: uuid.UUID) -> Any:
+        return F.call(
+            school,
+            "accountant",
+            fees.request_adjustment,
+            account_id,
+            AdjustmentCreate(
+                instalment_no=1,
+                head_id=head,
+                amount=amount,
+                reason_code="correction",
+                reason="Correction agreed with the management",
+            ),
+        )
+
+    with pytest.raises(Conflict) as err:
+        ask(-(due + D("0.01")), setup.tui)
+    assert err.value.code == "adjustment_exceeds_due"
+    other = F.call(
+        school,
+        "accountant",
+        fees.create_head,
+        HeadCreate(code="LIB", name="Library fee", kind="other", gst_exempt=True),
+    )
+    with pytest.raises(ValidationFailed) as bad:
+        ask(D("100.00"), other.id)
+    assert bad.value.errors[0]["field"] == "head_id"
+    # Two requests that fit alone but not together: the second is refused at approval.
+    first = ask(-due, setup.tui)
+    second = ask(D("-1.00"), setup.tui)
+    F.call(
+        school,
+        "accountant",
+        fees.approve_adjustment,
+        first.id,
+        DecisionIn(),
+        expected_version=None,
+        person=school.people["accountant2"],
+    )
+    with pytest.raises(Conflict) as late:
+        F.call(
+            school,
+            "accountant",
+            fees.approve_adjustment,
+            second.id,
+            DecisionIn(),
+            expected_version=None,
+            person=school.people["accountant2"],
+        )
+    assert late.value.code == "adjustment_exceeds_due"
+    assert _line(_account(school, account_id), 1, setup.tui).due == D("0.00")
+
+
 # --- late fees (FR-FEE-009) ----------------------------------------------------------------------
 
 

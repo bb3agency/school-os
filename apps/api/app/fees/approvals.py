@@ -464,10 +464,12 @@ def request_adjustment(
             raise ValidationFailed([c.error("amount", "waiver_reduces_late_fee")])
         if _late_fee_left(session, account, data.instalment_no) < -data.amount:
             raise ValidationFailed([c.error("amount", "above_late_fee")])
-    elif data.head_id is None or repo.get_head(session, data.head_id) is None:
+    elif data.head_id is None or data.head_id not in _plan_heads(session, account.plan_id):
         raise ValidationFailed([c.error("head_id", "invalid")])
     if abs(data.amount) > c.settings().limits.max_amount:
         raise ValidationFailed([c.error("amount", "too_large")])
+    if data.reason_code != "late_fee_waiver" and data.head_id is not None:
+        _check_within_due(session, account, data.instalment_no, data.head_id, data.amount)
     with c.db_errors():
         row = repo.insert_adjustment(
             session,
@@ -494,6 +496,41 @@ def request_adjustment(
     )
     notify_approvers(session, "adjustment", row.id, account.id)
     return _adjustment_out(row, _names(session, [row]))
+
+
+class AdjustmentExceedsDue(Conflict):
+    code = "adjustment_exceeds_due"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "This adjustment would take the line below zero. Lower it to what is still due; "
+            "money already paid is returned with a refund."
+        )
+
+
+def _plan_heads(session: Session, plan_id: uuid.UUID) -> set[uuid.UUID]:
+    """The heads of a plan and of every earlier version of it (YF-04)."""
+    chain: list[uuid.UUID] = []
+    current: uuid.UUID | None = plan_id
+    while current is not None and current not in chain:
+        chain.append(current)
+        plan = repo.get_plan(session, current)
+        current = plan.previous_plan_id if plan is not None else None
+    return {line.head_id for line in repo.plan_lines(session, chain)}
+
+
+def _check_within_due(
+    session: Session, account: Any, instalment_no: int, head_id: uuid.UUID, amount: Decimal
+) -> None:
+    """A manual credit may not take the line's due below zero (409 ``adjustment_exceeds_due``;
+    YF-04, lead decision 2026-11-09). Plan-change adjustments are not checked here: a plan that
+    lowers a fee after payment may leave a credit."""
+    if amount >= 0:
+        return
+    found = ledger.dues_for(session, account, c.today(session)).line(instalment_no, head_id)
+    due = found[0].due if found else ZERO
+    if -amount > due:
+        raise AdjustmentExceedsDue()
 
 
 def _late_fee_left(session: Session, account: Any, instalment_no: int) -> Decimal:
@@ -535,6 +572,8 @@ def approve_adjustment(
             "for a smaller one.",
             code="above_late_fee",
         )
+    if row.source_plan_id is None and row.head_id is not None:
+        _check_within_due(session, account, row.instalment_no, row.head_id, row.amount)
     with c.db_errors():
         row = repo.update_adjustment(
             session, row.id, _decision_values(ctx, session, "approved", note)
