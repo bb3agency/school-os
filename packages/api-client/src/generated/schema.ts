@@ -9818,7 +9818,8 @@ export interface paths {
          *     due date becomes the event's confirmed closing date, from that circular (permission
          *     ``readiness.calendar.manage`` and a school-wide ``task.manage``, else 403; a task you cannot
          *     reach: 404; a task not from a circular: 422 ``not_circular_task``). A person's action, never
-         *     automatic. Accepts ``Idempotency-Key``. Audited.
+         *     automatic. Optional ``If-Match`` with the event's ETag (412 when stale). Accepts
+         *     ``Idempotency-Key``. Audited.
          */
         post: operations["link_task_to_portal_event_api_v1_tasks__task_id__portal_event_post"];
         delete?: never;

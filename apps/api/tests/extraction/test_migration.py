@@ -279,7 +279,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         "0079_audit_outbox_set_once",  # D68 delivered_at set once
         "0080_audit_ti_fixes",  # audit 2026-11-08 TI-01, TI-02
         "0081_audit_bl_fixes",  # audit 2026-11-08 BL-05 claimed messages count in the cap
-        "0084_audit_ym_fixes",  # audit 2026-11-09 YM-06 e-mail sent at most once per event
+        "0082_audit_ym_fixes",  # audit 2026-11-09 YM-06 e-mail sent at most once per event
     }
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
         command.downgrade(cfg, "0017_exports")

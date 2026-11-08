@@ -14,7 +14,7 @@ cannot change an event's type or payload, and RLS of the table is unchanged.
 Downgrade: revokes the grant and drops the column (a claim only matters while its event may
 still be redelivered; nothing else reads it).
 
-Revision ID: 0084_audit_ym_fixes
+Revision ID: 0082_audit_ym_fixes
 Revises: 0081_audit_bl_fixes
 Create Date: 2026-11-09
 """
@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from alembic import op
 
-revision = "0084_audit_ym_fixes"
+revision = "0082_audit_ym_fixes"
 down_revision = "0081_audit_bl_fixes"
 branch_labels = None
 depends_on = None
