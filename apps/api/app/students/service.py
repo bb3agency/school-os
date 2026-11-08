@@ -2070,15 +2070,19 @@ class ImportRevertResult:
 def plan_import_revert(
     session: Session, batch_id: uuid.UUID, created_students: Mapping[uuid.UUID, int | None]
 ) -> ImportRevertPlan:
-    """Check that import batch ``batch_id`` can still be undone (FR-IMP-005); read-only.
+    """Check that import batch ``batch_id`` can still be undone (FR-IMP-005).
 
     ``created_students`` maps each student the batch created to the version the batch left it
     at. Refused (409 ``import_has_dependents``) when anything was recorded on top of the batch:
     a student it created was changed since (version), one of its values was superseded, or a
     value it replaced is a verified or admission-register identity value (BR-01: those change
-    only through a change request, never by a revert).
+    only through a change request, never by a revert). Not read-only: it locks the students
+    the batch touched until the caller's transaction ends (BL-02).
     """
-    versions = repo.student_versions(session, list(created_students))
+    # BL-02: lock every student the revert touches before checking, so a value saved while it
+    # runs is either seen here (refused) or waits for the revert; never deleted with the student.
+    touched = set(created_students) | {v.student_id for v in repo.batch_values(session, batch_id)}
+    versions = repo.student_versions(session, touched, lock=True)
     if any(versions.get(sid) != version for sid, version in created_students.items()):
         raise _import_has_dependents()
     values = repo.batch_values(session, batch_id)
