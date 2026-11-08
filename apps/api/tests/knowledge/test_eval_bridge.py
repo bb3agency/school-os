@@ -384,6 +384,20 @@ def test_FR_TALLY_008_fee_cases_pass_the_hard_gates_through_the_application(brid
     assert len(fee_gates) == 5
 
 
+@pytest.mark.db
+def test_D74_due_cases_pass_the_hard_gates_through_the_application(bridge: Any) -> None:
+    """Every synthetic "what's due" case through the real ask pipeline and list_due_tasks
+    (app-fake): a permission-limited caller never gets another person's task."""
+    from sos_evals import due, gates
+
+    metrics, outcomes = due.run(DATA.due, bridge)
+    assert [o.id for o in outcomes if o.leaks or o.found < o.expected] == []
+    assert metrics.due_leakage_count == 0
+    assert metrics.due_citation_validity == 1.0
+    assert metrics.due_task_recall == 1.0
+    assert len([g for g in gates.load_gates() if g.metric.startswith("due_")]) == 3
+
+
 # --- live evaluation (make eval-live; docs/06 §13.7; ADR-0033) ------------------------------------
 
 

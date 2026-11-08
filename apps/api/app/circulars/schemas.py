@@ -173,6 +173,40 @@ class TaskOut(_Out):
     version: int
 
 
+class AskDueTask(_Out):
+    """One task as the Ask tool ``list_due_tasks`` sees it (D74; docs/06 §7): title, due date,
+    status and who it is assigned to; never the task's details or a circular's AI summary
+    (DL-08), and no student data. Not an API response."""
+
+    id: uuid.UUID
+    title: str
+    due_on: dt.date
+    status: TaskStatus
+    overdue: bool
+    mine: bool
+    """Assigned to the caller."""
+    assignee_roles: tuple[str, ...]
+    """Role keys of the person it is assigned to (empty when that person is no longer an active
+    member); never their name."""
+    source: TaskSource
+    linked_circular: bool
+    """The task is linked to a circular (confirmed from its reading or linked by hand)."""
+    circular_title: str | None
+    """The title of that circular, only when the caller may open it now."""
+
+
+class AskDueTasks(_Out):
+    """Open and in-progress tasks due from ``start`` to ``end`` (both inclusive, IST dates)."""
+
+    start: dt.date
+    end: dt.date
+    school_wide: bool
+    """Every task of the school (``task.read_all`` school-wide); otherwise the caller's own."""
+    tasks: tuple[AskDueTask, ...]
+    more: bool
+    """More tasks are due in the range than ``limit`` allowed."""
+
+
 class TaskCreate(_In):
     title: Text = Field(min_length=1, max_length=200)
     details: Text | None = Field(default=None, max_length=2000)

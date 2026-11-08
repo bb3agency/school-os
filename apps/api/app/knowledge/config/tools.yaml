@@ -101,3 +101,19 @@ tools:
     permission: kb.ask
     max_results: 5                     # matching questions returned
     max_conversations: 30              # most recent conversations searched
+  # D74 (lead decision 2026-11-08, amending ADR-0008): open and in-progress tasks (including
+  # deadlines confirmed from circulars) due in a date range, through circulars.service. The
+  # caller's own tasks, or every task for a school-wide task.read_all holder. Titles, due dates,
+  # status and "you" or the assignee's role only: never task details or a circular's AI summary.
+  list_due_tasks:
+    description: >-
+      List open tasks and circular deadlines due in a date range (IST dates YYYY-MM-DD; by
+      default today and the next 7 days, at most 31 days), soonest first: each task's title,
+      due date, status (overdue when the date has passed), who it is assigned to ("you" or a
+      role) and the circular or calendar it comes from. Only the user's own tasks unless they
+      may see every task of the school. Use for "what is due this week", "which deadlines are
+      coming up" or "what is overdue". Quote due dates exactly as given.
+    permission: task.read
+    max_results: 30                    # tasks per call; the passage says when more are due
+    default_days: 7                    # to_date defaults to from_date + 7 days
+    max_days: 31                       # longer ranges are cut and the passage says so

@@ -14,6 +14,8 @@ from sos_evals.circulars import CircularCase, validate_cases
 from sos_evals.contextual import ContextualSet, CtxDocument, CtxQuestion
 from sos_evals.conversations import ConversationCase
 from sos_evals.conversations import validate_cases as validate_conversation_cases
+from sos_evals.due import DueCase
+from sos_evals.due import validate_cases as validate_due_cases
 from sos_evals.fees import FeeCase
 from sos_evals.fees import validate_cases as validate_fee_cases
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
@@ -25,6 +27,7 @@ CIRCULARS_FILE = "circulars.jsonl"
 FEES_FILE = "fees.jsonl"
 CONTEXTUAL_FILE = "contextual.jsonl"
 CONVERSATIONS_FILE = "conversations.jsonl"
+DUE_FILE = "due.jsonl"
 
 Suite = Literal["fast", "full"]
 
@@ -47,6 +50,8 @@ class Dataset:
     """Contextual retrieval and reranking set (docs/06 §13.6; the fast suite runs its subset)."""
     conversations: tuple[ConversationCase, ...] = ()
     """Scripted Ask conversations (ADR-0034; every suite runs all of them)."""
+    due: tuple[DueCase, ...] = ()
+    """Synthetic "what's due" cases for ``list_due_tasks`` (D74; every suite runs all)."""
 
     def select(self, suite: Suite) -> tuple[EvalItem, ...]:
         if suite == "full":
@@ -77,6 +82,7 @@ def dataset_files(directory: Path) -> list[Path]:
         directory / FEES_FILE,
         directory / CONTEXTUAL_FILE,
         directory / CONVERSATIONS_FILE,
+        directory / DUE_FILE,
     ]
 
 
@@ -112,9 +118,11 @@ def load(directory: Path = DATASETS_DIR) -> Dataset:
     conversations = tuple(
         ConversationCase.model_validate(row) for row in _read_jsonl(directory / CONVERSATIONS_FILE)
     )
+    due = tuple(DueCase.model_validate(row) for row in _read_jsonl(directory / DUE_FILE))
     try:
         validate_cases(circulars)
         validate_fee_cases(fees)
+        validate_due_cases(due)
         validate_conversation_cases(conversations)
         contextual = load_contextual(directory / CONTEXTUAL_FILE)
     except ValueError as exc:
@@ -127,6 +135,7 @@ def load(directory: Path = DATASETS_DIR) -> Dataset:
         fees=fees,
         contextual=contextual,
         conversations=conversations,
+        due=due,
     )
 
 

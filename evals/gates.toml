@@ -191,6 +191,32 @@ threshold = 0.95
 severity = "hard"
 requirements = ["FR-TALLY-008", "FR-KB-007"]
 
+# --- "What's due this week?" (sos_evals.due; docs/06 §13.10; D74, list_due_tasks) ------------------
+# Synthetic tiny schools with tasks assigned to the asker or to others, done or cancelled, due
+# inside or outside the default week. No one else's task may reach a caller who may see only
+# their own (task.read without task.read_all school-wide), and every task stated is cited.
+
+[[gate]]
+metric = "due_leakage_count"
+op = "=="
+threshold = 0
+severity = "hard"
+requirements = ["FR-KB-010", "SEC-018"]
+
+[[gate]]
+metric = "due_citation_validity"
+op = ">="
+threshold = 1.0
+severity = "hard"
+requirements = ["FR-KB-005"]
+
+[[gate]]
+metric = "due_task_recall"
+op = ">="
+threshold = 0.95
+severity = "soft"
+requirements = ["FR-KB-004"]
+
 # --- Contextual retrieval and reranking (sos_evals.contextual; docs/06 §13.6; PO 2026-09-30) ---
 # Multi-page synthetic circulars whose titles are reference numbers and whose later pages never
 # name their subject, in English, Telugu script and code-mixed Telugu, plus restricted memos that

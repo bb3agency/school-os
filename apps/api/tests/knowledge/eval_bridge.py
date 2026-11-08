@@ -66,6 +66,13 @@ and cites it whole. Without the tool (no ``finance.read``, connector off) it sea
 (there are none) and answers "not found". The figures therefore measure the application's tool,
 links, permission and flag checks, never Claude.
 
+"What's due this week?" (D74, ``sos_evals.due``): each case is its own school with the asker,
+one member per other owner role and the case's tasks made through ``circulars.service`` (done
+and cancelled through its status moves). A question naming "task" makes the stand-in call
+``list_due_tasks`` with its defaults when the application offers it and cite every passage
+whole, so leakage and recall measure the application's scope rule (own tasks unless
+``task.read_all`` school-wide), status and date filters, never Claude.
+
 English first (ADR-0036; ``sos_evals.english_first``): the adapter runs every pass with
 ``SOS_TELUGU_ENABLED`` ON (the dormant Telugu path keeps its gates), then the harness calls
 :meth:`AppFakeAdapter.set_telugu` with ``False`` (the runtime is rebuilt with the product
@@ -192,6 +199,9 @@ CHATS: Final = "search_my_conversations"
 CHAT_WORDS: Final = ("did i ask", "i asked", "నేను అడిగిన")
 """Questions about the caller's own earlier chats (ADR-0034)."""
 FEES: Final = "get_fee_dues"
+DUE: Final = "list_due_tasks"
+TASK_WORDS: Final = ("task",)
+"""Questions about tasks due (D74; only when the application offers list_due_tasks)."""
 RECALL_CHUNKS: Final = 4000
 RECALL_OTHER_SCHOOLS: Final = 4
 RECALL_OTHER_CHUNKS: Final = 500
@@ -418,8 +428,21 @@ class EvalFakeTransport:
                 return FEES, {"student_id": student}
         elif FEES not in called:
             return FEES, {}
+        return self._whole(messages, FEES, prefix)
+
+    def _due_step(self, messages: Sequence[Mapping[str, Any]], prefix: str) -> Step:
+        """``list_due_tasks`` with its defaults (today and the next 7 days, IST), then every
+        passage it returned, cited whole (D74)."""
+        if DUE not in set(self._calls(messages).values()):
+            return DUE, {}
+        return self._whole(messages, DUE, prefix)
+
+    def _whole(
+        self, messages: Sequence[Mapping[str, Any]], tool: str, prefix: str
+    ) -> list[dict[str, Any]]:
+        """Every result of ``tool`` as one answer block, cited whole."""
         content = []
-        for index, result in enumerate(self._results(messages, FEES)):
+        for index, result in enumerate(self._results(messages, tool)):
             text_ = _block_text(result)
             citation = {
                 "type": "search_result_location",
@@ -482,6 +505,8 @@ class EvalFakeTransport:
             wanted = record_request(question)
             if CHATS in tools and any(w in question.casefold() for w in CHAT_WORDS):
                 step = self._chat_step(messages, question, tools, prefix)
+            elif DUE in tools and any(w in question.casefold() for w in TASK_WORDS):
+                step = self._due_step(messages, prefix)
             elif FEES in tools and any(w in question.casefold() for w in FEE_WORDS):
                 step = self._fee_step(messages, question, tools, prefix)
             elif wanted is not None:
@@ -1358,6 +1383,81 @@ class AppFakeAdapter:
             text=" ".join(seg.text for seg in answer.segments),
             citations=tuple(
                 FeeCitation(source=c.source, cited_text=c.cited_text)
+                for seg in answer.segments
+                for c in seg.citations
+            ),
+            provided_sources=tuple(answer.provided),
+        )
+
+    # --- "What's due this week?" (sos_evals.due; D74, list_due_tasks) ------------------------
+
+    def _ask_ctx(self, school: Any, member: Any, role: str) -> Any:
+        """A ``UserContext`` with the system role's permissions (scoped roles reach section 9A)."""
+        from app.authz.catalog import implicit_permissions, system_roles
+        from app.authz.context import Scopes, UserContext
+
+        template = system_roles()[role]
+        scoped = {p for p in template.permission_keys if (g := template.grant(p)) and g.scoped}
+        sections = frozenset({school.ids["section:9A"]}) if scoped else frozenset()
+        return UserContext(
+            user_id=member.user_id,
+            tenant_id=school.tenant_id,
+            membership_id=member.membership_id,
+            roles=frozenset({role}),
+            permissions=frozenset(set(template.permission_keys) | set(implicit_permissions())),
+            scopes=Scopes(school=not scoped, section_ids=sections),
+            mfa=True,
+            auth_time=None,
+            scoped_permissions=frozenset(scoped),
+        )
+
+    def ask_due(self, case: Any) -> Any:
+        """One "what's due" case: its own school, the asker and one member per other owner
+        role, the tasks made through ``circulars.service`` (done and cancelled through its
+        status moves), then the question through ``knowledge.service``."""
+        from app.circulars import service as circulars
+        from app.circulars.schemas import TaskCreate, TaskStatusIn
+        from app.core.db import tenant_session
+        from app.knowledge.domain import AskRequest
+        from sos_evals.due import DueCitation, DueResult
+
+        school = self._school(f"due:{case.id}")
+        world = self.K.W
+        asker = world.add_member(self._admin, school.tenant_id, [case.asker])
+        others: dict[str, Any] = {}
+        for t in case.tasks:
+            if not t.mine and t.owner_role not in others:
+                others[t.owner_role] = world.add_member(
+                    self._admin, school.tenant_id, [t.owner_role]
+                )
+        manager = self.K.SW.ctx_for(school.tenant_id, school.people["owner"], "owner")
+        today = circulars.today_ist()
+        with tenant_session(school.tenant_id, manager.user_id) as db:
+            for t in case.tasks:
+                owner = asker if t.mine else others[t.owner_role]
+                made = circulars.create_task(
+                    db,
+                    manager,
+                    TaskCreate(
+                        title=t.title,
+                        owner_membership_id=owner.membership_id,
+                        due_on=today + dt.timedelta(days=t.days),
+                    ),
+                )
+                if t.status != "open":
+                    circulars.set_task_status(
+                        db, manager, made.id, TaskStatusIn(status=t.status), made.version
+                    )
+        ctx = self._ask_ctx(school, asker, case.asker)
+        with tenant_session(school.tenant_id, ctx.user_id) as s:
+            outcome = self._service.respond(
+                s, ctx, AskRequest(question=case.question, session_id=uuid.uuid4())
+            )
+        answer = outcome.answer
+        return DueResult(
+            text=" ".join(seg.text for seg in answer.segments),
+            citations=tuple(
+                DueCitation(source=c.source, cited_text=c.cited_text)
                 for seg in answer.segments
                 for c in seg.citations
             ),

@@ -46,6 +46,7 @@ from sos_evals.contextual import (
     needs_context,
 )
 from sos_evals.conversations import ConversationCase, ConversationRun, TurnResult, script_of
+from sos_evals.due import DueCase, DueCitation, DueResult, DueTask
 from sos_evals.english_first import NoticeResult, has_telugu
 from sos_evals.fees import FeeCase, FeeCitation, FeeResult, inr
 from sos_evals.schema import Asker, CorpusItem, EvalItem, Locale
@@ -293,6 +294,24 @@ class PerfectStub(_ConversationOracle):
             provided_sources=(source,),
         )
 
+    @staticmethod
+    def _due_answer(case: DueCase, tasks: Iterable[DueTask]) -> DueResult:
+        lines = [
+            (f"sos://task/{uuid.uuid5(uuid.NAMESPACE_URL, f'{case.id}/{t.key}')}", t.title)
+            for t in tasks
+        ]
+        if not lines:
+            return DueResult(text=REFUSALS[case.locale])
+        return DueResult(
+            text=" ".join(f"{title}." for _, title in lines),
+            citations=tuple(DueCitation(source=s, cited_text=f"Task: {t}.") for s, t in lines),
+            provided_sources=tuple(s for s, _ in lines),
+        )
+
+    def ask_due(self, case: DueCase) -> DueResult:
+        """The answer key: the asker's (or, school-wide, every) open task due this week."""
+        return self._due_answer(case, (t for t in case.tasks if t.key in case.expected))
+
     def ask_fees(self, case: FeeCase) -> FeeResult:
         """The answer key: the exact figure from the linked ledgers, or no figure at all."""
         if case.expect_refusal or case.expected_total is None:
@@ -352,6 +371,10 @@ class LeakyStub(PerfectStub):
             if d.restricted
         ]
         return forbidden + super()._ctx_ranked(variant, question)
+
+    def ask_due(self, case: DueCase) -> DueResult:
+        """Ignores whose task it is, its status and its date: lists every task."""
+        return self._due_answer(case, case.tasks)
 
     def ask_fees(self, case: FeeCase) -> FeeResult:
         """Maps ledgers by name and ignores who may see fees: states a figure every time."""

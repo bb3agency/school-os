@@ -39,7 +39,7 @@ _FIELD: Final = re.compile(
     rf"^sos://student/(?P<id>{_UUID})/field/(?P<attr>[a-z][a-z0-9_]{{0,63}})"
     r"\?src=(?P<src>[a-z][a-z0-9_]{0,63})$"
 )
-_SIMPLE: Final = re.compile(rf"^sos://(?P<kind>finding|change|verified)/(?P<id>{_UUID})$")
+_SIMPLE: Final = re.compile(rf"^sos://(?P<kind>finding|change|verified|task)/(?P<id>{_UUID})$")
 _AGGREGATE: Final = re.compile(
     rf"^sos://(?P<kind>count|fee)/(?P<id>{_UUID})(?:#s(?P<scope>[0-9a-f]{{16}}))?$"
 )
@@ -99,6 +99,11 @@ def change_request(change_request_id: uuid.UUID) -> str:
 
 def verified_answer(verified_answer_id: uuid.UUID) -> str:
     return f"sos://verified/{verified_answer_id}"
+
+
+def task(task_id: uuid.UUID) -> str:
+    """One task (``list_due_tasks``, D74): its title, due date, status and assignee role."""
+    return f"sos://task/{task_id}"
 
 
 def scope_fingerprint(grant: Reach) -> str:
@@ -182,5 +187,6 @@ __all__ = [
     "scope_fingerprint",
     "student_count",
     "student_field",
+    "task",
     "verified_answer",
 ]

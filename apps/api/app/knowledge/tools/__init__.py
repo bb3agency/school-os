@@ -16,7 +16,8 @@ service), ``documents`` (:class:`DocumentSearch`, ``search_documents`` and ``lis
 over ``documents.service``), ``students`` (``find_students``, ``get_student_facts`` over
 ``students.service``), ``history`` (``get_value_history``), ``counts`` (``count_students``),
 ``findings`` (``list_findings`` over ``dq.service``), ``fees`` (``get_fee_dues`` over
-``tally.service``, M6, behind the school's Tally connector flag; ADR-0032 Proposed) and
+``tally.service``, M6, behind the school's Tally connector flag; ADR-0032 Proposed), ``due``
+(``list_due_tasks`` over ``circulars.service`` through a registered reader, D74) and
 ``registry`` (the tools described in ``tools.yaml``, offered per caller permission). The whole
 whitelist is built.
 """
