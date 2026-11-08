@@ -74,6 +74,11 @@ export interface ApiFormOptions<TSchema extends z.ZodType, TResult> {
   onSuccess?: (result: TResult, form: HTMLFormElement) => void;
   /** Fields that failed validation (client or server), e.g. to move a wizard to that step. */
   onInvalid?: (fields: string[]) => void;
+  /**
+   * Focus the first invalid field after a failed client check (default). Forms with an
+   * `ErrorSummary` pass `false`: the summary takes focus instead (docs/17 §4.4).
+   */
+  focusInvalid?: boolean;
 }
 
 export interface ApiFormState<TResult> {
@@ -118,6 +123,7 @@ export function useApiForm<TSchema extends z.ZodType, TResult>(
       setErrors(Object.fromEntries(Object.entries(keys).map(([f, k]) => [f, translateClient(k)])));
       setError(undefined);
       opts.onInvalid?.(Object.keys(keys));
+      if (opts.focusInvalid === false) return;
       const first = form.querySelector<HTMLElement>("[aria-invalid='true']");
       requestAnimationFrame(() =>
         (form.querySelector<HTMLElement>("[aria-invalid='true']") ?? first)?.focus(),

@@ -81,3 +81,42 @@ export function ErrorSummary({
     </div>
   );
 }
+
+/**
+ * For forms whose fields get generated ids (dialogs, shared field sets): the id of each named
+ * field in `form`, read when a submit fails (`useApiForm` `onInvalid`). A checkbox group or a
+ * radio group links to its first box. A field without an id is left out.
+ */
+export function fieldIdsByName(
+  form: HTMLFormElement | null,
+  names: readonly string[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!form) return out;
+  for (const name of names) {
+    const item = form.elements.namedItem(name);
+    const element = item instanceof RadioNodeList ? item[0] : item;
+    if (element instanceof HTMLElement && element.id) out[name] = element.id;
+  }
+  return out;
+}
+
+/**
+ * The summary lines for `errors` (field name → message) in form order, each linked through
+ * `ids` (field name → input id). A field whose id is unknown, or shared with an earlier
+ * line, is left out of the summary; its message still shows under the field.
+ */
+export function summaryFor(
+  errors: Readonly<Record<string, string>>,
+  ids: Readonly<Record<string, string>>,
+): SummaryError[] {
+  const seen = new Set<string>();
+  const out: SummaryError[] = [];
+  for (const [name, message] of Object.entries(errors)) {
+    const fieldId = ids[name];
+    if (!fieldId || !message || seen.has(fieldId)) continue;
+    seen.add(fieldId);
+    out.push({ fieldId, message });
+  }
+  return out;
+}
