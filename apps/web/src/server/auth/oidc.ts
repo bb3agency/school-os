@@ -51,6 +51,8 @@ export class OidcGrantError extends Error {
 }
 
 const DEFAULT_ACCESS_TTL_MS = 5 * 60_000;
+/** Timeout of every IdP request (discovery, token, revocation) unless a client sets its own. */
+export const OIDC_TIMEOUT_SECONDS = 10;
 
 function toGrantError(error: unknown): unknown {
   if (error instanceof client.ResponseBodyError) return new OidcGrantError(error.error);
@@ -76,7 +78,7 @@ export function createOidcClient(
           client.ClientSecretPost(config.clientSecret),
           {
             execute,
-            timeout: options.timeoutSeconds ?? 10,
+            timeout: options.timeoutSeconds ?? OIDC_TIMEOUT_SECONDS,
             ...(options.fetch ? { [client.customFetch]: options.fetch } : {}),
           },
         )

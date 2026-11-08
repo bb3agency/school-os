@@ -8,7 +8,7 @@ import {
   type SessionStore,
   type TokenSet,
 } from "@/server/session/store";
-import { OidcGrantError, type OidcClient } from "./oidc";
+import { OIDC_TIMEOUT_SECONDS, OidcGrantError, type OidcClient } from "./oidc";
 
 /**
  * Access-token refresh with rotation and reuse detection (FR-IAM-004, docs/07 §5.2).
@@ -23,6 +23,16 @@ import { OidcGrantError, type OidcClient } from "./oidc";
  */
 
 export const REFRESH_SKEW_MS = 60_000;
+
+/**
+ * XB-04: how long one refresh may hold the lock. A refresh can wait for OIDC discovery (not
+ * cached after a start or a failure) and then the token request, each up to the IdP timeout;
+ * the lock must outlive both, or another web task takes it and spends the same refresh token,
+ * which looks like reuse and signs the person out everywhere. Plus a margin for Valkey.
+ */
+export function refreshLockTtlMs(idpTimeoutMs: number = OIDC_TIMEOUT_SECONDS * 1000): number {
+  return Math.max(30_000, 2 * idpTimeoutMs + 10_000);
+}
 
 export type SessionEndReason =
   "session_gone" | "no_refresh_token" | "refresh_failed" | "refresh_reuse" | "subject_changed";
@@ -47,6 +57,8 @@ export interface RefresherOptions {
   oidc: Record<SessionKind, OidcClient>;
   now?: () => number;
   lockTtlMs?: number;
+  /** The OIDC clients' request timeout (default OIDC_TIMEOUT_SECONDS); sets the lock TTL. */
+  idpTimeoutMs?: number;
   lockWaitMs?: number;
   pollMs?: number;
 }
@@ -91,7 +103,7 @@ export class TokenRefresher {
     const lockKey = sessionKeys.lock(session.id);
     const lockToken = randomToken(16);
     const deadline = this.now() + (this.options.lockWaitMs ?? 8_000);
-    const lockTtl = this.options.lockTtlMs ?? 15_000;
+    const lockTtl = this.options.lockTtlMs ?? refreshLockTtlMs(this.options.idpTimeoutMs);
 
     while (!(await store.kv.set(lockKey, lockToken, { nx: true, pxMs: lockTtl }))) {
       if (this.now() >= deadline) throw new RefreshBusyError();
@@ -105,13 +117,19 @@ export class TokenRefresher {
       const current = await store.get(session.id);
       if (!current) throw new SessionEndedError("session_gone");
       if (await this.isFresh(current, check)) return current;
-      return await this.refresh(current);
+      return await this.refresh(current, async () => {
+        // Still ours? Then give it a full TTL again for the IdP call (XB-04).
+        if ((await store.kv.get(lockKey)) !== lockToken) return false;
+        await store.kv.pexpire(lockKey, lockTtl);
+        return true;
+      });
     } finally {
       await store.kv.delIfEquals(lockKey, lockToken);
     }
   }
 
-  private async refresh(session: Session): Promise<Session> {
+  /** `renewLock` re-arms the lock and says whether this task still holds it. */
+  private async refresh(session: Session, renewLock: () => Promise<boolean>): Promise<Session> {
     const { store } = this.options;
     const stored = await store.tokens(session.id);
     const refreshToken = stored?.tokens.refreshToken;
@@ -124,6 +142,11 @@ export class TokenRefresher {
       await store.revokeFamily(session.familyId);
       logEvent("refresh_token_reuse_detected", { kind: session.kind }, "error");
       throw new SessionEndedError("refresh_reuse");
+    }
+    if (!(await renewLock())) {
+      // The lock expired and another task may be refreshing now: leave the token to it.
+      await store.unspendRefreshToken(session.familyId, refreshToken);
+      throw new RefreshBusyError();
     }
 
     const client = this.options.oidc[session.kind];

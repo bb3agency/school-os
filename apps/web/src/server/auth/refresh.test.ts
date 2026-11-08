@@ -151,6 +151,56 @@ describe("token refresh (FR-IAM-004)", () => {
     expect(Object.keys(kv.dump()).some((k) => k.includes(":lock:"))).toBe(false);
   });
 
+  it("XB-04 (FR-IAM-004): the lock outlives a slow refresh (discovery + token request at their timeouts)", async () => {
+    vi.useFakeTimers({ now: Date.now() });
+    try {
+      // The key-value store and the session store read the faked clock.
+      kv = new MemoryKeyValue(() => Date.now());
+      store = new SessionStore(kv, secret, { now: () => Date.now() });
+      // Discovery not cached and a slow IdP: the refresh takes 19 s, under 2 x the 10 s timeout.
+      const idp = fakeIdp({ delayMs: 19_000 });
+      const { session } = await newSession(10_000);
+      const make = (s: SessionStore) =>
+        new TokenRefresher({
+          store: s,
+          oidc: { staff: idp.client, operator: idp.client, support: idp.client },
+          pollMs: 100,
+        });
+      const first = make(store).ensureFresh(session);
+      await vi.advanceTimersByTimeAsync(16_000);
+      // Another web task needs a token while the first is still waiting for the IdP. With a
+      // lock shorter than the refresh it would spend the same refresh token: "reuse", and the
+      // whole family (every device) signed out.
+      const second = make(new SessionStore(kv, secret)).ensureFresh(session);
+      await vi.advanceTimersByTimeAsync(6_000);
+      const [a, b] = await Promise.all([first, second]);
+      expect(idp.refresh).toHaveBeenCalledTimes(1);
+      expect(a.accessExpiresAt).toBe(b.accessExpiresAt);
+      expect(await store.get(session.id)).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("XB-04 (FR-IAM-004): a holder whose lock has expired does not spend the refresh token", async () => {
+    const idp = fakeIdp();
+    const { session } = await newSession(10_000);
+    const lockKey = `sos:web:sess:lock:${session.id}`;
+    // The lock is taken, then lost (expired and taken by another task) before the token request.
+    const original = store.spendRefreshToken.bind(store);
+    vi.spyOn(store, "spendRefreshToken").mockImplementation(async (family, token) => {
+      await kv.set(lockKey, "another-task", { pxMs: 30_000 });
+      return original(family, token);
+    });
+    await expect(refresherFor(idp.client).ensureFresh(session)).rejects.toBeInstanceOf(
+      RefreshBusyError,
+    );
+    expect(idp.refresh).not.toHaveBeenCalled();
+    expect(await store.get(session.id)).not.toBeNull();
+    // The refresh token is still usable for the task that holds the lock now.
+    expect(await store.spendRefreshToken(session.familyId, "refresh-0")).toBe(true);
+  });
+
   it("gives up waiting for a stuck lock with a retryable error", async () => {
     const idp = fakeIdp();
     const { session } = await newSession(10_000);
