@@ -151,6 +151,7 @@ def test_FR_KB_042_every_source_kind_has_its_screen_or_none() -> None:
         sources.fee_dues(i, scope=scope): "/fees",
         sources.conversation_question(i, q): f"/ask/c/{i}#m-{q}",
         sources.student_count(i, scope=scope): None,
+        sources.task(i): "/tasks",  # D74
     }
     for uri, href in cases.items():
         assert href_for(sources.parse(uri)) == href, uri
