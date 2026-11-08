@@ -21,6 +21,7 @@ import { Pager, useCursorStack } from "@/features/students/paging";
 import { LoadGate } from "@/features/students/parts";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
+import { pollHeaders } from "@/lib/bff/poll";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDateTime } from "@/lib/format";
 import { translateOr } from "@/lib/i18n-dynamic";
@@ -411,9 +412,10 @@ export function BatchScreen({ batchId }: { batchId: string }) {
   const permissions = useStaffPermissions();
   const batch = usePolledQuery(
     batchKey(batchId),
-    () =>
+    (context) =>
       unwrap(
         api.GET("/api/v1/extraction-batches/{batch_id}", {
+          headers: pollHeaders(context),
           params: { path: { batch_id: batchId } },
         }),
       ),

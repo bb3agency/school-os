@@ -711,6 +711,17 @@ describe("BFF proxy: background polls and API pages (FR-NOT-001, FR-CR-005)", ()
     expect(h.apiCalls.every((request) => request.headers.get("x-sos-passive") === null)).toBe(true);
   });
 
+  it("a passive platform GET reads the operator session without sliding it (XB-07)", async () => {
+    await h.signIn("operator", operator);
+    const load = vi.spyOn(h.runtime.store, "load");
+    await call("/bff/api/v1/platform/incidents/clocks", { headers: { "x-sos-passive": "1" } });
+    expect(load).toHaveBeenCalledWith(expect.any(String), { touch: false });
+    expect(load).not.toHaveBeenCalledWith(expect.any(String), { touch: true });
+    load.mockClear();
+    await call("/bff/api/v1/platform/incidents/clocks");
+    expect(load).toHaveBeenCalledWith(expect.any(String), { touch: true });
+  });
+
   it("keeps an API page's own strict CSP and replaces anything looser", async () => {
     await h.signIn("staff", clerk);
     const memoPolicy =

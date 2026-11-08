@@ -6,7 +6,9 @@ import { installBffStub, uninstallBffStub, type BffStub } from "@/test/bff-stub"
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { me, SECTION, structureRoutes } from "@/test/school-fixtures";
 import { BroadcastReportScreen } from "./BroadcastScreens";
+import { expectPollStops, expectPollsThroughTransient, failSecondRead } from "@/test/poll";
 import {
+  LIVE_REFRESH_MS,
   READ,
   SEND,
   type Automatic,
@@ -290,6 +292,25 @@ describe("broadcasts and automatic messages on /messages (FR-MSG-017)", () => {
       expect(stub.callsTo("GET /bff/api/v1/messaging/broadcasts").length).toBeGreaterThan(0),
     );
     await waitFor(() => expect(screen.queryByText(en.broadcasts.title)).toBeNull());
+  });
+});
+
+describe("delivery report live counts (XB-07, XO-08, FR-MSG-017)", () => {
+  it.each([
+    ["keep asking after a transient failure (503), passively", 503, false],
+    ["stop asking after a failure asking again does not fix (403)", 403, true],
+  ])("%s", async (_name, status, stops) => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      signedIn([READ]);
+      const route = `GET /bff/api/v1/messaging/broadcasts/${BROADCAST}`;
+      failSecondRead(stub, route, () => Response.json(report()), status, stops);
+      renderWithIntl(<BroadcastReportScreen broadcastId={BROADCAST} />);
+      if (stops) await expectPollStops(stub, route, LIVE_REFRESH_MS);
+      else await expectPollsThroughTransient(stub, route, LIVE_REFRESH_MS);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

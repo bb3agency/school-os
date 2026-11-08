@@ -4,7 +4,9 @@ import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { notificationHref } from "@/features/notifications/data";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { setExportPollDelayForTesting } from "@/features/exports/data";
 import { expectOneCall, fireTwice } from "@/test/double-submit";
+import { expectPollStops, expectPollsThroughTransient, failSecondRead } from "@/test/poll";
 import { NoticePdfButton } from "./parts";
 import { ID, NOW, fakeAadhaar, me } from "@/test/records-fixtures";
 import { messages, renderWithIntl } from "@/test/render";
@@ -774,5 +776,57 @@ describe("a notice PDF is asked for once per click (XP-05, FR-DPDP-003)", () => 
     renderWithIntl(<NoticePdfButton templateKey="notice_parents" label="Notice to parents" />);
     fireTwice(screen.getByRole("button", { name: new RegExp(pm.pdf.make) }), "click");
     await expectOneCall(stub, "POST /bff/api/v1/privacy/templates/notice_parents/pdf");
+  });
+});
+
+describe("privacy file and access report polls (XB-07, XO-08, FR-DPDP-003, FR-DPDP-006)", () => {
+  const cases = [
+    ["keep asking after a transient failure (503), passively", 503, false],
+    ["stop asking after a failure asking again does not fix (404)", 404, true],
+  ] as const;
+
+  it.each(cases)("the access report on a request: %s", async (_name, status, stops) => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    setExportPollDelayForTesting(() => 1000);
+    try {
+      staff(READ);
+      const route = `GET /bff/api/v1/privacy/requests/${REQUEST}`;
+      const shown = detail();
+      const report = { ...shown.report!, status: "running" as const, finished_at: null };
+      failSecondRead(stub, route, () => Response.json({ ...shown, report }), status, stops);
+      renderWithIntl(<RequestDetailScreen requestId={REQUEST} />);
+      if (stops) await expectPollStops(stub, route, 1000);
+      else await expectPollsThroughTransient(stub, route, 1000);
+    } finally {
+      setExportPollDelayForTesting(null);
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(cases)("a notice PDF being made: %s", async (_name, status, stops) => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    setExportPollDelayForTesting(() => 1000);
+    try {
+      staff(MANAGE);
+      const queued: PrivacyFile = {
+        export_id: "0192f3a4-0000-7000-8000-00000000e203",
+        status: "queued",
+        error_code: null,
+        created_at: NOW,
+        finished_at: null,
+        expires_at: null,
+      };
+      stub.routes["POST /bff/api/v1/privacy/templates/notice_parents/pdf"] = () =>
+        Response.json(queued, { status: 202 });
+      const route = `GET /bff/api/v1/privacy/files/${queued.export_id}`;
+      failSecondRead(stub, route, () => Response.json(queued), status, stops);
+      renderWithIntl(<NoticePdfButton templateKey="notice_parents" label="Notice to parents" />);
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(pm.pdf.make) }));
+      if (stops) await expectPollStops(stub, route, 1000);
+      else await expectPollsThroughTransient(stub, route, 1000);
+    } finally {
+      setExportPollDelayForTesting(null);
+      vi.useRealTimers();
+    }
   });
 });

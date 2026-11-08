@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
+import { pollHeaders } from "@/lib/bff/poll";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDateTime } from "@/lib/format";
 import { istLocalInput } from "@/features/breaches/schema";
@@ -121,9 +122,11 @@ export function IncidentsScreen() {
   const [now] = useState(() => istLocalInput());
   const clocks = useApiQuery(
     INCIDENT_KEYS.clocks,
-    () => unwrap(api.GET("/api/v1/platform/incidents/clocks")),
+    (context) =>
+      unwrap(api.GET("/api/v1/platform/incidents/clocks", { headers: pollHeaders(context) })),
     // Only once the role is known: an operator without it never asks. Asked again every
     // minute: the API words each clock from the time it answered (`minutes_left`, stage).
+    // The re-reads are passive: an open console does not keep an operator signed in (XB-07).
     { enabled: Boolean(me?.permissions.includes(INCIDENTS_READ)), refetchInterval: 60_000 },
   );
   const list = usePagedList(INCIDENT_KEYS.list, (cursor) =>

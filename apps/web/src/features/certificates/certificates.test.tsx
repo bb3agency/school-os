@@ -5,6 +5,7 @@ import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { notificationHref } from "@/features/notifications/data";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { expectPollStops, expectPollsThroughTransient, failSecondRead } from "@/test/poll";
 import { intlErrors, renderWithIntl } from "@/test/render";
 import { me, ME_MEMBERSHIP, OTHER_MEMBERSHIP, STUDENT } from "@/test/school-fixtures";
 import {
@@ -451,6 +452,31 @@ describe("certificate detail (US-1102..US-1107)", () => {
       expect(stub.callsTo(`GET /bff/api/v1/certificates/${CERT}`)).toHaveLength(settled);
     } finally {
       setCertificatePollDelayForTesting(null);
+    }
+  });
+
+  it.each([
+    ["keeps asking after a transient failure (429), passively", 429, false],
+    ["stops asking after a failure asking again does not fix (404)", 404, true],
+  ])("the PDF poll %s (XB-07, XO-08, FR-CERT-011)", async (_name, status, stops) => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    setCertificatePollDelayForTesting(() => 1000);
+    try {
+      const route = `GET /bff/api/v1/certificates/${CERT}`;
+      stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([READ]));
+      failSecondRead(
+        stub,
+        route,
+        () => Response.json(issued({ pdf_status: "queued" })),
+        status,
+        stops,
+      );
+      renderWithIntl(<CertificateDetailScreen certificateId={CERT} />);
+      if (stops) await expectPollStops(stub, route, 1000);
+      else await expectPollsThroughTransient(stub, route, 1000);
+    } finally {
+      setCertificatePollDelayForTesting(null);
+      vi.useRealTimers();
     }
   });
 

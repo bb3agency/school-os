@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Value } from "@/components/ui/Value";
 import type { Locale } from "@/i18n/routing";
 import { Link } from "@/i18n/navigation";
+import { pollHeaders } from "@/lib/bff/poll";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatCount, formatDate, formatDateTime, formatInr } from "@/lib/format";
@@ -225,9 +226,11 @@ export function BroadcastReportScreen({ broadcastId }: { broadcastId: string }) 
   const locale = useLocale() as Locale;
   const report = useApiQuery(
     KEYS.broadcast(broadcastId),
-    () =>
+    (context) =>
       unwrap(
         api.GET("/api/v1/messaging/broadcasts/{broadcast_id}", {
+          // The live counts are polled passively (XB-07).
+          headers: pollHeaders(context),
           params: { path: { broadcast_id: broadcastId } },
         }),
       ),

@@ -10,7 +10,8 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { AuthRedirectError } from "@/lib/bff/fetch";
-import { ApiError, NotAvailableError, unwrap, useBffClient } from "@/lib/bff/query";
+import { pollHeaders } from "@/lib/bff/poll";
+import { ApiError, NotAvailableError, pollFailed, unwrap, useBffClient } from "@/lib/bff/query";
 import { ifMatch } from "./data";
 import type {
   ConversationDetail,
@@ -142,17 +143,22 @@ export function useConversation(id: string | null) {
   const api = useBffClient("staff");
   return useQuery({
     queryKey: CONVERSATION_KEYS.detail(id ?? "none"),
-    queryFn: (): Promise<ConversationDetail> =>
+    queryFn: (context): Promise<ConversationDetail> =>
       unwrap(
         api.GET("/api/v1/knowledge/conversations/{conversation_id}", {
+          // The re-reads while an answer is written elsewhere are passive (XB-07).
+          headers: pollHeaders(context),
           params: { path: { conversation_id: id ?? "" } },
         }),
       ),
     enabled: id !== null,
     retry,
     staleTime: 60_000,
+    // A transient failure keeps polling; any other stops it (XO-08).
     refetchInterval: (query) =>
-      query.state.data && writingElsewhere(query.state.data.messages) ? STREAMING_POLL_MS : false,
+      !pollFailed(query.state) && query.state.data && writingElsewhere(query.state.data.messages)
+        ? STREAMING_POLL_MS
+        : false,
   });
 }
 
