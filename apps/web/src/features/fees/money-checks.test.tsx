@@ -17,7 +17,7 @@ import {
   type FeeStatus,
   type Receipt,
 } from "./data";
-import { ReceiptDetailScreen } from "./ReceiptDetailScreen";
+import { ReceiptDetailScreen, setReceiptPollDelayForTesting } from "./ReceiptDetailScreen";
 import { DailyScreen } from "./ReportsScreens";
 
 /**
@@ -313,5 +313,36 @@ describe("own allocation at the counter stays within each line (XF-04, FR-FEE-01
       (await screen.findAllByText(en.counter.errors.allocationAboveDue)).length,
     ).toBeGreaterThan(0);
     expect(stub.callsTo("POST /bff/api/v1/fees/receipts")).toHaveLength(0);
+  });
+});
+
+describe("the receipt page reads the receipt again while its PDF is made (XF-07, FR-FEE-011)", () => {
+  it("FR-FEE-011 XF-07: polls a queued PDF passively until ready, then stops", async () => {
+    setReceiptPollDelayForTesting(() => 20);
+    try {
+      signedIn([COLLECT]);
+      let reads = 0;
+      stub.routes[`GET /bff/api/v1/fees/receipts/${RECEIPT}`] = () =>
+        Response.json(receipt({ pdf_status: (reads += 1) < 3 ? "queued" : "ready" }));
+      const user = userEvent.setup();
+      renderWithIntl(<ReceiptDetailScreen receiptId={RECEIPT} />);
+      expect(await screen.findByText(en.receipt.pdfPreparing)).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByText(en.receipt.pdfPreparing)).toBeNull());
+      const calls = stub.callsTo(`GET /bff/api/v1/fees/receipts/${RECEIPT}`);
+      // The first read is the clerk opening the page; the polls do not keep the session awake.
+      expect(calls[0]?.headers.get("x-sos-passive")).toBeNull();
+      expect(calls.length).toBeGreaterThan(1);
+      expect(calls.slice(1).every((c) => c.headers.get("x-sos-passive") === "1")).toBe(true);
+      await user.click(screen.getByRole("button", { name: messages.en.ui.more }));
+      expect(screen.getByRole("menuitem", { name: en.receipt.downloadPdf })).not.toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+      const settled = stub.callsTo(`GET /bff/api/v1/fees/receipts/${RECEIPT}`).length;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(stub.callsTo(`GET /bff/api/v1/fees/receipts/${RECEIPT}`)).toHaveLength(settled);
+    } finally {
+      setReceiptPollDelayForTesting(null);
+    }
   });
 });

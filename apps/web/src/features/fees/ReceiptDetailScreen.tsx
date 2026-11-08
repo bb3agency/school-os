@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
@@ -44,7 +44,9 @@ import {
   type DialogControl,
   type MoreItem,
 } from "./parts";
+import { PASSIVE_HEADER } from "@/lib/bff/fetch";
 import { openFileUrl } from "@/lib/open-file-url";
+import { runPollDelay } from "@/features/findings/RunChecks";
 
 const reason = z
   .string()
@@ -90,6 +92,15 @@ export function refundSchema(leftPaise: number) {
     mode: z.enum(["original_method", "cash", "cheque", "bank_transfer"]),
     reason,
   });
+}
+
+/**
+ * Pause before reading the receipt again while its PDF is made (2 s, 3 s, 4.5 s … at most
+ * 15 s; XF-07, as certificates XO-03). Tests shorten it.
+ */
+let pdfPollDelay: (attempt: number) => number = runPollDelay;
+export function setReceiptPollDelayForTesting(delay: ((attempt: number) => number) | null) {
+  pdfPollDelay = delay ?? runPollDelay;
 }
 
 /** The stored PDF through a short-lived link (the API client runs any step-up first). */
@@ -371,15 +382,30 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
   const me = useStaffMe();
   const allowed = can([COLLECT, FINANCE_READ]);
   const api = useBffClient("staff");
+  // XF-07: the PDF is made in the background after the receipt is saved; read the receipt
+  // again until it is ready or failed, so Download opens without a reload. The re-reads are
+  // passive: they do not keep an unattended office PC's session awake.
+  const pdfPolls = useRef(0);
   const receipt = useApiQuery(
     KEYS.receipt(receiptId),
     () =>
       unwrap(
         api.GET("/api/v1/fees/receipts/{receipt_id}", {
           params: { path: { receipt_id: receiptId } },
+          ...(pdfPolls.current > 0 ? { headers: { [PASSIVE_HEADER]: "1" } } : {}),
         }),
       ),
-    { enabled: me !== undefined && allowed },
+    {
+      enabled: me !== undefined && allowed,
+      refetchInterval: (current) => {
+        if (current?.status !== "issued" || current.pdf_status !== "queued") {
+          pdfPolls.current = 0;
+          return false;
+        }
+        pdfPolls.current += 1;
+        return pdfPollDelay(pdfPolls.current - 1);
+      },
+    },
   );
   const pdf = useDownloadPdf(receipt.status === "ready" ? receipt.data : null);
   const header = (r: Receipt | null) => {
