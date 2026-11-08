@@ -2,14 +2,23 @@
 
 Outbound only: every 5 minutes the host's beat posts versions, health and aggregate counts
 (never personal data) to ``SOS_CONTROL_PLANE_URL``, signed with its per-deployment key
-(``SOS_HEARTBEAT_KEY_ID`` / ``SOS_HEARTBEAT_KEY``, from SSM). The response's announcements are
-cached locally for the school app. The response never carries commands.
+(``SOS_HEARTBEAT_KEY_ID`` / ``SOS_HEARTBEAT_KEY``, from SSM).
+
+The answer is accepted only when it is signed with the same key (ADR-0058, W3-05): the key id
+is the host's, the timestamp within the fleet skew, ``X-SOS-Signature`` the HMAC-SHA256 of
+``timestamp + "." + body`` (constant-time compare), the body a valid ``HeartbeatOut`` and its
+``request_nonce`` the nonce just sent. Otherwise nothing is applied and the last good state
+stays (``fleet.heartbeat.answer_rejected`` with a reason code; no key, signature or body is
+logged). A verified answer refreshes the announcements and is applied by
+:mod:`app.platform.heartbeat_apply` (flags, AI answer allowance, billing summary). The answer
+never carries commands.
 """
 
 from __future__ import annotations
 
 import base64
 import datetime as dt
+import hmac
 import json
 import os
 import time
@@ -19,12 +28,13 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from pydantic import ValidationError
 
 from app.core.config import Settings, get_settings
 from app.core.health import get_checks
 from app.core.logging import get_logger
-from app.platform import announcements, invoice_storage, usage
-from app.platform.common import today_ist
+from app.platform import announcements, heartbeat_apply, invoice_storage, usage
+from app.platform.common import fleet_cfg, today_ist
 from app.platform.fleet import (
     HEADER_DEPLOYMENT,
     HEADER_KEY_ID,
@@ -40,6 +50,14 @@ TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 class HeartbeatNotConfigured(RuntimeError):
     pass
+
+
+class AnswerRejected(Exception):
+    """The control plane's answer failed verification; ``reason`` is a code, never content."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 def decode_key(value: str) -> bytes:
@@ -205,7 +223,86 @@ def send(
     if response.status_code != 200:
         log.warning("fleet.heartbeat.send_failed", status=response.status_code, outcome="rejected")
         return {"status": response.status_code}
-    out = HeartbeatOut.model_validate(response.json())
-    announcements.cache_from_heartbeat(out.announcements)
-    log.info("fleet.heartbeat.sent", status=200, count=len(out.announcements), outcome="ok")
-    return {"status": 200, "announcements": len(out.announcements)}
+    return handle_answer(settings, response.headers, response.content, request_nonce=payload.nonce)
+
+
+def verify_answer(
+    settings: Settings,
+    headers: Mapping[str, str],
+    body: bytes,
+    *,
+    request_nonce: uuid.UUID,
+    now: float | None = None,
+) -> HeartbeatOut:
+    """The control plane's answer, verified (ADR-0058); :class:`AnswerRejected` otherwise."""
+    if settings.heartbeat_key is None or settings.heartbeat_key_id is None:
+        raise HeartbeatNotConfigured("SOS_HEARTBEAT_KEY_ID and SOS_HEARTBEAT_KEY are required")
+    lower = {str(k).lower(): str(v) for k, v in headers.items()}  # HTTP names: any case
+    signature = lower.get(HEADER_SIGNATURE.lower(), "")
+    timestamp = lower.get(HEADER_TIMESTAMP.lower(), "")
+    if not signature:
+        raise AnswerRejected("unsigned")
+    if lower.get(HEADER_KEY_ID.lower(), "") != settings.heartbeat_key_id:
+        raise AnswerRejected("unknown_key")
+    if not timestamp.isdigit() or len(timestamp) > 12:
+        raise AnswerRejected("bad_timestamp")
+    current = now if now is not None else time.time()
+    if abs(current - int(timestamp)) > int(fleet_cfg()["skew_seconds"]):
+        raise AnswerRejected("stale")
+    key = decode_key(settings.heartbeat_key.get_secret_value())
+    if not hmac.compare_digest(sign(key, timestamp, body), signature):
+        raise AnswerRejected("bad_signature")
+    try:
+        answer = HeartbeatOut.model_validate_json(body)
+    except ValidationError:
+        raise AnswerRejected("schema") from None
+    if answer.request_nonce != request_nonce:
+        raise AnswerRejected("nonce_mismatch")
+    return answer
+
+
+def handle_answer(
+    settings: Settings,
+    headers: Mapping[str, str],
+    body: bytes,
+    *,
+    request_nonce: uuid.UUID,
+    now: float | None = None,
+    store: heartbeat_apply.BillingSummaryStore | None = None,
+    cache: announcements.AnnouncementCache | None = None,
+) -> dict[str, Any]:
+    """Verify the answer, then refresh announcements and apply it; on refusal keep the last
+    good state. With ``SOS_HEARTBEAT_ANSWER_UNSIGNED_OK`` (one release only) an UNSIGNED answer
+    still refreshes the announcements and applies nothing else; a wrong signature never."""
+    try:
+        answer = verify_answer(settings, headers, body, request_nonce=request_nonce, now=now)
+    except AnswerRejected as exc:
+        if exc.reason == "unsigned" and settings.heartbeat_answer_unsigned_ok:
+            try:
+                legacy = HeartbeatOut.model_validate_json(body)
+            except ValidationError:
+                log.warning(
+                    "fleet.heartbeat.answer_rejected", error_code="schema", outcome="rejected"
+                )
+                return {"status": 200, "answer": "rejected", "reason": "schema"}
+            announcements.cache_from_heartbeat(legacy.announcements, cache)
+            log.warning(
+                "fleet.heartbeat.answer_unsigned",
+                count=len(legacy.announcements),
+                outcome="announcements_only",
+            )
+            return {"status": 200, "answer": "unsigned", "announcements": len(legacy.announcements)}
+        log.warning("fleet.heartbeat.answer_rejected", error_code=exc.reason, outcome="rejected")
+        return {"status": 200, "answer": "rejected", "reason": exc.reason}
+    announcements.cache_from_heartbeat(answer.announcements, cache)
+    tenant_id = uuid.UUID(str(settings.dedicated_tenant_id))
+    applied = heartbeat_apply.apply_answer(tenant_id, answer, store=store)
+    log.info(
+        "fleet.heartbeat.sent", status=200, count=len(answer.announcements), outcome="verified"
+    )
+    return {
+        "status": 200,
+        "answer": "verified",
+        "announcements": len(answer.announcements),
+        **applied,
+    }

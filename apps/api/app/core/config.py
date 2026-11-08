@@ -438,6 +438,11 @@ class Settings(BaseSettings):
     dedicated_tenant_id: str | None = None
     heartbeat_key_id: str | None = None
     heartbeat_key: SecretStr | None = None
+    # ADR-0058: the host refuses an unsigned heartbeat answer. True only for the one release in
+    # which a host may still talk to a control plane that does not sign yet: an unsigned answer
+    # then refreshes announcements only and applies no flags, allowance or billing summary.
+    # Remove in the release after 2026.11.
+    heartbeat_answer_unsigned_ok: bool = False
 
     @property
     def is_production_like(self) -> bool:
@@ -724,8 +729,8 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"SOS_REDIS_URL must set ssl_cert_reqs=required for rediss:// in {self.env}"
                 )
-            # The heartbeat answer (announcements shown to school users) is not signed: only TLS
-            # authenticates the control plane to a dedicated host (SEC-009).
+            # TLS protects the heartbeat in transit (SEC-009); the answer is also HMAC-signed with
+            # the deployment's key and verified by the host (ADR-0058, W3-05).
             if self.control_plane_url is not None and not _is_public_https(self.control_plane_url):
                 raise ValueError(f"SOS_CONTROL_PLANE_URL must be a public https URL in {self.env}")
             # Invoices are tax documents: never issue them with the placeholder supplier. Only the

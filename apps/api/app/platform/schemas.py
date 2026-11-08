@@ -989,11 +989,53 @@ class AnnouncementBrief(Out):
     ends_at: dt.datetime
 
 
+class HbAiAllowance(Out):
+    """The AI answer bundle's included answers a month (ADR-0020 B3, ADR-0058); ``None``: no
+    bundle, the school's own ``ai_monthly_budget_inr`` applies."""
+
+    included_answers: int | None = Field(default=None, gt=0)
+
+
+class HbBillingSummary(Out):
+    """The school's subscription for its Plan and billing page on a dedicated host (ADR-0058;
+    docs/16 §19 Q7). Platform billing data only, never student data."""
+
+    plan_code: str
+    plan_name: str
+    tier: str
+    billing_period: str
+    status: str
+    current_period_start: dt.date
+    current_period_end: dt.date
+    trial_ends_at: dt.datetime | None = None
+    past_due_since: dt.date | None = None
+    grace_ends_on: dt.date | None = None
+    cancel_at_period_end: bool = False
+    amount_due_inr: Decimal = Decimal("0.00")
+    # The next invoice is drafted for the period starting on this day (billing in advance);
+    # ``None`` while in trial, when the subscription ends at the period end, or is suspended.
+    next_invoice_on: dt.date | None = None
+    # Estimate including GST: the plan (or override) and the AI answer bundle. Per-student
+    # lines and last month's AI overage are added when the invoice is drafted.
+    next_invoice_amount_inr: Decimal | None = None
+
+
 class HeartbeatOut(Out):
+    """The heartbeat answer, signed by the control plane with the deployment's key (ADR-0058).
+
+    Old hosts ignore the fields after ``announcements``. A signed answer always carries the
+    deployment's effective ``feature_flags`` (the host makes them its per-school overrides),
+    ``ai_allowance`` and ``billing`` (``None``: no live subscription). ``request_nonce`` echoes
+    the heartbeat it answers."""
+
     received_at: dt.datetime
     target_version: str | None
     min_supported_version: str
     announcements: list[AnnouncementBrief]
+    request_nonce: uuid.UUID | None = None
+    feature_flags: dict[FlagKey, bool] = Field(default_factory=dict, max_length=200)
+    ai_allowance: HbAiAllowance | None = None
+    billing: HbBillingSummary | None = None
 
 
 # --- announcements ----------------------------------------------------------------------------

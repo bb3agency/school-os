@@ -132,3 +132,4 @@ FR-…, NFR-…, SEC-…, PRV-…; docs sections affected.
 | [ADR-0055](ADR-0055-records-and-readiness-entry-tier.md) | "Records & Readiness" entry tier sold beside an existing ERP (would amend ADR-0015, ADR-0038; reopens D8) | Proposed |
 | [ADR-0056](ADR-0056-invited-owner-of-suspended-school-may-accept.md) | An invited owner or principal of a suspended school may accept the invitation (migration 0078; D67) | Accepted (lead, 2026-11-05; owner may revisit; D67) |
 | [ADR-0057](ADR-0057-board-sync-and-protected-windows.md) | Board codes reach the control plane (daily collector) and protected exam windows come from the portal calendar (amends ADR-0020; D78) | Accepted (lead, 2026-11-08; owner may revisit; D78) |
+| [ADR-0058](ADR-0058-signed-heartbeat-answer.md) | The heartbeat answer is signed and carries flags, the AI answer allowance and a billing summary (W3-05; docs/16 §19 Q5, Q7, Q19) | Accepted (lead, 2026-11-08; owner may revisit; D79) |

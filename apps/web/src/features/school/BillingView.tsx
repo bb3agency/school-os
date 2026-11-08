@@ -19,8 +19,26 @@ import { UsageMeter } from "@/components/ui/UsageMeter";
 import { Value } from "@/components/ui/Value";
 import { invoiceTone, known, subscriptionTone } from "@/features/status";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
-import { formatCount, formatDate, formatInr } from "@/lib/format";
+import { formatCount, formatDate, formatDateTime, formatInr } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
+import * as z from "@/lib/zod";
+
+/**
+ * ADR-0058 fields of GET /tenant/billing (the next invoice; on a dedicated host when the
+ * control plane's summary was received). A local schema until the generated client has them.
+ */
+const billingExtras = z.object({
+  next_invoice_on: z.string().nullish(),
+  next_invoice_amount_inr: z.string().nullish(),
+  summary_as_of: z.string().nullish(),
+});
+type BillingExtras = z.infer<typeof billingExtras>;
+
+function extrasOf(plan: TenantBilling | null): BillingExtras {
+  if (plan === null) return {};
+  const parsed = billingExtras.safeParse(plan);
+  return parsed.success ? parsed.data : {};
+}
 
 export interface BillingViewProps {
   billing: Loadable<TenantBilling>;
@@ -232,6 +250,7 @@ export function BillingView({ billing, invoices, onRetryInvoices }: BillingViewP
   ];
 
   const plan = billing.status === "ready" ? billing.data : null;
+  const extras = extrasOf(plan);
   const subStatus = plan?.status ? known(subscriptionTone, plan.status) : null;
   const usage = (plan?.usage ?? []).filter((item): item is UsageAgainstLimit & { metric: Metric } =>
     isMetric(item.metric),
@@ -305,7 +324,24 @@ export function BillingView({ billing, invoices, onRetryInvoices }: BillingViewP
                     </>
                   ) : null}
                 </div>
+                {extras.next_invoice_on ? (
+                  <div className="rounded-lg bg-surface-muted p-4 sm:col-span-2">
+                    <dt className="text-sm text-ink-muted">{t("nextInvoice")}</dt>
+                    <dd className="num mt-1 text-sm text-ink">
+                      {t("nextInvoiceValue", {
+                        amount: formatInr(extras.next_invoice_amount_inr, locale) ?? "—",
+                        date: formatDate(extras.next_invoice_on) ?? "—",
+                      })}
+                    </dd>
+                    <dd className="mt-1 text-xs text-ink-muted">{t("nextInvoiceNote")}</dd>
+                  </div>
+                ) : null}
               </dl>
+              {extras.summary_as_of ? (
+                <p className="text-xs text-ink-muted">
+                  {t("summaryAsOf", { date: formatDateTime(extras.summary_as_of) ?? "" })}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </Card>

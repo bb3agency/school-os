@@ -59,6 +59,7 @@ from app.platform.schemas import (
     AiBundleOut,
     BillingAccountIn,
     BillingAccountOut,
+    HbBillingSummary,
     InvoiceLineIn,
     InvoiceOut,
     JobOut,
@@ -1316,6 +1317,89 @@ def tenant_ai_answers(tenant_id: uuid.UUID, *, today: dt.date | None = None) -> 
         sub = repo.live_subscription(s, tenant_id)
     bundle = None if sub is None else school_ai_bundle(tenant_id, sub["id"], today=today)
     return TenantAiAnswersOut(tenant_id=tenant_id, bundle=bundle)
+
+
+# --- the billing summary a dedicated host shows (ADR-0058; docs/16 §19 Q7) ----------------------
+
+
+def next_invoice(s: Session, sub: Mapping[Any, Any]) -> tuple[dt.date | None, Decimal | None]:
+    """(day, estimated total incl. GST) of the subscription's next invoice, the one drafted for
+    the period starting at ``current_period_end`` (billing in advance; :func:`roll_periods`).
+
+    ``(None, None)`` when no such invoice follows: in trial, suspended, cancelled or ending at
+    the period end. The estimate is the plan price (or the override) and the AI answer bundle
+    counting by then, taxed as :func:`create_draft` would; per-student lines and last month's
+    overage are added only when the invoice is drafted."""
+    if sub["status"] not in ("active", "past_due") or sub["cancel_at_period_end"]:
+        return None, None
+    start = sub["current_period_end"]
+    plan = _plan_for_period(s, sub, start)
+    price = (
+        sub["price_override_inr"]
+        if sub["price_override_inr"] is not None
+        else plan["base_price_inr"]
+    )
+    amounts = [Decimal(price)]
+    if sub["ai_bundle_id"] is not None and (
+        sub["ai_bundle_from"] is None or sub["ai_bundle_from"] <= start
+    ):
+        bundle = repo.get(s, m.ai_bundles, sub["ai_bundle_id"])
+        if bundle is not None:
+            amounts.append(Decimal(bundle["price_inr"]))
+    account = repo.get(s, m.billing_accounts, sub["billing_account_id"])
+    supplier = get_settings().billing_supplier_state_code
+    tax = compute_tax(
+        ((a, Decimal(plan["gst_rate"])) for a in amounts),
+        supplier_state=supplier,
+        place_of_supply=account["state_code"] if account is not None else supplier,
+    )
+    return start, tax.total_inr
+
+
+def billing_summary(s: Session, tenant_id: uuid.UUID) -> HbBillingSummary | None:
+    """The school's live subscription as a :class:`HbBillingSummary` (platform rows only, read
+    for this one ``tenant_id``); ``None`` without a live subscription."""
+    sub = repo.live_subscription(s, tenant_id)
+    if sub is None:
+        return None
+    plan = must(repo.get(s, m.plans, sub["plan_id"]))
+    i = m.invoices
+    due: Any = s.execute(
+        select(func.coalesce(func.sum(i.c.total_inr - i.c.amount_paid_inr - i.c.tds_inr), 0)).where(
+            i.c.tenant_id == tenant_id, i.c.status == "issued"
+        )
+    ).scalar_one()
+    on, amount = next_invoice(s, sub)
+    return HbBillingSummary(
+        plan_code=plan["code"],
+        plan_name=plan["name"],
+        tier=plan["tier"],
+        billing_period=plan["billing_period"],
+        status=sub["status"],
+        current_period_start=sub["current_period_start"],
+        current_period_end=sub["current_period_end"],
+        trial_ends_at=sub["trial_ends_at"],
+        past_due_since=sub["past_due_since"],
+        grace_ends_on=sub["grace_ends_on"],
+        cancel_at_period_end=bool(sub["cancel_at_period_end"]),
+        amount_due_inr=round_paise(max(Decimal(due), Decimal("0.00"))),
+        next_invoice_on=on,
+        next_invoice_amount_inr=amount,
+    )
+
+
+def school_next_invoice(
+    tenant_id: uuid.UUID, subscription_id: uuid.UUID
+) -> tuple[dt.date | None, Decimal | None]:
+    """:func:`next_invoice` for the calling school's own subscription (shared tier page)."""
+    with platform_session() as s:
+        sub = repo.get_by(
+            s,
+            m.subscriptions,
+            m.subscriptions.c.id == subscription_id,
+            m.subscriptions.c.tenant_id == tenant_id,
+        )
+        return (None, None) if sub is None else next_invoice(s, sub)
 
 
 def _totals(s: Session, invoice: Mapping[Any, Any]) -> dict[str, Any]:

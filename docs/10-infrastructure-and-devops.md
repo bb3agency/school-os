@@ -388,7 +388,8 @@ All Python services share one image (`schoolos-python:dev`) with a read-only roo
 | `SOS_PLATFORM_INVOICE_BUCKET` | unset (files bucket) | Control-plane bucket for invoice PDFs; unset = the files bucket under `platform/invoices/`, never a school prefix (ADR-0017 Amendment 2026-09-28); Terraform `platform_invoice_bucket` |
 | `SOS_CONTROL_PLANE_URL` | none | Dedicated hosts: where the heartbeat is sent |
 | `SOS_DEPLOYMENT_ID`, `SOS_DEDICATED_TENANT_ID` | none | Dedicated hosts: identity in the heartbeat |
-| `SOS_HEARTBEAT_KEY_ID`, `SOS_HEARTBEAT_KEY` | none | Dedicated hosts: heartbeat HMAC key (base64url, shown once by the panel) |
+| `SOS_HEARTBEAT_KEY_ID`, `SOS_HEARTBEAT_KEY` | none | Dedicated hosts: heartbeat HMAC key (base64url, shown once by the panel); also verifies the signed answer (ADR-0058) |
+| `SOS_HEARTBEAT_ANSWER_UNSIGNED_OK` | `false` | Dedicated hosts, one release only (remove after 2026.11): accept an UNSIGNED heartbeat answer for announcements only (no flags, allowance or billing summary); a wrong signature is always refused (ADR-0058) |
 
 Deployments use exactly these names: Terraform `shared_platform` (§5) and `deploy/dedicated/compose.yaml` (§15.2) give every app container (api, worker, beat, migrate) the full set it needs, and `apps/api/tests/deploy/test_env_contract.py` enforces it. Names that reach app containers without being settings are allowlisted there with the reader: `AWS_DEFAULT_REGION` (AWS SDK) and `SOS_HOST_STATE_DIR` (dedicated host state mount).
 

@@ -344,6 +344,36 @@ describe("Plan and billing (FR-PLT-030)", () => {
     expect(screen.getAllByRole("meter")).toHaveLength(1);
   });
 
+  it("dedicated host: shows the control plane's summary with the next invoice (ADR-0058)", async () => {
+    stub.routes["GET /bff/api/v1/tenant/billing"] = () =>
+      Response.json({
+        available: true,
+        plan_code: "dedicated",
+        plan_name: "Dedicated",
+        tier: "dedicated",
+        billing_period: "monthly",
+        status: "active",
+        current_period_start: "2026-11-01",
+        current_period_end: "2026-12-01",
+        trial_ends_at: null,
+        past_due_since: null,
+        grace_ends_on: null,
+        cancel_at_period_end: false,
+        usage_date: null,
+        usage: [],
+        amount_due_inr: "0.00",
+        ai_bundle: null,
+        next_invoice_on: "2026-12-01",
+        next_invoice_amount_inr: "29500.00",
+        summary_as_of: "2026-11-08T04:35:01Z",
+      });
+    stub.routes["GET /bff/api/v1/tenant/billing/invoices"] = () => page([]);
+    renderWithIntl(<BillingScreen />);
+    expect(await screen.findByText(sm.billing.nextInvoice)).toBeInTheDocument();
+    expect(screen.getByText("₹29,500.00 on 01/12/2026")).toBeInTheDocument();
+    expect(screen.getByText(/Plan details from SchoolOS, as of 08\/11\/2026/)).toBeInTheDocument();
+  });
+
   describe("AI answers card (ADR-0038)", () => {
     const base = {
       available: true,
