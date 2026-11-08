@@ -47,7 +47,7 @@ import {
   useSchoolDirectory,
 } from "./data";
 import { InvoiceTable } from "./InvoiceTable";
-import { FilterCard } from "./FilterCard";
+import { FilterCard, activeFilters, knownLabel } from "./FilterCard";
 import { Figure, Mono, TierTag } from "./pills";
 import { SubscriptionActions } from "./SubscriptionActions";
 
@@ -442,6 +442,7 @@ export function PlansScreen({ status = "" }: { status?: string }) {
       description={t("draftNote")}
       confirmLabel={t("saveDraft")}
       stepUp
+      errorSummary
       schema={planSchema}
       fieldMap={(field) => field}
       invalidate={[PK.plans]}
@@ -556,6 +557,8 @@ export function PlansScreen({ status = "" }: { status?: string }) {
                     description={t("editBody")}
                     confirmLabel={t("saveChanges")}
                     stepUp
+                    errorSummary
+                    unsavedStatus
                     schema={planPatchSchema(row)}
                     fieldMap={(field) => field}
                     invalidate={[PK.plans]}
@@ -642,7 +645,19 @@ export function PlansScreen({ status = "" }: { status?: string }) {
       />
       <DataTableV2
         toolbar={
-          <FilterCard bare clearHref={status ? "/platform/plans" : undefined}>
+          <FilterCard
+            bare
+            clearHref={status ? "/platform/plans" : undefined}
+            path="/platform/plans"
+            active={activeFilters([
+              {
+                param: "status",
+                raw: status,
+                label: t("colStatus"),
+                value: knownLabel(["draft", "published", "retired"] as const, status, tstatus),
+              },
+            ])}
+          >
             <SelectField
               name="status"
               label={t("colStatus")}
@@ -856,7 +871,19 @@ export function SubscriptionsScreen({ status = "" }: { status?: string }) {
       />
       <DataTableV2
         toolbar={
-          <FilterCard bare clearHref={status ? "/platform/subscriptions" : undefined}>
+          <FilterCard
+            bare
+            clearHref={status ? "/platform/subscriptions" : undefined}
+            path="/platform/subscriptions"
+            active={activeFilters([
+              {
+                param: "status",
+                raw: status,
+                label: t("filterStatus"),
+                value: knownLabel(SUBSCRIPTION_STATUSES, status, tstatus),
+              },
+            ])}
+          >
             <SelectField
               name="status"
               label={t("filterStatus")}
@@ -979,6 +1006,27 @@ export function InvoicesScreen({ filters = {} }: { filters?: InvoiceFilters }) {
                 ? "/platform/invoices"
                 : undefined
             }
+            path="/platform/invoices"
+            active={activeFilters([
+              {
+                param: "status",
+                raw: filters.status ?? "",
+                label: t("colStatus"),
+                value: knownLabel(INVOICE_STATUSES, filters.status ?? "", tstatus),
+              },
+              {
+                param: "fy",
+                raw: filters.financialYear ?? "",
+                label: t("financialYear"),
+                value: filters.financialYear ?? "",
+              },
+              {
+                param: "school",
+                raw: filters.tenantId ?? "",
+                label: t("colSchool"),
+                value: nameOf(filters.tenantId),
+              },
+            ])}
           >
             <SelectField
               name="status"

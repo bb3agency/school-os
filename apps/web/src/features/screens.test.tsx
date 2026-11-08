@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import type * as Navigation from "next/navigation";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { forgetSessionInfo } from "@/lib/bff/session-client";
@@ -9,6 +10,18 @@ import { AcademicStructureScreen } from "./academic-structure/AcademicStructureS
 import { auditQuery } from "./school/audit-filters";
 import { AuditScreen, toIsoDate } from "./school/screens";
 import { UsersScreen } from "./users/UsersScreen";
+
+// The operator schools list shows URL filters as chips (D75); a chip's remove button navigates.
+vi.mock("next/navigation", async (importOriginal) => {
+  const actual = await importOriginal<typeof Navigation>();
+  return {
+    ...actual,
+    usePathname: () => "/platform/schools",
+    useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+    useSearchParams: () => new URLSearchParams(),
+    useParams: () => ({ locale: "en" }),
+  };
+});
 
 type Route = (url: URL, request: Request) => Response | Promise<Response>;
 let routes: Record<string, Route>;

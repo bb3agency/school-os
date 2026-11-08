@@ -188,8 +188,15 @@ describe("edit an announcement (FR-PLT-026)", () => {
     await user.clear(d.getByLabelText(a.endsAt));
     await user.type(d.getByLabelText(a.endsAt), "2026-10-11T05:00");
     await user.click(d.getByRole("button", { name: a.editSave }));
-    expect(await d.findByText(messages.en.validation.required)).toBeInTheDocument();
-    expect(d.getByText(messages.en.validation.endAfterStart)).toBeInTheDocument();
+    // D75 (docs/17 §4.4): the error summary on top takes focus and links to each field; the
+    // message also shows under the field.
+    const summary = await d.findByRole("alert", { name: messages.en.ui.errorSummary.title });
+    expect(summary).toHaveFocus();
+    expect(
+      within(summary).getByRole("link", { name: messages.en.validation.required }),
+    ).toHaveAttribute("href", `#${d.getByLabelText(a.titleLabel).id}`);
+    expect(d.getAllByText(messages.en.validation.required)).toHaveLength(2);
+    expect(d.getAllByText(messages.en.validation.endAfterStart)).toHaveLength(2);
     expect(d.getByLabelText(a.titleLabel)).toHaveAttribute("maxLength", "120");
     expect(stub.callsTo(PATCH_A1)).toHaveLength(0);
   });

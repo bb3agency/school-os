@@ -32,7 +32,7 @@ import type { Loadable } from "@/lib/loadable";
 import { checkbox, text, uuid } from "@/lib/validation";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { PK, ifMatch, useCan, useOperatorMe, useSchoolDirectory } from "./data";
-import { FilterCard } from "./FilterCard";
+import { FilterCard, activeFilters, knownLabel } from "./FilterCard";
 import { MonoTime } from "./pills";
 
 /** Always-visible warning on every support screen (docs/16 §15; CLAUDE.md §11). */
@@ -271,6 +271,27 @@ export function PlatformSupportScreen({ filters = {} }: { filters?: TicketFilter
             clearHref={
               filters.status || filters.priority || filters.mine ? "/platform/support" : undefined
             }
+            path="/platform/support"
+            active={activeFilters([
+              {
+                param: "status",
+                raw: filters.status ?? "",
+                label: t("colStatus"),
+                value: knownLabel(TICKET_STATUSES, filters.status ?? "", tstatus),
+              },
+              {
+                param: "priority",
+                raw: filters.priority ?? "",
+                label: t("colPriority"),
+                value: knownLabel(TICKET_PRIORITIES, filters.priority ?? "", tprio),
+              },
+              filters.mine && {
+                param: "mine",
+                raw: "true",
+                label: t("assignedToMe"),
+                value: tc("yes"),
+              },
+            ])}
           >
             <SelectField
               name="status"

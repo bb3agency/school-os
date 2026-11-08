@@ -51,7 +51,7 @@ import {
   useSchoolDirectory,
 } from "./data";
 import { DeploymentActions } from "./DeploymentActions";
-import { FilterCard } from "./FilterCard";
+import { FilterCard, activeFilters, knownLabel } from "./FilterCard";
 import { FlagSwitch } from "./FlagSwitch";
 import { HeartbeatPill } from "./HeartbeatPill";
 import { Figure, Mono, MonoTime, TierTag } from "./pills";
@@ -110,6 +110,22 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
             clearHref={
               filters.from || filters.to || filters.tenantId ? "/platform/usage" : undefined
             }
+            path="/platform/usage"
+            active={activeFilters([
+              {
+                param: "from",
+                raw: filters.from ?? "",
+                label: t("from"),
+                value: filters.from ?? "",
+              },
+              { param: "to", raw: filters.to ?? "", label: t("to"), value: filters.to ?? "" },
+              {
+                param: "school",
+                raw: filters.tenantId ?? "",
+                label: t("colSchool"),
+                value: nameOf(filters.tenantId),
+              },
+            ])}
           >
             <TextField
               name="from"
@@ -458,6 +474,15 @@ export function FlagsScreen() {
 
 /* ------------------------------------------------------------------ fleet */
 
+/** The fleet list's status filter values. */
+const DEPLOYMENT_STATUSES = [
+  "provisioning",
+  "healthy",
+  "degraded",
+  "unreachable",
+  "decommissioned",
+] as const;
+
 /** FR-PLT-023..025 (docs/16 §5.12): deployments, versions, last heartbeat, actions. */
 export function FleetScreen({ status = "" }: { status?: string }) {
   const t = useTranslations("platform.fleet");
@@ -584,15 +609,24 @@ export function FleetScreen({ status = "" }: { status?: string }) {
         description={t("description")}
         breadcrumb={[{ label: tn("dashboard"), href: "/platform" }, { label: t("title") }]}
       />
-      <FilterCard clearHref={status ? "/platform/fleet" : undefined}>
+      <FilterCard
+        clearHref={status ? "/platform/fleet" : undefined}
+        path="/platform/fleet"
+        active={activeFilters([
+          {
+            param: "status",
+            raw: status,
+            label: t("colStatus"),
+            value: knownLabel(DEPLOYMENT_STATUSES, status, tstatus),
+          },
+        ])}
+      >
         <SelectField
           name="status"
           label={t("colStatus")}
           placeholder={tc("all")}
           defaultValue={status}
-          options={(
-            ["provisioning", "healthy", "degraded", "unreachable", "decommissioned"] as const
-          ).map((value) => ({ value, label: tstatus(value) }))}
+          options={DEPLOYMENT_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
           className="w-52"
         />
       </FilterCard>
@@ -1071,6 +1105,34 @@ export function PlatformAuditScreen({ filters = {} }: { filters?: PlatformAuditF
                 ? "/platform/audit"
                 : undefined
             }
+            path="/platform/audit"
+            active={activeFilters([
+              {
+                param: "actor",
+                raw: filters.actor ?? "",
+                label: t("filterOperator"),
+                value: filters.actor ?? "",
+              },
+              {
+                param: "action",
+                raw: filters.action ?? "",
+                label: t("colAction"),
+                value: filters.action ?? "",
+              },
+              {
+                param: "school",
+                raw: filters.tenantId ?? "",
+                label: t("colSchool"),
+                value: nameOf(filters.tenantId),
+              },
+              {
+                param: "from",
+                raw: filters.from ?? "",
+                label: t("from"),
+                value: filters.from ?? "",
+              },
+              { param: "to", raw: filters.to ?? "", label: t("to"), value: filters.to ?? "" },
+            ])}
           >
             <TextField
               name="actor"
