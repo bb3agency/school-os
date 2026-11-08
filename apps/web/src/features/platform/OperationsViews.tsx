@@ -827,6 +827,9 @@ export function BreakGlassScreen() {
     ) : row.emergency &&
       row.status === "requested" &&
       row.emergency_confirmed_by_2 === null &&
+      // SEC-029 (WP-01): the first confirmer cannot give the second confirmation.
+      meId !== undefined &&
+      row.emergency_confirmed_by_1 !== meId &&
       can("platform.breakglass.emergency") ? (
       <ActionDialog
         triggerLabel={t("confirmEmergency")}

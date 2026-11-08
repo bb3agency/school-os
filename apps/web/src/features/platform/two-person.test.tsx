@@ -270,3 +270,87 @@ describe("critical announcements are two-person", () => {
     ).toBeNull();
   });
 });
+
+describe("the operator who asked cannot give the second step (WP-01, SEC-029)", () => {
+  // The API refuses with 409 same_operator; the console must not offer the button at all.
+  async function meLoaded() {
+    await waitFor(() =>
+      expect(stub.callsTo("GET /bff/api/v1/platform/me").length).toBeGreaterThan(0),
+    );
+  }
+
+  it("offboarding: the requester sees no Approve button", async () => {
+    stub.routes[`GET /bff/api/v1/platform/tenants/${T}`] = () =>
+      Response.json({ ...DETAIL, offboard_requested_by: OP });
+    renderWithIntl(<SchoolDetailScreen schoolId={T} tab="overview" />);
+    expect(await screen.findByText(pm.schoolDetail.offboardPendingTitle)).toBeVisible();
+    await meLoaded();
+    expect(
+      await screen.findByRole("button", { name: pm.schoolDetail.withdrawOffboard }),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: pm.schoolDetail.approveOffboard })).toBeNull(),
+    );
+  });
+
+  it("emergency break-glass: the first confirmer sees no second Confirm button", async () => {
+    stub.routes["GET /bff/api/v1/platform/break-glass-requests"] = () =>
+      page([
+        {
+          id: BG,
+          tenant_id: T,
+          requested_by: OTHER,
+          reason_code: "security_incident",
+          reason: "Suspected account compromise reported by principal",
+          scope: {},
+          duration_minutes: 60,
+          emergency: true,
+          emergency_confirmed_by_1: OP,
+          emergency_confirmed_by_2: null,
+          status: "requested",
+          created_at: "2026-10-07T04:30:00Z",
+          confirm_by: "2026-10-10T04:30:00Z",
+        },
+      ]);
+    renderWithIntl(<BreakGlassScreen />);
+    expect(await screen.findByText(/^Confirm by /)).toBeVisible();
+    await meLoaded();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: new RegExp(`^${pm.breakGlass.confirmEmergency}`) }),
+      ).toBeNull(),
+    );
+  });
+
+  it("critical announcement: the operator who submitted it sees no Approve button", async () => {
+    stub.routes["GET /bff/api/v1/platform/announcements"] = () =>
+      page([
+        {
+          id: A1,
+          title_en: "Security notice",
+          title_te: "Security notice",
+          body_en: "Do not share sign-in codes.",
+          body_te: "Do not share sign-in codes.",
+          severity: "critical",
+          audience: "all",
+          audience_tier: null,
+          audience_tenant_ids: [],
+          starts_at: "2026-10-11T00:30:00Z",
+          ends_at: "2026-10-12T00:30:00Z",
+          status: "pending_approval",
+          version: 1,
+          submitted_by: OP,
+          submitted_at: "2026-10-07T05:00:00Z",
+          approval_expires_at: "2026-10-10T05:00:00Z",
+        } satisfies Announcement,
+      ]);
+    renderWithIntl(<AnnouncementsScreen />);
+    expect(await screen.findByText(messages.en.status.announcement.pending_approval)).toBeVisible();
+    await meLoaded();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: new RegExp(`^${pm.announcements.approve}`) }),
+      ).toBeNull(),
+    );
+  });
+});

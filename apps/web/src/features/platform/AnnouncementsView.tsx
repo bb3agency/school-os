@@ -17,7 +17,7 @@ import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { AnnouncementEditDialog, AnnouncementEditor } from "./AnnouncementEditor";
-import { LIST_PAGE_SIZE, PK, useCan, usePagedList } from "./data";
+import { LIST_PAGE_SIZE, PK, useCan, useOperatorMe, usePagedList } from "./data";
 import { MonoTime } from "./pills";
 import { ShowMore } from "./ShowMore";
 
@@ -53,6 +53,8 @@ export function AnnouncementsScreen() {
   const api = useBffClient("operator");
   const can = useCan();
   const manage = can("platform.announcements.manage");
+  // SEC-029 (WP-01): the operator who submitted a critical banner cannot approve it.
+  const meId = useOperatorMe()?.operator_id;
   const queryClient = useQueryClient();
   const [updated, setUpdated] = useState(false);
   // The clock "ended" is read against: every minute, and again when the API refuses an edit
@@ -150,7 +152,12 @@ export function AnnouncementsScreen() {
               triggerLabel={t("approve")}
               triggerSize="sm"
               triggerVariant="primary"
-              triggerHidden={readOnly || row.status !== "pending_approval"}
+              triggerHidden={
+                readOnly ||
+                row.status !== "pending_approval" ||
+                meId === undefined ||
+                row.submitted_by === meId
+              }
               triggerDescription={row.title_en}
               title={t("approveTitle")}
               description={t("approveBody")}
