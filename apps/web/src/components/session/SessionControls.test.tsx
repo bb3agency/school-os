@@ -281,6 +281,26 @@ describe("SessionControls (docs/07 §5.2 shared-PC mode)", () => {
     expect(requests.some((r) => r.url.includes("/bff/auth/logout"))).toBe(false);
   });
 
+  it("SEC-021 WS-02: a support session in use is not signed out (its BFF calls report as the school console)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    expiresInMs = 2 * MINUTE;
+    const navigate = vi.fn();
+    renderWithIntl(<SessionControls kind="support" navigate={navigate} />);
+    await flush();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    // The school console's BFF client reports activity as "staff" for a support session.
+    act(() => {
+      activity();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(MINUTE + 30_000);
+    });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(requests.some((r) => r.url.includes("/bff/auth/logout"))).toBe(false);
+  });
+
   it("FR-IAM-003 WS-02: the session ended in another tab: this tab leaves the page", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     expiresInMs = 2 * MINUTE;
