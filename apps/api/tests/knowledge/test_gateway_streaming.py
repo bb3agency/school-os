@@ -151,6 +151,9 @@ _TELUGU = str.maketrans("0123456789", "౦౧౨౩౪౫౬౭౮౯")
         "/".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),
         " ".join([_VALID[:4], _VALID[4:8], _VALID[8:]]).translate(_TELUGU),  # Telugu digits
         "      ".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),  # wide gap (DPA-01)
+        " | ".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),  # table row (DPA-03)
+        ":".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),
+        "  *  ".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),
     ],
 )
 def test_invariant_4_DPA_02_every_separator_the_masker_joins_is_held_back(number: str) -> None:

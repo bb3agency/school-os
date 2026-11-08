@@ -47,10 +47,13 @@ consecutive whole groups inside a run, so:
    exactly three 4-digit groups, each pair joined by 1-3 characters from whitespace (incl. NBSP,
    narrow NBSP and every other Zs), hyphens and Unicode dashes, ``.`` ``/`` ``_`` and invisible
    format characters (Cf) in any mix (``2345.6789/0124``, ``2345 - 6789 - 0124``,
-   ``2345/ 6789 .0124``), or by a single ``,``; Verhoeff-valid; no group inside a longer
-   contiguous digit block, and not continued by another digit group joined only by ``.`` ``/``
-   ``,`` ``_``. Refused by ``contains_full_aadhaar`` and ``contains_grouped_aadhaar``, masked
-   like rule 1, located by ``find_aadhaar``. Over-masking is accepted, under-masking is not.
+   ``2345/ 6789 .0124``), or by a single ``,``, or by one table separator ``|`` ``:`` ``*``
+   with any whitespace around it (``2345 | 6789 | 0124``; lead decision 2026-11-08 extending
+   D52, audit DPA-03; ``x`` and parentheses are not separators); Verhoeff-valid; no group
+   inside a longer contiguous digit block, and not continued by another digit group joined
+   only by ``.`` ``/`` ``,`` ``_``. Refused by ``contains_full_aadhaar`` and
+   ``contains_grouped_aadhaar``, masked like rule 1, located by ``find_aadhaar``. Over-masking
+   is accepted, under-masking is not.
 
 Masking repeats until nothing changes, so ``redact(redact(x)) == redact(x)``.
 """
@@ -315,14 +318,22 @@ def _mobile_regions(groups: list[_Group], taken: set[int]) -> list[tuple[int, in
 # slashes, commas or underscores (``1234.5678.9012.3456``), so ``SOS/2026-27/000123``, dates and
 # amounts never match. Windows may overlap (zero-width lookahead); every quantifier is bounded,
 # so the scan is linear in the text length.
-_WIDE_SEP = rf"(?:[\s{_INVISIBLE}\-\u2010-\u2015\u2212\ufe58\ufe63\uff0d._/]{{1,3}}|,)"
+# Lead decision 2026-11-08 (extends D52; audit DPA-03): table separators ``|``, ``:`` and ``*``
+# with any whitespace (or Cf) around them also join the three 4-digit groups, as OCR and PDF
+# extraction write table cells (``2345 | 6789 | 0124``). Only here, never as general run
+# separators, so clock times (``09:30``) and ratios are never joined. ``x`` and parentheses are
+# not separators. Gaps and table characters are disjoint and each try is anchored by ``\d{4}``,
+# so the scan stays linear.
+_TABLE_SEP = rf"[\s{_INVISIBLE}]*[|:*][\s{_INVISIBLE}]*"
+_WIDE_SEP = rf"(?:{_TABLE_SEP}|[\s{_INVISIBLE}\-\u2010-\u2015\u2212\ufe58\ufe63\uff0d._/]{{1,3}}|,)"
 _TIGHT = r"[./,_]"
 AADHAAR_GROUP_SEPARATOR = _WIDE_SEP
 """Regex fragment for what may join two 4-digit groups (rule 4); other maskers reuse it."""
-NUMBER_RUN_CHARACTER = rf"[+\d\s{_INVISIBLE}\-\u2010-\u2015\u2212\ufe58\ufe63\uff0d._/,]"
+NUMBER_RUN_CHARACTER = rf"[+\d\s{_INVISIBLE}\-\u2010-\u2015\u2212\ufe58\ufe63\uff0d._/,|:*]"
 """Regex class of every character that may continue a number the maskers look at (digits of
-any script, every gap, dash and rule-4 separator). A masker that sees text in pieces (the AI
-stream, audit 2026-11-08 DPA-02) holds back a trailing run of these until the run has ended."""
+any script, every gap, dash and rule-4 separator, the table separators of DPA-03 included).
+A masker that sees text in pieces (the AI stream, audit 2026-11-08 DPA-02) holds back a
+trailing run of these until the run has ended."""
 _PUNCT_RE = re.compile(
     rf"(?<!\d)(?<!\d{_TIGHT})(?<!\d{_TIGHT}{{2}})(?<!\d{_TIGHT}{{3}})"
     rf"(?=(\d{{4}}){_WIDE_SEP}(\d{{4}}){_WIDE_SEP}(\d{{4}})(?!{_TIGHT}{{0,3}}\d))"

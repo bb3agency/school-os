@@ -154,6 +154,10 @@ def test_SEC_019_injection_signals_are_canaries_and_external_links() -> None:
         ("Aadhaar 2345.6789/0123", True),  # D52 separators
         ("Aadhaar 2345 - 6789 - 0123", True),
         ("Aadhaar 2345/ 6789 .0123", True),
+        ("Aadhaar 2345      6789\n\n\n\n0123", True),  # wide gaps (DPA-01)
+        ("Row 2345 | 6789 | 0123", True),  # table separators (DPA-03)
+        ("Row 2345   :   6789   :   0123", True),
+        ("Row 2345  *  6789  *  0123", True),
         ("Aadhaar XXXX XXXX 0123", False),
         ("Phone 98480 22338", False),
         ("Ref 1234567890123", False),
