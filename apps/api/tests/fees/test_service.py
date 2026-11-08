@@ -811,6 +811,56 @@ def test_FR_FEE_008_percent_concession_above_100_is_refused(school: Any) -> None
     assert err.value.errors[0]["code"] == "above_100_percent"
 
 
+def _exam_concession(school: Any, account_id: uuid.UUID, exm: uuid.UUID, value: str) -> Any:
+    return F.call(
+        school,
+        "office_admin",
+        fees.request_concession,
+        account_id,
+        ConcessionCreate(
+            concession_type="merit",
+            basis="amount",
+            value=D(value),
+            targets=[ConcessionTarget(instalment_no=2, head_id=exm)],
+            reason="Merit scholarship for this term",
+        ),
+    )
+
+
+def test_BL_04_FR_FEE_008_a_concession_may_not_take_a_due_below_zero(school: Any) -> None:
+    """BL-04 (lead decision 2026-11-08): a concession above what is still due on a line is
+    refused (422 ``concession_exceeds_due`` on ``value``), when asked and again when approved
+    (a payment can land in between). Money already paid goes back only through a refund."""
+    setup = F.ensure_setup(school)
+    account_id = F.account(school)
+    due = _line(_account(school, account_id), 2, setup.exm).due
+    assert due > D("100.00")
+    # Asked while the line is unpaid, then the line is paid before the approval.
+    pending = _exam_concession(school, account_id, setup.exm, "100.00")
+    F.issue(
+        school,
+        account_id,
+        due,
+        allocations=[AllocationIn(instalment_no=2, head_id=setup.exm, amount=due)],
+    )
+    with pytest.raises(ValidationFailed) as err:
+        F.call(
+            school,
+            "principal",
+            fees.approve_concession,
+            pending.id,
+            DecisionIn(),
+            expected_version=None,
+        )
+    assert err.value.errors[0]["field"] == "value"
+    assert err.value.errors[0]["code"] == "concession_exceeds_due"
+    assert _line(_account(school, account_id), 2, setup.exm).due == D("0.00")
+    # Asked on the paid line: refused at once.
+    with pytest.raises(ValidationFailed) as err:
+        _exam_concession(school, account_id, setup.exm, "100.00")
+    assert err.value.errors[0]["code"] == "concession_exceeds_due"
+
+
 def test_FR_FEE_009_per_day_late_fee_capped_never_compounding(school: Any) -> None:
     _, account_id = _late_plan(
         school,

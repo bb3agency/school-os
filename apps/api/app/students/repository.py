@@ -245,12 +245,17 @@ def student_ids_with_batch(session: Session, batch_id: uuid.UUID) -> list[uuid.U
 # ``ON DELETE CASCADE`` foreign key.
 
 
-def student_versions(session: Session, student_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, int]:
+def student_versions(
+    session: Session, student_ids: Collection[uuid.UUID], *, lock: bool = False
+) -> dict[uuid.UUID, int]:
+    """Versions of ``student_ids``; ``lock`` takes their rows ``FOR UPDATE`` in id order (the
+    order every multi-student writer uses), as each value write locks its student first."""
     if not student_ids:
         return {}
-    rows = session.execute(
-        select(Student.id, Student.version).where(Student.id.in_(list(student_ids)))
-    ).all()
+    stmt = select(Student.id, Student.version).where(Student.id.in_(list(student_ids)))
+    if lock:
+        stmt = stmt.order_by(Student.id).with_for_update()
+    rows = session.execute(stmt).all()
     return {r.id: int(r.version) for r in rows}
 
 

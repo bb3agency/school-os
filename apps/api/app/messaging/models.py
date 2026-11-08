@@ -206,6 +206,8 @@ class Message(Base):
     # 0061_messaging_sends: the notice broadcast it belongs to; when the sender may try again.
     broadcast_id: Mapped[uuid.UUID | None]
     next_attempt_at: Mapped[dt.datetime | None]
+    claimed_until: Mapped[dt.datetime | None]
+    """A live send claim (BL-05): counted in the daily cap until the send is recorded."""
 
 
 class InboundEvent(Base):

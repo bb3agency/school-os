@@ -186,6 +186,12 @@ def request_concession(
         if key in seen or found is None or found[0].charged <= 0:
             raise ValidationFailed([c.error(f"targets.{i}", "invalid")])
         seen.add(key)
+    _concession_parts(
+        dues,
+        [(t.instalment_no, t.head_id) for t in data.targets],
+        basis=data.basis,
+        value=data.value,
+    )
     with c.db_errors():
         row = repo.insert_concession(
             session,
@@ -226,6 +232,50 @@ def _load_concession(session: Session, row_id: uuid.UUID) -> Concession:
     return row
 
 
+def _concession_parts(
+    dues: ledger.Dues,
+    targets: Sequence[tuple[int, uuid.UUID]],
+    *,
+    basis: str,
+    value: Decimal,
+) -> list[Decimal]:
+    """The concession on each target line. Percent: of the line's charge; amount: spread over
+    the targets in order. Never more than the charge less earlier concessions (409
+    ``nothing_to_concede`` when nothing is left) and never more than what is still due on a
+    line: a concession may not take a due below zero (422 ``concession_exceeds_due`` on
+    ``value``; BL-04, lead decision 2026-11-08). Money already paid goes back only through a
+    refund (FR-FEE-013)."""
+    room: list[Decimal] = []
+    due: list[Decimal] = []
+    charged: list[Decimal] = []
+    for key in targets:
+        found = dues.line(*key)
+        bucket = found[0] if found else None
+        charged.append(bucket.charged if bucket else ZERO)
+        room.append(max((bucket.charged + bucket.concession) if bucket else ZERO, ZERO))
+        due.append(max(bucket.due, ZERO) if bucket else ZERO)
+    if basis == "percent":
+        parts = [min(percent_of(ch, value), r) for ch, r in zip(charged, room, strict=True)]
+    else:
+        try:
+            parts = spread(min(value, total(room)), room)
+        except ValueError:  # pragma: no cover - min() above keeps it within room
+            parts = []
+    if total(parts) <= 0:
+        raise Conflict(
+            "There is nothing left to concede on these lines.", code="nothing_to_concede"
+        )
+    if any(part > left for part, left in zip(parts, due, strict=True)):
+        raise ValidationFailed(
+            [c.error("value", "concession_exceeds_due")],
+            detail=(
+                "The concession is more than what is still due on a line. Lower it; money "
+                "already paid is returned with a refund."
+            ),
+        )
+    return parts
+
+
 def approve_concession(
     session: Session,
     ctx: UserContext,
@@ -237,7 +287,8 @@ def approve_concession(
     """Approve and post the concession entries in one transaction (``fee.concession.approve``,
     step-up, not the requester). Percent: of each target's charge; amount: spread over the
     targets in order. Never more than what was charged less earlier concessions (409
-    ``nothing_to_concede``)."""
+    ``nothing_to_concede``) or than what is still due on a line (422
+    ``concession_exceeds_due``; BL-04)."""
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.CONCESSION_APPROVE)
     c.require_recent_mfa(ctx)
@@ -248,25 +299,8 @@ def approve_concession(
     today = c.today(session)
     dues = ledger.dues_for(session, account, today)
     targets = [(int(t["instalment_no"]), uuid.UUID(str(t["head_id"]))) for t in row.targets]
-    room: list[Decimal] = []
-    charged: list[Decimal] = []
-    for key in targets:
-        found = dues.line(*key)
-        bucket = found[0] if found else None
-        charged.append(bucket.charged if bucket else ZERO)
-        room.append(max((bucket.charged + bucket.concession) if bucket else ZERO, ZERO))
-    if row.basis == "percent":
-        parts = [min(percent_of(ch, row.value), r) for ch, r in zip(charged, room, strict=True)]
-    else:
-        try:
-            parts = spread(min(row.value, total(room)), room)
-        except ValueError:  # pragma: no cover - min() above keeps it within room
-            parts = []
+    parts = _concession_parts(dues, targets, basis=row.basis, value=row.value)
     amount = total(parts)
-    if amount <= 0:
-        raise Conflict(
-            "There is nothing left to concede on these lines.", code="nothing_to_concede"
-        )
     with c.db_errors():
         row = repo.update_concession(
             session,

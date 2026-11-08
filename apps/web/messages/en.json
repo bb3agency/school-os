@@ -2134,6 +2134,8 @@
       "waiver_reduces_late_fee": "A late-fee waiver is a negative amount on the late-fee line.",
       "zero": "Enter an amount other than zero.",
       "above_due": "This is more than is due on that line.",
+      "concession_exceeds_due": "The concession is more than what is still due on this line. Lower it; money already paid is returned with a refund.",
+      "test_keys_in_prod": "This is a Razorpay test key. Use the live key id and secret; they start with rzp_live_.",
       "allocations_do_not_add_up": "The amounts must add up to the receipt amount.",
       "invalid_utr": "Enter the 12-digit UPI reference (UTR).",
       "invalid_cheque_number": "Enter the 6-digit cheque number.",

@@ -635,6 +635,9 @@ def list_dues(
     totals = _student_totals(balances)
     shared = _sharing(balances)
     visible = students.summaries(session, ctx, totals)
+    # BL-07: how many siblings share a ledger counts only students the caller can see;
+    # ``shared_ledger`` (D54) still says the ledger is shared.
+    seen_with = _sharing(b for b in balances if b.student_id in visible)
     party_ids = {b.party_id for b in balances if b.student_id in visible}
     bills = _student_bills(
         (b for b in balances if b.student_id in visible),
@@ -658,7 +661,7 @@ def list_dues(
                 ledgers=ledgers[sid],
                 as_of=as_of[sid],
                 shared_ledger=shared.get(sid, 0) > 0,
-                shared_with=shared.get(sid, 0),
+                shared_with=seen_with.get(sid, 0),
                 bills=bills.get(sid, []),
                 overdue_due=sum((x.pending for x in bills.get(sid, ()) if x.overdue), ZERO),
                 overdue_bills=sum(1 for x in bills.get(sid, ()) if x.overdue),
@@ -718,7 +721,8 @@ class LedgerDue:
     closing_balance: Decimal
     as_of: dt.date
     shared_with: int = 0
-    """Other students this ledger is also linked to (a family ledger; D54)."""
+    """Other students the caller can see that this ledger is also linked to (a family
+    ledger; D54, BL-07)."""
     bills: tuple[BillDue, ...] = ()
     """Pending bills by due date (D63); empty without bill-wise details in Tally."""
 
@@ -765,6 +769,9 @@ def student_fee_dues(session: Session, ctx: UserContext, student_id: uuid.UUID) 
         raise NotFound("Student not found")
     present = [b for b in repo.linked_balances(session, [student_id]) if b.present]
     links = repo.links_of(session, [b.party_id for b in present])
+    # BL-07: siblings outside the caller's student scope are not counted.
+    others = {sid for ids in links.values() for sid in ids} - {student_id}
+    seen = set(students.summaries(session, ctx, others)) if others else set()
     bills = repo.bills_of(session, [b.party_id for b in present])
     today = _today_ist()
     return StudentFeeDues(
@@ -778,7 +785,7 @@ def student_fee_dues(session: Session, ctx: UserContext, student_id: uuid.UUID) 
                 b.group_name,
                 b.closing_balance,
                 b.as_of,
-                shared_with=len(set(links.get(b.party_id, ())) - {student_id}),
+                shared_with=len((set(links.get(b.party_id, ())) - {student_id}) & seen),
                 bills=tuple(
                     BillDue(
                         x.reference,

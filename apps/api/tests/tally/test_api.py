@@ -830,6 +830,54 @@ def test_FR_TALLY_007_a_family_ledger_shared_by_siblings_counts_once_in_totals(
     ]
 
 
+def test_BL_07_FR_TALLY_007_shared_with_counts_only_siblings_the_caller_can_see(
+    api: Any, admin_engine: Engine
+) -> None:
+    """BL-07: ``shared_with`` counted every student linked to a family ledger, so a reader whose
+    student scope is one section learnt how many siblings exist outside it. It now counts only
+    siblings the caller can see; ``shared_ledger`` (and a bill's ``shared``) still says the
+    ledger is shared (D54), in the list and in the Ask tool."""
+    import dataclasses
+
+    school, agent = _ready(api, admin_engine)
+    ravi = T.SW.create(school, name="Synthetica Ravi", section_key="section_9a", admission_no="R1")
+    sita = T.SW.create(school, name="Synthetica Sita", section_key="section_9c", admission_no="R2")
+    res = T.snapshot(api, agent, [T.party("Synthetica Family Ledger", "1000.00")])
+    assert res.status_code == 200, res.text
+    accountant = school.people["accountant"]
+    (party,) = api.call(accountant, "GET", "/api/v1/tally/parties").json()["data"]
+    for student in (ravi, sita):
+        res = api.call(
+            accountant,
+            "POST",
+            f"/api/v1/tally/parties/{party['id']}/links",
+            json={"student_id": str(student)},
+        )
+        assert res.status_code == 201, res.text
+
+    teacher = school.people["class_teacher"]
+    scoped = T.SW.ctx_for(
+        school.tenant_id,
+        teacher,
+        "class_teacher",
+        section_ids=frozenset({school.ids["section_9a"]}),
+    )
+    # A custom role: school-wide finance.read, students of section 9A only.
+    reader = dataclasses.replace(scoped, permissions=scoped.permissions | {service.READ})
+    with tenant_session(school.tenant_id, teacher.user_id) as db:
+        page = service.list_dues(db, reader)
+        own = service.student_fee_dues(db, reader, ravi)
+    assert [(r.student_id, r.shared_ledger, r.shared_with) for r in page.data] == [(ravi, True, 0)]
+    assert [(x.ledger_name, x.shared_with) for x in own.ledgers] == [
+        ("Synthetica Family Ledger", 0)
+    ]
+    # The school-wide reader still sees both siblings.
+    full = T.SW.ctx_for(school.tenant_id, accountant, "accountant")
+    with tenant_session(school.tenant_id, accountant.user_id) as db:
+        rows = {r.student_id: r.shared_with for r in service.list_dues(db, full).data}
+    assert rows == {ravi: 1, sita: 1}
+
+
 def test_FR_TALLY_007_status_totals_only_for_finance_readers(
     api: Any, admin_engine: Engine
 ) -> None:

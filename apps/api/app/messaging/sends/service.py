@@ -1206,10 +1206,15 @@ def _notice_live(session: Session, notice_id: uuid.UUID) -> bool:
     return notice is not None and notice.approved
 
 
-def _claim(session: Session, message_id: uuid.UUID, now: dt.datetime) -> _Claim | str:  # noqa: PLR0911 - one return per outcome
+def _claim(  # noqa: PLR0911 - one return per outcome
+    session: Session, message_id: uuid.UUID, now: dt.datetime, started: dt.datetime
+) -> _Claim | str:
     """Check the rules for one queued message and claim it, or say why it waits / was
-    skipped (``deferred``, ``skipped``, ``busy``)."""
+    skipped (``deferred``, ``skipped``, ``busy``). ``now`` is the run's clock at ``started``
+    (database time when the run began); the rules apply at the moment of claiming, which a long
+    run reaches minutes later (BL-01: claim expiry; BL-03: quiet hours and the daily cap)."""
     cfg = load_config().sending
+    now = now + max(mrepo.now(session) - started, dt.timedelta(0))
     message = repo.get_message(session, message_id, lock=True)
     if message is None or message.status != "queued":
         return "busy"
@@ -1238,14 +1243,19 @@ def _claim(session: Session, message_id: uuid.UUID, now: dt.datetime) -> _Claim 
     if opens is not None:
         repo.set_message(session, message.id, {"next_attempt_at": opens})
         return "deferred"
+    # BL-05: the cap counts sent AND claimed messages, checked and claimed under the school's
+    # cap lock, so two runs at once cannot both pass it with a message in flight.
+    repo.lock_cap(session)
     if rules.cap_reached(
-        repo.sent_since(session, rules.ist_midnight(now)), _cap(session, settings)
+        repo.sent_since(session, rules.ist_midnight(now)) + repo.claimed_count(session, now),
+        _cap(session, settings),
     ):
         repo.set_message(
             session, message.id, {"next_attempt_at": rules.next_morning(now, quiet_end)}
         )
         return "deferred"
-    values: dict[str, Any] = {"next_attempt_at": now + dt.timedelta(seconds=cfg.claim_seconds)}
+    lease = now + dt.timedelta(seconds=cfg.claim_seconds)
+    values: dict[str, Any] = {"next_attempt_at": lease, "claimed_until": lease}
     key: str | None = None
     handle_id: uuid.UUID | None = None
     kind = LINKS.get(message.purpose)
@@ -1266,9 +1276,11 @@ def _claim(session: Session, message_id: uuid.UUID, now: dt.datetime) -> _Claim 
     return _Claim(key=key, handle_id=handle_id)
 
 
-def _send_one(tenant_id: uuid.UUID, message_id: uuid.UUID, now: dt.datetime) -> str:
+def _send_one(
+    tenant_id: uuid.UUID, message_id: uuid.UUID, now: dt.datetime, started: dt.datetime
+) -> str:
     with tenant_session(tenant_id) as session:
-        claim = _claim(session, message_id, now)
+        claim = _claim(session, message_id, now, started)
     if not isinstance(claim, _Claim):
         return claim
     status = messaging.deliver(tenant_id, message_id, url_suffix=claim.key)
@@ -1280,7 +1292,11 @@ def _send_one(tenant_id: uuid.UUID, message_id: uuid.UUID, now: dt.datetime) -> 
             return status
         if status == "queued":  # transient error: try again after the backoff
             backoff = load_config().sending.backoff(message.attempts)
-            repo.set_message(session, message_id, {"next_attempt_at": mrepo.now(session) + backoff})
+            repo.set_message(
+                session,
+                message_id,
+                {"next_attempt_at": mrepo.now(session) + backoff, "claimed_until": None},
+            )
             _revoke(session, claim.handle_id, "send_retry")
             return "retry"
         _revoke(session, claim.handle_id, "send_failed")
@@ -1305,11 +1321,12 @@ def send_due(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> dict[st
     with tenant_session(tenant_id) as session:
         if not _active(session):
             return {"held": 1}
-        moment = now or mrepo.now(session)
+        started = mrepo.now(session)
+        moment = now or started
         ids = repo.due_message_ids(session, moment, cfg.batch_per_run, SENDING_PURPOSES)
     totals: Counter[str] = Counter()
     for message_id in ids:
-        totals[_send_one(tenant_id, message_id, moment)] += 1
+        totals[_send_one(tenant_id, message_id, moment, started)] += 1
     with tenant_session(tenant_id) as session:
         _finish_broadcasts(session)
     if ids:

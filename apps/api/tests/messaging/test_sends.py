@@ -262,6 +262,56 @@ def test_FR_MSG_011_daily_cap_defers_to_the_next_morning(
     S.settings(school)
 
 
+def test_BL_05_FR_MSG_011_two_runs_at_once_cannot_both_pass_the_daily_cap(
+    send_school: Any, api: Any, admin_engine: Engine, fake_state: Any
+) -> None:
+    """BL-05 (lead decision 2026-11-08): the cap counts claimed as well as sent messages, and
+    the check and the claim run under the school's cap lock. Two runs claiming at once with one
+    message left under the cap: the second waits for the first and then defers its message."""
+    import threading
+
+    from app.messaging import repository as mrepo
+    from app.messaging.sends import repository as srepo
+
+    school = send_school
+    _reset(school)
+    when = S.at(13, days=1)
+    with tenant_session(school.tenant_id) as db:
+        already = srepo.sent_since(db, S.at(0, days=1)) + srepo.claimed_count(db, when)
+    S.settings(school, daily_cap=already + 1)
+    first, _ = _queue_notice(api, school)
+    second, _ = _queue_notice(api, school)
+    ids = [S.message_rows(admin_engine, guardian_id=g)[0]["id"] for g in (first, second)]
+    outcome: dict[str, Any] = {}
+
+    def claim_second() -> None:
+        with tenant_session(school.tenant_id) as db:
+            outcome["second"] = sends._claim(db, ids[1], when, mrepo.now(db))
+
+    try:
+        with tenant_session(school.tenant_id) as db:
+            outcome["first"] = sends._claim(db, ids[0], when, mrepo.now(db))
+            worker = threading.Thread(target=claim_second)
+            worker.start()
+            worker.join(timeout=3)  # the second run reaches its claim while the first holds it
+        worker.join(timeout=30)
+        assert isinstance(outcome["first"], sends._Claim)
+        assert outcome.get("second") == "deferred", outcome
+        assert S.message_rows(admin_engine, guardian_id=second)[0]["next_attempt_at"] == S.at(
+            7, days=2
+        )
+    finally:
+        S.settings(school)
+        with admin_engine.begin() as c:  # leave no live claim behind for later cap tests
+            c.execute(
+                text(
+                    "UPDATE msg.messages SET status = 'skipped', skip_reason = 'purpose_off' "
+                    "WHERE id = ANY(:ids) AND status = 'queued'"
+                ),
+                {"ids": ids},
+            )
+
+
 def test_FR_MSG_016_transient_error_retries_with_backoff_and_new_link(
     send_school: Any, api: Any, admin_engine: Engine, fake_state: Any
 ) -> None:
@@ -298,6 +348,74 @@ def test_FR_MSG_016_permanent_error_is_final(
     row = S.message_rows(admin_engine, guardian_id=guardian)[0]
     assert (row["status"], row["error_code"]) == ("failed", "meta:131026")
     assert S.handle(admin_engine, row["public_handle_id"])["revoked_at"] is not None
+
+
+def _slow_run(monkeypatch: Any, start: dt.datetime, after: dt.timedelta) -> None:
+    """The run's database clock reads ``start`` until it has listed its messages, then
+    ``start + after``: the run reaches the message ``after`` into the run (300 messages, slow
+    or timing-out provider calls)."""
+    from app.messaging import repository as mrepo
+    from app.messaging.sends import repository as srepo
+
+    clock = [start]
+    listed = srepo.due_message_ids
+    monkeypatch.setattr(mrepo, "now", lambda session: clock[0])
+
+    def due_then_later(*args: Any) -> Any:
+        ids = listed(*args)
+        clock[0] = start + after
+        return ids
+
+    monkeypatch.setattr(srepo, "due_message_ids", due_then_later)
+
+
+def test_BL_01_FR_MSG_016_a_claim_late_in_a_long_run_is_not_sent_twice(
+    send_school: Any, api: Any, admin_engine: Engine, fake_state: Any, monkeypatch: Any
+) -> None:
+    """BL-01: a run takes its clock once, at the start, and may reach a message minutes later.
+    The claim must run from the moment the message is claimed, or the next minute's sweep
+    claims it again while the first run is still talking to Meta: the parent gets the message
+    twice and the first link is revoked."""
+    from app.messaging.providers.fake import FakeMessagingProvider
+
+    school = send_school
+    _reset(school)
+    guardian, mobile = _queue_notice(api, school)
+    start = S.at(12, days=1)
+    _slow_run(monkeypatch, start, dt.timedelta(seconds=400))
+    original = FakeMessagingProvider.send_template
+    nested: list[dict[str, int]] = []
+
+    def slow_send(self: Any, *args: Any) -> Any:
+        if not nested:
+            # While A talks to Meta, the next sweep (a minute later) runs.
+            nested.append(sends.send_due(school.tenant_id, now=start + dt.timedelta(seconds=460)))
+        return original(self, *args)
+
+    monkeypatch.setattr(FakeMessagingProvider, "send_template", slow_send)
+    sends.send_due(school.tenant_id, now=start)
+    assert len(_sent_to(mobile)) == 1, nested
+    row = S.message_rows(admin_engine, guardian_id=guardian)[0]
+    assert row["status"] == "sent"
+    assert S.handle(admin_engine, row["public_handle_id"])["revoked_at"] is None
+
+
+def test_BL_03_FR_MSG_011_a_run_that_reaches_a_message_in_quiet_hours_defers_it(
+    send_school: Any, api: Any, admin_engine: Engine, fake_state: Any, monkeypatch: Any
+) -> None:
+    """BL-03: a run that starts at 20:59 IST and reaches a message at 21:01 must not send it:
+    quiet hours (21:00-07:00 by default) apply at the moment of sending, not at the run's
+    start."""
+    school = send_school
+    _reset(school)
+    guardian, mobile = _queue_notice(api, school)
+    _slow_run(monkeypatch, S.at(20, 59, days=1), dt.timedelta(minutes=2))
+    out = sends.send_due(school.tenant_id, now=S.at(20, 59, days=1))
+    assert out.get("deferred", 0) >= 1, out
+    assert _sent_to(mobile) == []
+    row = S.message_rows(admin_engine, guardian_id=guardian)[0]
+    assert row["status"] == "queued"
+    assert row["next_attempt_at"] == S.at(7, days=2)
 
 
 def test_D31_nothing_is_sent_while_the_school_is_suspended(

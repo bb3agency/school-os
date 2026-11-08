@@ -276,6 +276,41 @@ def test_FR_IMP_005_revert_refused_when_records_changed_since(
     assert S.batch(admin_engine, batch_id)["status"] == "committed"
 
 
+def test_BL_02_FR_IMP_005_a_value_saved_while_the_revert_runs_is_not_lost(
+    world: Any, admin_engine: Engine
+) -> None:
+    """BL-02: the revert read the created students' versions without a lock. A value saved on
+    one of them in a transaction that commits while the revert runs was then deleted with the
+    student (the revert's DELETE waits for the row and goes ahead). The revert must lock the
+    students first and see the change: 409 ``import_has_dependents``."""
+    import threading
+
+    rows, numbers = S.class_list(2)
+    batch_id = S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
+    sid = S.student_by_adm(admin_engine, world.a.tenant_id, numbers[1])
+    assert sid is not None
+    ctx = S.SW.admin_ctx(world.a)
+    outcome: dict[str, Any] = {}
+
+    def revert_now() -> None:
+        try:
+            outcome["out"] = _revert(world.a, batch_id)
+        except Conflict as exc:
+            outcome["code"] = exc.code
+
+    with tenant_session(world.a.tenant_id, ctx.user_id) as s:
+        # The clerk's save holds the student (every value write locks it first) ...
+        students.record_value(s, ctx, sid, "mother_tongue", "parent_form", "Telugu")
+        worker = threading.Thread(target=revert_now)
+        worker.start()
+        worker.join(timeout=3)  # ... while the revert starts and waits for the row.
+        assert worker.is_alive()
+    worker.join(timeout=30)
+    assert outcome.get("code") == "import_has_dependents", outcome
+    assert _students_with(admin_engine, world.a.tenant_id, numbers) == 2
+    assert S.batch(admin_engine, batch_id)["status"] == "committed"
+
+
 def test_FR_IMP_005_revert_refused_when_a_batch_value_was_superseded(
     world: Any, admin_engine: Engine
 ) -> None:
