@@ -8,8 +8,8 @@ import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { isSafeAppPath } from "./answer";
 
 /**
- * `GET /documents/{id}/pages/{n}` (D73). Local schema until the generated client carries the
- * route (the lead regenerates apps/api/openapi.json and packages/api-client).
+ * `GET /documents/{id}/pages/{n}` (D73), checked at runtime as well: the link is opened in a
+ * new tab, so its shape is validated before use.
  */
 export const pageLinkSchema = z.object({
   url: z.string().min(1),
@@ -19,16 +19,6 @@ export const pageLinkSchema = z.object({
   version_no: z.number().int().min(1),
 });
 export type PageLink = z.infer<typeof pageLinkSchema>;
-
-type PagePath = "/api/v1/documents/{document_id}/pages/{n}";
-type PageClient = {
-  GET: (
-    path: PagePath,
-    init: {
-      params: { path: { document_id: string; n: number }; query?: { version?: number } };
-    },
-  ) => Promise<{ data?: unknown; error?: unknown; response: Response }>;
-};
 
 /**
  * Where the browser opens a cited page: the presigned link (http/https only) with
@@ -78,7 +68,7 @@ export function CitedPageButton({
   name: string;
 }) {
   const t = useTranslations("ask.answer");
-  const api = useBffClient("staff") as unknown as PageClient;
+  const api = useBffClient("staff");
   const router = useRouter();
   const [opening, setOpening] = useState(false);
 

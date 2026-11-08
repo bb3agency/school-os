@@ -22256,6 +22256,41 @@
         "title": "PageOut",
         "type": "object"
       },
+      "PageUrlOut": {
+        "description": "A cited page of a document (D73): a short-lived presigned URL of a ``ready`` version\nserved ``inline``; the browser opens it at ``page`` (``#page=n`` for a PDF).",
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "version_no": {
+            "title": "Version No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "url",
+          "page",
+          "expires_at",
+          "content_type",
+          "version_no"
+        ],
+        "title": "PageUrlOut",
+        "type": "object"
+      },
       "Page_AcademicYearOut_": {
         "properties": {
           "data": {
@@ -32319,7 +32354,8 @@
               "verified",
               "count",
               "fee",
-              "conversation"
+              "conversation",
+              "task"
             ],
             "title": "Kind",
             "type": "string"
@@ -48196,6 +48232,105 @@
           }
         },
         "summary": "Get Download Url",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/pages/{n}": {
+      "get": {
+        "description": "Open the cited page of a document (Ask source chips; D73). Same permission and checks as\na download (``document.read``, ACL and scopes: 404 outside them; C3 needs\n``student.read_sensitive`` or being the uploader; only scanned ``ready`` versions, 409\notherwise). Answers a link valid for at most 5 minutes that opens the file in the browser\n(PDF or image); the web adds ``#page=n``. ``n`` above the version's page count \u2192 422\n``page_out_of_range``; Office, spreadsheet and text files \u2192 415 ``page_not_viewable``.",
+        "operationId": "get_page_url_api_v1_documents__document_id__pages__n__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page number (1-based)",
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "description": "Page number (1-based)",
+              "maximum": 10000,
+              "minimum": 1,
+              "title": "N",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 999999,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageUrlOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Page Url",
         "tags": [
           "documents"
         ]

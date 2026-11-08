@@ -1784,6 +1784,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/pages/{n}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Page Url
+         * @description Open the cited page of a document (Ask source chips; D73). Same permission and checks as
+         *     a download (``document.read``, ACL and scopes: 404 outside them; C3 needs
+         *     ``student.read_sensitive`` or being the uploader; only scanned ``ready`` versions, 409
+         *     otherwise). Answers a link valid for at most 5 minutes that opens the file in the browser
+         *     (PDF or image); the web adds ``#page=n``. ``n`` above the version's page count → 422
+         *     ``page_out_of_range``; Office, spreadsheet and text files → 415 ``page_not_viewable``.
+         */
+        get: operations["get_page_url_api_v1_documents__document_id__pages__n__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/sheet": {
         parameters: {
             query?: never;
@@ -18738,6 +18763,26 @@ export interface components {
             status: "queued" | "done" | "failed";
         };
         /**
+         * PageUrlOut
+         * @description A cited page of a document (D73): a short-lived presigned URL of a ``ready`` version
+         *     served ``inline``; the browser opens it at ``page`` (``#page=n`` for a PDF).
+         */
+        PageUrlOut: {
+            /** Content Type */
+            content_type: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Page */
+            page: number;
+            /** Url */
+            url: string;
+            /** Version No */
+            version_no: number;
+        };
+        /**
          * ParentDocumentLinkOut
          * @description A presigned GET of the notice or receipt PDF, valid at most 5 minutes; the BFF redirects
          *     the parent to it (303) and never shows the address.
@@ -22023,7 +22068,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "doc" | "student" | "finding" | "change" | "verified" | "count" | "fee" | "conversation";
+            kind: "doc" | "student" | "finding" | "change" | "verified" | "count" | "fee" | "conversation" | "task";
         };
         /** RetentionCategoryOut */
         RetentionCategoryOut: {
@@ -29259,6 +29304,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__documents__schemas__DownloadUrlOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_page_url_api_v1_documents__document_id__pages__n__get: {
+        parameters: {
+            query?: {
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                document_id: string;
+                /** @description Page number (1-based) */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageUrlOut"];
                 };
             };
             /** @description Validation Error */
