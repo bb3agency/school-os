@@ -18,6 +18,7 @@ import {
   summary,
 } from "./chat-test-utils";
 import { STREAMING_POLL_MS } from "./conversations";
+import { duplicateLandmarks } from "@/test/landmarks";
 
 const nav = vi.hoisted(() => ({
   path: "/ask",
@@ -211,6 +212,8 @@ describe("Ask chat: a new conversation (FR-KB-008, FR-KB-012)", () => {
       question: "Is there a timetable?",
       conversation_id: CHAT.conversation,
     });
+    // WA-03 (axe landmark-unique): no two landmarks share a role and a name.
+    expect(await duplicateLandmarks()).toEqual([]);
   });
 
   it("regenerate sends regenerate_of and keeps the earlier answer as version 1 of 2", async () => {

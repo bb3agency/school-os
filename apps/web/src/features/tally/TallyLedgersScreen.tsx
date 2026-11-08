@@ -213,7 +213,13 @@ function LinkPanel({ partyId, onClose }: { partyId: string; onClose: () => void 
                 </ul>
               )}
             </div>
-            <form role="search" onSubmit={(event) => void search(event)} className="space-y-2">
+            <form
+              role="search"
+              // WA-03: the ledger list has its own search; each landmark needs its own name.
+              aria-label={t("searchTitle")}
+              onSubmit={(event) => void search(event)}
+              className="space-y-2"
+            >
               <div className="flex flex-wrap items-end gap-2">
                 <SearchInput
                   label={t("searchLabel")}
@@ -377,7 +383,12 @@ export function TallyLedgersScreen() {
           setFilter(value as LinkFilter);
         }}
       />
-      <form role="search" onSubmit={submitSearch} className="flex flex-wrap items-end gap-2">
+      <form
+        role="search"
+        aria-label={t("searchTitle")}
+        onSubmit={submitSearch}
+        className="flex flex-wrap items-end gap-2"
+      >
         <SearchInput
           label={t("searchLabel")}
           labelVisible

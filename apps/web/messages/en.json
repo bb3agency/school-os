@@ -150,7 +150,8 @@
       "selectAll": "Select all rows on this page",
       "selected": "{count, plural, one {# selected} other {# selected}}",
       "bulkActions": "Actions for the selected rows",
-      "clearSelection": "Clear selection"
+      "clearSelection": "Clear selection",
+      "scrollRegion": "{label} table, scrolls sideways"
     }
   },
   "language": {
@@ -8263,7 +8264,8 @@
         "balance": "Balance",
         "students": "Linked students",
         "actions": "Actions"
-      }
+      },
+      "searchTitle": "Search ledgers"
     },
     "link": {
       "title": "Link a ledger",
@@ -8278,7 +8280,8 @@
       "results": "Search results",
       "close": "Close",
       "link": "Link",
-      "linkTo": "Link to {student}"
+      "linkTo": "Link to {student}",
+      "searchTitle": "Find a student to link"
     },
     "errors": {
       "too_many_devices": {

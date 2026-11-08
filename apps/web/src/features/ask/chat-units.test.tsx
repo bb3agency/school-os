@@ -1,5 +1,6 @@
 import { act, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { duplicateLandmarks } from "@/test/landmarks";
 import { renderWithIntl } from "@/test/render";
 import {
   applyEvent,
@@ -104,13 +105,20 @@ describe("restricted markdown (docs/06 §9 rule 5)", () => {
     expect(screen.getByText(/and \[7\]\./)).toBeInTheDocument();
   });
 
-  it("renders a table in its own labelled, focusable scroll region", () => {
+  it("renders a table in its own labelled, focusable scroll box", async () => {
+    const table = "| A | B |\n|---|---|\n| 1 | 2 |";
+    // Two answers in one chat, each with a table (WA-03).
     renderWithIntl(
-      <Markdown text={"| A | B |\n|---|---|\n| 1 | 2 |"} citations={CITES} cite={() => null} />,
+      <>
+        <Markdown text={table} citations={CITES} cite={() => null} />
+        <Markdown text={table} citations={CITES} cite={() => null} />
+      </>,
     );
-    const region = screen.getByRole("region", { name: "Table in the answer" });
-    expect(region).toHaveAttribute("tabindex", "0");
-    expect(screen.getAllByRole("columnheader")).toHaveLength(2);
+    const [box] = screen.getAllByRole("group", { name: "Table in the answer" });
+    expect(box).toHaveAttribute("tabindex", "0");
+    expect(screen.getAllByRole("columnheader")).toHaveLength(4);
+    // A group, not a region landmark: every answer's table would repeat the landmark name.
+    expect(await duplicateLandmarks()).toEqual([]);
   });
 
   it("keeps Telugu text whole", () => {

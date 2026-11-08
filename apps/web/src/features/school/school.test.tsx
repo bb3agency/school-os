@@ -18,6 +18,7 @@ import { AnnouncementBanner, resetDismissedAnnouncements } from "./AnnouncementB
 import { BillingScreen } from "./BillingView";
 import { HomeScreen } from "./HomeView";
 import { SupportScreen, SupportTicketScreen } from "./SupportScreens";
+import { duplicateLandmarks } from "@/test/landmarks";
 
 /** School-side screens (US-1204, FR-PLT-026, FR-PLT-027, FR-IAM-013). Synthetic data only. */
 
@@ -591,6 +592,8 @@ describe("support (FR-PLT-027)", () => {
     expect(
       stub.callsTo("GET /bff/api/v1/support/tickets").at(-1)?.url.searchParams.get("cursor"),
     ).toBe("tickets-2");
+    // WA-03 (axe landmark-unique): no two landmarks share a role and a name.
+    expect(await duplicateLandmarks()).toEqual([]);
   });
 
   it("opens a ticket with an Idempotency-Key, with the student-data warning visible", async () => {

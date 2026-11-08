@@ -17,6 +17,7 @@ import { BreakGlassScreen, FleetScreen, FlagsScreen, PlatformAuditScreen } from 
 import { OperatorsScreen } from "./OperatorsView";
 import { SchoolDetailScreen } from "./SchoolDetailView";
 import { PlatformTicketScreen } from "./SupportScreens";
+import { duplicateLandmarks } from "@/test/landmarks";
 
 // The operator lists show URL filters as chips; removing one navigates (D75, docs/17 §4.3).
 vi.mock("next/navigation", async (importOriginal) => {
@@ -667,6 +668,8 @@ describe("plans, subscriptions and invoices (FR-PLT-010..019)", () => {
     expect(within(standard).getByText("₹1.50")).toBeInTheDocument();
     // Answers, never tokens or "unlimited", for schools' bundles.
     expect(bundles.textContent?.toLowerCase()).not.toMatch(/unlimited|token/);
+    // WA-03 (axe landmark-unique): no two landmarks share a role and a name.
+    expect(await duplicateLandmarks()).toEqual([]);
   });
 
   it("a new plan sends its one-time fee and description", async () => {

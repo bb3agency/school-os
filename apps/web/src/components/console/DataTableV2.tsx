@@ -26,6 +26,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { NarrowSwitch } from "@/components/ui/NarrowSwitch";
 import { Popover } from "@/components/ui/Popover";
 import { StackedRows, type Column, type TableDensity } from "@/components/ui/Table";
+import { useDistinctRegionName } from "@/components/ui/TableScroll";
 import { useDensity } from "@/components/shell/density";
 import { cn } from "@/lib/cn";
 import type { Loadable } from "@/lib/loadable";
@@ -130,6 +131,8 @@ export function DataTableV2<T>({
   const tc = useTranslations("common");
   const te = useTranslations("errors");
   const captionId = useId();
+  const [region, setRegion] = useState<HTMLDivElement | null>(null);
+  const regionName = useDistinctRegionName(region, caption);
   const headerCheckbox = useRef<HTMLInputElement>(null);
 
   const defaultHidden = useMemo(
@@ -334,8 +337,10 @@ export function DataTableV2<T>({
     });
     const table = (
       <div
+        ref={setRegion}
         role="region"
-        aria-labelledby={captionId}
+        // WA-03: a distinct name when the card around it already has the caption's name.
+        {...(regionName ? { "aria-label": regionName } : { "aria-labelledby": captionId })}
         tabIndex={0}
         className="table-scroll max-h-[70vh] overflow-y-auto max-h-[70dvh] focus-visible:outline-offset-[-3px]"
       >

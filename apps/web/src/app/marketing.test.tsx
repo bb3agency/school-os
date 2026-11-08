@@ -26,6 +26,7 @@ import PricingPage from "./[locale]/pricing/page";
 import SecurityPage from "./[locale]/security/page";
 import SignedOutPage from "./[locale]/signed-out/page";
 import WelcomePage from "./[locale]/welcome/page";
+import { duplicateLandmarks } from "@/test/landmarks";
 
 /**
  * Public marketing pages (FR-IAM-001 public entry, NFR-A11Y-001, NFR-I18N-001, SEC-010):
@@ -235,7 +236,7 @@ describe("marketing pages render with structure and calls to action (FR-IAM-001)
     }
   });
 
-  it("pricing: two plans with ADR-0038's starting prices before GST, and a comparison table", () => {
+  it("pricing: two plans with ADR-0038's starting prices before GST, and a comparison table", async () => {
     render("pricing");
     expect(
       screen.getByRole("heading", { level: 2, name: m.pricing.shared.name }),
@@ -254,6 +255,8 @@ describe("marketing pages render with structure and calls to action (FR-IAM-001)
     const table = screen.getByRole("table", { name: m.pricing.compare.caption });
     expect(within(table).getAllByRole("row")).toHaveLength(7);
     expect(within(table).getByText(m.pricing.compare.domainDedicated)).toBeInTheDocument();
+    // WA-03 (axe landmark-unique): no two landmarks share a role and a name.
+    expect(await duplicateLandmarks()).toEqual([]);
   });
 
   it("pricing explains the packaging: fee basis, what everyone gets, the one-time fee, AI, GST, next steps", () => {
