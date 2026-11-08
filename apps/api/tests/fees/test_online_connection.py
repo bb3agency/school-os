@@ -100,6 +100,40 @@ def test_FR_PAY_003_bad_keys_and_switch_off(school: Any) -> None:
         payments_runtime.patch_for_tests(PILOT)
 
 
+def test_BL_06_FR_PAY_003_test_keys_refused_in_production(school: Any) -> None:
+    """BL-06: in production a Razorpay test key id (``rzp_test_``) is refused with 422
+    ``test_keys_in_prod`` on ``key_id``: it takes no real money, yet receipts would be issued.
+    A live key connects; staging and local keep test keys (the other tests here)."""
+    from app.core.config import Environment
+    from app.fees.providers import FakePaymentProvider, set_provider
+
+    P.disconnect_if_connected(school)
+    payments_runtime.patch_for_tests({**PILOT, "env": Environment.PROD})
+    set_provider(FakePaymentProvider())  # production settings would pick the real provider
+    try:
+        with pytest.raises(ValidationFailed) as caught:
+            F.call(
+                school,
+                "owner",
+                online.connect_manual,
+                ManualKeysIn.model_validate({"key_id": P.key_id(), "key_secret": "x" * 12}),
+            )
+        assert caught.value.errors[0]["field"] == "key_id"
+        assert caught.value.errors[0]["code"] == "test_keys_in_prod"
+        live = P.key_id().replace("rzp_test_", "rzp_live_")
+        out = F.call(
+            school,
+            "owner",
+            online.connect_manual,
+            ManualKeysIn.model_validate({"key_id": live, "key_secret": "x" * 12}),
+        )
+        assert out.connection.environment == "live"
+    finally:
+        set_provider(None)
+        payments_runtime.patch_for_tests(PILOT)
+        P.disconnect_if_connected(school)
+
+
 def test_FR_PAY_002_only_the_owner_configures(school: Any) -> None:
     P.connect(school)
     for role in ("principal", "accountant", "office_staff"):

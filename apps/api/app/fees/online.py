@@ -60,6 +60,7 @@ from sqlalchemy.orm import Session
 from app.authz.context import Scopes, UserContext
 from app.authz.http import decode_cursor, encode_cursor
 from app.authz.kv import KVUnavailable, kv_store
+from app.core.config import Environment
 from app.core.crypto import CryptoError, unwrap_bound, wrap_bound
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import (
@@ -455,12 +456,22 @@ def connect_manual(session: Session, ctx: UserContext, data: ManualKeysIn) -> Ma
     """Connect with the school's own key id and secret (pilots until partner approval, D13;
     FR-PAY-003; ``payments.configure``, step-up). The keys are checked with a read call, wrapped
     and never returned; the webhook URL and a new random secret are returned **once** for the
-    school to add in its Razorpay dashboard. Errors: 403 ``manual_keys_not_allowed``; 409
+    school to add in its Razorpay dashboard. Errors: 403 ``manual_keys_not_allowed``; 422
+    ``test_keys_in_prod`` (a test key id in production, BL-06); 409
     ``payments_already_connected``; 422 ``keys_rejected``; 502 ``payments_provider_error``.
     Audit ``payments.connected`` (mode, environment)."""
     _require_configure(session, ctx)
-    if not payments_settings().razorpay_manual_keys_allowed:
+    runtime = payments_settings()
+    if not runtime.razorpay_manual_keys_allowed:
         raise ManualKeysNotAllowed()
+    if runtime.env == Environment.PROD and not data.key_id.startswith("rzp_live_"):
+        # BL-06: a test-mode key in production takes no real money; parents would "pay" and
+        # receipts would be issued for nothing. Staging and local keep test keys.
+        raise ValidationFailed(
+            [c.error("key_id", "test_keys_in_prod")],
+            detail="This is a Razorpay test key. Use the live key id and secret "
+            "(they start with rzp_live_).",
+        )
     _clear_revoked(session, ctx)
     secret = data.key_secret.get_secret_value()
     creds = Credentials(key_id=data.key_id, key_secret=secret)
