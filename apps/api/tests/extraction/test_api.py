@@ -146,7 +146,7 @@ def test_YS_04_FR_IMP_020_two_clerks_submitting_one_photo_at_once_make_one_batch
     worker.join(timeout=30)
     assert outcome == {"code": "already_extracted"}, outcome
     with admin_engine.connect() as c:
-        pages = c.execute(
+        pages: int = c.execute(
             text("SELECT count(*) FROM sis.extraction_pages WHERE document_id = :d"), {"d": doc}
         ).scalar_one()
     assert pages == 1

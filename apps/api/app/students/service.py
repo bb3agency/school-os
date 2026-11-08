@@ -2112,6 +2112,16 @@ def plan_import_revert(
     )
 
 
+def import_batch_current_keys(session: Session, batch_id: uuid.UUID) -> set[tuple[uuid.UUID, str]]:
+    """(student, attribute key) of the values import batch ``batch_id`` recorded that are still
+    current and not rejected: what its revert would withdraw (YS-02; ``app.imports`` only)."""
+    return {
+        (v.student_id, v.attribute_key)
+        for v in repo.batch_values(session, batch_id)
+        if v.superseded_by is None and v.verification_status != "rejected"
+    }
+
+
 def revert_import(session: Session, ctx: UserContext, plan: ImportRevertPlan) -> ImportRevertResult:
     """Undo an import batch checked by :func:`plan_import_revert`, in the caller's transaction.
 

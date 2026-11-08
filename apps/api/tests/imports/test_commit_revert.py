@@ -359,6 +359,53 @@ def test_YS_01_FR_IMP_005_revert_refused_when_a_batch_value_was_checked_since(
     assert S.batch(admin_engine, batch_id)["status"] == "committed"
 
 
+def test_YS_02_FR_IMP_005_revert_refused_when_a_later_import_confirmed_a_batch_value(
+    world: Any, admin_engine: Engine
+) -> None:
+    """YS-02: a later import with the same value on the same source reuses the batch's value
+    (``record_value`` is a no-op for an identical value), and shows it as added. Reverting the
+    first batch withdrew that value under the later import: 409 while that import is live.
+    A later import of other fields does not block the revert."""
+    rows, numbers = S.class_list(1)
+    S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
+    sid = S.student_by_adm(admin_engine, world.a.tenant_id, numbers[0])
+    assert sid is not None
+    head = ["Admission Number", "Mother Tongue", "Caste"]
+    first = S.imported(
+        admin_engine,
+        world.a,
+        S.xlsx_bytes([head, [numbers[0], "Telugu", ""]]),
+        source="udise_plus",
+    )
+    later = S.imported(
+        admin_engine,
+        world.a,
+        S.xlsx_bytes([head, [numbers[0], "Telugu", "Synthetic Caste A"]]),
+        source="udise_plus",
+    )
+    with pytest.raises(Conflict) as err:
+        _revert(world.a, first)
+    assert err.value.code == "import_has_dependents"
+    assert S.batch(admin_engine, first)["status"] == "committed"
+    # Once the later import is reverted, the first one can be reverted too.
+    assert _revert(world.a, later).status == "reverted"
+    assert _revert(world.a, first).status == "reverted"
+    # Another field only: no dependency.
+    third = S.imported(
+        admin_engine,
+        world.a,
+        S.xlsx_bytes([head, [numbers[0], "Urdu", ""]]),
+        source="udise_plus",
+    )
+    S.imported(
+        admin_engine,
+        world.a,
+        S.xlsx_bytes([head, [numbers[0], "", "Synthetic Caste B"]]),
+        source="udise_plus",
+    )
+    assert _revert(world.a, third).status == "reverted"
+
+
 def test_FR_IMP_005_students_are_deleted_only_by_their_import_revert(
     world: Any, admin_engine: Engine, shared: dict[str, Any]
 ) -> None:
