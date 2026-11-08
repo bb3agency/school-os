@@ -185,6 +185,18 @@ def _tls_without_certificate_check(url: str) -> bool:
     return values not in (["required"], ["cert_required"])
 
 
+def _is_loopback_host(host: str | None) -> bool:
+    """``localhost`` or a loopback address (``127.0.0.0/8``, ``::1``)."""
+    if not host:
+        return False
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 def _postgres_tls_verified(url: str) -> bool:
     """A database URL whose TLS checks the server certificate AND host name: exactly one
     ``sslmode=verify-full`` (libpq keywords are lower-case; anything else means no TLS, TLS
@@ -711,6 +723,14 @@ class Settings(BaseSettings):
                 continue
             if not _postgres_tls_verified(url):
                 raise ValueError(f"SOS_{name.upper()} must set sslmode=verify-full in {self.env}")
+        # The broker and cache (ElastiCache) are reached across the VPC too: plaintext redis://
+        # would carry task arguments, idempotency records and sessions unencrypted (YA-07). The
+        # certificate check of a rediss:// URL is enforced in _guard_production (SEC-011). Only
+        # the loopback default is let through: nothing crosses the network, and with no Valkey
+        # on the task's own host it cannot connect at all.
+        redis = urlsplit(self.redis_url.get_secret_value())
+        if redis.scheme.lower() != "rediss" and not _is_loopback_host(redis.hostname):
+            raise ValueError(f"SOS_REDIS_URL must be a rediss:// URL in {self.env}")
 
     @model_validator(mode="after")
     def _guard_production(self) -> Settings:

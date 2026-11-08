@@ -170,6 +170,7 @@ function day(overrides: Partial<AttendanceDay> = {}): AttendanceDay {
           roll_no: "1",
         },
         status: null,
+        version: 0,
       },
       {
         student: {
@@ -179,6 +180,7 @@ function day(overrides: Partial<AttendanceDay> = {}): AttendanceDay {
           roll_no: "2",
         },
         status: null,
+        version: 0,
       },
     ],
     counts: {},
@@ -535,8 +537,8 @@ describe("attendance (US-1701, US-1702; FR-ATT-001..004)", () => {
     expect(JSON.parse(call?.body ?? "{}")).toEqual({
       source: "mark",
       entries: [
-        { student_id: STUDENT_ID, on_date: todayIst(), status: "present" },
-        { student_id: OTHER_STUDENT, on_date: todayIst(), status: "absent" },
+        { student_id: STUDENT_ID, on_date: todayIst(), status: "present", expected_version: 0 },
+        { student_id: OTHER_STUDENT, on_date: todayIst(), status: "absent", expected_version: 0 },
       ],
     });
     expect(await screen.findByText("Saved 2 entries.")).toBeVisible();
@@ -779,7 +781,9 @@ describe("attendance (US-1701, US-1702; FR-ATT-001..004)", () => {
         ),
       ).toEqual({
         source: "mark",
-        entries: [{ student_id: OTHER_STUDENT, on_date: todayIst(), status: "absent" }],
+        entries: [
+          { student_id: OTHER_STUDENT, on_date: todayIst(), status: "absent", expected_version: 0 },
+        ],
       });
     });
 
@@ -901,6 +905,7 @@ describe("marks (US-1703; FR-MRK-001..003)", () => {
           max_marks: "100",
           marks: "42.5",
           absent: false,
+          expected_version: 0,
         },
         {
           student_id: OTHER_STUDENT,
@@ -908,6 +913,7 @@ describe("marks (US-1703; FR-MRK-001..003)", () => {
           max_marks: "100",
           marks: null,
           absent: true,
+          expected_version: 0,
         },
       ],
     });
@@ -1018,6 +1024,7 @@ describe("marks (US-1703; FR-MRK-001..003)", () => {
           max_marks: "100",
           marks: "42.5",
           absent: false,
+          expected_version: 0,
         },
         {
           student_id: OTHER_STUDENT,
@@ -1025,6 +1032,7 @@ describe("marks (US-1703; FR-MRK-001..003)", () => {
           max_marks: "100",
           marks: null,
           absent: true,
+          expected_version: 0,
         },
       ]);
     } finally {
@@ -1294,5 +1302,123 @@ describe("the rules form saves once per submit (XP-05, FR-EW-014)", () => {
     await userEvent.type(input, "80");
     fireTwice(input.closest("form")!, "submit");
     await expectOneCall(stub, "PUT /bff/api/v1/insights/settings");
+  });
+});
+
+describe("two people saving the same day or exam (YA-01, YA-05, XA-06)", () => {
+  it("a save carries each changed row's version; 412 reloads the day and keeps my changes", async () => {
+    signedIn(["attendance.read", "attendance.record"]);
+    const marked = (ravi: "present" | "absent", raviVersion: number) =>
+      day({
+        marked: true,
+        students: day().students.map((row) =>
+          row.student.student_id === STUDENT_ID
+            ? { ...row, status: ravi, version: raviVersion }
+            : { ...row, status: "present", version: 1 },
+        ),
+      });
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/attendance`] = () =>
+      Response.json(marked("present", 1));
+    stub.routes[`POST /bff/api/v1/sections/${SECTION}/attendance`] = () => {
+      // Someone else marked Ravi absent before this save arrived.
+      stub.routes[`GET /bff/api/v1/sections/${SECTION}/attendance`] = () =>
+        Response.json(marked("absent", 2));
+      return problem(412, "attendance_changed");
+    };
+    renderWithIntl(<AttendanceScreen />);
+    const picker = await screen.findByLabelText(en.attendance.section);
+    await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(1));
+    await userEvent.selectOptions(picker, SECTION);
+    const anjali = await screen.findByRole("group", { name: "Attendance of Synthetica Anjali" });
+    await userEvent.click(within(anjali).getByRole("radio", { name: en.attendance.status.late }));
+    await userEvent.click(screen.getByRole("button", { name: en.attendance.save }));
+    expect(await screen.findByText(en.attendance.changedBySomeone)).toBeVisible();
+    const first = stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/attendance`)[0];
+    expect(JSON.parse(first?.body ?? "{}").entries).toEqual([
+      { student_id: OTHER_STUDENT, on_date: todayIst(), status: "late", expected_version: 1 },
+    ]);
+    // The reloaded register shows the other person's change and keeps mine.
+    const ravi = screen.getByRole("group", { name: "Attendance of Synthetica Ravi" });
+    await waitFor(() =>
+      expect(within(ravi).getByRole("radio", { name: en.attendance.status.absent })).toBeChecked(),
+    );
+    expect(
+      within(screen.getByRole("group", { name: "Attendance of Synthetica Anjali" })).getByRole(
+        "radio",
+        { name: en.attendance.status.late },
+      ),
+    ).toBeChecked();
+    // Saving again sends only my change, against the version just read.
+    stub.routes[`POST /bff/api/v1/sections/${SECTION}/attendance`] = () =>
+      Response.json({ written: 1, unchanged: 0, dates: [todayIst()] });
+    await userEvent.click(screen.getByRole("button", { name: en.attendance.save }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/attendance`)).toHaveLength(2),
+    );
+    const second = stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/attendance`)[1];
+    expect(JSON.parse(second?.body ?? "{}").entries).toEqual([
+      { student_id: OTHER_STUDENT, on_date: todayIst(), status: "late", expected_version: 1 },
+    ]);
+    expect(await screen.findByText("Saved 1 entry.")).toBeVisible();
+  });
+
+  it("marks carry each paper's version; 412 reloads the grid and keeps the typed marks", async () => {
+    const EXAM = "0192f3a4-0000-7000-8000-00000000ea05";
+    const exam = {
+      id: EXAM,
+      academic_year_id: YEAR,
+      name: "Formative assessment 2",
+      held_on: "2026-08-10",
+      version: 1,
+    };
+    signedIn(["marks.read", "marks.record"]);
+    stub.routes["GET /bff/api/v1/exams"] = () => Response.json([exam]);
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`] = () =>
+      Response.json({
+        section: section(),
+        exam,
+        subjects: ["Telugu"],
+        students: day().students.map((row) => ({
+          student: row.student,
+          marks:
+            row.student.student_id === STUDENT_ID
+              ? [{ subject: "Telugu", max_marks: "100", marks: "30", absent: false, version: 3 }]
+              : [],
+          percent: null,
+        })),
+      });
+    stub.routes[`POST /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`] = () =>
+      problem(412, "marks_changed");
+    renderWithIntl(<MarksScreen />);
+    const picker = await screen.findByLabelText(en.marks.section);
+    await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(1));
+    await userEvent.selectOptions(picker, SECTION);
+    const exams = screen.getByLabelText(en.marks.exam);
+    await waitFor(() => expect(within(exams).getAllByRole("option").length).toBeGreaterThan(1));
+    await userEvent.selectOptions(exams, EXAM);
+    await userEvent.type(await screen.findByLabelText(en.marks.entry.subject), "telugu");
+    await userEvent.type(screen.getByLabelText("Marks of Synthetica Ravi"), "40");
+    await userEvent.type(screen.getByLabelText("Marks of Synthetica Anjali"), "ab");
+    const reads = stub.callsTo(`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`).length;
+    await userEvent.click(screen.getByRole("button", { name: en.marks.entry.save }));
+    expect(await screen.findByText(en.marks.entry.changedBySomeone)).toBeVisible();
+    const call = stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`)[0];
+    expect(
+      JSON.parse(call?.body ?? "{}").entries.map(
+        (entry: { student_id: string; expected_version: number }) => [
+          entry.student_id,
+          entry.expected_version,
+        ],
+      ),
+    ).toEqual([
+      [STUDENT_ID, 3],
+      [OTHER_STUDENT, 0],
+    ]);
+    await waitFor(() =>
+      expect(
+        stub.callsTo(`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`).length,
+      ).toBeGreaterThan(reads),
+    );
+    expect(screen.getByLabelText("Marks of Synthetica Ravi")).toHaveValue("40");
   });
 });

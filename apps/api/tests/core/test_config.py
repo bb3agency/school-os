@@ -147,12 +147,34 @@ def test_SEC_011_prod_rejects_a_valkey_tls_url_without_certificate_checks(url: s
     [
         "rediss://:token@valkey.example.internal:6379/0?ssl_cert_reqs=required",
         "rediss://:token@valkey.example.internal:6379/0?ssl_cert_reqs=CERT_REQUIRED",
-        # Dedicated hosts: plaintext on the internal, isolated compose network (docs/10 §15).
-        "redis://:token@valkey:6379/0",
     ],
 )
 def test_SEC_011_prod_accepts_a_verified_or_internal_valkey_url(url: str) -> None:
     assert _prod(redis_url=SecretStr(url)).redis_url.get_secret_value() == url
+
+
+@pytest.mark.parametrize("env", [Environment.STAGING, Environment.PROD])
+@pytest.mark.parametrize(
+    "url",
+    ["redis://:token@valkey.example.internal:6379/0", "redis://:token@10.0.3.17:6379/0"],
+)
+def test_YA_07_SEC_011_shared_tier_refuses_a_plaintext_valkey_url(
+    env: Environment, url: str
+) -> None:
+    """Audit 2026-11-09 YA-07: on the shared tier the broker and cache are reached across the
+    VPC, so a plaintext ``redis://`` URL would carry task arguments and sessions unencrypted.
+    Postgres already had the matching guard (``sslmode=verify-full``)."""
+    with pytest.raises(ValidationError, match=r"SOS_REDIS_URL must be a rediss://"):
+        _prod(env=env, redis_url=SecretStr(url))
+
+
+def test_YA_07_dedicated_hosts_keep_plaintext_valkey_on_the_compose_network() -> None:
+    # Dedicated hosts: plaintext on the internal, isolated compose network (docs/10 §15).
+    from app.core.config import DeploymentMode
+
+    url = "redis://:token@valkey:6379/0"
+    s = _prod(deployment_mode=DeploymentMode.DEDICATED, redis_url=SecretStr(url))
+    assert s.redis_url.get_secret_value() == url
 
 
 def test_SEC_011_local_allows_rediss_without_certificate_checks() -> None:

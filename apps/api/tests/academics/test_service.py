@@ -23,7 +23,7 @@ from app.academics.schemas import (
     SheetIn,
 )
 from app.core.db import tenant_session
-from app.core.errors import Conflict, NotFound, ValidationFailed
+from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.redaction import verhoeff_check_digit
 
 pytestmark = pytest.mark.db
@@ -657,3 +657,182 @@ def test_SEC_015_a_scoped_teacher_cannot_rewrite_another_sections_marks(
             {"t": school.tenant_id, "s": sid, "e": exam_id},
         ).one()
     assert (row.section_id, row.marks) == (school.ids["section_9c"], Decimal("20.00"))
+
+
+# --- optimistic concurrency per mark (XA-06) ------------------------------------------------------
+
+
+def _write(school: Any, actor: Any, entries: list[AttendanceEntryIn]) -> Any:
+    with tenant_session(school.tenant_id, actor.user_id) as db:
+        return academics.record_attendance(
+            db, actor, school.ids["section_9a"], AttendanceWrite(entries=entries)
+        )
+
+
+def test_FR_ATT_002_XA_06_a_stale_expected_version_is_412_and_saves_nothing(
+    school: Any,
+) -> None:
+    day = S.school_days(1, end=S.school_days(41)[0])[0]
+    a1, a2 = school.ids["a1"], school.ids["a2"]
+    ct, office = S.ct_ctx(school), S.principal_ctx(school)
+    # Both open the unmarked day: version 0 for everyone.
+    with tenant_session(school.tenant_id, ct.user_id) as db:
+        view = academics.attendance_day(db, ct, school.ids["section_9a"], day)
+    seen = {s.student.student_id: s.version for s in view.students}
+    assert seen[a1] == 0
+    # The office saves first; the teacher's save from the stale view must not overwrite it.
+    _write(school, office, [AttendanceEntryIn(student_id=a1, on_date=day, status="absent")])
+    with pytest.raises(PreconditionFailed) as err:
+        _write(
+            school,
+            ct,
+            [
+                AttendanceEntryIn(
+                    student_id=a1, on_date=day, status="present", expected_version=seen[a1]
+                ),
+                AttendanceEntryIn(
+                    student_id=a2, on_date=day, status="present", expected_version=seen[a2]
+                ),
+            ],
+        )
+    assert err.value.code == "attendance_changed"
+    with tenant_session(school.tenant_id, ct.user_id) as db:
+        view = academics.attendance_day(db, ct, school.ids["section_9a"], day)
+    now = {s.student.student_id: (s.status, s.version) for s in view.students}
+    assert now[a1] == ("absent", 1)
+    assert now[a2] == (None, 0)  # all or nothing
+    # With the version just read, the correction goes through and moves the version on.
+    out = _write(
+        school,
+        ct,
+        [AttendanceEntryIn(student_id=a1, on_date=day, status="present", expected_version=1)],
+    )
+    assert out.written == 1
+    # Leaving expected_version out still overwrites (sheet imports, older clients).
+    assert (
+        _write(
+            school, office, [AttendanceEntryIn(student_id=a1, on_date=day, status="late")]
+        ).written
+        == 1
+    )
+
+
+def test_FR_ATT_002_XA_06_concurrent_saves_of_the_same_unmarked_day_cannot_both_win(
+    school: Any,
+) -> None:
+    import threading
+    import time
+
+    day = S.school_days(1, end=S.school_days(42)[0])[0]
+    a1 = school.ids["a1"]
+    ct, office = S.ct_ctx(school), S.principal_ctx(school)
+    outcome: dict[str, BaseException | None] = {}
+
+    def second() -> None:
+        try:
+            _write(
+                school,
+                ct,
+                [
+                    AttendanceEntryIn(
+                        student_id=a1, on_date=day, status="present", expected_version=0
+                    )
+                ],
+            )
+            outcome["second"] = None
+        except BaseException as exc:
+            outcome["second"] = exc
+
+    with tenant_session(school.tenant_id, office.user_id) as db:
+        academics.record_attendance(
+            db,
+            office,
+            school.ids["section_9a"],
+            AttendanceWrite(
+                entries=[
+                    AttendanceEntryIn(
+                        student_id=a1, on_date=day, status="absent", expected_version=0
+                    )
+                ]
+            ),
+        )
+        worker = threading.Thread(target=second)
+        worker.start()
+        time.sleep(1.0)  # the second save reads the versions while the first is uncommitted
+    worker.join(timeout=30)
+    assert isinstance(outcome.get("second"), PreconditionFailed)
+    with tenant_session(school.tenant_id, ct.user_id) as db:
+        view = academics.attendance_day(db, ct, school.ids["section_9a"], day)
+    assert {s.student.student_id: s.status for s in view.students}[a1] == "absent"
+
+
+def _mark_write(school: Any, actor: Any, exam_id: uuid.UUID, entries: list[MarkIn]) -> Any:
+    with tenant_session(school.tenant_id, actor.user_id) as db:
+        return academics.record_marks(
+            db, actor, school.ids["section_9a"], exam_id, MarksWrite(entries=entries)
+        )
+
+
+def _grid_versions(school: Any, exam_id: uuid.UUID) -> dict[tuple[uuid.UUID, str], Any]:
+    ct = S.ct_ctx(school)
+    with tenant_session(school.tenant_id, ct.user_id) as db:
+        grid = academics.section_marks(db, ct, school.ids["section_9a"], exam_id)
+    return {
+        (s.student.student_id, m.subject): (m.marks, m.version)
+        for s in grid.students
+        for m in s.marks
+    }
+
+
+def test_FR_MRK_002_YA_05_a_stale_expected_version_is_412_and_saves_nothing(
+    school: Any,
+) -> None:
+    exam_id = S.exam(school, f"Synthetic YA5 {uuid.uuid4().hex[:5]}", S.school_days(1)[0])
+    a1, a2 = school.ids["a1"], school.ids["a2"]
+    ct, office = S.ct_ctx(school), S.principal_ctx(school)
+    S.marks(school, "section_9a", exam_id, {a1: [("Maths", 30, 50)]})
+    seen = _grid_versions(school, exam_id)[(a1, "Maths")][1]
+    assert seen == 1
+    # The office corrects the mark; the teacher's save from the older grid must not undo it.
+    _mark_write(
+        school,
+        office,
+        exam_id,
+        [MarkIn(student_id=a1, subject="Maths", max_marks=Decimal(50), marks=Decimal(35))],
+    )
+    with pytest.raises(PreconditionFailed) as err:
+        _mark_write(
+            school,
+            ct,
+            exam_id,
+            [
+                MarkIn(
+                    student_id=a1,
+                    subject="maths",
+                    max_marks=Decimal(50),
+                    marks=Decimal(31),
+                    expected_version=seen,
+                ),
+                MarkIn(
+                    student_id=a2,
+                    subject="Maths",
+                    max_marks=Decimal(50),
+                    marks=Decimal(20),
+                    expected_version=0,
+                ),
+            ],
+        )
+    assert err.value.code == "marks_changed"
+    now = _grid_versions(school, exam_id)
+    assert now[(a1, "Maths")] == (Decimal("35.00"), 2)
+    assert (a2, "Maths") not in now  # all or nothing
+    # With the version just read the correction goes through; leaving it out still overwrites.
+    fresh = MarkIn(
+        student_id=a1,
+        subject="Maths",
+        max_marks=Decimal(50),
+        marks=Decimal(31),
+        expected_version=2,
+    )
+    assert _mark_write(school, ct, exam_id, [fresh]).written == 1
+    assert S.marks(school, "section_9a", exam_id, {a1: [("Maths", 33, 50)]}).written == 1

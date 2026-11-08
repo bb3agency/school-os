@@ -15,7 +15,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveBar } from "@/components/ui/SaveBar";
 import { SelectField } from "@/components/ui/Select";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
-import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
+import { ApiError, newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
@@ -189,7 +189,13 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
   const [error, setError] = useState<unknown>(undefined);
   const [saved, setSaved] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
+  const [conflict, setConflict] = useState(false);
   const students = grid.students;
+  // YA-05: the version of the paper as read (0: no mark yet), so a save cannot overwrite a mark
+  // someone else saved since. Subjects match whatever their case, as on the server.
+  const versionOf = (row: MarksGrid["students"][number], name: string) =>
+    row.marks.find((mark) => mark.subject.toLowerCase() === name.trim().toLowerCase())?.version ??
+    0;
   const ids = students.map((row) => row.student.student_id);
   const current = Math.min(index, Math.max(students.length - 1, 0));
 
@@ -199,6 +205,7 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
     setBad(new Set());
     setError(undefined);
     setSaved(null);
+    setConflict(false);
     const maximum = Number(max);
     const problems: SummaryError[] = [];
     if (!subject.trim()) {
@@ -219,6 +226,7 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
           max_marks: max.trim(),
           marks: null,
           absent: true,
+          expected_version: versionOf(row, subject),
         });
         continue;
       }
@@ -234,6 +242,7 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
         max_marks: max.trim(),
         marks: raw,
         absent: false,
+        expected_version: versionOf(row, subject),
       });
     }
     const first = invalid[0];
@@ -261,7 +270,13 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
       setValues({});
       await onSaved();
     } catch (failure) {
-      setError(failure);
+      if (failure instanceof ApiError && failure.code === "marks_changed") {
+        // YA-05: show the other person's marks; the typed ones stay for a second look.
+        setConflict(true);
+        await onSaved();
+      } else {
+        setError(failure);
+      }
     } finally {
       setPending(false);
     }
@@ -423,6 +438,11 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
         {saved !== null ? (
           <Alert tone="success" live>
             {t("saved", { count: saved })}
+          </Alert>
+        ) : null}
+        {conflict ? (
+          <Alert tone="warning" live>
+            {t("changedBySomeone")}
           </Alert>
         ) : null}
         <ApiErrorAlert error={error} />

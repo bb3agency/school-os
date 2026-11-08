@@ -63,6 +63,48 @@ def upsert_attendance(session: Session, rows: Sequence[Mapping[str, Any]]) -> tu
     return _written(session, stmt)
 
 
+def lock_attendance_days(session: Session, dates: Collection[dt.date]) -> None:
+    """Serialise attendance writes of the current school per date until the transaction ends
+    (transaction-level advisory locks, taken in date order so two writers cannot deadlock), so
+    the ``expected_version`` check and the upsert see no write in between (XA-06)."""
+    for day in sorted(set(dates)):
+        session.execute(
+            text(
+                "SELECT pg_advisory_xact_lock(hashtextextended("
+                "'sis.attendance_marks:' || core.current_tenant()::text || ':' || :d, 0))"
+            ),
+            {"d": day.isoformat()},
+        )
+
+
+def lock_exam_marks(session: Session, exam_id: uuid.UUID) -> None:
+    """Serialise marks writes of one exam until the transaction ends (transaction-level
+    advisory lock), so the ``expected_version`` check and the upsert see no write in between
+    (YA-05)."""
+    session.execute(
+        text(
+            "SELECT pg_advisory_xact_lock(hashtextextended("
+            "'sis.exam_marks:' || core.current_tenant()::text || ':' || :e, 0))"
+        ),
+        {"e": str(exam_id)},
+    )
+
+
+def attendance_versions(
+    session: Session, student_ids: Collection[uuid.UUID], dates: Collection[dt.date]
+) -> dict[tuple[uuid.UUID, dt.date], int]:
+    """The stored version of every (student, date) mark among ``student_ids`` x ``dates``."""
+    if not student_ids or not dates:
+        return {}
+    rows = session.execute(
+        select(AttendanceMark.student_id, AttendanceMark.on_date, AttendanceMark.version).where(
+            AttendanceMark.student_id.in_(list(student_ids)),
+            AttendanceMark.on_date.in_(list(dates)),
+        )
+    ).all()
+    return {(r.student_id, r.on_date): int(r.version) for r in rows}
+
+
 def marks_in_other_sections(
     session: Session,
     section_id: uuid.UUID,
@@ -311,6 +353,7 @@ def export_tables(session: Session) -> list[RecordTable]:
 
 __all__ = [
     "attendance_by_month",
+    "attendance_versions",
     "current_tenant_id",
     "exam_marks",
     "exam_name_taken",
@@ -319,6 +362,8 @@ __all__ = [
     "get_exam",
     "insert_exam",
     "list_exams",
+    "lock_attendance_days",
+    "lock_exam_marks",
     "marks_of_student",
     "results_of",
     "section_marks",

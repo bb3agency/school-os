@@ -7698,7 +7698,8 @@
       "discard": "Discard",
       "keep": "Keep marking"
     },
-    "unsavedLeave": "Attendance for this day is not saved. Leave and lose it?"
+    "unsavedLeave": "Attendance for this day is not saved. Leave and lose it?",
+    "changedBySomeone": "Someone else saved attendance for this day while you were marking it, so nothing was saved. The register now shows their changes, with the statuses you changed kept. Check them, then save again."
   },
   "marks": {
     "nav": "Marks",
@@ -7753,7 +7754,8 @@
       "previous": "Previous student",
       "next": "Next student",
       "keyboardHint": "Press Enter or the down arrow to go to the next student.",
-      "discard": "Clear typed marks"
+      "discard": "Clear typed marks",
+      "changedBySomeone": "Someone else saved marks for this exam while you were typing, so nothing was saved. The table now shows their marks and your typed marks are kept. Check them, then save again."
     },
     "import": {
       "title": "Add marks from a sheet",

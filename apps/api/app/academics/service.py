@@ -70,7 +70,7 @@ from app.authz.context import UserContext
 from app.authz.scope import ensure_section_visible
 from app.core import purge as purging
 from app.core.db import tenant_session
-from app.core.errors import Conflict, NotFound, ValidationFailed
+from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
@@ -250,13 +250,19 @@ def attendance_day(
     roster = _roster(session, ctx, sec.section, ATTENDANCE_READ)
     rows = repo.section_marks(session, sec.section.id, on_date, on_date)
     by_student = {r.student_id: r.status for r in rows}
+    versions = {r.student_id: r.version for r in rows}
     shown = {s.student_id for s in roster}
     return AttendanceDayOut(
         section=sec.out,
         on_date=on_date,
         marked=bool(rows),
         students=[
-            AttendanceDayStudent(student=s, status=by_student.get(s.student_id)) for s in roster
+            AttendanceDayStudent(
+                student=s,
+                status=by_student.get(s.student_id),
+                version=versions.get(s.student_id, 0),
+            )
+            for s in roster
         ],
         counts=_counts(v for k, v in by_student.items() if k in shown),
     )
@@ -308,7 +314,8 @@ def record_attendance(
     """Store a section's statuses for one or more dates, all or nothing (``attendance.record``;
     FR-ATT-002). 422 when a student is not in the section's roster, a date is in the future or
     outside the section's academic year, or an entry repeats; and, for a scoped recorder, when
-    the day is already recorded under another section (``recorded_in_another_section``).
+    the day is already recorded under another section (``recorded_in_another_section``); 412
+    ``attendance_changed`` when an entry's ``expected_version`` is stale (XA-06).
     Audit ``attendance.recorded``."""
     cfg = load_config().attendance
     sec = _section(session, ctx, section_id, ATTENDANCE_RECORD)
@@ -336,6 +343,7 @@ def record_attendance(
             if (entry.student_id, entry.on_date) in elsewhere:
                 errors.append(_error(f"entries.{i}.on_date", OTHER_SECTION_CODE))
         _refuse(errors)
+    _check_expected_versions(session, data)
     inserted, updated = repo.upsert_attendance(
         session,
         [
@@ -372,6 +380,29 @@ def record_attendance(
         _queue_rules(session, {e.student_id for e in data.entries}, "attendance")
     log.info("academics.attendance_recorded", resource_id=sec.section.id, count=written)
     return WriteResultOut(written=written, unchanged=len(data.entries) - written, dates=dates)
+
+
+def _check_expected_versions(session: Session, data: AttendanceWrite) -> None:
+    """Optimistic concurrency per mark (XA-06): with the school's attendance of those dates
+    locked, every entry that carries ``expected_version`` must still find that version (0: not
+    marked). Otherwise 412 ``attendance_changed`` and nothing is saved, so two people marking
+    the same section and day cannot silently overwrite each other's change."""
+    repo.lock_attendance_days(session, {e.on_date for e in data.entries})
+    checked = [e for e in data.entries if e.expected_version is not None]
+    if not checked:
+        return
+    stored = repo.attendance_versions(
+        session, {e.student_id for e in checked}, {e.on_date for e in checked}
+    )
+    stale = sum(
+        1 for e in checked if stored.get((e.student_id, e.on_date), 0) != e.expected_version
+    )
+    if stale:
+        raise PreconditionFailed(
+            f"Someone else changed the attendance of {stale} student(s) since you opened it. "
+            "Reload to see their changes, then save again.",
+            code="attendance_changed",
+        )
 
 
 # --- sheets ---------------------------------------------------------------------------------------
@@ -578,7 +609,11 @@ def section_marks(
                 student=s,
                 marks=[
                     MarkOut(
-                        subject=m.subject, max_marks=m.max_marks, marks=m.marks, absent=m.absent
+                        subject=m.subject,
+                        max_marks=m.max_marks,
+                        marks=m.marks,
+                        absent=m.absent,
+                        version=m.version,
                     )
                     for m in by_student.get(s.student_id, [])
                 ],
@@ -608,6 +643,27 @@ def _marks_in_other_sections(
     ]
 
 
+def _check_expected_mark_versions(existing: Iterable[ExamMark], entries: Sequence[MarkIn]) -> None:
+    """Optimistic concurrency per mark (YA-05): with the exam's marks locked, every entry that
+    carries ``expected_version`` must still find that version (0: no mark). Otherwise 412
+    ``marks_changed`` and nothing is saved."""
+    checked = [e for e in entries if e.expected_version is not None]
+    if not checked:
+        return
+    versions = {(m.student_id, m.subject.casefold()): m.version for m in existing}
+    stale = sum(
+        1
+        for e in checked
+        if versions.get((e.student_id, e.subject.casefold()), 0) != e.expected_version
+    )
+    if stale:
+        raise PreconditionFailed(
+            f"Someone else changed {stale} mark(s) since you opened them. "
+            "Reload to see their changes, then save again.",
+            code="marks_changed",
+        )
+
+
 def record_marks(
     session: Session,
     ctx: UserContext,
@@ -619,7 +675,8 @@ def record_marks(
     when a student is not in the roster, marks exceed the maximum, absent papers carry marks,
     a subject is too long or holds an Aadhaar-like number, or an entry repeats; and, for a scoped
     recorder, when the paper is already recorded under another section
-    (``recorded_in_another_section``). Subjects match
+    (``recorded_in_another_section``); 412 ``marks_changed`` when an entry's
+    ``expected_version`` is stale (YA-05). Subjects match
     whatever their case: a paper already stored corrects in place under its first spelling.
     Audit ``marks.recorded``."""
     cfg = load_config().marks
@@ -660,9 +717,11 @@ def record_marks(
     spelling: dict[str, str] = {}
     for subject in repo.exam_subjects(session, exam.id):
         spelling.setdefault(subject.casefold(), subject)
+    repo.lock_exam_marks(session, exam.id)
     existing = repo.exam_marks(session, exam.id, {e.student_id for e in data.entries})
     stored = {(m.student_id, m.subject.casefold()): m.subject for m in existing}
     _refuse(_marks_in_other_sections(ctx, sec.section.id, existing, data.entries))
+    _check_expected_mark_versions(existing, data.entries)
 
     def _subject(entry: MarkIn) -> str:
         folded = entry.subject.casefold()

@@ -48,3 +48,35 @@ def test_SEC_008_no_task_result_or_error_is_kept_in_valkey() -> None:
         if not name.startswith("celery.") and not task.ignore_result
     )
     assert stored == []
+
+
+def test_YA_02_no_countdown_reaches_the_broker_visibility_timeout() -> None:
+    """Audit 2026-11-09 YA-02: on Valkey a reserved message that is not acknowledged within the
+    visibility timeout is delivered again. ETA/countdown messages are reserved at once and, with
+    ``acks_late``, acknowledged only after they ran, so a retry countdown of an hour (documents,
+    online payments) met the 1 h default and could run twice. The timeout is now pinned above
+    every countdown plus a run, and the outbox dedupe lease outlives it."""
+    from app.ops.service import EVENT_LEASE_SECONDS, HOLD_COUNTDOWN_SECONDS
+
+    options = celery_app.conf.broker_transport_options or {}
+    timeout = options.get("visibility_timeout")
+    assert isinstance(timeout, int)
+    longest_retry_countdown = 3600  # min(..., 3600) in documents and fees.tasks_online
+    assert timeout >= longest_retry_countdown + celery_app.conf.task_time_limit
+    assert timeout > HOLD_COUNTDOWN_SECONDS
+    assert timeout < EVENT_LEASE_SECONDS
+
+
+def test_YA_03_interval_beat_jobs_expire_instead_of_piling_up() -> None:
+    """Audit 2026-11-09 YA-03: beat keeps publishing while workers are down; every missed run of
+    an interval job (the outbox relay every 5 s, the 1-minute sweeps) then ran back to back
+    ahead of real work on the same queue. A run older than its interval is now discarded."""
+    from datetime import timedelta
+
+    for name, entry in celery_app.conf.beat_schedule.items():
+        every = entry["schedule"]
+        seconds = every.total_seconds() if isinstance(every, timedelta) else every
+        if isinstance(seconds, int | float):
+            expires = entry.get("options", {}).get("expires")
+            assert expires is not None, name
+            assert 0 < expires <= seconds, name

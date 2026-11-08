@@ -15,7 +15,7 @@ import { SaveBar } from "@/components/ui/SaveBar";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/Select";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
-import { unwrap, useBffClient } from "@/lib/bff/query";
+import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
@@ -61,6 +61,24 @@ function DayForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
   const [saved, setSaved] = useState<number | null>(null);
+  // Students whose status this person chose (YA-01): kept over a reload after a conflict.
+  const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
+  const [conflict, setConflict] = useState(false);
+  const reloading = useRef(false);
+  // YA-01: after 412 attendance_changed the day is read again; once it arrives, the register
+  // shows the other person's statuses and keeps only the ones this person chose.
+  useEffect(() => {
+    if (!reloading.current) return;
+    reloading.current = false;
+    setStatuses((mine) => {
+      const next: Record<string, AttendanceStatus> = {};
+      for (const row of day.students) {
+        const id = row.student.student_id;
+        next[id] = touched.has(id) ? (mine[id] ?? "present") : (row.status ?? "present");
+      }
+      return next;
+    });
+  }, [day, touched]);
   // XA-06: only the students whose status differs from what the server holds (all of them on
   // a day not marked yet). The API upserts per student and date and never clears the ones
   // left out, so a correction does not overwrite what someone else marked for other students.
@@ -70,6 +88,8 @@ function DayForm({
       student_id: row.student.student_id,
       on_date: day.on_date,
       status: statuses[row.student.student_id] ?? "present",
+      // YA-01: the version read, so a save cannot overwrite someone else's change unseen.
+      expected_version: row.version,
     }));
   const unsaved = canRecord ? entries.length : 0;
   useEffect(() => {
@@ -87,6 +107,7 @@ function DayForm({
     event.preventDefault();
     setError(undefined);
     setSaved(null);
+    setConflict(false);
     if (entries.length === 0) {
       setSaved(0);
       return;
@@ -100,9 +121,16 @@ function DayForm({
         }),
       );
       setSaved(out.written);
+      setTouched(new Set());
       await queryClient.invalidateQueries({ queryKey: KEYS.attendance });
     } catch (failure) {
-      setError(failure);
+      if (failure instanceof ApiError && failure.code === "attendance_changed") {
+        setConflict(true);
+        reloading.current = true;
+        await queryClient.invalidateQueries({ queryKey: KEYS.attendance });
+      } else {
+        setError(failure);
+      }
     } finally {
       setPending(false);
     }
@@ -137,9 +165,10 @@ function DayForm({
             variant="secondary"
             size="sm"
             data-print="hide"
-            onClick={() =>
-              setStatuses(Object.fromEntries(Object.keys(statuses).map((k) => [k, "present"])))
-            }
+            onClick={() => {
+              setStatuses(Object.fromEntries(Object.keys(statuses).map((k) => [k, "present"])));
+              setTouched(new Set(Object.keys(statuses)));
+            }}
           >
             <Icon name="check" className="size-4" />
             {t("allPresent")}
@@ -175,9 +204,10 @@ function DayForm({
                 className="w-full sm:w-auto sm:min-w-[22rem] sm:shrink-0"
                 name={`status-${id}`}
                 value={status}
-                onValueChange={(value) =>
-                  setStatuses({ ...statuses, [id]: value as AttendanceStatus })
-                }
+                onValueChange={(value) => {
+                  setStatuses({ ...statuses, [id]: value as AttendanceStatus });
+                  setTouched(new Set(touched).add(id));
+                }}
                 options={ATTENDANCE_STATUSES.map((value) => ({
                   value,
                   label: t(`status.${value}`),
@@ -193,6 +223,11 @@ function DayForm({
           {t("saved", { count: saved })}
         </Alert>
       ) : null}
+      {conflict ? (
+        <Alert tone="warning" live>
+          {t("changedBySomeone")}
+        </Alert>
+      ) : null}
       <ApiErrorAlert error={error} />
       <ProblemList error={error} />
       {canRecord ? (
@@ -200,7 +235,10 @@ function DayForm({
           <Button
             variant="secondary"
             disabled={!changed || pending}
-            onClick={() => setStatuses({ ...baseline })}
+            onClick={() => {
+              setStatuses({ ...baseline });
+              setTouched(new Set());
+            }}
           >
             {t("undo")}
           </Button>
