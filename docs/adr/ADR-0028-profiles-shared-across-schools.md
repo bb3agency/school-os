@@ -77,3 +77,17 @@ across schools; a school may edit it only when the person belongs to that school
 
 US-102, FR-IAM-010, FR-IAM-013, SEC-001, SEC-026, PRV-013; docs/05 §4 (core.users),
 docs/07 §7, docs/09 (users).
+
+## Amendment 2026-11-08: the database enforces the reach of a profile update (TI-05)
+
+Lead decision after the tenant-isolation audit of 2026-11-08 (finding TI-05; DL-09). Until now
+the rule above lived only in the service (`_guard_profile_not_shared`); the RLS policy
+`users_in_tenant_update` on `core.users` let a school update a person through any membership row,
+including an open invitation (an invited person is not yet the school's member, DL-09) or a
+removal. Migration `0080_audit_ti_fixes` narrows the policy: a school may update a person's
+profile row only through an `active` or `suspended` membership, or when its membership is the
+person's only one (`core.user_membership_count(id) = 1`, the function of this ADR; no new
+function). The second case keeps two legitimate paths: edits of a brand-new account the school
+itself invited, and the offboarding clean-up of sole profiles (`clear_sole_profiles`, ADR-0029).
+`last_login_at` is stamped from the school the person signs in to, where the membership is active.
+The RLS catalog test pins the policy's expression.

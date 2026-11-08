@@ -150,15 +150,54 @@ def test_ADR_0013_security_definer_functions_are_allowlisted(admin_engine: Engin
 
 STANDARD_ISOLATION = "(tenant_id = core.current_tenant())"
 DEFINER_ACCESS = "(CURRENT_USER = 'sos_definer'::name)"
+_IN_TENANT = "m.user_id = users.id AND m.tenant_id = core.current_tenant()"
+# TI-05 (ADR-0028 amendment 2026-11-08): profile updates only through an active or suspended
+# membership, or when this school's membership is the person's only one.
+_UPDATE_REACH = (
+    f"EXISTS (SELECT 1 FROM core.memberships m WHERE {_IN_TENANT} AND "
+    "(m.status = ANY (ARRAY['active'::text, 'suspended'::text]) "
+    "OR core.user_membership_count(users.id) = 1))"
+)
 # Reviewed permissive policies other than the standard tenant_isolation (rls_allowlist.yaml
-# policy_variants and definer_access_tables). Restrictive policies only narrow access.
-PERMISSIVE_VARIANTS = {
-    ("core.tenants", "own_tenant"),
-    ("core.users", "users_in_tenant"),
-    ("core.users", "users_in_tenant_update"),
-    ("sis.attribute_definitions", "attrdef_read"),
-    ("sis.attribute_definitions", "attrdef_write"),
+# policy_variants and definer_access_tables), with their command and expressions (compared
+# without parentheses and whitespace). Restrictive policies only narrow access.
+PERMISSIVE_VARIANTS: dict[tuple[str, str], tuple[str, str, str | None]] = {
+    ("core.tenants", "own_tenant"): (
+        "*",
+        "id = core.current_tenant()",
+        "id = core.current_tenant()",
+    ),
+    ("core.users", "users_in_tenant"): (
+        "r",
+        f"EXISTS (SELECT 1 FROM core.memberships m WHERE {_IN_TENANT})",
+        None,
+    ),
+    ("core.users", "users_in_tenant_update"): ("w", _UPDATE_REACH, _UPDATE_REACH),
+    ("sis.attribute_definitions", "attrdef_read"): (
+        "r",
+        "core.current_tenant() IS NOT NULL AND (tenant_id IS NULL OR "
+        "tenant_id = core.current_tenant())",
+        None,
+    ),
+    ("sis.attribute_definitions", "attrdef_write"): (
+        "*",
+        "tenant_id = core.current_tenant()",
+        "tenant_id = core.current_tenant()",
+    ),
 }
+
+
+def _norm(expr: str | None) -> str | None:
+    return None if expr is None else "".join(c for c in expr if c not in "() \n\t")
+
+
+def _variant_problems(name: str, r: Any, cmd: str, qual: str, chk: str | None) -> list[str]:
+    problems = []
+    if not (r["polcmd"] == cmd and r["to_public"]):
+        problems.append(f"{name}: must be FOR {cmd} TO PUBLIC")
+    if _norm(r["qual"]) != _norm(qual) or _norm(r["chk"]) != _norm(chk):
+        problems.append(f"{name}: expression differs from the reviewed one")
+    return problems
 
 
 def policy_violations(conn: Connection, schemas: list[str]) -> list[str]:
@@ -183,7 +222,9 @@ def policy_violations(conn: Connection, schemas: list[str]) -> list[str]:
     problems: list[str] = []
     for r in rows:
         name = f"{r['fq']}.{r['polname']}"
-        if (r["fq"], r["polname"]) in PERMISSIVE_VARIANTS:
+        variant = PERMISSIVE_VARIANTS.get((r["fq"], r["polname"]))
+        if variant is not None:
+            problems.extend(_variant_problems(name, r, *variant))
             continue
         if r["polname"] == "tenant_isolation":
             expected = STANDARD_ISOLATION
