@@ -67,9 +67,10 @@ describe("table scroll regions have unique landmark names (WA-03)", () => {
       </section>,
     );
     expect(await duplicateLandmarks()).toEqual([]);
-    expect(
-      screen.getByRole("region", { name: "Schools table, scrolls sideways" }),
-    ).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("region", { name: "Schools table, scrolls sideways" })).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
   });
 
   it("keeps the caption as the name when no parent has it", async () => {
