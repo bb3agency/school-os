@@ -29,6 +29,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from app.circulars import service as circulars
+from app.circulars.config import rules as circular_rules
 from app.core import pdf
 from app.core import ratelimit as rl
 from app.core.db import tenant_session
@@ -341,7 +342,7 @@ def _fail_render(
     """The render failed ``minutes_ago`` (the trigger stamps ``updated_at`` now; the
     service's clock is moved forward instead)."""
     with admin.begin() as c:
-        failed_at = c.execute(
+        failed_at: dt.datetime = c.execute(
             text(
                 "UPDATE ops.parent_notices SET render_status = 'failed', "
                 "render_error = 'render_failed', pdf_key = NULL, png_key = NULL, "
@@ -368,7 +369,7 @@ def test_D71_AZ_02_a_failed_render_is_queued_again_only_after_the_cooldown(
     with tenant_session(world.a.tenant_id, owner.user_id) as db:
         notice_id = P.approved_notice(db, owner.user_id)
     key = _link(world.a, "parent_notice", notice_id, guardian)
-    cooldown = circulars.rules().notices.failed_render_cooldown_s
+    cooldown = circular_rules().notices.failed_render_cooldown_s
     assert cooldown == 900
     _fail_render(admin_engine, notice_id, monkeypatch, minutes_ago=1)
     for _ in range(3):
