@@ -21,6 +21,8 @@ import {
 
 /** Warn this long before the idle timeout signs the user out. */
 export const IDLE_WARNING_MS = 60_000;
+/** A server deadline this close is treated as reached (clock and network slack). */
+const RECHECK_SLACK_MS = 5_000;
 
 /** Add reason=idle to our own signed-out page (the IdP's end-session URL is left alone). */
 function idleTarget(target: string): string {
@@ -276,23 +278,58 @@ export function IdleWarning({
     }
   }, [kind, navigate, expire]);
 
+  /**
+   * The session is shared by every tab (WS-02): another tab's calls slide it on the server, and
+   * signing out there ends it. Before warning or signing out, read the server's deadline (a
+   * read that does not slide it). Returns the later deadline when there is one, "ended" when
+   * the session is gone, or null (keep this tab's timing) when it cannot be read.
+   */
+  const serverDeadline = useCallback(
+    async (margin: number): Promise<number | "ended" | null> => {
+      try {
+        const info = await loadSessionInfo(kind, { fresh: true });
+        if (!info.authenticated) return "ended";
+        if (info.expires_in_ms <= margin) return null;
+        idleTimeoutRef.current = info.idle_timeout_ms;
+        return Date.now() + info.expires_in_ms;
+      } catch {
+        return null;
+      }
+    },
+    [kind],
+  );
+
   useEffect(() => {
     if (deadline === null) return;
     const dialog = dialogRef.current;
     const untilWarning = deadline - IDLE_WARNING_MS - Date.now();
     if (untilWarning > 0 && dialog?.open) dialog.close();
+    let stale = false;
     const warn = setTimeout(
-      () => {
-        if (dialog && !dialog.open) dialog.showModal();
-      },
+      () =>
+        void serverDeadline(IDLE_WARNING_MS + RECHECK_SLACK_MS).then((later) => {
+          if (stale) return;
+          if (later === "ended") void expire();
+          else if (later !== null) setDeadline(later);
+          else if (dialog && !dialog.open) dialog.showModal();
+        }),
       Math.max(0, untilWarning),
     );
-    const end = setTimeout(() => void expire(), Math.max(0, deadline - Date.now()));
+    const end = setTimeout(
+      () =>
+        void serverDeadline(RECHECK_SLACK_MS).then((later) => {
+          if (stale) return;
+          if (typeof later === "number") setDeadline(later);
+          else void expire();
+        }),
+      Math.max(0, deadline - Date.now()),
+    );
     return () => {
+      stale = true;
       clearTimeout(warn);
       clearTimeout(end);
     };
-  }, [deadline, expire]);
+  }, [deadline, expire, serverDeadline]);
 
   return (
     <dialog

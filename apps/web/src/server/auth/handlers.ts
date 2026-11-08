@@ -483,6 +483,9 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
     Pick<Session, "familyId" | "handle" | "csrfToken" | "activeTenantId" | "idleTimeoutMs">
   > = {};
   let next = transaction.next;
+  // A first sign-in, or a step-up where someone else signed in at the prompt (WS-01): that
+  // person gets the whole sign-in (invitations, MFA check, school, audited login event).
+  let freshSignIn = !transaction.stepUpSessionId;
   if (transaction.stepUpSessionId) {
     if (claims.authTime !== null && nowSeconds - claims.authTime > STEP_UP_MAX_AGE_SECONDS) {
       return fail("step_up_failed");
@@ -502,8 +505,11 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
         idleTimeoutMs: existing.idleTimeoutMs,
       };
     } else {
-      // Someone else signed in at the step-up prompt: start clean, go home.
+      // Someone else signed in at the step-up prompt: start clean, go home. A support session
+      // starts only from a grant in the admin panel (ADR-0023), never from a step-up.
+      if (kind === "support") return fail("support_not_allowed");
       next = DEFAULT_NEXT[kind];
+      freshSignIn = true;
     }
   }
   if (existing) {
@@ -544,7 +550,7 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
     }
     await recordLoginEvent(runtime, session, tokens.accessToken, requestId);
   }
-  if (kind === "staff" && !transaction.stepUpSessionId) {
+  if (kind === "staff" && freshSignIn) {
     const outcome = await afterStaffSignIn(runtime, session, tokens.accessToken, requestId);
     if (outcome.kind === "mfa_required") {
       // A privileged role without MFA gets no session at all (FR-IAM-002).
@@ -559,11 +565,7 @@ export async function handleCallback(request: Request, runtime: AuthRuntime, kin
     }
   }
   await runtime.authLimiter.clear(hash);
-  logEvent(
-    transaction.stepUpSessionId ? "step_up_completed" : "signin_completed",
-    { kind },
-    "info",
-  );
+  logEvent(freshSignIn ? "signin_completed" : "step_up_completed", { kind }, "info");
   return seeOther(runtime, next, [
     serializeCookie(sessionCookieName(kind, secure), cookieValue, { secure }),
     clearTransaction,
