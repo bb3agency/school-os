@@ -8652,7 +8652,9 @@ export interface paths {
          * Record Attendance
          * @description Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a
          *     day again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range`` or
-         *     ``duplicate_entry`` per entry. The early-warning rules look at these students again.
+         *     ``duplicate_entry`` per entry. An entry may carry ``expected_version`` (the ``version`` read
+         *     from the day): 412 ``attendance_changed`` when someone else changed that mark since, and
+         *     nothing is saved. The early-warning rules look at these students again.
          */
         post: operations["record_attendance_api_v1_sections__section_id__attendance_post"];
         delete?: never;
@@ -8724,7 +8726,8 @@ export interface paths {
          * Record Marks
          * @description Save marks per student and subject with the maximum marks, or absent, all or nothing
          *     (``marks.record``). 422 ``not_in_section``, ``marks_over_max``, ``absent_has_no_marks``,
-         *     ``exam_other_year``...
+         *     ``exam_other_year``...; an entry may carry ``expected_version`` (the mark's ``version``):
+         *     412 ``marks_changed`` when someone else changed that mark since, and nothing is saved.
          */
         post: operations["record_marks_api_v1_sections__section_id__exams__exam_id__marks_post"];
         delete?: never;
@@ -11132,9 +11135,20 @@ export interface components {
              */
             status: ("present" | "absent" | "late" | "leave") | null;
             student: components["schemas"]["RosterStudentOut"];
+            /**
+             * Version
+             * @description The mark's version (0: not marked that day). Send it back as ``expected_version`` so a save does not overwrite someone else's change.
+             * @default 0
+             */
+            version: number;
         };
         /** AttendanceEntryIn */
         AttendanceEntryIn: {
+            /**
+             * Expected Version
+             * @description The ``version`` read for this student and date (0: not marked then). When sent, the save is refused (412 ``attendance_changed``) if someone else changed the mark since; leave it out to overwrite (sheet imports).
+             */
+            expected_version?: number | null;
             /**
              * On Date
              * Format: date
@@ -17346,6 +17360,11 @@ export interface components {
              * @default false
              */
             absent: boolean;
+            /**
+             * Expected Version
+             * @description The ``version`` read for this student and subject (0: no mark then). When sent, the save is refused (412 ``marks_changed``) if someone else changed the mark since; leave it out to overwrite (sheet imports).
+             */
+            expected_version?: number | null;
             /** Marks */
             marks?: number | string | null;
             /** Max Marks */
@@ -17365,6 +17384,11 @@ export interface components {
              * @default false
              */
             absent: boolean;
+            /**
+             * Expected Version
+             * @description The ``version`` read for this student and subject (0: no mark then). When sent, the save is refused (412 ``marks_changed``) if someone else changed the mark since; leave it out to overwrite (sheet imports).
+             */
+            expected_version?: number | null;
             /** Marks */
             marks?: string | null;
             /** Max Marks */
@@ -17387,6 +17411,12 @@ export interface components {
             max_marks: string;
             /** Subject */
             subject: string;
+            /**
+             * Version
+             * @description The mark's version. Send it back as ``expected_version`` so a save does not overwrite someone else's change.
+             * @default 1
+             */
+            version: number;
         };
         /** MarksGridOut */
         MarksGridOut: {
