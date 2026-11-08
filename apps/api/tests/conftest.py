@@ -1,7 +1,7 @@
 """Shared test fixtures: a real PostgreSQL 16 + pgvector database with the production role model.
 
 Database lifecycle (session scope):
-1. Start ``pgvector/pgvector:0.8.6-pg16-bookworm`` via testcontainers, or reuse the admin URL in
+1. Start ``pgvector/pgvector:0.8.7-pg16-bookworm`` via testcontainers, or reuse the admin URL in
    ``SOS_TEST_ADMIN_DATABASE_URL`` (psql must then be on PATH).
 2. Run ``infra/db/bootstrap.sql`` as the admin (roles, schemas, extensions, grants).
 3. ``alembic upgrade head`` as ``sos_migrator``.
@@ -44,7 +44,7 @@ get_settings.cache_clear()
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BOOTSTRAP_SQL = REPO_ROOT / "infra" / "db" / "bootstrap.sql"
 ALEMBIC_INI = REPO_ROOT / "apps" / "api" / "alembic.ini"
-PG_IMAGE = "pgvector/pgvector:0.8.6-pg16-bookworm"
+PG_IMAGE = "pgvector/pgvector:0.8.7-pg16-bookworm"
 DB_NAME = "schoolos"
 
 PASSWORDS = {

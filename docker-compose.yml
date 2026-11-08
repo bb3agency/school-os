@@ -30,7 +30,7 @@ x-python-app: &python-app
 
 services:
   db:
-    image: pgvector/pgvector:0.8.6-pg16-bookworm@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
+    image: pgvector/pgvector:0.8.7-pg16-bookworm@sha256:0dd3149a06e4579a0d70d8fef9945636cd514005e7237deb27f9b67886f8dc4f
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${SOS_DB_ADMIN_PASSWORD}
@@ -163,7 +163,7 @@ services:
   # Dev-only OIDC provider (docs/10 §11). Never deployed; the API refuses its issuer outside local.
   oidc:
     profiles: ["dev"]
-    image: ghcr.io/navikt/mock-oauth2-server:6.0.3
+    image: ghcr.io/navikt/mock-oauth2-server:6.1.4
     environment:
       SERVER_PORT: "8080"
       JSON_CONFIG_PATH: /config/oidc.json
@@ -186,7 +186,7 @@ services:
   # (never linked into SchoolOS code). Without it the dev-only scanner is used (refused in prod).
   clamav:
     profiles: ["av"]
-    image: clamav/clamav:1.4@sha256:a5f03c12a79dbe9f6d8a527b6bb1ea053fa8dd061d3738a26897f055ee2d9303
+    image: clamav/clamav:1.5@sha256:6d87c712e3391e13c1ba6e05dfb074d4b1ddb5a6834b23bb9da990d2a4ef042a
     volumes:
       - clamdb:/var/lib/clamav
     ports: ["127.0.0.1:3310:3310"]
