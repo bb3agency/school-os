@@ -104,7 +104,8 @@ def dispatch_outbox(send: SendTask, *, batch: int = 100) -> DispatchResult:
 # --- suspended schools: hold queued work (audit 2026-10-05 A-12) -------------------------------
 
 # How long a held task waits before it checks the school again. Below the broker's visibility
-# timeout (1 h on Valkey), so a held message is never delivered twice.
+# timeout (2 h, ``sos_worker.celery_app.BROKER_VISIBILITY_TIMEOUT_S``), so a held message is never
+# delivered twice.
 HOLD_COUNTDOWN_SECONDS: Final = 600
 
 # Outbox consumers that still run while a school is suspended or offboarding. Each one either
@@ -148,7 +149,7 @@ DEDUPE_BY_EVENT: Final[frozenset[str]] = frozenset(
         "admin.tenant_export",
     }
 )
-EVENT_LEASE_SECONDS: Final = 2 * 3600  # longer than the broker visibility timeout (1 h)
+EVENT_LEASE_SECONDS: Final = 3 * 3600  # longer than the broker visibility timeout (2 h, YA-02)
 EVENT_DONE_SECONDS: Final = 7 * 24 * 3600
 _RUNNING: Final = b"running"
 _DONE: Final = b"done"

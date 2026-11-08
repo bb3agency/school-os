@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from contextvars import Token
+from datetime import timedelta
 from typing import Any
 
 from celery import Celery, Task, signals
@@ -73,6 +74,28 @@ import app.students.service  # isort: skip
 import app.tally.service  # noqa: F401  isort: skip
 
 QUEUES: tuple[str, ...] = ("ingest", "embed", "ocr", "dq", "exports", "pdf", "maintenance")
+
+# Valkey redelivers a reserved message not acknowledged within this time. ETA/countdown messages
+# are reserved at once and, with ``acks_late``, acknowledged after they ran, so the timeout must
+# exceed the longest retry countdown (1 h) plus a run (15 min); the outbox dedupe lease
+# (``ops.service.EVENT_LEASE_SECONDS``) outlives it (audit 2026-11-09 YA-02).
+BROKER_VISIBILITY_TIMEOUT_S: int = 2 * 3600
+
+
+def expiring(entries: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Beat entries whose interval runs expire after one interval (audit 2026-11-09 YA-03):
+    runs published while no worker took them are discarded instead of running back to back
+    once workers return. Crontab entries and an explicit ``expires`` are kept as they are."""
+    out: dict[str, dict[str, Any]] = {}
+    for name, entry in entries.items():
+        every = entry["schedule"]
+        seconds = every.total_seconds() if isinstance(every, timedelta) else every
+        options = dict(entry.get("options", {}))
+        if isinstance(seconds, int | float) and "expires" not in options:
+            options["expires"] = float(seconds)
+        out[name] = {**entry, "options": options} if options else dict(entry)
+    return out
+
 
 # Task modules registered as they are built (each module owns its tasks.py).
 TASK_MODULES: list[str] = [
@@ -142,6 +165,7 @@ def create_celery() -> Celery:
         timezone="UTC",
         enable_utc=True,
         broker_connection_retry_on_startup=True,
+        broker_transport_options={"visibility_timeout": BROKER_VISIBILITY_TIMEOUT_S},
         task_routes={
             "maintenance.*": {"queue": "maintenance"},
             # R-19: an on-demand audit-chain check (outbox consumer of POST /audit/verify).
@@ -292,6 +316,7 @@ def create_celery() -> Celery:
             **platform_beat_schedule(settings),
         },
     )
+    app.conf.beat_schedule = expiring(app.conf.beat_schedule)
     return app
 
 
