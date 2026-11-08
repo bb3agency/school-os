@@ -217,7 +217,10 @@ describe("Stop link on a sent message (ADR-0046 decision 5)", () => {
     stub.routes[`POST /bff/api/v1/messages/${MESSAGE}/revoke-link`] = () =>
       Response.json({ message_id: MESSAGE, revoked: true });
     renderWithIntl(<MessageHistory studentId={STUDENT_A} tableId="fee-account-messages" />);
-    const stop = await screen.findByRole("button", { name: /Stop the link of the Fee reminder/ });
+    const stop = await screen.findByRole("button", { name: /Fee reminder/ });
+    // WCAG 2.5.3 (WA-01): the name starts with the visible text, so "click Stop link" works.
+    expect(stop.textContent).toBe(en.messaging.revokeLink.open);
+    expect(stop.getAttribute("aria-label")?.startsWith(en.messaging.revokeLink.open)).toBe(true);
     const search = stub.callsTo("POST /bff/api/v1/messages/search")[0];
     expect(JSON.parse(search?.body ?? "{}")).toMatchObject({ student_id: STUDENT_A });
     await userEvent.click(stop);
@@ -235,7 +238,7 @@ describe("Stop link on a sent message (ADR-0046 decision 5)", () => {
       Response.json({ items: [message()], next_cursor: null } satisfies MessagePage);
     renderWithIntl(<MessageHistory studentId={STUDENT_A} />);
     expect(await screen.findByText(en.messaging.log.statuses.delivered)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Stop the link/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Stop link/ })).toBeNull();
   });
 
   it("offers no stop for a failed message", async () => {
@@ -249,6 +252,6 @@ describe("Stop link on a sent message (ADR-0046 decision 5)", () => {
     await waitFor(() =>
       expect(screen.getByText(en.messaging.log.reasons.not_on_whatsapp)).toBeInTheDocument(),
     );
-    expect(screen.queryByRole("button", { name: /Stop the link/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Stop link/ })).toBeNull();
   });
 });

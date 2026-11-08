@@ -9077,7 +9077,7 @@
     },
     "revokeLink": {
       "open": "Stop link",
-      "rowLabel": "Stop the link of the {purpose} sent {when}",
+      "rowLabel": "Stop link: {purpose} sent {when}",
       "title": "Stop this parent link?",
       "description": "{purpose} sent {when}.",
       "consequence": "The page this message opens stops working for the parent at once. This cannot be undone; send a new message if the parent needs the page again.",
