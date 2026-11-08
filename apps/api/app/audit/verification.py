@@ -119,20 +119,23 @@ def latest(session: Session, tenant_id: uuid.UUID) -> AuditVerificationOut:
 
 def _verify_from_checkpoint(
     session: Session, tenant_id: uuid.UUID, cp_seq: int, cp_hash: bytes
-) -> VerifyResult:
+) -> tuple[VerifyResult, int, bytes]:
     rows = repository.events_at(session, tenant_id, cp_seq)
     if len(rows) != 1:
-        return VerifyResult(False, 0, cp_seq, "checkpoint_mismatch")
+        return VerifyResult(False, 0, cp_seq, "checkpoint_mismatch"), cp_seq, cp_hash
     event = rows[0]
     if (
         bytes(event["hash"]) != cp_hash
         or chain_hash(bytes(event["prev_hash"]), tenant_event_dict(event)) != cp_hash
     ):
-        return VerifyResult(False, 0, cp_seq, "checkpoint_mismatch")
-    head = repository.get_head(session, tenant_id)
-    later = repository.iter_events_after(session, tenant_id, cp_seq)
-    return service.verify_events(
-        later, head, tenant_event_dict, start_seq=cp_seq + 1, start_prev_hash=cp_hash
+        return VerifyResult(False, 0, cp_seq, "checkpoint_mismatch"), cp_seq, cp_hash
+    return service.verify_live(
+        repository.iter_events_after(session, tenant_id, cp_seq),
+        lambda: repository.get_head(session, tenant_id),
+        lambda after, upto: repository.count_events_between(session, tenant_id, after, upto),
+        tenant_event_dict,
+        start_seq=cp_seq + 1,
+        start_prev_hash=cp_hash,
     )
 
 
@@ -148,9 +151,9 @@ def run(
     cp_hash = bytes(row["checkpoint_hash"]) if row is not None and row["checkpoint_hash"] else None
     incremental = not full and cp_seq > 0 and cp_hash is not None
     if not full and cp_seq > 0 and cp_hash is not None:
-        result = _verify_from_checkpoint(session, tenant_id, cp_seq, cp_hash)
+        result, last_seq, last_hash = _verify_from_checkpoint(session, tenant_id, cp_seq, cp_hash)
     else:
-        result = service.verify_chain(session, tenant_id)
+        result, last_seq, last_hash = service.verify_chain_live(session, tenant_id)
     at = _now()
     values: dict[str, Any] = {
         "verified_at": at,
@@ -163,10 +166,10 @@ def run(
     }
     if not incremental:
         values["last_full_at"] = at
-    if result.ok:
-        head = repository.get_head(session, tenant_id)
-        if head is not None and head[0] > 0 and head[0] != cp_seq:
-            values.update(checkpoint_seq=head[0], checkpoint_hash=head[1], checkpoint_at=at)
+    if result.ok and last_seq > 0 and last_seq != cp_seq:
+        # The last event this run verified, never a head moved by an append committed
+        # meanwhile (that event is the next run's; YP-01).
+        values.update(checkpoint_seq=last_seq, checkpoint_hash=last_hash, checkpoint_at=at)
     if source == "on_demand":
         values.update(requested_at=None, requested_by=None, requested_full=False)
     if row is None and result.ok and result.checked == 0 and "checkpoint_seq" not in values:
