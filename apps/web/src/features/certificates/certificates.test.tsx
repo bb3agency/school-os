@@ -329,6 +329,20 @@ describe("URL parameters and helpers", () => {
 });
 
 describe("certificate list (US-1101..US-1105)", () => {
+  it("a failed next page keeps the certificates shown and offers Show more again (XO-05)", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([READ]));
+    stub.routes["GET /bff/api/v1/certificates"] = (_request, url) =>
+      url.searchParams.get("cursor")
+        ? problem(502, "bad_gateway")
+        : Response.json({ data: [issued()], next_cursor: "c2" });
+    renderWithIntl(<CertificatesScreen filters={parseCertificateFilters({})} />);
+    expect(await screen.findByText("Bonafide certificate BC/2026-27/0007")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show more" }));
+    await screen.findByRole("alert");
+    expect(screen.getByText("Bonafide certificate BC/2026-27/0007")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show more" })).toBeEnabled();
+  });
+
   it("names certificates by type and serial and marks those waiting for this approver", async () => {
     stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([READ, APPROVE, "register.read"]));
     stub.routes["GET /bff/api/v1/certificates"] = () =>

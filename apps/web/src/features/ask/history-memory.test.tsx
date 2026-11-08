@@ -63,6 +63,20 @@ describe("All chats (FR-KB-012)", () => {
       );
   });
 
+  it("a failed next page keeps the chats shown and offers Load more again (XO-05)", async () => {
+    stub.routes[`GET ${LIST_ROUTE.slice(4)}`] = (_request, url) =>
+      url.searchParams.get("cursor")
+        ? problem(502, "bad_gateway")
+        : Response.json({ data: [summary({ id: A, title: "Exam dates" })], next_cursor: "c2" });
+    renderWithIntl(<AskHistoryPage />);
+    await screen.findByRole("link", { name: /Exam dates/ });
+    await userEvent.click(screen.getByRole("button", { name: "Load more chats" }));
+    // A 5xx is asked once more (after about a second) before it counts as failed.
+    await screen.findByRole("alert", {}, { timeout: 4000 });
+    expect(screen.getByRole("link", { name: /Exam dates/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Load more chats" })).toBeEnabled();
+  });
+
   it("lists pinned chats first and filters loaded titles as you type (no request)", async () => {
     renderWithIntl(<AskHistoryPage />);
     const pinned = await screen.findByRole("region", { name: "Pinned" });

@@ -4,6 +4,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Pill } from "@/components/ui/Badge";
+import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import type { FilterChip } from "@/components/ui/FilterChips";
 import { Icon } from "@/components/ui/Icon";
@@ -193,7 +194,12 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
         caption={t("title")}
         captionHidden
         columns={columns}
-        state={toLoadable({ ...list, data: rows })}
+        // A failed next page keeps the rows shown; its error sits by Show more (XO-05).
+        state={toLoadable({
+          ...list,
+          isError: list.isError && !list.isFetchNextPageError,
+          data: rows,
+        })}
         rowKey={(row) => row.id}
         toolbar={
           <form
@@ -244,7 +250,10 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
         onRetry={() => void list.refetch()}
         footer={
           list.hasNextPage ? (
-            <div className="flex justify-center">
+            <div className="flex flex-col items-center gap-2">
+              {list.isFetchNextPageError ? (
+                <ApiErrorAlert error={list.error} namespace="certificates" />
+              ) : null}
               <Button
                 variant="secondary"
                 onClick={() => void list.fetchNextPage()}
