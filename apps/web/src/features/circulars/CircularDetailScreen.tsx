@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
@@ -17,11 +17,11 @@ import { Value } from "@/components/ui/Value";
 import { SourceChip } from "@/features/ask/parts";
 import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Link, useRouter } from "@/i18n/navigation";
-import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
+import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
 import { useDateInput } from "@/lib/date-format";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { zodErrorKeys } from "@/lib/forms";
+import { useIntentKey, zodErrorKeys } from "@/lib/forms";
 import { translateOr } from "@/lib/i18n-dynamic";
 import {
   KEYS,
@@ -305,6 +305,9 @@ export function CircularDetailScreen({ documentId }: { documentId: string }) {
   const assignees = useAssignees(canReview);
   const [error, setError] = useState<unknown>(undefined);
   const [pending, setPending] = useState(false);
+  // A second click in the same frame does not see `pending` yet (WD-06): one action at a time.
+  const running = useRef(false);
+  const noticeIntent = useIntentKey();
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: KEYS.circulars });
@@ -312,6 +315,8 @@ export function CircularDetailScreen({ documentId }: { documentId: string }) {
   }
 
   async function run(action: () => Promise<unknown>) {
+    if (running.current) return;
+    running.current = true;
     setPending(true);
     setError(undefined);
     try {
@@ -320,6 +325,7 @@ export function CircularDetailScreen({ documentId }: { documentId: string }) {
     } catch (failure) {
       setError(failure);
     } finally {
+      running.current = false;
       setPending(false);
     }
   }
@@ -343,13 +349,21 @@ export function CircularDetailScreen({ documentId }: { documentId: string }) {
     );
   const draftNotice = () =>
     run(async () => {
-      const notice = await unwrap(
-        api.POST("/api/v1/notices", {
-          headers: { "Idempotency-Key": newIdempotencyKey() },
-          body: { source: "circular", document_id: documentId },
-        }),
-      );
-      router.push(`/notices/${notice.id}`);
+      const body = { source: "circular" as const, document_id: documentId };
+      try {
+        const notice = await unwrap(
+          api.POST("/api/v1/notices", {
+            // The same key when it is tried again after a lost answer: one notice (XO-01).
+            headers: { "Idempotency-Key": noticeIntent.next(body) },
+            body,
+          }),
+        );
+        noticeIntent.succeeded();
+        router.push(`/notices/${notice.id}`);
+      } catch (failure) {
+        noticeIntent.failed(failure);
+        throw failure;
+      }
     });
 
   return (
