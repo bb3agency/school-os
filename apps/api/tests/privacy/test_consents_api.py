@@ -495,6 +495,7 @@ def test_FR_DPDP_009_access_report_lists_consents_and_breaches(
         "PUT",
         f"/api/v1/privacy/breaches/{breach['id']}/affected",
         json={"student_ids": [str(sid)]},
+        headers={"If-Match": 'W/"1"'},
     )
     assert res.status_code == 200, res.text
     with tenant_session(world.a.tenant_id) as db:

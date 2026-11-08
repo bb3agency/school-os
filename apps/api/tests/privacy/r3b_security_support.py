@@ -191,7 +191,7 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
         ),
         ("GET", "/api/v1/privacy/breaches/{breach_id}/affected"): on_breach("/affected"),
         ("PUT", "/api/v1/privacy/breaches/{breach_id}/affected"): on_breach(
-            "/affected", {"student_ids": []}
+            "/affected", {"student_ids": []}, if_match=True
         ),
         ("GET", "/api/v1/privacy/breaches/{breach_id}/drafts/{draft}"): on_breach(
             "/drafts/board_outline"
