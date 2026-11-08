@@ -505,3 +505,42 @@ def test_FR_DPDP_009_access_report_lists_consents_and_breaches(
     assert "Private office note" not in str(consents.rows)
     assert breaches.class_key == "breach_records"
     assert P.DESCRIPTION not in str(breaches.rows)
+
+
+# --- TI-01: the guardian link of a decision (FR-DPDP-021, docs/08) -----------------------------
+
+
+def test_TI_01_FR_DPDP_021_a_guardian_who_decided_can_still_be_unlinked_and_deleted(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    """``consents_guardian_fk`` is ``ON DELETE SET NULL (guardian_id)``: an UPDATE of the decision
+    row. The append-only trigger refused it, so a guardian who once decided could never be
+    unlinked from the last student (that deletes the guardian), and their phone and address
+    stayed. The decision itself stays with its relationship; only the link to the person goes."""
+    admin = world.person("office_admin")
+    pid = P.shared_purpose(api, world.a, admin_engine)
+    sid = P.student(world.a)
+    gid = P.SW.add_guardian(world.a, sid, full_name="Synthetica Consent Decider")
+    res = P.record(api, admin, sid, P.refused(pid, guardian_id=str(gid)))
+    assert res.status_code == 201, res.text
+    # Clearing the link directly (not through the guardian's deletion) is still refused.
+    with admin_engine.begin() as c, pytest.raises(Exception, match="append-only"):
+        c.execute(
+            text("UPDATE sis.consents SET guardian_id = NULL WHERE student_id = :s"), {"s": sid}
+        )
+    version = P.SW.version(admin_engine, "sis.guardians", gid)
+    res = api.call(
+        admin,
+        "DELETE",
+        f"/api/v1/students/{sid}/guardians/{gid}",
+        headers={"If-Match": f'W/"{version}"'},
+    )
+    assert res.status_code == 204, res.text
+    rows = P.consent_rows(admin_engine, sid)
+    assert len(rows) == 1
+    assert rows[0]["guardian_id"] is None
+    assert (rows[0]["status"], rows[0]["relationship"]) == ("refused", "father")
+    # Every other change of a decision is still refused, for every role (also the owner).
+    for change in ("status = 'given'", "guardian_id = NULL, note = 'changed'"):
+        with admin_engine.begin() as c, pytest.raises(Exception, match="append-only"):
+            c.execute(text(f"UPDATE sis.consents SET {change} WHERE student_id = :s"), {"s": sid})
