@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
@@ -350,60 +350,76 @@ function InputItem({
   );
 }
 
-function PublishDialog({ draft, live }: { draft: DisclosureDraft; live: boolean }) {
+/**
+ * Publishing freezes the saved draft (XP-01): while the editor holds unsaved changes the button
+ * is off and says why, so the school never publishes something other than what it sees.
+ */
+function PublishDialog({
+  draft,
+  live,
+  unsaved,
+}: {
+  draft: DisclosureDraft;
+  live: boolean;
+  unsaved: boolean;
+}) {
   const t = useTranslations("disclosure.publish");
   const api = useBffClient("staff");
   const documents = Object.values(draft.documents).reduce((n, list) => n + list.length, 0);
   return (
-    <ActionDialog
-      triggerLabel={live ? t("again") : t("open")}
-      triggerVariant="primary"
-      title={t("title")}
-      description={t("description", { documents })}
-      confirmLabel={t("confirm")}
-      stepUp
-      consequence={t("consequence")}
-      // A literal, not .optional().refine(): zod 4 skips refinements when the value is missing, so
-      // an unticked box (absent from the form data) would pass.
-      schema={z.object({ confirm_no_student_data: z.literal("on", { error: "required" }) })}
-      invalidate={[DISCLOSURE_KEYS.all]}
-      errorNamespace="disclosure"
-      submit={(input, idempotencyKey) =>
-        unwrap(
-          api.POST("/api/v1/disclosure/publish", {
-            headers: { "Idempotency-Key": idempotencyKey },
-            body: { confirm_no_student_data: input.confirm_no_student_data === "on" },
-          }),
-        )
-      }
-    >
-      {(errors) => (
-        <div className="space-y-3">
-          {draft.missing.length ? (
-            <Alert tone="warning" title={t("missingTitle")}>
-              {t("missingBody", { count: draft.missing.length })}
-            </Alert>
-          ) : null}
-          <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
-            <li>{t("whatPublic1")}</li>
-            <li>{t("whatPublic2", { documents })}</li>
-            <li>{t("whatPublic3")}</li>
-          </ul>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              name="confirm_no_student_data"
-              className="mt-1 size-4 accent-primary"
-              aria-invalid={errors.confirm_no_student_data ? true : undefined}
-            />
-            <span>{t("checkbox")}</span>
-          </label>
-          {errors.confirm_no_student_data ? (
-            <p className="text-sm text-danger">{t("checkboxRequired")}</p>
-          ) : null}
-        </div>
-      )}
-    </ActionDialog>
+    <span className="flex flex-col items-end gap-1">
+      <ActionDialog
+        triggerLabel={live ? t("again") : t("open")}
+        triggerVariant="primary"
+        triggerDisabled={unsaved}
+        title={t("title")}
+        description={t("description", { documents })}
+        confirmLabel={t("confirm")}
+        stepUp
+        consequence={t("consequence")}
+        // A literal, not .optional().refine(): zod 4 skips refinements when the value is missing, so
+        // an unticked box (absent from the form data) would pass.
+        schema={z.object({ confirm_no_student_data: z.literal("on", { error: "required" }) })}
+        invalidate={[DISCLOSURE_KEYS.all]}
+        errorNamespace="disclosure"
+        submit={(input, idempotencyKey) =>
+          unwrap(
+            api.POST("/api/v1/disclosure/publish", {
+              headers: { "Idempotency-Key": idempotencyKey },
+              body: { confirm_no_student_data: input.confirm_no_student_data === "on" },
+            }),
+          )
+        }
+      >
+        {(errors) => (
+          <div className="space-y-3">
+            {draft.missing.length ? (
+              <Alert tone="warning" title={t("missingTitle")}>
+                {t("missingBody", { count: draft.missing.length })}
+              </Alert>
+            ) : null}
+            <ul className="list-disc space-y-1 pl-5 text-sm text-ink">
+              <li>{t("whatPublic1")}</li>
+              <li>{t("whatPublic2", { documents })}</li>
+              <li>{t("whatPublic3")}</li>
+            </ul>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="confirm_no_student_data"
+                className="mt-1 size-4 accent-primary"
+                aria-invalid={errors.confirm_no_student_data ? true : undefined}
+              />
+              <span>{t("checkbox")}</span>
+            </label>
+            {errors.confirm_no_student_data ? (
+              <p className="text-sm text-danger">{t("checkboxRequired")}</p>
+            ) : null}
+          </div>
+        )}
+      </ActionDialog>
+      {unsaved ? <span className="text-sm text-ink-muted">{t("saveFirst")}</span> : null}
+    </span>
   );
 }
 
@@ -661,6 +677,8 @@ function DraftEditor({
   const [state, setState] = useState<DraftState>(initial);
   const [dirty, setDirty] = useState(false);
   const [pending, setPending] = useState(false);
+  // Checked before the request starts: a second Enter in the same frame does not see `pending`.
+  const busy = useRef(false);
   const [error, setError] = useState<unknown>(undefined);
   const [attempt, setAttempt] = useState(0);
   const [saved, setSaved] = useState(false);
@@ -681,6 +699,8 @@ function DraftEditor({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy.current) return;
+    busy.current = true;
     setPending(true);
     setError(undefined);
     try {
@@ -697,6 +717,7 @@ function DraftEditor({
       setError(failure);
       setAttempt((n) => n + 1);
     } finally {
+      busy.current = false;
       setPending(false);
     }
   }
@@ -760,7 +781,7 @@ function DraftEditor({
               })
             : t("neverSaved")}
         </p>
-        {canPublish ? <PublishDialog draft={draft} live={live} /> : null}
+        {canPublish ? <PublishDialog draft={draft} live={live} unsaved={dirty} /> : null}
       </div>
       <form noValidate onSubmit={(e) => void onSubmit(e)} className="space-y-5">
         <ErrorSummary errors={summary} attempt={attempt} />
