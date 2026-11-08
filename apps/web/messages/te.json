@@ -7684,7 +7684,14 @@
       "late": "{count, number} మంది ఆలస్యం",
       "leave": "{count, number} మంది సెలవులో"
     },
-    "undo": "మార్పులను రద్దు చేయండి"
+    "undo": "మార్పులను రద్దు చేయండి",
+    "discard": {
+      "title": "Discard unsaved attendance?",
+      "body": "{count, plural, one {You have unsaved attendance for # student. Discard it?} other {You have unsaved attendance for # students. Discard them?}}",
+      "discard": "Discard",
+      "keep": "Keep marking"
+    },
+    "unsavedLeave": "Attendance for this day is not saved. Leave and lose it?"
   },
   "marks": {
     "nav": "మార్కులు",

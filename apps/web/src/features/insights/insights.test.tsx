@@ -2,6 +2,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { ALL_STRUCTURE_KEYS } from "@/features/academic-structure/data";
 import { AFTER_PROMOTION_KEYS } from "@/features/promotions/data";
+import { resetUnsavedGuardForTesting } from "@/features/sheets/unsaved";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import type * as Upload from "@/features/imports/upload";
@@ -268,6 +269,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   uninstallBffStub();
+  // An unsaved attendance day holds the page's unsaved-changes guard (XA-05).
+  resetUnsavedGuardForTesting();
   expect(intlErrors).toEqual([]);
 });
 
@@ -737,6 +740,99 @@ describe("attendance (US-1701, US-1702; FR-ATT-001..004)", () => {
       expect(within(picker).queryByRole("option", { name: /A$/ })).toBeNull();
     },
   );
+
+  describe("saving and leaving a marked day (XA-05, XA-06, FR-ATT-002)", () => {
+    async function openDay(marked: boolean) {
+      signedIn(["attendance.read", "attendance.record"]);
+      stub.routes[`GET /bff/api/v1/sections/${SECTION}/attendance`] = () =>
+        Response.json(
+          marked
+            ? day({
+                marked: true,
+                students: day().students.map((row) => ({ ...row, status: "present" })),
+              })
+            : day(),
+        );
+      stub.routes[`POST /bff/api/v1/sections/${SECTION}/attendance`] = () =>
+        Response.json({ written: 1, unchanged: 0, dates: [todayIst()] });
+      renderWithIntl(<AttendanceScreen />);
+      const picker = await screen.findByLabelText(en.attendance.section);
+      await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(1));
+      await userEvent.selectOptions(picker, SECTION);
+      await screen.findByRole("group", { name: "Attendance of Synthetica Anjali" });
+    }
+
+    it("a correction sends only the students whose status changed (XA-06)", async () => {
+      await openDay(true);
+      const anjali = screen.getByRole("group", { name: "Attendance of Synthetica Anjali" });
+      await userEvent.click(
+        within(anjali).getByRole("radio", { name: en.attendance.status.absent }),
+      );
+      await userEvent.click(screen.getByRole("button", { name: en.attendance.save }));
+      await waitFor(() =>
+        expect(stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/attendance`)).toHaveLength(1),
+      );
+      expect(
+        JSON.parse(
+          stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/attendance`)[0]?.body ?? "{}",
+        ),
+      ).toEqual({
+        source: "mark",
+        entries: [{ student_id: OTHER_STUDENT, on_date: todayIst(), status: "absent" }],
+      });
+    });
+
+    it("saving a marked day with no change sends nothing (XA-06)", async () => {
+      await openDay(true);
+      await userEvent.click(screen.getByRole("button", { name: en.attendance.save }));
+      expect(await screen.findByText("Nothing changed.")).toBeVisible();
+      expect(stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/attendance`)).toHaveLength(0);
+    });
+
+    it("asks before another date or view drops unsaved statuses; warns on unload (XA-05)", async () => {
+      await openDay(false);
+      const question = "You have unsaved attendance for 2 students. Discard them?";
+      // Unsaved: leaving the page asks the browser's own question.
+      const unload = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(unload);
+      expect(unload.defaultPrevented).toBe(true);
+
+      await userEvent.click(screen.getByRole("radio", { name: en.attendance.view.month }));
+      let dialog = await screen.findByRole("dialog", { name: en.attendance.discard.title });
+      expect(within(dialog).getByText(question)).toBeVisible();
+      await userEvent.click(
+        within(dialog).getByRole("button", { name: en.attendance.discard.keep }),
+      );
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(screen.getByRole("radio", { name: en.attendance.view.day })).toBeChecked();
+      expect(
+        screen.getByRole("group", { name: "Attendance of Synthetica Anjali" }),
+      ).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText(en.attendance.date), {
+        target: { value: "2026-09-01" },
+      });
+      dialog = await screen.findByRole("dialog", { name: en.attendance.discard.title });
+      await userEvent.click(
+        within(dialog).getByRole("button", { name: en.attendance.discard.discard }),
+      );
+      await waitFor(() =>
+        expect(
+          stub
+            .callsTo(`GET /bff/api/v1/sections/${SECTION}/attendance`)
+            .map((call) => call.url.searchParams.get("date")),
+        ).toContain("2026-09-01"),
+      );
+      expect(screen.getByLabelText(en.attendance.date)).toHaveValue("2026-09-01");
+    });
+
+    it("a saved day switches without asking (XA-05)", async () => {
+      await openDay(true);
+      await userEvent.click(screen.getByRole("radio", { name: en.attendance.view.month }));
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.getByRole("radio", { name: en.attendance.view.month })).toBeChecked();
+    });
+  });
 
   it("refuses a file that is not a sheet before uploading", async () => {
     signedIn(["attendance.read", "attendance.record"]);

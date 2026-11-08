@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
@@ -34,9 +34,20 @@ import {
 } from "./data";
 import { LoadGate, ProblemList, SectionPicker } from "./parts";
 import { SheetImport } from "./SheetImport";
+import { useUnsavedChangesWarning } from "@/features/sheets/unsaved";
+import { DialogCloseButton } from "@/components/ui/DialogCloseButton";
 
 /** One day of the register as a form: every student gets one status (US-1701). */
-function DayForm({ day, canRecord }: { day: AttendanceDay; canRecord: boolean }) {
+function DayForm({
+  day,
+  canRecord,
+  onUnsavedChange,
+}: {
+  day: AttendanceDay;
+  canRecord: boolean;
+  /** How many students' statuses are not saved yet (0 once saved or unmounted). */
+  onUnsavedChange: (count: number) => void;
+}) {
   const t = useTranslations("attendance");
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
@@ -50,6 +61,23 @@ function DayForm({ day, canRecord }: { day: AttendanceDay; canRecord: boolean })
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
   const [saved, setSaved] = useState<number | null>(null);
+  // XA-06: only the students whose status differs from what the server holds (all of them on
+  // a day not marked yet). The API upserts per student and date and never clears the ones
+  // left out, so a correction does not overwrite what someone else marked for other students.
+  const entries: AttendanceEntry[] = day.students
+    .filter((row) => row.status === null || statuses[row.student.student_id] !== row.status)
+    .map((row) => ({
+      student_id: row.student.student_id,
+      on_date: day.on_date,
+      status: statuses[row.student.student_id] ?? "present",
+    }));
+  const unsaved = canRecord ? entries.length : 0;
+  useEffect(() => {
+    onUnsavedChange(unsaved);
+  }, [onUnsavedChange, unsaved]);
+  useEffect(() => () => onUnsavedChange(0), [onUnsavedChange]);
+  // XA-05: closing, reloading or leaving the page asks first while statuses are unsaved.
+  useUnsavedChangesWarning(unsaved > 0, t("unsavedLeave"));
 
   if (day.students.length === 0) {
     return <EmptyState icon="users" title={t("emptyTitle")} body={t("emptyBody")} />;
@@ -57,15 +85,14 @@ function DayForm({ day, canRecord }: { day: AttendanceDay; canRecord: boolean })
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true);
     setError(undefined);
     setSaved(null);
+    if (entries.length === 0) {
+      setSaved(0);
+      return;
+    }
+    setPending(true);
     try {
-      const entries: AttendanceEntry[] = day.students.map((row) => ({
-        student_id: row.student.student_id,
-        on_date: day.on_date,
-        status: statuses[row.student.student_id] ?? "present",
-      }));
       const out = await unwrap(
         api.POST("/api/v1/sections/{section_id}/attendance", {
           params: { path: { section_id: day.section.id } },
@@ -85,7 +112,7 @@ function DayForm({ day, canRecord }: { day: AttendanceDay; canRecord: boolean })
     (row) => statuses[row.student.student_id] !== baseline[row.student.student_id],
   );
   // A day not marked yet is not saved, even when everyone is present.
-  const dirty = changed || !day.marked;
+  const dirty = entries.length > 0;
   const count = (status: AttendanceStatus) =>
     Object.values(statuses).filter((value) => value === status).length;
   // "32 present, 3 absent" (late and leave only when someone is).
@@ -284,6 +311,65 @@ function monthLabel(value: string, locale: string): string {
 }
 
 /**
+ * XA-05: asked before a change of section, date or view drops statuses not saved yet. A
+ * native modal `<dialog>` (focus kept inside, Escape keeps marking); "Keep marking" is first so
+ * Enter does not discard by accident.
+ */
+function DiscardDialog({
+  count,
+  onDiscard,
+  onKeep,
+}: {
+  count: number;
+  onDiscard: () => void;
+  onKeep: () => void;
+}) {
+  const t = useTranslations("attendance.discard");
+  const tc = useTranslations("common");
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const bodyId = useId();
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+  const close = (then: () => void) => {
+    ref.current?.close();
+    then();
+  };
+  return (
+    <dialog
+      ref={ref}
+      aria-labelledby={titleId}
+      aria-describedby={bodyId}
+      onCancel={(event) => {
+        event.preventDefault();
+        close(onKeep);
+      }}
+      className="dialog-motion m-auto w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-0 text-ink shadow-popover"
+    >
+      <div className="flex items-start justify-between gap-4 p-4 pb-2 sm:p-6 sm:pb-2">
+        <h2 id={titleId} className="text-lg font-semibold">
+          {t("title")}
+        </h2>
+        <DialogCloseButton label={tc("close")} onClick={() => close(onKeep)} />
+      </div>
+      <p id={bodyId} className="px-4 py-3 text-sm text-ink sm:px-6">
+        {t("body", { count })}
+      </p>
+      <div className="dialog-footer flex flex-wrap justify-end gap-2 rounded-b-xl border-t border-border bg-surface-muted px-4 py-3 max-sm:[&>*]:flex-1 sm:px-6 sm:py-4">
+        <Button variant="secondary" onClick={() => close(onKeep)}>
+          {t("keep")}
+        </Button>
+        <Button variant="danger" onClick={() => close(onDiscard)}>
+          {t("discard")}
+        </Button>
+      </div>
+    </dialog>
+  );
+}
+
+/**
  * Attendance (US-1701, US-1702): mark a section's day, see the month register and print it, or
  * import a month from the paper register's sheet. Class teachers see only their sections.
  */
@@ -302,6 +388,14 @@ export function AttendanceScreen() {
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
   const day = useAttendanceDay(section, date, allowed && view === "day");
+  // XA-05: statuses not saved yet in the day form, and the switch waiting for an answer.
+  const [unsaved, setUnsaved] = useState(0);
+  const [held, setHeld] = useState<(() => void) | null>(null);
+  const onUnsavedChange = useCallback((count: number) => setUnsaved(count), []);
+  const guard = (change: () => void) => {
+    if (view === "day" && unsaved > 0) setHeld(() => change);
+    else change();
+  };
 
   return (
     <div className="space-y-5" data-print={view === "month" ? "landscape" : undefined}>
@@ -327,12 +421,16 @@ export function AttendanceScreen() {
           <div data-print="hide">
             <Card padding="sm">
               <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4">
-                <SectionPicker label={t("section")} value={section} onChange={setSection} />
+                <SectionPicker
+                  label={t("section")}
+                  value={section}
+                  onChange={(id) => guard(() => setSection(id))}
+                />
                 <SegmentedControl
                   legend={t("viewLabel")}
                   legendVisible
                   value={view}
-                  onValueChange={(value) => setView(value as "day" | "month")}
+                  onValueChange={(value) => guard(() => setView(value as "day" | "month"))}
                   options={[
                     { value: "day", label: t("view.day") },
                     { value: "month", label: t("view.month") },
@@ -344,7 +442,10 @@ export function AttendanceScreen() {
                     label={t("date")}
                     value={date}
                     max={todayIst()}
-                    onChange={(event) => setDate(event.target.value)}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      guard(() => setDate(next));
+                    }}
                   />
                 ) : (
                   <SelectField
@@ -370,6 +471,7 @@ export function AttendanceScreen() {
                     key={`${value.section.id}:${value.on_date}`}
                     day={value}
                     canRecord={canRecord}
+                    onUnsavedChange={onUnsavedChange}
                   />
                 )}
               </LoadGate>
@@ -377,6 +479,16 @@ export function AttendanceScreen() {
           ) : (
             <MonthRegister section={section} month={month} />
           )}
+          {held ? (
+            <DiscardDialog
+              count={unsaved}
+              onKeep={() => setHeld(null)}
+              onDiscard={() => {
+                setHeld(null);
+                held();
+              }}
+            />
+          ) : null}
           {canRecord && section ? (
             <div data-print="hide">
               <SheetImport<AttendanceEntry, AttendanceSheet>
