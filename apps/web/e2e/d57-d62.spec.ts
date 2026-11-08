@@ -197,6 +197,9 @@ test.describe("D57-D62 screens (stand-in IdP)", () => {
     await expectFocusInsideOpenDialog(page);
     await expect(dialog).toContainText("cannot be opened again");
     await expectNoAxeViolations(page, "withdraw dialog");
+    // YP-03 (FR-DPDP-016): an erasure request is withdrawn only with a written note.
+    const note = "The parent phoned on 3 Nov and confirmed by the registered number.";
+    await dialog.getByLabel("How they withdrew it").fill(note);
     await pressOn(
       dialog.getByRole("button", { name: "Mark as withdrawn" }),
       "Enter",
@@ -204,7 +207,7 @@ test.describe("D57-D62 screens (stand-in IdP)", () => {
     );
     expect(
       await lastWrite(page, "PATCH", new RegExp(`/privacy/requests/${R3_IDS.erasureRequest}$`)),
-    ).toEqual({ status: "withdrawn" });
+    ).toEqual({ status: "withdrawn", withdrawal_note: note });
     await expect(dialog).toBeHidden();
     await expect(page.getByText("Withdrawn", { exact: true }).first()).toBeVisible();
     // A withdrawn request is closed: the action is gone.
