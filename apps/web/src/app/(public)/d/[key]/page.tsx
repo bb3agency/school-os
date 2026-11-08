@@ -11,12 +11,26 @@ import { DISCLOSURE_KEY, loadDisclosure } from "@/server/public/disclosure";
  */
 export const dynamic = "force-dynamic";
 
-export default async function DisclosureKeyPage({ params }: { params: Promise<{ key: string }> }) {
+export default async function DisclosureKeyPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ key: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { key } = await params;
+  // WP-03: set by /d/{key}/documents/{n} when a document did not open.
+  const documentFailed = (await searchParams).doc === "0";
   if (!DISCLOSURE_KEY.test(key)) notFound();
   const runtime = await getAuthRuntime();
   const view = await loadDisclosure(runtime, new Headers(await headers()), key);
   if (view.state === "not_found") notFound();
   if (view.state === "busy") return <DisclosureBusy />;
-  return <DisclosurePage disclosure={view.disclosure} docBase={`/d/${view.key}`} />;
+  return (
+    <DisclosurePage
+      disclosure={view.disclosure}
+      docBase={`/d/${view.key}`}
+      documentFailed={documentFailed}
+    />
+  );
 }

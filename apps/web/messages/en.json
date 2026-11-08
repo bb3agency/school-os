@@ -8523,7 +8523,8 @@
       "notProvided": "Not provided",
       "notFoundTitle": "Page not found",
       "notFoundBody": "This disclosure link is not in use. Ask the school for its current link, or open the disclosure from the school's own website.",
-      "busyBody": "The page could not be loaded just now. Try again in a minute."
+      "busyBody": "The page could not be loaded just now. Try again in a minute.",
+      "documentFailed": "The document could not be opened just now. Try again in a few minutes."
     }
   },
   "messaging": {
