@@ -131,11 +131,18 @@ def list_stale_requests(session: Session, cutoff: dt.datetime) -> list[RowMappin
 
 
 def list_emergency_without_membership(session: Session, now: dt.datetime) -> list[RowMapping]:
-    stmt = select(g).where(
-        g.c.emergency.is_(True),
-        g.c.status == "approved",
-        g.c.membership_id.is_(None),
-        g.c.expires_at > now,
+    """Emergency grants still waiting for their membership, locked for the retry. A grant the
+    school is revoking (or the expiry job is ending) is skipped, so the retry never turns a
+    ``revoked``/``expired`` grant back into ``active`` with a new membership (YP-02)."""
+    stmt = (
+        select(g)
+        .where(
+            g.c.emergency.is_(True),
+            g.c.status == "approved",
+            g.c.membership_id.is_(None),
+            g.c.expires_at > now,
+        )
+        .with_for_update(skip_locked=True)
     )
     return list(session.execute(stmt).mappings())
 

@@ -744,3 +744,34 @@ def test_ADR_0015_dedicated_hosts_do_not_pull_from_a_control_plane(
     monkeypatch.setattr(service, "get_settings", lambda: dedicated)
     assert service.sync_school(campus.tenant_id) == service.SyncResult()
     assert service.report_outcomes(campus.tenant_id) == 0
+
+
+def test_SEC_029_YP_02_emergency_retry_skips_a_grant_being_revoked(
+    campus: Campus, admin_engine: Engine, make_operator: MakeOperator
+) -> None:
+    """The sync's retry of an emergency membership locks the grants it may open. A grant the
+    school is revoking at that moment (row locked) is skipped, so the retry can never overwrite
+    ``revoked`` with ``active`` and open a new membership after the school closed access."""
+    from app.breakglass import repository as bg_repo
+    from app.core.db import tenant_session
+
+    requester = make_operator("platform_owner")
+    second = make_operator("platform_owner")
+    request_id = raise_request(
+        campus.tenant_id, requester, emergency=True, reason_code="legal_obligation"
+    )
+    platform_breakglass.emergency_confirm(requester.actor, request_id)
+    platform_breakglass.emergency_confirm(second.actor, request_id)
+    service.sync_school(campus.tenant_id)
+    grant = grant_row(admin_engine, request_id)
+    assert (grant["status"], grant["membership_id"]) == ("approved", None)
+    with admin_engine.connect() as school_side:
+        tx = school_side.begin()
+        school_side.execute(
+            text("SELECT 1 FROM ops.break_glass_grants WHERE id = :id FOR UPDATE"),
+            {"id": grant["id"]},
+        )
+        with tenant_session(campus.tenant_id) as s:
+            due = bg_repo.list_emergency_without_membership(s, dt.datetime.now(dt.UTC))
+        tx.rollback()
+    assert [r["id"] for r in due] == []
