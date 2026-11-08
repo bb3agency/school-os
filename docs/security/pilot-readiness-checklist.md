@@ -1,6 +1,6 @@
 # Pilot readiness checklist
 
-Status of every item of the pilot-ready gate ([docs/14 §3](../14-roadmap.md#3-pilot-ready-gate-before-any-real-student-data)) as of 2026-11-01 (row 10a updated 2026-11-08), with the evidence that exists in the repository and what the owner still has to do. No real student data may enter SchoolOS until every row is closed (CLAUDE.md invariant 11).
+Status of every item of the pilot-ready gate ([docs/14 §3](../14-roadmap.md#3-pilot-ready-gate-before-any-real-student-data)) as of 2026-11-01 (rows 9a and 10a updated 2026-11-08), with the evidence that exists in the repository and what the owner still has to do. No real student data may enter SchoolOS until every row is closed (CLAUDE.md invariant 11).
 
 Statuses:
 
@@ -14,9 +14,9 @@ Statuses:
 | Status | Rows |
 |---|---|
 | Done in code | 3 |
-| Ready, needs owner | 11 |
+| Ready, needs owner | 12 |
 | Needs AWS-ops | 4 |
-| Not started | 1 |
+| Not started | 0 |
 | **Total** | **19** |
 
 ## Checklist
@@ -38,7 +38,7 @@ Statuses:
 | 7c | Break-glass tested | A support-access request approved, used and seen by the school, in production | `apps/api/app/breakglass/`; `apps/api/tests/breakglass/` (approval, visibility to the school, support sign-in) | Needs AWS-ops | Run one break-glass request end to end in prod against a synthetic school, then purge it (row 9b) |
 | 7d | At least two active platform owners (two-person rules, docs/16 §19 Q1) | A second `platform_owner` | Two-person rules in `apps/api/app/platform/roles.yaml` (`two_person`, 7-day minimum role age); `apps/api/tests/platform/test_two_person_requests.py`; first owner from `python -m app.platform.bootstrap_owner` | Ready, needs owner | Appoint the second owner at least 7 days before it is needed (role age rule) |
 | 8 | Invoice number format and GST registration confirmed with a CA (docs/16 §19 Q2-Q3) | CA confirmation of `SOS/26-27/000123`, GST registration and SAC, invoice wording | `apps/api/app/platform/billing.yaml` (`invoice_number_format`, `default_gst_rate`); invoice PDF v0 pending CA review (Q11); `apps/api/tests/platform/test_invoice_pdf*.py` | Ready, needs owner | Take the format, the v0 invoice PDF and the GST question to a CA; change `billing.yaml` only after the answer |
-| 9a | Data-handling permission for imports and photos documented | Written permission from the school to import its lists and photograph its registers (BRD assumption A1) | Mentioned in docs/01 (A1) only; no permission template | Not started | Write a one-page permission letter (or a DPA annex) and get it signed with the DPA |
+| 9a | Data-handling permission for imports and photos documented | Written permission from the school to import its lists and photograph its registers (BRD assumption A1) | Template drafted 2026-11-08 (D81): [docs/legal/data-handling-permission.md](../legal/data-handling-permission.md) v0.1 (not legal advice, owner decision D30), a letter / DPA Annex E with purposes, data, storage, retention and deletion as built, no Aadhaar numbers, sub-processors and the right to withdraw; open points marked (to confirm) | Ready, needs owner | Settle the (to confirm) points (register-photo provider, onboarding copies, staff lists), fill the placeholders and get it signed with the DPA (row 4a); signing is still open |
 | 9b | Synthetic data purged from prod | Proof that no school, staff member, student or document made by `make seed-synthetic` exists in prod | `make synthetic-check` (`apps/api/app/devtools/synthetic_check.py`, read only; exit 1 with "synthetic data present: purge before real data" in staging/prod); tests in `apps/api/tests/devtools/test_synthetic_check.py`; the generator refuses to run outside local/ci (`apps/api/tests/devtools/test_seed_synthetic.py`) | Done in code | Run `make synthetic-check` in prod (as `sos_app`) before the first real import and keep the output; purge through offboarding if it fails |
 | 10a | Staff training done (English; Telugu deferred, ADR-0036) | Training material and a session for the pilot school's office | Material drafted 2026-11-08 (D76): [docs/guides/](../guides/README.md), one English guide per role (office, principal and owner, accountant, exam coordinator, class teacher) with a one-page cheat sheet each, written from the built screens with synthetic examples only | Ready, needs owner | Read the guides against a `make seed-synthetic` school, then run the training session with the pilot school's staff (still open) |
 | 10b | Support channel and escalation path defined | A named channel, hours and escalation | In-app support tickets (docs/16 §15, Q6 settled); channels described in [docs/11](../11-observability-and-operations.md) (support WhatsApp number or email in school hours, phone for P1/P2) | Ready, needs owner | Choose the support number and email, publish the hours and the escalation contacts to the school |

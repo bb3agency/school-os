@@ -13,7 +13,7 @@ Decision: [ADR-0048](../adr/ADR-0048-dpdp-processor-pack-and-data-principal-requ
 | data-principal-response-templates.md | `apps/api/app/privacy/templates/letters.yaml` | `tests/privacy/test_registries.py` (`test_FR_DPDP_001_letter_templates_match_docs_legal`) |
 | breach-runbook.md §4 templates B and C | `apps/api/app/privacy/breach_templates.yaml` | `tests/privacy/test_config_and_templates.py` (`test_FR_DPDP_036_breach_templates_match_the_runbook`) |
 
-Change the docs file first, then the app copy, and move both versions together. The DPA, DPIA and terms are not shipped in the app.
+Change the docs file first, then the app copy, and move both versions together. The DPA, DPIA, terms and the data-handling permission are not shipped in the app.
 
 ## Files
 
@@ -26,6 +26,7 @@ Change the docs file first, then the app copy, and move both versions together. 
 | [dpia-template.md](dpia-template.md) | The school completes it with SchoolOS's help (docs/08 §10) | 0.2 |
 | [breach-runbook.md](breach-runbook.md) | SchoolOS operators and the school (ADR-0050; docs/11 §7) | 0.1 |
 | [data-principal-response-templates.md](data-principal-response-templates.md) | The school's office answering requests and grievances (ADR-0048) | 0.1 |
+| [data-handling-permission.md](data-handling-permission.md) | The school permits SchoolOS to import its lists and photograph its registers; signed with the DPA as its Annex E (BRD A1, pilot gate 9a, D81) | 0.1 |
 
 ## Conventions
 
