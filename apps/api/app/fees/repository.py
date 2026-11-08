@@ -412,6 +412,20 @@ def accounts_on_plan(session: Session, plan_id: uuid.UUID) -> list[StudentFeeAcc
     return list(session.scalars(stmt.order_by(StudentFeeAccount.id)))
 
 
+def lock_accounts(session: Session, account_ids: Collection[uuid.UUID]) -> list[StudentFeeAccount]:
+    """Lock accounts in id order (``FOR UPDATE``) and return them re-read (YF-05)."""
+    if not account_ids:
+        return []
+    stmt = (
+        select(StudentFeeAccount)
+        .where(StudentFeeAccount.id.in_(list(account_ids)))
+        .order_by(StudentFeeAccount.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return list(session.scalars(stmt))
+
+
 def insert_account(session: Session, **values: Any) -> StudentFeeAccount:
     return session.scalars(
         insert(StudentFeeAccount).values(**values).returning(StudentFeeAccount)
@@ -549,6 +563,31 @@ def get_adjustment(session: Session, row_id: uuid.UUID, *, lock: bool = False) -
 def update_adjustment(session: Session, row_id: uuid.UUID, values: Mapping[str, Any]) -> Adjustment:
     row: Adjustment = _update(session, Adjustment, row_id, values)
     return row
+
+
+def plan_change_sums(
+    session: Session, account_ids: Collection[uuid.UUID], plan_ids: Collection[uuid.UUID]
+) -> dict[tuple[uuid.UUID, int, uuid.UUID | None], Decimal]:
+    """Plan-change adjustments proposed by ``plan_ids`` that stand (pending or approved), summed
+    per (account, instalment, head): what earlier versions already changed (FR-FEE-004)."""
+    if not account_ids or not plan_ids:
+        return {}
+    stmt = (
+        select(
+            Adjustment.account_id,
+            Adjustment.instalment_no,
+            Adjustment.head_id,
+            func.sum(Adjustment.amount),
+        )
+        .where(
+            Adjustment.account_id.in_(list(account_ids)),
+            Adjustment.source_plan_id.in_(list(plan_ids)),
+            Adjustment.status.in_(("pending", "approved")),
+            Adjustment.head_id.is_not(None),
+        )
+        .group_by(Adjustment.account_id, Adjustment.instalment_no, Adjustment.head_id)
+    )
+    return {(r[0], int(r[1]), r[2]): Decimal(r[3]) for r in session.execute(stmt)}
 
 
 def adjustments_of(session: Session, account_id: uuid.UUID) -> list[Adjustment]:

@@ -593,7 +593,7 @@ IDEMPOTENCY_EXEMPT = {
 
 
 def _accepts_idempotency_key(route: APIRoute) -> bool:
-    return "get_idempotency" in _dependency_names(route) or (
+    return bool({"get_idempotency", "get_required_idempotency"} & _dependency_names(route)) or (
         "idempotency-key" in _header_names(route)
     )
 

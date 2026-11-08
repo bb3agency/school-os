@@ -243,6 +243,79 @@ def test_FR_FEE_004_active_plan_is_frozen_new_version_proposes_adjustments(schoo
     assert [a.status for a in pending if a.source_plan_id == active.id] == ["pending"]
 
 
+def _tuition_version(school: Any, plan_id: uuid.UUID, amount: Decimal) -> Any:
+    setup = F.ensure_setup(school)
+    draft = F.call(school, "accountant", fees.new_version, plan_id)
+    draft = F.call(
+        school,
+        "accountant",
+        fees.update_plan,
+        draft.id,
+        FeePlanPatch(
+            lines=[PlanLineIn(head_id=setup.tui, annual_amount=amount)],
+            instalments=[
+                InstalmentIn(
+                    instalment_no=1,
+                    label="Term 1",
+                    due_on=setup.first_due,
+                    amounts={setup.tui: amount},
+                )
+            ],
+        ),
+        expected_version=draft.version,
+    )
+    return F.call(
+        school, "accountant", fees.activate_plan, draft.id, expected_version=draft.version
+    )
+
+
+def test_FR_FEE_004_YF_03_second_revision_counts_the_first_revisions_adjustment(
+    school: Any,
+) -> None:
+    """YF-03: the differences of a new plan version are measured against what the account
+    already owes for each line under the earlier versions: its charges AND the plan-change
+    adjustments of an earlier version. Before, only charges counted, so a second revision
+    (1000 -> 1100 -> 1300) proposed +300 on top of the approved +100 and the student owed 1400."""
+    plan_id, account_id = _late_plan(school, LateFeeRule(), "revised_twice")
+    v2 = _tuition_version(school, plan_id, D("1100.00"))
+    F.call(
+        school,
+        "accountant",
+        fees.propose_adjustments,
+        v2.id,
+        ProposeAdjustmentsIn(reason="Tuition increased by the management"),
+    )
+    first = next(
+        a
+        for a in F.call(school, "accountant", fees.list_adjustments, account_id)
+        if a.source_plan_id == v2.id
+    )
+    F.call(
+        school, "principal", fees.approve_adjustment, first.id, DecisionIn(), expected_version=None
+    )
+    v3 = _tuition_version(school, v2.id, D("1300.00"))
+    diffs = F.call(school, "accountant", fees.plan_differences, v3.id)
+    mine = [(d.instalment_no, d.difference) for d in diffs.items if d.account_id == account_id]
+    assert mine == [(1, D("200.00"))]
+    F.call(
+        school,
+        "accountant",
+        fees.propose_adjustments,
+        v3.id,
+        ProposeAdjustmentsIn(reason="Tuition increased again by the management"),
+    )
+    second = next(
+        a
+        for a in F.call(school, "accountant", fees.list_adjustments, account_id)
+        if a.source_plan_id == v3.id
+    )
+    F.call(
+        school, "principal", fees.approve_adjustment, second.id, DecisionIn(), expected_version=None
+    )
+    setup = F.ensure_setup(school)
+    assert _line(_account(school, account_id), 1, setup.tui).due == D("1300.00")
+
+
 def test_US_2101_AC2_AC3_apply_is_idempotent_and_skips_past_instalments(school: Any) -> None:
     setup = F.ensure_setup(school)
     sid = F.student(school, "section_9c")
@@ -684,6 +757,70 @@ def test_US_2104_adjustment_and_late_fee_waiver_maker_checker(school: Any) -> No
         )
 
 
+def test_FR_FEE_007_YF_04_manual_adjustment_stays_within_the_due_and_the_plan(
+    school: Any,
+) -> None:
+    """YF-04 (lead decision 2026-11-09): a manual negative adjustment may not take a line below
+    zero (409 ``adjustment_exceeds_due``, when asked and again when approved), and its head must
+    be a head of the account's plan (422 ``invalid`` on ``head_id``). Credits after a plan lowers
+    a fee go through plan-change adjustments."""
+    setup = F.ensure_setup(school)
+    account_id = F.account(school)
+    due = _line(_account(school, account_id), 1, setup.tui).due
+
+    def ask(amount: Decimal, head: uuid.UUID) -> Any:
+        return F.call(
+            school,
+            "accountant",
+            fees.request_adjustment,
+            account_id,
+            AdjustmentCreate(
+                instalment_no=1,
+                head_id=head,
+                amount=amount,
+                reason_code="correction",
+                reason="Correction agreed with the management",
+            ),
+        )
+
+    with pytest.raises(Conflict) as err:
+        ask(-(due + D("0.01")), setup.tui)
+    assert err.value.code == "adjustment_exceeds_due"
+    other = F.call(
+        school,
+        "accountant",
+        fees.create_head,
+        HeadCreate(code="LIB", name="Library fee", kind="other", gst_exempt=True),
+    )
+    with pytest.raises(ValidationFailed) as bad:
+        ask(D("100.00"), other.id)
+    assert bad.value.errors[0]["field"] == "head_id"
+    # Two requests that fit alone but not together: the second is refused at approval.
+    first = ask(-due, setup.tui)
+    second = ask(D("-1.00"), setup.tui)
+    F.call(
+        school,
+        "accountant",
+        fees.approve_adjustment,
+        first.id,
+        DecisionIn(),
+        expected_version=None,
+        person=school.people["accountant2"],
+    )
+    with pytest.raises(Conflict) as late:
+        F.call(
+            school,
+            "accountant",
+            fees.approve_adjustment,
+            second.id,
+            DecisionIn(),
+            expected_version=None,
+            person=school.people["accountant2"],
+        )
+    assert late.value.code == "adjustment_exceeds_due"
+    assert _line(_account(school, account_id), 1, setup.tui).due == D("0.00")
+
+
 # --- late fees (FR-FEE-009) ----------------------------------------------------------------------
 
 
@@ -742,6 +879,45 @@ def test_FR_FEE_009_flat_late_fee_posted_once(school: Any) -> None:
     _post(school)
     late = _line(_account(school, account_id), 1, None)
     assert late.late_fee == D("100.00")
+
+
+def test_FR_FEE_009_YF_05_late_fee_waits_for_a_payment_in_flight(school: Any) -> None:
+    """YF-05: the nightly job locks each account and recomputes its dues before posting. A
+    payment committing while the job runs (another session holds the account) is seen, so no
+    late fee lands on an instalment that was just paid. Before, the job read the dues without a
+    lock and posted the late fee anyway."""
+    import threading
+    import time
+
+    from app.fees.schemas import ReceiptCreate
+
+    _, account_id = _late_plan(
+        school,
+        LateFeeRule(kind="flat_per_instalment", amount=D("100.00"), grace_days=5),
+        "race_rule",
+    )
+    F.install()
+    person = school.people["office_staff"]
+    done: dict[str, Any] = {}
+
+    def job() -> None:
+        done["out"] = _post(school)
+
+    worker = threading.Thread(target=job)
+    with tenant_session(school.tenant_id, person.user_id) as s:
+        fees.issue_receipt(
+            s,
+            F.ctx(school, person, "office_staff"),
+            ReceiptCreate(account_id=account_id, amount=D("1000.00"), mode="cash"),
+        )
+        worker.start()
+        time.sleep(2)
+    worker.join(timeout=60)
+    assert not worker.is_alive()
+    tui = F.ensure_setup(school).tui
+    assert _line(_account(school, account_id), 1, tui).due == D("0.00")
+    late = [x for x in _account(school, account_id).lines if x.head_id is None]
+    assert late == []
 
 
 def _waiver(school: Any, account_id: uuid.UUID, amount: str) -> Any:
@@ -874,6 +1050,48 @@ def test_FR_FEE_009_per_day_late_fee_capped_never_compounding(school: Any) -> No
 
 
 # --- refunds (US-2106) ---------------------------------------------------------------------------
+
+
+def test_FR_FEE_013_YF_06_refund_mode_details_are_checked_like_the_counter(
+    school: Any,
+) -> None:
+    """YF-06: the refund cheque number and bank reference follow the counter's patterns (422
+    ``invalid_cheque_number``, ``invalid_reference``) and never carry a full Aadhaar number (422
+    ``aadhaar_full_number_rejected``). Before, any text up to 40 characters was accepted and
+    printed on the voucher."""
+    from app.core.redaction import verhoeff_check_digit
+
+    account_id = F.account(school)
+    r = F.issue(school, account_id, "500.00")
+
+    def ask(mode: str, details: ModeDetailsIn) -> Any:
+        return F.call(
+            school,
+            "accountant",
+            fees.request_refund,
+            r.id,
+            RefundCreate(
+                amount=D("10.00"),
+                mode=mode,
+                mode_details=details,
+                reason="Paid twice for the same term",
+            ),
+        )
+
+    def code(mode: str, details: ModeDetailsIn) -> str:
+        with pytest.raises(ValidationFailed) as err:
+            ask(mode, details)
+        return str(err.value.errors[0]["code"])
+
+    assert code("cheque", ModeDetailsIn(cheque_number="12AB")) == "invalid_cheque_number"
+    assert code("bank_transfer", ModeDetailsIn(reference="REF-1")) == "invalid_reference"
+    aadhaar_like = "23456789012"
+    aadhaar_like += verhoeff_check_digit(aadhaar_like)
+    assert (
+        code("bank_transfer", ModeDetailsIn(reference=aadhaar_like))
+        == "aadhaar_full_number_rejected"
+    )
+    assert ask("cheque", ModeDetailsIn(cheque_number="004512")).status == "pending"
 
 
 def test_US_2106_cash_refund_voucher_on_approval(school: Any) -> None:
@@ -1045,3 +1263,70 @@ def test_data_contract_account_summary_and_dues(school: Any) -> None:
     assert dues is not None
     assert dues.total_due == D("7000.00")
     assert summary.overdue == D("3500.00")
+
+
+def test_FR_FEE_008_YF_02_concession_evidence_must_be_visible_to_the_requester(
+    school: Any, admin_engine: Engine
+) -> None:
+    """YF-02 (BOLA on a body id): the evidence of a concession must be a usable document the
+    requester can open. Before, any document id of the school was accepted (only the foreign
+    key checked it), so a requester could attach, and learn the existence of, a document its
+    ACL hides (e.g. a principal-only file)."""
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    from app.documents import service as documents
+
+    name = "sos_test_documents_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "documents" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    docs = sys.modules[name]
+    setup = F.ensure_setup(school)
+    account_id = F.account(school)
+    hidden = docs.make_document(
+        admin_engine,
+        school.tenant_id,
+        school.people["principal"].user_id,
+        purpose="evidence",
+        doc_type="certificate",
+        sensitivity="C3",
+        acl=[("role", "principal")],
+    )
+    assert not F.call(school, "accountant", lambda s, c: documents.is_visible(s, c, hidden))
+
+    def ask(evidence: uuid.UUID) -> Any:
+        return F.call(
+            school,
+            "accountant",
+            fees.request_concession,
+            account_id,
+            ConcessionCreate(
+                concession_type="hardship",
+                basis="amount",
+                value=D("100"),
+                targets=[ConcessionTarget(instalment_no=1, head_id=setup.tui)],
+                reason="Family hardship this term, letter attached",
+                evidence_document_id=evidence,
+            ),
+        )
+
+    with pytest.raises(ValidationFailed) as err:
+        ask(hidden)
+    assert err.value.errors[0]["field"] == "evidence_document_id"
+    visible = docs.make_document(
+        admin_engine,
+        school.tenant_id,
+        school.people["accountant"].user_id,
+        purpose="evidence",
+        doc_type="certificate",
+        sensitivity="C3",
+        acl=[("role", "accountant"), ("role", "principal")],
+    )
+    assert ask(visible).evidence_document_id == visible

@@ -7,6 +7,7 @@ audit summaries of the school (ids, codes, numbers and counts only).
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 import pytest
@@ -53,6 +54,7 @@ def test_FR_FEE_025_fee_calls_do_not_log_personal_data(
             "POST",
             "/api/v1/fees/receipts",
             json={"account_id": str(account_id), "amount": "100.00", **payload},
+            headers={"Idempotency-Key": uuid.uuid4().hex},
         )
         assert res.status_code == 201, res.text
         receipts.append(res.json())
@@ -61,6 +63,7 @@ def test_FR_FEE_025_fee_calls_do_not_log_personal_data(
         staff,
         "POST",
         "/api/v1/fees/receipts",
+        headers={"Idempotency-Key": uuid.uuid4().hex},
         json={
             "account_id": str(account_id),
             "amount": "1.00",
@@ -76,6 +79,7 @@ def test_FR_FEE_025_fee_calls_do_not_log_personal_data(
         accountant,
         "POST",
         f"/api/v1/fees/accounts/{account_id}/concessions",
+        headers={"Idempotency-Key": uuid.uuid4().hex},
         json={
             "concession_type": "hardship",
             "basis": "amount",

@@ -12,6 +12,7 @@ series.
 from __future__ import annotations
 
 import datetime as dt
+import re
 import uuid
 from collections import defaultdict
 from collections.abc import Sequence
@@ -171,13 +172,22 @@ def request_concession(
     session: Session, ctx: UserContext, account_id: uuid.UUID, data: ConcessionCreate
 ) -> ConcessionOut:
     """Ask for a concession (``fee.concession.request``). Targets must be charged lines of the
-    account. Audit ``fee.concession.requested``; the approvers are notified."""
+    account. The optional evidence is a usable document the requester can open (422
+    ``invalid`` on ``evidence_document_id`` otherwise; YF-02). Audit
+    ``fee.concession.requested``; the approvers are notified."""
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.CONCESSION_REQUEST)
     reason = c.clean_reason("reason", data.reason)
     if data.basis == "percent" and data.value > HUNDRED:
         raise ValidationFailed([c.error("value", "above_100_percent")])
     account = _account_for(session, account_id)
+    if data.evidence_document_id is not None and not (
+        documents.is_visible(session, ctx, data.evidence_document_id)
+        and documents.evidence_exists(session, data.evidence_document_id)
+    ):
+        # YF-02: a document the requester cannot open (or a quarantined one) is not evidence;
+        # the same answer as an unknown id, so its existence is not revealed.
+        raise ValidationFailed([c.error("evidence_document_id", "invalid")])
     dues = ledger.dues_for(session, account, c.today(session))
     seen: set[tuple[int, uuid.UUID]] = set()
     for i, t in enumerate(data.targets):
@@ -455,10 +465,12 @@ def request_adjustment(
             raise ValidationFailed([c.error("amount", "waiver_reduces_late_fee")])
         if _late_fee_left(session, account, data.instalment_no) < -data.amount:
             raise ValidationFailed([c.error("amount", "above_late_fee")])
-    elif data.head_id is None or repo.get_head(session, data.head_id) is None:
+    elif data.head_id is None or data.head_id not in _plan_heads(session, account.plan_id):
         raise ValidationFailed([c.error("head_id", "invalid")])
     if abs(data.amount) > c.settings().limits.max_amount:
         raise ValidationFailed([c.error("amount", "too_large")])
+    if data.reason_code != "late_fee_waiver" and data.head_id is not None:
+        _check_within_due(session, account, data.instalment_no, data.head_id, data.amount)
     with c.db_errors():
         row = repo.insert_adjustment(
             session,
@@ -485,6 +497,41 @@ def request_adjustment(
     )
     notify_approvers(session, "adjustment", row.id, account.id)
     return _adjustment_out(row, _names(session, [row]))
+
+
+class AdjustmentExceedsDue(Conflict):
+    code = "adjustment_exceeds_due"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "This adjustment would take the line below zero. Lower it to what is still due; "
+            "money already paid is returned with a refund."
+        )
+
+
+def _plan_heads(session: Session, plan_id: uuid.UUID) -> set[uuid.UUID]:
+    """The heads of a plan and of every earlier version of it (YF-04)."""
+    chain: list[uuid.UUID] = []
+    current: uuid.UUID | None = plan_id
+    while current is not None and current not in chain:
+        chain.append(current)
+        plan = repo.get_plan(session, current)
+        current = plan.previous_plan_id if plan is not None else None
+    return {line.head_id for line in repo.plan_lines(session, chain)}
+
+
+def _check_within_due(
+    session: Session, account: Any, instalment_no: int, head_id: uuid.UUID, amount: Decimal
+) -> None:
+    """A manual credit may not take the line's due below zero (409 ``adjustment_exceeds_due``;
+    YF-04, lead decision 2026-11-09). Plan-change adjustments are not checked here: a plan that
+    lowers a fee after payment may leave a credit."""
+    if amount >= 0:
+        return
+    found = ledger.dues_for(session, account, c.today(session)).line(instalment_no, head_id)
+    due = found[0].due if found else ZERO
+    if -amount > due:
+        raise AdjustmentExceedsDue()
 
 
 def _late_fee_left(session: Session, account: Any, instalment_no: int) -> Decimal:
@@ -526,6 +573,8 @@ def approve_adjustment(
             "for a smaller one.",
             code="above_late_fee",
         )
+    if row.source_plan_id is None and row.head_id is not None:
+        _check_within_due(session, account, row.instalment_no, row.head_id, row.amount)
     with c.db_errors():
         row = repo.update_adjustment(
             session, row.id, _decision_values(ctx, session, "approved", note)
@@ -831,6 +880,26 @@ def _refund_out(session: Session, row: Refund, receipt: Receipt) -> RefundOut:
     return receipts.refund_out(row, receipt.receipt_number, _names(session, [row]))
 
 
+def _refund_details(data: RefundCreate) -> dict[str, str]:
+    """The refund's cheque number or bank reference, checked as at the counter (YF-06): the
+    configured patterns, and never a full Aadhaar number (both are printed on the voucher)."""
+    modes = c.settings().modes
+    d = data.mode_details
+    if data.mode == "cheque":
+        if not d.cheque_number:
+            raise ValidationFailed([c.error("mode_details.cheque_number", "missing")])
+        c.refuse_aadhaar("mode_details.cheque_number", d.cheque_number)
+        if not re.match(modes.cheque_number_pattern, d.cheque_number):
+            raise ValidationFailed([c.error("mode_details.cheque_number", "invalid_cheque_number")])
+        return {"cheque_number": d.cheque_number}
+    if data.mode == "bank_transfer" and d.reference:
+        c.refuse_aadhaar("mode_details.reference", d.reference)
+        if not re.match(modes.bank_reference_pattern, d.reference):
+            raise ValidationFailed([c.error("mode_details.reference", "invalid_reference")])
+        return {"reference": d.reference.upper()}
+    return {}
+
+
 def request_refund(
     session: Session, ctx: UserContext, receipt_id: uuid.UUID, data: RefundCreate
 ) -> RefundOut:
@@ -856,13 +925,7 @@ def request_refund(
             )
     elif data.mode == "original_method":
         raise ValidationFailed([c.error("mode", "original_method_online_only")])
-    details: dict[str, str] = {}
-    if data.mode == "cheque":
-        if not data.mode_details.cheque_number:
-            raise ValidationFailed([c.error("mode_details.cheque_number", "missing")])
-        details["cheque_number"] = data.mode_details.cheque_number
-    elif data.mode == "bank_transfer" and data.mode_details.reference:
-        details["reference"] = data.mode_details.reference.upper()
+    details = _refund_details(data)
     taken = receipts.committed_refunds(repo.refunds_of(session, [receipt.id]))
     if data.amount > receipt.amount - taken:
         raise Conflict(

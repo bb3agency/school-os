@@ -848,6 +848,9 @@ def _differences(session: Session, plan: FeePlan) -> list[PlanDifference]:
         for head_key, value in inst.amounts.items():
             planned[(inst.instalment_no, uuid.UUID(head_key))] = Decimal(value)
     buckets = ledger.buckets_by_account(session, [a.id for a in accounts])
+    # YF-03: what earlier versions already changed (their plan-change adjustments that stand)
+    # is part of what the account owes for a line; only the rest is a difference.
+    earlier = repo.plan_change_sums(session, [a.id for a in accounts], chain)
     out: list[PlanDifference] = []
     for account in accounts:
         per = {(b.instalment_no, b.head_id): b for b in buckets.get(account.id, [])}
@@ -857,7 +860,9 @@ def _differences(session: Session, plan: FeePlan) -> list[PlanDifference]:
         keys |= {(k[0], k[1]) for k, b in per.items() if b.charged and k[1] is not None}
         for inst_no, head_id in sorted(keys, key=lambda k: (k[0], str(k[1]))):
             bucket = per.get((inst_no, head_id))
-            charged = bucket.charged if bucket else ZERO
+            charged = (bucket.charged if bucket else ZERO) + earlier.get(
+                (account.id, inst_no, head_id), ZERO
+            )
             want = planned.get((inst_no, head_id), ZERO)
             if want != charged:
                 out.append(

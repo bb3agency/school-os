@@ -85,7 +85,7 @@ def test_SEC_001_other_school_links_are_404(
             {"instalments": [1]},
         ),
     ):
-        res = api.call(mine, method, path, json=body)
+        res = api.call(mine, method, path, json=body, headers={"Idempotency-Key": uuid.uuid4().hex})
         assert res.status_code == 404, (method, path, res.text)
     assert (
         P.scalar(admin_engine, "SELECT status FROM fin.payment_intents WHERE id = :i", i=theirs.id)
@@ -126,6 +126,7 @@ def test_CLAUDE_6_7_provider_failure_leaves_no_intent_and_no_audit(
         "POST",
         f"/api/v1/fees/accounts/{account_id}/payment-intents",
         json={"instalments": [1]},
+        headers={"Idempotency-Key": uuid.uuid4().hex},
     )
     assert res.status_code == 502
     assert res.json()["code"] == "payment_link_failed"
