@@ -21,6 +21,10 @@ modules' services (the same rules as the UI and the record tools):
   computed over a wider scope is not shown or sent again after the scope narrows (audit
   2026-10-04 W3-09). A key stored before the fingerprint existed is visible only to a caller
   whose reach is school-wide.
+- ``task`` (D74): ``circulars.service.task_visible_for_ask`` through the registered reader
+  (``task.read``; the caller's own task, or any for a school-wide ``task.read_all`` /
+  ``task.manage`` holder; a task linked to a circular only while the caller may still open that
+  circular), and ``list_due_tasks`` still offered to the caller (fail closed).
 - ``conversation``: one of the caller's own conversations that is not deleted, the cited question
   in it, and every source that question's answer cited (the passage repeats that answer).
 
@@ -42,6 +46,7 @@ from app.knowledge import repository as repo
 from app.knowledge import sources
 from app.knowledge.config.tools import load_tools_config
 from app.knowledge.sealed import cited_sources_of
+from app.knowledge.tools.due import task_reader
 from app.knowledge.tools.students import ROW_FIELDS
 from app.students import service as students
 
@@ -53,6 +58,7 @@ if TYPE_CHECKING:
 READ_SENSITIVE: Final = "student.read_sensitive"
 COUNT_TOOL: Final = "count_students"
 FEE_TOOL: Final = "get_fee_dues"
+TASK_TOOL: Final = "list_due_tasks"
 
 
 class SourceVisibility:
@@ -131,6 +137,13 @@ class SourceVisibility:
                     return FEE_TOOL in self._tool_names() and self._same_scope(FEE_TOOL, ref)
                 case "conversation":
                     return self._chat_visible(ref.object_id, ref.query_id)
+                case "task":
+                    reader = task_reader()
+                    return (
+                        reader is not None
+                        and TASK_TOOL in self._tool_names()
+                        and reader.visible(self._session, self._ctx, ref.object_id)
+                    )
         except DomainError:
             return False
         return False  # pragma: no cover - every SourceKind is matched above

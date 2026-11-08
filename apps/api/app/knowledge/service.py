@@ -173,6 +173,7 @@ from app.knowledge.schemas import (
 )
 from app.knowledge.subjects import erase_for_subject, subject_report
 from app.knowledge.tools.access import acl_keys
+from app.knowledge.tools.due import TASK_READERS, TaskReader
 from app.knowledge.tools.registry import offered
 from app.knowledge.visibility import SourceVisibility
 from app.ops import service as ops
@@ -2030,6 +2031,7 @@ __all__ = [
     "INDEXED_HOOKS",
     "MANAGE_VERIFIED",
     "SEARCH",
+    "TASK_READERS",
     "AclKeys",
     "AiUnavailable",
     "AnswerSegment",
@@ -2065,6 +2067,7 @@ __all__ = [
     "SchoolKnowledgeService",
     "SearchFilters",
     "StatusEvent",
+    "TaskReader",
     "TokenEvent",
     "admit_ai_request",
     "adopt_conversations",

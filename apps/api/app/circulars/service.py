@@ -51,6 +51,8 @@ from app.circulars.config import rules
 from app.circulars.models import CircularReading, CircularSuggestion, ParentNotice, Task
 from app.circulars.rendering import notice_html
 from app.circulars.schemas import (
+    AskDueTask,
+    AskDueTasks,
     AssigneeOut,
     CircularDetail,
     CircularOut,
@@ -106,6 +108,7 @@ REVIEW: Final = "circular.review"
 TASK_READ: Final = "task.read"
 TASK_ALL: Final = "task.read_all"
 TASK_MANAGE: Final = "task.manage"
+READ_SENSITIVE: Final = "student.read_sensitive"
 NOTICE_DRAFT: Final = "notice.draft"
 NOTICE_APPROVE: Final = "notice.approve"
 
@@ -989,6 +992,91 @@ def _visible_task(
 def get_task(session: Session, ctx: UserContext, task_id: uuid.UUID) -> TaskOut:
     """One task: yours, or any with ``task.read_all`` / ``task.manage`` (404 otherwise)."""
     return _task_out(session, ctx, _visible_task(session, ctx, task_id))
+
+
+def _circular_title(session: Session, ctx: UserContext, document_id: uuid.UUID) -> str | None:
+    """The circular's title when the caller may open it now (ACL and scope; a restricted, C3,
+    document also needs ``student.read_sensitive``, as Ask retrieval does); else None."""
+    try:
+        doc = documents.get_document(session, ctx, document_id)
+    except NotFound:
+        return None
+    if doc.sensitivity == "C3" and not ctx.has(READ_SENSITIVE):
+        return None
+    return doc.title
+
+
+def due_tasks_for_ask(
+    session: Session, ctx: UserContext, *, start: dt.date, end: dt.date, limit: int
+) -> AskDueTasks:
+    """Open and in-progress tasks due from ``start`` to ``end`` (inclusive), soonest first, at
+    most ``limit``, for the Ask tool ``list_due_tasks`` (D74; docs/06 §7). Read-only.
+
+    ``task.read`` is required (403 ``tasks_not_allowed`` otherwise). The caller's own tasks;
+    every task of the school only with ``task.read_all`` granted school-wide (a scoped grant
+    fails closed, as on the Tasks screen). Each task carries its title, due date, status, and
+    "you" or the assignee's role keys (never a name, never the task's details); a task from a
+    circular names the circular only when the caller may open it now. A task confirmed from a
+    circular suggestion never carries the circular's AI summary (DL-08), so none can reach Ask.
+    """
+    if not ctx.has(TASK_READ):
+        raise Forbidden("You cannot see tasks.", code="tasks_not_allowed")
+    if end < start:
+        raise ValidationFailed([_error("end", "before_start")])
+    school_wide = _school_grant(ctx, TASK_ALL)
+    rows = repo.list_tasks(
+        session,
+        owner=None if school_wide else ctx.membership_id,
+        statuses=ACTIVE,
+        document_id=None,
+        due_before=end + dt.timedelta(days=1),
+        due_from=start,
+        after=None,
+        limit=limit + 1,
+    )
+    more = len(rows) > limit
+    rows = rows[:limit]
+    others = {t.owner_membership_id for t in rows} - {ctx.membership_id}
+    roles = (
+        {m.membership_id: tuple(m.roles) for m in identity.active_members(session)}
+        if others
+        else {}
+    )
+    titles: dict[uuid.UUID, str | None] = {}
+    for t in rows:
+        if t.document_id is not None and t.document_id not in titles:
+            titles[t.document_id] = _circular_title(session, ctx, t.document_id)
+    today = today_ist()
+    tasks = tuple(
+        AskDueTask(
+            id=t.id,
+            title=t.title,
+            due_on=t.due_on,
+            status=t.status,
+            overdue=t.due_on < today,
+            mine=t.owner_membership_id == ctx.membership_id,
+            assignee_roles=roles.get(t.owner_membership_id, ()),
+            source=t.source,
+            linked_circular=t.document_id is not None,
+            circular_title=titles.get(t.document_id) if t.document_id is not None else None,
+        )
+        for t in rows
+    )
+    return AskDueTasks(start=start, end=end, school_wide=school_wide, tasks=tasks, more=more)
+
+
+def task_visible_for_ask(session: Session, ctx: UserContext, task_id: uuid.UUID) -> bool:
+    """Whether an Ask answer that cited this task (``sos://task/{id}``) may be shown or sent
+    again to the caller NOW: ``task.read``, the task is theirs or they may see every task (the
+    Tasks screen rule, :func:`get_task`), and a task linked to a circular only while they may
+    still open that circular (its title was in the passage). Read-only; never raises."""
+    if not ctx.has(TASK_READ):
+        return False
+    try:
+        task = _visible_task(session, ctx, task_id)
+    except NotFound:
+        return False
+    return task.document_id is None or _circular_title(session, ctx, task.document_id) is not None
 
 
 def _linked_document(session: Session, ctx: UserContext, document_id: uuid.UUID) -> uuid.UUID:
@@ -2013,6 +2101,13 @@ def abandon_render(tenant_id: uuid.UUID, notice_id: uuid.UUID, code: str) -> Non
 if on_version_indexed not in knowledge.INDEXED_HOOKS:
     knowledge.INDEXED_HOOKS.append(on_version_indexed)
 
+# The Ask tool list_due_tasks and its source visibility read tasks through these two public
+# functions (D74; knowledge cannot import this module: it calls knowledge.service).
+if not any(r.due is due_tasks_for_ask for r in knowledge.TASK_READERS):
+    knowledge.TASK_READERS.append(
+        knowledge.TaskReader(due=due_tasks_for_ask, visible=task_visible_for_ask)
+    )
+
 
 @dataclass(frozen=True, slots=True)
 class NoticeForSending:
@@ -2110,6 +2205,7 @@ __all__ = [
     "create_task",
     "dismiss_suggestion",
     "download_url",
+    "due_tasks_for_ask",
     "export_records",
     "get_circular",
     "get_notice",
@@ -2134,6 +2230,7 @@ __all__ = [
     "set_task_status",
     "subject_report",
     "task_for_portal_link",
+    "task_visible_for_ask",
     "tenant_data_counts",
     "today_ist",
     "update_notice",

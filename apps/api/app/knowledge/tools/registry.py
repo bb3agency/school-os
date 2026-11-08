@@ -19,6 +19,8 @@ from app.knowledge.tools.counts import CountStudentsTool
 from app.knowledge.tools.documents import LIST_NAME as LIST_DOCUMENTS
 from app.knowledge.tools.documents import NAME as SEARCH
 from app.knowledge.tools.documents import DocumentSearch, ListDocumentsTool, SearchDocumentsTool
+from app.knowledge.tools.due import NAME as DUE
+from app.knowledge.tools.due import ListDueTasksTool
 from app.knowledge.tools.fees import NAME as FEES
 from app.knowledge.tools.fees import GetFeeDuesTool
 from app.knowledge.tools.findings import NAME as FINDINGS
@@ -61,12 +63,15 @@ def build_tools(config: ToolsConfig, search: DocumentSearch) -> dict[str, Offere
         tools[FEES] = GetFeeDuesTool(specs[FEES])
     if specs[CHATS].description:
         tools[CHATS] = SearchMyConversationsTool(specs[CHATS])
+    if specs[DUE].description:
+        tools[DUE] = ListDueTasksTool(specs[DUE])
     return tools
 
 
 def _available(tool: OfferedTool, ctx: UserContext, session: Session | None) -> bool:
-    """``allowed``, and for a tool behind a school flag (``get_fee_dues``, ADR-0032) its
-    ``available`` check too; without a session such a tool is never offered (fail closed)."""
+    """``allowed``, and for a tool behind a school flag (``get_fee_dues``, ADR-0032) or a
+    registered reader (``list_due_tasks``, D74) its ``available`` check too; without a session
+    such a tool is never offered (fail closed)."""
     if not tool.allowed(ctx):
         return False
     check = getattr(tool, "available", None)
