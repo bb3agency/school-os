@@ -260,6 +260,22 @@ describe("critical announcements are two-person", () => {
     );
   });
 
+  it("approves the version on screen: If-Match carries it (YI-02, SEC-029)", async () => {
+    stub.routes["GET /bff/api/v1/platform/announcements"] = () => page([critical({ version: 3 })]);
+    stub.routes[`POST /bff/api/v1/platform/announcements/${A1}/approve`] = () =>
+      Response.json(critical({ status: "scheduled", approved_by: OP, version: 4 }));
+    const user = userEvent.setup();
+    renderWithIntl(<AnnouncementsScreen />);
+    await user.click(
+      await screen.findByRole("button", { name: new RegExp(`^${pm.announcements.approve}`) }),
+    );
+    const dialog = screen.getByRole("dialog", { name: pm.announcements.approveTitle });
+    await user.click(within(dialog).getByRole("button", { name: pm.announcements.approve }));
+    const key = `POST /bff/api/v1/platform/announcements/${A1}/approve`;
+    await waitFor(() => expect(stub.callsTo(key)).toHaveLength(1));
+    expect(stub.callsTo(key)[0]?.headers.get("If-Match")).toBe('"3"');
+  });
+
   it("a scheduled one has no Approve button", async () => {
     stub.routes["GET /bff/api/v1/platform/announcements"] = () =>
       page([critical({ status: "scheduled", approved_by: OP })]);

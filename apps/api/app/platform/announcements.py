@@ -234,7 +234,7 @@ def update(
 
 
 def approve(
-    actor: Actor, announcement_id: uuid.UUID, *, expected_version: int | None = None
+    actor: Actor, announcement_id: uuid.UUID, *, expected_version: int
 ) -> AnnouncementOut:
     """Second operator approves a critical announcement (``pending_approval`` -> ``scheduled``).
 
@@ -248,7 +248,7 @@ def approve(
         row = repo.get(s, m.announcements, announcement_id, for_update=True)
         if row is None:
             raise NotFound("Announcement not found")
-        if expected_version is not None and row["version"] != expected_version:
+        if row["version"] != expected_version:
             raise PreconditionFailed()
         if row["status"] != "pending_approval":
             raise Conflict(

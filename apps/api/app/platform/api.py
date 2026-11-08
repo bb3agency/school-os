@@ -1217,12 +1217,11 @@ def approve_announcement(
 ) -> AnnouncementOut:
     """A second operator approves a critical announcement (two-person; audit 2026-10-05).
     ``409 same_operator``, ``request_expired``, ``requester_not_authorised``,
-    ``approver_not_eligible`` or ``invalid_state``. To withdraw it, cancel it. Send ``If-Match``
-    with the ETag of the announcement as shown to the approver: when its text changed since,
-    412 and nothing is approved (audit 2026-11-09 YI-02). Answers the new ``ETag``."""
-    out = announcements.approve(
-        _actor(ctx), announcement_id, expected_version=_optional_version(if_match)
-    )
+    ``approver_not_eligible`` or ``invalid_state``. To withdraw it, cancel it. ``If-Match``
+    with the ETag of the announcement as shown to the approver is required (400
+    ``if_match_required``): when it changed since, 412 and nothing is approved (audit
+    2026-11-09 YI-02). Answers the new ``ETag``."""
+    out = announcements.approve(_actor(ctx), announcement_id, expected_version=_version(if_match))
     announcements.publish()
     _etag(response, out.version)
     return out
