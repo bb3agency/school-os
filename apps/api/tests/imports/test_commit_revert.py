@@ -327,6 +327,38 @@ def test_FR_IMP_005_revert_refused_when_a_batch_value_was_superseded(
     assert err.value.code == "import_has_dependents"
 
 
+@pytest.mark.parametrize("decision", ["verified", "rejected"])
+def test_YS_01_FR_IMP_005_revert_refused_when_a_batch_value_was_checked_since(
+    world: Any, admin_engine: Engine, decision: str
+) -> None:
+    """YS-01: a clerk verified (or rejected) a value the batch added to an existing student.
+    The value stays current, so the revert saw nothing "on top" and silently withdrew it,
+    discarding the person's later decision. A human check is a later edit: 409."""
+    rows, numbers = S.class_list(1)
+    S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
+    sid = S.student_by_adm(admin_engine, world.a.tenant_id, numbers[0])
+    assert sid is not None
+    udise = [["Admission Number", "Mother Tongue", "Remarks"], [numbers[0], "Telugu", ""]]
+    batch_id = S.imported(admin_engine, world.a, S.xlsx_bytes(udise), source="udise_plus")
+    with admin_engine.connect() as c:
+        value_id = c.execute(
+            text("SELECT id FROM sis.attribute_values WHERE import_batch_id = :b"), {"b": batch_id}
+        ).scalar_one()
+    ctx = S.SW.admin_ctx(world.a)
+    with tenant_session(world.a.tenant_id, ctx.user_id) as s:
+        students.verify_value(s, ctx, sid, value_id, decision)  # type: ignore[arg-type]
+    with pytest.raises(Conflict) as err:
+        _revert(world.a, batch_id)
+    assert err.value.code == "import_has_dependents"
+    with admin_engine.connect() as c:
+        status = c.execute(
+            text("SELECT verification_status FROM sis.attribute_values WHERE id = :v"),
+            {"v": value_id},
+        ).scalar_one()
+    assert status == decision
+    assert S.batch(admin_engine, batch_id)["status"] == "committed"
+
+
 def test_FR_IMP_005_students_are_deleted_only_by_their_import_revert(
     world: Any, admin_engine: Engine, shared: dict[str, Any]
 ) -> None:
