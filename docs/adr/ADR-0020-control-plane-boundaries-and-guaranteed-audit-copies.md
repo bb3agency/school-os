@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted · implementation amendments 2026-09-29 (ADR-0029), 2026-10-01 (ADR-0038; B2 approved by the product owner 2026-10-03), 2026-10-03 (B3, AI budget from the bundle) |
+| Status | Accepted · implementation amendments 2026-09-29 (ADR-0029), 2026-10-01 (ADR-0038; B2 approved by the product owner 2026-10-03), 2026-10-03 (B3, AI budget from the bundle) · amended 2026-11-08 by ADR-0057 (board codes) |
 | Date | 2026-09-27 |
 | Deciders | Founder (product owner decisions of 2026-09-27 on the M0 "decisions needed" list, [14 · M0 status](../14-roadmap.md#m0-status-2026-09-26)) |
 | Amends / supersedes | Amends [ADR-0013](ADR-0013-cross-tenant-access-and-platform-privilege-separation.md) (settles Amendments A6 and A10) and [ADR-0017](ADR-0017-platform-admin-panel-architecture.md) (what `platform` may call on the tenant side) |
@@ -37,7 +37,8 @@ The M0 build left two deviations open (ADR-0013 Amendments A6 and A10, recorded 
 - initialise keys (`initialise_tenant`);
 - activate, suspend, reactivate, offboard (`activate_tenant`, `suspend_tenant`, `reactivate_tenant`, `begin_offboarding`, `set_tenant_status`);
 - usage counts (`tenant_usage`, and `list_tenant_ids` for the daily fan-out);
-- the AI answer allowance of the school's subscription (`set_ai_answer_allowance`, amendment B3).
+- the AI answer allowance of the school's subscription (`set_ai_answer_allowance`, amendment B3);
+- the school's board codes (`tenant_board_codes`, called only by `platform/usage.py`; [ADR-0057](ADR-0057-board-sync-and-protected-windows.md)).
 
 It MUST NOT read tenant data. Pinned tenant-side imports, with the names they may bring in:
 - `app.tenancy.schemas.TenantProvisionIn`;
@@ -173,3 +174,13 @@ actions (`HOOKED_ACTIONS`): a process without the hook leaves them undelivered (
 (hook registration, like its existing `app.identity.service` import); pinned in
 `apps/api/tests/platform/test_boundaries.py` (`TENANT_SIDE_IMPORTS`). No new `tenant_session`
 file, tenant relation in SQL or `tenancy` call.
+
+## Amendments (2026-11-08)
+
+**B7 · Board codes for protected exam windows ([ADR-0057](ADR-0057-board-sync-and-protected-windows.md),
+lead decision D78).** What `platform` may read from a school now includes its board codes:
+`tenancy.service.tenant_board_codes` (the school's own `tenant_session`, codes only) is added
+to `TENANCY_ALLOWED`, called only by `platform/usage.py`, whose daily collector keeps
+`platform.deployments.boards` current (audit `deployment.boards_synced`). No new `tenant_session`
+file, tenant relation in SQL or tenant-side import; `platform` still never imports `app.dq` (the
+protected windows are a tested copy of the portal calendar in `billing.yaml`).
