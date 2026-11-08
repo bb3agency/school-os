@@ -73,7 +73,7 @@ REFUSED_MESSAGE: Final = "restore-drill is disabled outside local/ci (SOS_ENV)\n
 REPO_ROOT: Final = Path(__file__).resolve().parents[4]
 BOOTSTRAP_SQL: Final = REPO_ROOT / "infra" / "db" / "bootstrap.sql"
 ALEMBIC_INI: Final = REPO_ROOT / "apps" / "api" / "alembic.ini"
-PG_IMAGE: Final = "pgvector/pgvector:0.8.6-pg16-bookworm"  # same as apps/api/tests/conftest.py
+PG_IMAGE: Final = "pgvector/pgvector:0.8.7-pg16-bookworm"  # same as apps/api/tests/conftest.py
 DB_NAME: Final = "schoolos"
 ADMIN_PASSWORD: Final = f"drill-{secrets.token_hex(12)}"  # throwaway container only
 

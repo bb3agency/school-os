@@ -389,7 +389,7 @@ The local stack mirrors a dedicated host plus the control plane, using permissiv
 
 | Service | Image | Port | Role |
 |---|---|---|---|
-| `db` | `pgvector/pgvector:0.8.6-pg16-bookworm` | 5432 | PostgreSQL; `infra/db/bootstrap.sql` runs on first start (roles, schemas, extensions) |
+| `db` | `pgvector/pgvector:0.8.7-pg16-bookworm` | 5432 | PostgreSQL; `infra/db/bootstrap.sql` runs on first start (roles, schemas, extensions) |
 | `valkey` | `valkey/valkey:8.1-alpine` | 6379 | Celery broker, rate limits, sessions, caches |
 | `s3` | `chrislusf/seaweedfs` (pinned release) | 8333 | S3-compatible object storage |
 | `s3-init` | api image | — | One-off: creates `SOS_S3_BUCKET_FILES` and `SOS_S3_BUCKET_AUDIT` |
