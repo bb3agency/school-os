@@ -10,7 +10,8 @@ whose fee lines (not the late fee itself, so never compounding) are still due af
 
 Keys are unique per account (index ``ledger_entries_one_late_fee``), so running the job again,
 or two workers at once, posts nothing twice. A new plan version does not post the same late fee
-again (the key has no plan version). Waivers are adjustments (FR-FEE-007).
+again (the key has no plan version). Waivers are adjustments (FR-FEE-007). Each account is locked
+(id order) and its dues are read after the lock, so a payment in flight is seen (YF-05).
 """
 
 from __future__ import annotations
@@ -82,9 +83,10 @@ def post_for_school(session: Session, *, today: dt.date | None = None) -> dict[s
     counts; audits ``fee.late_fees.posted`` (counts only) when anything was posted."""
     day = today or c.today(session)
     plans = {p.id: p for p in repo.list_plans(session) if p.late_fee_rule.get("kind") != "none"}
-    accounts = [
-        a for pid in plans for a in repo.accounts_on_plan(session, pid) if a.status == "open"
-    ]
+    ids = [a.id for pid in plans for a in repo.accounts_on_plan(session, pid) if a.status == "open"]
+    # YF-05: lock the accounts (id order, so two runs or a counter never deadlock) and read
+    # their dues after the lock: a payment in flight commits first and is seen here.
+    accounts = [a for a in repo.lock_accounts(session, ids) if a.status == "open"]
     dues = ledger.dues_of(session, accounts, day)
     max_days = c.settings().late_fees.max_catch_up_days
     rows: list[dict[str, Any]] = []

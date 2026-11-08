@@ -412,6 +412,20 @@ def accounts_on_plan(session: Session, plan_id: uuid.UUID) -> list[StudentFeeAcc
     return list(session.scalars(stmt.order_by(StudentFeeAccount.id)))
 
 
+def lock_accounts(session: Session, account_ids: Collection[uuid.UUID]) -> list[StudentFeeAccount]:
+    """Lock accounts in id order (``FOR UPDATE``) and return them re-read (YF-05)."""
+    if not account_ids:
+        return []
+    stmt = (
+        select(StudentFeeAccount)
+        .where(StudentFeeAccount.id.in_(list(account_ids)))
+        .order_by(StudentFeeAccount.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return list(session.scalars(stmt))
+
+
 def insert_account(session: Session, **values: Any) -> StudentFeeAccount:
     return session.scalars(
         insert(StudentFeeAccount).values(**values).returning(StudentFeeAccount)

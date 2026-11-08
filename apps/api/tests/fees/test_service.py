@@ -881,6 +881,45 @@ def test_FR_FEE_009_flat_late_fee_posted_once(school: Any) -> None:
     assert late.late_fee == D("100.00")
 
 
+def test_FR_FEE_009_YF_05_late_fee_waits_for_a_payment_in_flight(school: Any) -> None:
+    """YF-05: the nightly job locks each account and recomputes its dues before posting. A
+    payment committing while the job runs (another session holds the account) is seen, so no
+    late fee lands on an instalment that was just paid. Before, the job read the dues without a
+    lock and posted the late fee anyway."""
+    import threading
+    import time
+
+    from app.fees.schemas import ReceiptCreate
+
+    _, account_id = _late_plan(
+        school,
+        LateFeeRule(kind="flat_per_instalment", amount=D("100.00"), grace_days=5),
+        "race_rule",
+    )
+    F.install()
+    person = school.people["office_staff"]
+    done: dict[str, Any] = {}
+
+    def job() -> None:
+        done["out"] = _post(school)
+
+    worker = threading.Thread(target=job)
+    with tenant_session(school.tenant_id, person.user_id) as s:
+        fees.issue_receipt(
+            s,
+            F.ctx(school, person, "office_staff"),
+            ReceiptCreate(account_id=account_id, amount=D("1000.00"), mode="cash"),
+        )
+        worker.start()
+        time.sleep(2)
+    worker.join(timeout=60)
+    assert not worker.is_alive()
+    tui = F.ensure_setup(school).tui
+    assert _line(_account(school, account_id), 1, tui).due == D("0.00")
+    late = [x for x in _account(school, account_id).lines if x.head_id is None]
+    assert late == []
+
+
 def _waiver(school: Any, account_id: uuid.UUID, amount: str) -> Any:
     return F.call(
         school,
