@@ -1047,6 +1047,8 @@ PLAIN_PARAMS: dict[str, str] = {
     "draft": "family_notice",
     # R3-1A: a letter of a privacy request (closed catalog).
     "letter": "acknowledgement",
+    # D73: a page number inside the document in the path.
+    "n": "1",
 }
 
 

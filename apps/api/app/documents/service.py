@@ -93,6 +93,7 @@ from app.documents.schemas import (
     DocumentSheetOut,
     DocumentUpdate,
     DownloadUrlOut,
+    PageUrlOut,
     SheetCellEdit,
     SheetExportIn,
     SheetReadOnly,
@@ -104,6 +105,7 @@ from app.documents.schemas import (
     VersionOut,
 )
 from app.documents.storage import (
+    INLINE_CONTENT_TYPES,
     LIFECYCLE_EXPORT,
     LIFECYCLE_TENANT_EXPORT,
     ObjectChanged,
@@ -1082,14 +1084,15 @@ def get_document(session: Session, ctx: UserContext, document_id: uuid.UUID) -> 
     return DocumentDetail.model_validate(_load_out(session, ctx, doc, detail=True).model_dump())
 
 
-def get_download_url(
-    session: Session, ctx: UserContext, document_id: uuid.UUID, version_no: int | None = None
-) -> DownloadUrlOut:
-    """A presigned GET valid <= 5 minutes, forced to download as an attachment with the
-    verified content type (FR-DOC-004). Only scanned (``ready``) versions are served; C3
-    documents and raw import files (which may hold restricted columns that only the import's own
-    sheet hides, FR-IMP-008) also need ``student.read_sensitive`` unless the caller uploaded
-    them."""
+def _servable_version(
+    session: Session, ctx: UserContext, document_id: uuid.UUID, version_no: int | None
+) -> tuple[Document, DocumentVersion]:
+    """The document (ACL and scopes; 404 outside them) and the version whose file may be handed
+    out: the newest ``ready`` one, or ``version_no`` when it is ``ready`` (409
+    ``document_not_ready`` for queued, scanning, quarantined or failed versions). C3 documents
+    and raw import files (which may hold restricted columns that only the import's own sheet
+    hides, FR-IMP-008) also need ``student.read_sensitive`` unless the caller uploaded them
+    (403 ``sensitive_document``). Shared by downloads and cited pages (D73)."""
     doc = repo.get_document(session, document_id, visibility=_visibility(session, ctx))
     if doc is None:
         raise _not_found()
@@ -1112,9 +1115,24 @@ def get_download_url(
             raise NotFound("Version not found")
         if version.status != "ready":
             raise Conflict("This version cannot be downloaded yet.", code="document_not_ready")
+    return doc, version
+
+
+def _served_filename(doc: Document, version: DocumentVersion) -> str:
     kind = filetypes.kind_for_content_type(version.mime_type)
     ext = kind.ext if kind else "bin"
-    filename = f"{doc.doc_type}-{str(doc.id)[:8]}-v{version.version_no}.{ext}"
+    return f"{doc.doc_type}-{str(doc.id)[:8]}-v{version.version_no}.{ext}"
+
+
+def get_download_url(
+    session: Session, ctx: UserContext, document_id: uuid.UUID, version_no: int | None = None
+) -> DownloadUrlOut:
+    """A presigned GET valid <= 5 minutes, forced to download as an attachment with the
+    verified content type (FR-DOC-004). Only scanned (``ready``) versions are served; C3
+    documents and raw import files also need ``student.read_sensitive`` unless the caller
+    uploaded them (:func:`_servable_version`)."""
+    doc, version = _servable_version(session, ctx, document_id, version_no)
+    filename = _served_filename(doc, version)
     ttl = get_settings().documents_download_url_ttl_s
     url, expires_at = get_object_store().presigned_get(
         key=version.object_key, content_type=version.mime_type, filename=filename, expires_s=ttl
@@ -1126,6 +1144,58 @@ def get_download_url(
         version_no=version.version_no,
         mime_type=version.mime_type,
         filename=filename,
+    )
+
+
+# Highest page number accepted when the version's page count is not known (D73).
+MAX_CITED_PAGE: Final = 10_000
+
+
+def get_page_url(
+    session: Session,
+    ctx: UserContext,
+    document_id: uuid.UUID,
+    page: int,
+    version_no: int | None = None,
+) -> PageUrlOut:
+    """The cited page of a document for an Ask source chip (D73; ADR-0005, invariant 8): a
+    presigned GET of the version a download would serve (same ACL, scope, C3 and ``ready``
+    checks, :func:`_servable_version`), valid <= 5 minutes and served ``inline`` so the
+    browser opens it at ``page``; no page image is made. ``page`` must be 1..page_count when the
+    version's page count is known, else 1..10000 (422 ``page_out_of_range`` on ``n``). Office,
+    spreadsheet and text files are not shown in the browser (415 ``page_not_viewable``).
+    Audited like a download (``document.download_url_issued`` with the page)."""
+    doc, version = _servable_version(session, ctx, document_id, version_no)
+    if not 1 <= page <= (version.page_count or MAX_CITED_PAGE):
+        raise ValidationFailed(
+            [{"field": "n", "code": "page_out_of_range", "message_key": "errors.page_out_of_range"}]
+        )
+    if version.mime_type not in INLINE_CONTENT_TYPES:
+        raise UnsupportedFileType(
+            "This file cannot be shown in the browser. Download it instead.",
+            code="page_not_viewable",
+        )
+    filename = _served_filename(doc, version)
+    ttl = get_settings().documents_download_url_ttl_s
+    url, expires_at = get_object_store().presigned_get(
+        key=version.object_key,
+        content_type=version.mime_type,
+        filename=filename,
+        expires_s=ttl,
+        inline=True,
+    )
+    _audit(
+        session,
+        "document.download_url_issued",
+        doc.id,
+        {"version_no": version.version_no, "page": page, "inline": True},
+    )
+    return PageUrlOut(
+        url=url,
+        page=page,
+        expires_at=expires_at,
+        content_type=version.mime_type,
+        version_no=version.version_no,
     )
 
 

@@ -3,7 +3,8 @@
 Uploads go straight from the browser to S3 with a presigned POST; the API then registers the
 object after checking it (size, magic bytes, hash) and a worker scans it for malware. Reads
 are filtered by the document ACL and the caller's scopes (404 outside them). Downloads are
-presigned GETs valid for at most 5 minutes that always download as attachments.
+presigned GETs valid for at most 5 minutes that download as attachments; a cited page (D73) is
+the one inline link, for PDF and images only.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Path, Query, Response
 
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require
@@ -37,6 +38,7 @@ from app.documents.schemas import (
     DocumentStatus,
     DocumentUpdate,
     DownloadUrlOut,
+    PageUrlOut,
     Purpose,
     SheetExportIn,
     SheetSaveIn,
@@ -236,6 +238,26 @@ def get_download_url(
     ``document.read``). Only files that passed the malware scan are served (409 otherwise)."""
     response.headers["Cache-Control"] = "no-store"
     return service.get_download_url(db, ctx, document_id, version)
+
+
+@router.get("/documents/{document_id}/pages/{n}", response_model=PageUrlOut)
+def get_page_url(
+    ctx: Reader,
+    db: TenantDB,
+    document_id: uuid.UUID,
+    n: Annotated[int, Path(ge=1, le=service.MAX_CITED_PAGE, description="Page number (1-based)")],
+    response: Response,
+    *,
+    version: Annotated[int | None, Query(ge=1, le=999_999)] = None,
+) -> PageUrlOut:
+    """Open the cited page of a document (Ask source chips; D73). Same permission and checks as
+    a download (``document.read``, ACL and scopes: 404 outside them; C3 needs
+    ``student.read_sensitive`` or being the uploader; only scanned ``ready`` versions, 409
+    otherwise). Answers a link valid for at most 5 minutes that opens the file in the browser
+    (PDF or image); the web adds ``#page=n``. ``n`` above the version's page count → 422
+    ``page_out_of_range``; Office, spreadsheet and text files → 415 ``page_not_viewable``."""
+    response.headers["Cache-Control"] = "no-store"
+    return service.get_page_url(db, ctx, document_id, n, version)
 
 
 @router.put("/documents/{document_id}/acl", response_model=DocumentOut)

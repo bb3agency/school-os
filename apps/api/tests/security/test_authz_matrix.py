@@ -1369,6 +1369,12 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # D73: the cited page of a document (Ask source chips), checked like a download.
+    ("GET", "/api/v1/documents/{document_id}/pages/{n}"): lambda w, r, a: (
+        f"/api/v1/documents/{_shared_doc(w, a, 'read')}/pages/1",
+        None,
+        {},
+    ),
     ("PUT", "/api/v1/documents/{document_id}/acl"): _doc_acl_put,
     ("DELETE", "/api/v1/documents/{document_id}"): _doc_delete,
     ("PATCH", "/api/v1/documents/{document_id}"): _doc_patch,

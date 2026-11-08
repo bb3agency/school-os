@@ -184,6 +184,26 @@ def test_FR_DOC_004_presigned_get_is_attachment_and_objects_are_never_public(
         s3_store.delete_prefix("t/")
 
 
+def test_D73_presigned_get_inline_only_for_pdf_and_images(s3_store: S3ObjectStore) -> None:
+    """D73: a cited page opens in the browser tab, so its URL is ``inline``; only PDF and
+    raster images may be served that way (never HTML, SVG, Office or text files)."""
+    key = storage.document_key(uuid.uuid4(), uuid.uuid4(), 1, "pdf")
+    data = S.pdf()
+    s3_store.put(key, data, PDF_CT)
+    url, _ = s3_store.presigned_get(
+        key=key, content_type=PDF_CT, filename="circular-1.pdf", expires_s=60, inline=True
+    )
+    res = httpx.get(url, timeout=30)
+    assert res.status_code == 200
+    assert res.headers["content-disposition"] == 'inline; filename="circular-1.pdf"'
+    assert res.headers["content-type"] == PDF_CT
+    for content_type in ("text/html", "image/svg+xml", "text/csv"):
+        with pytest.raises(ValueError, match="inline"):
+            s3_store.presigned_get(
+                key=key, content_type=content_type, filename="a", expires_s=60, inline=True
+            )
+
+
 def test_FR_DOC_003_sse_kms_is_required_by_policy_and_sent_on_writes() -> None:
     client = boto3.client(
         "s3",
