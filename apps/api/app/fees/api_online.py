@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, Path, Response
 
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require, require_any
-from app.authz.http import Cursor, IdempotencyDep, Limit, OptionalIfMatch, etag
+from app.authz.http import Cursor, Limit, OptionalIfMatch, RequiredIdempotencyDep, etag
 from app.fees import _common as c
 from app.fees import online
 from app.fees.online_schemas import (
@@ -141,7 +141,7 @@ def create_payment_intent(
     db: TenantDB,
     account_id: uuid.UUID,
     body: PaymentIntentCreate,
-    idem: IdempotencyDep,
+    idem: RequiredIdempotencyDep,
 ) -> Response:
     """A payment link for chosen instalments (``fee.collect``; send ``Idempotency-Key``): the
     amount is what is due on them now; an open link for the same instalments is reused

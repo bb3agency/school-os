@@ -1088,7 +1088,7 @@ def test_SEC_001_other_school_ids_are_404(
                 _fill(template, target),
                 json=BODIES.get(key),
                 params=QUERY.get(key),
-                headers={"If-Match": 'W/"1"'},
+                headers={"If-Match": 'W/"1"', "Idempotency-Key": uuid.uuid4().hex},
             )
         assert res.status_code == 404, (key, res.text)
         body = res.json()

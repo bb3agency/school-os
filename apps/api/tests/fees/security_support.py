@@ -387,7 +387,11 @@ def _open_item(w: Any) -> uuid.UUID:
 
 def _create_link(w: Any, r: str, a: Engine) -> Request:
     _connected(w, a)
-    return f"/api/v1/fees/accounts/{_account(w)}/payment-intents", {"instalments": [2]}, {}
+    return (
+        f"/api/v1/fees/accounts/{_account(w)}/payment-intents",
+        {"instalments": [2]},
+        {"Idempotency-Key": uuid.uuid4().hex},
+    )
 
 
 def _online_specs() -> dict[tuple[str, str], Builder]:
@@ -541,7 +545,7 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
         ("POST", "/api/v1/fees/receipts"): lambda w, r, a: (
             "/api/v1/fees/receipts",
             {"account_id": str(acc(w)), "amount": "1.00", "mode": "cash"},
-            {},
+            {"Idempotency-Key": uuid.uuid4().hex},
         ),
         ("GET", "/api/v1/fees/receipts"): g(lambda w, a: "/api/v1/fees/receipts"),
         ("GET", "/api/v1/fees/receipts/{receipt_id}"): g(
@@ -561,7 +565,7 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
         ("POST", "/api/v1/fees/receipts/{receipt_id}/cancellation"): lambda w, r, a: (
             f"/api/v1/fees/receipts/{_receipt(w).id}/cancellation",
             {"reason_code": "other", "reason": REASON},
-            {},
+            {"Idempotency-Key": uuid.uuid4().hex},
         ),
         ("POST", "/api/v1/fees/cancellations/{cancellation_id}/approve"): _decide(
             "cancellation", "approve"
@@ -584,7 +588,7 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
                 "targets": [{"instalment_no": 2, "head_id": str(F.ensure_setup(w.a).tui)}],
                 "reason": REASON,
             },
-            {},
+            {"Idempotency-Key": uuid.uuid4().hex},
         ),
         ("POST", "/api/v1/fees/concessions/{concession_id}/approve"): _decide(
             "concession", "approve"
@@ -607,7 +611,7 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
                 "reason_code": "other",
                 "reason": REASON,
             },
-            {},
+            {"Idempotency-Key": uuid.uuid4().hex},
         ),
         ("POST", "/api/v1/fees/adjustments/{adjustment_id}/approve"): _decide(
             "adjustment", "approve"
@@ -621,7 +625,7 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
         ("POST", "/api/v1/fees/receipts/{receipt_id}/refunds"): lambda w, r, a: (
             f"/api/v1/fees/receipts/{_receipt(w).id}/refunds",
             {"amount": "1.00", "mode": "cash", "reason": REASON},
-            {},
+            {"Idempotency-Key": uuid.uuid4().hex},
         ),
         ("GET", "/api/v1/fees/refunds/{refund_id}/print"): g(
             lambda w, a: f"/api/v1/fees/refunds/{_shared_voucher(w)}/print"

@@ -26,6 +26,7 @@ from app.authz.http import (
     Limit,
     OptionalIfMatch,
     Page,
+    RequiredIdempotencyDep,
     etag,
 )
 from app.fees import service
@@ -368,7 +369,7 @@ def student_fee_accounts(ctx: Viewer, db: TenantDB, student_id: uuid.UUID) -> li
 
 @router.post("/fees/receipts", response_model=ReceiptOut, status_code=201)
 def issue_fee_receipt(
-    ctx: Collector, db: TenantDB, body: ReceiptCreate, idem: IdempotencyDep
+    ctx: Collector, db: TenantDB, body: ReceiptCreate, idem: RequiredIdempotencyDep
 ) -> Response:
     """Take a payment and issue the receipt (``fee.collect``; send ``Idempotency-Key``).
     Errors (409): ``amount_exceeds_due``, ``head_not_collectable``, ``utr_in_use``,
@@ -448,7 +449,7 @@ def request_fee_receipt_cancellation(
     db: TenantDB,
     receipt_id: uuid.UUID,
     body: CancellationRequest,
-    idem: IdempotencyDep,
+    idem: RequiredIdempotencyDep,
 ) -> Response:
     """Ask for a receipt to be cancelled (``fee.collect`` or ``fee.manage``)."""
     return idem.run(db, body, lambda: service.request_cancellation(db, ctx, receipt_id, body))
@@ -503,7 +504,7 @@ def request_fee_concession(
     db: TenantDB,
     account_id: uuid.UUID,
     body: ConcessionCreate,
-    idem: IdempotencyDep,
+    idem: RequiredIdempotencyDep,
 ) -> Response:
     """Ask for a concession (``fee.concession.request``)."""
     return idem.run(db, body, lambda: service.request_concession(db, ctx, account_id, body))
@@ -556,7 +557,7 @@ def request_fee_adjustment(
     db: TenantDB,
     account_id: uuid.UUID,
     body: AdjustmentCreate,
-    idem: IdempotencyDep,
+    idem: RequiredIdempotencyDep,
 ) -> Response:
     """Ask for an adjustment or a late-fee waiver (``fee.manage``)."""
     return idem.run(db, body, lambda: service.request_adjustment(db, ctx, account_id, body))
@@ -598,7 +599,7 @@ def request_fee_refund(
     db: TenantDB,
     receipt_id: uuid.UUID,
     body: RefundCreate,
-    idem: IdempotencyDep,
+    idem: RequiredIdempotencyDep,
 ) -> Response:
     """Ask for a refund against a receipt (``fee.refund.request``)."""
     return idem.run(db, body, lambda: service.request_refund(db, ctx, receipt_id, body))

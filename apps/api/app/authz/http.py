@@ -299,3 +299,19 @@ def get_idempotency(
 
 
 IdempotencyDep = Annotated[Idempotency, Depends(get_idempotency)]
+
+
+def get_required_idempotency(
+    request: Request, ctx: Annotated[UserContext, Depends(get_user_context)]
+) -> Idempotency:
+    """As :func:`get_idempotency`, but a request without ``Idempotency-Key`` is refused with 400
+    ``idempotency_key_required`` (routes that create money records: a double submit must
+    never make two; audit 2026-11-09 YF, lead decision)."""
+    if request.headers.get(IDEMPOTENCY_HEADER) is None:
+        raise BadRequest(
+            "Send an Idempotency-Key header with this request.", code="idempotency_key_required"
+        )
+    return Idempotency(request, ctx)
+
+
+RequiredIdempotencyDep = Annotated[Idempotency, Depends(get_required_idempotency)]

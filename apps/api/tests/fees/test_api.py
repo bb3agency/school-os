@@ -62,9 +62,21 @@ def test_FR_FEE_010_receipt_over_http_is_idempotent(
 def test_FR_FEE_010_amount_is_exact_decimal_string(school: Any, api: Any) -> None:
     account_id = F.account(school)
     who = school.people["office_staff"]
-    res = api.call(who, "POST", "/api/v1/fees/receipts", json=_receipt_body(account_id, "10.005"))
+    res = api.call(
+        who,
+        "POST",
+        "/api/v1/fees/receipts",
+        json=_receipt_body(account_id, "10.005"),
+        headers={"Idempotency-Key": uuid.uuid4().hex},
+    )
     assert res.status_code == 422
-    ok = api.call(who, "POST", "/api/v1/fees/receipts", json=_receipt_body(account_id, "10.5"))
+    ok = api.call(
+        who,
+        "POST",
+        "/api/v1/fees/receipts",
+        json=_receipt_body(account_id, "10.5"),
+        headers={"Idempotency-Key": uuid.uuid4().hex},
+    )
     assert ok.status_code == 201
     assert ok.json()["amount"] == "10.50"
 
@@ -110,6 +122,7 @@ def test_FR_FEE_012_approval_needs_step_up_and_another_person(school: Any, api: 
         "POST",
         f"/api/v1/fees/receipts/{receipt.id}/cancellation",
         json={"reason_code": "wrong_student", "reason": "Receipt made for the wrong child"},
+        headers={"Idempotency-Key": uuid.uuid4().hex},
     )
     assert req.status_code == 201, req.text
     cid = req.json()["id"]
@@ -182,6 +195,7 @@ def test_approvals_inbox_marks_mine(school: Any, api: Any) -> None:
         "POST",
         f"/api/v1/fees/receipts/{receipt.id}/cancellation",
         json={"reason_code": "other", "reason": "Checking the approvals inbox"},
+        headers={"Idempotency-Key": uuid.uuid4().hex},
     )
     mine = api.call(school.people["accountant"], "GET", "/api/v1/fees/approvals").json()
     item = next(i for i in mine if i["receipt_id"] == str(receipt.id))
@@ -191,3 +205,27 @@ def test_approvals_inbox_marks_mine(school: Any, api: Any) -> None:
     item = next(i for i in theirs if i["receipt_id"] == str(receipt.id))
     assert item["mine"] is False
     assert item["can_decide"] is True
+
+
+MONEY_POSTS = (
+    "/api/v1/fees/receipts",
+    "/api/v1/fees/receipts/{receipt_id}/refunds",
+    "/api/v1/fees/receipts/{receipt_id}/cancellation",
+    "/api/v1/fees/accounts/{account_id}/concessions",
+    "/api/v1/fees/accounts/{account_id}/adjustments",
+    "/api/v1/fees/accounts/{account_id}/payment-intents",
+)
+
+
+@pytest.mark.parametrize("route", MONEY_POSTS)
+def test_FR_FEE_010_money_posts_require_an_idempotency_key(
+    school: Any, api: Any, route: str
+) -> None:
+    """Lead decision 2026-11-09 (audit YF, outside-area item): every POST that creates a money
+    record needs ``Idempotency-Key`` (400 ``idempotency_key_required``), so a double submit
+    never makes two receipts, refunds, requests or links. Nothing runs without it."""
+    account_id = F.account(school)
+    path = route.format(account_id=account_id, receipt_id=uuid.uuid4())
+    res = api.call(school.people["accountant"], "POST", path, json={})
+    assert res.status_code == 400, res.text
+    assert res.json()["code"] == "idempotency_key_required"
