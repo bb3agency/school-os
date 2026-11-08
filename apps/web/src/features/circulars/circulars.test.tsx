@@ -437,6 +437,26 @@ describe("tasks (US-1603, US-1604)", () => {
     });
   });
 
+  it("a retry after a lost answer reuses the Idempotency-Key, so no second task is made (WD-02, FR-TASK-003)", async () => {
+    signedIn(["task.read", "task.read_all", "task.manage"]);
+    stub.routes["GET /bff/api/v1/tasks"] = () => page([]);
+    let answers = 0;
+    stub.routes["POST /bff/api/v1/tasks"] = () =>
+      (answers += 1) === 1 ? problem(502, "bad_gateway") : Response.json(task(), { status: 201 });
+    renderWithIntl(<TasksScreen />);
+    await userEvent.type(await screen.findByLabelText(en.tasks.new.taskTitle), "Send the report");
+    await userEvent.selectOptions(await screen.findByLabelText(en.tasks.new.owner), OWNER);
+    await userEvent.type(screen.getByLabelText(en.tasks.new.dueOn), "2026-12-01");
+    await userEvent.click(screen.getByRole("button", { name: en.tasks.new.submit }));
+    await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/tasks")).toHaveLength(1));
+    await screen.findByText(messages.en.errors.api.bad_gateway.title);
+    await userEvent.click(screen.getByRole("button", { name: en.tasks.new.submit }));
+    await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/tasks")).toHaveLength(2));
+    const [first, second] = stub.callsTo("POST /bff/api/v1/tasks");
+    expect(first?.headers.get("idempotency-key")).toBeTruthy();
+    expect(second?.headers.get("idempotency-key")).toBe(first?.headers.get("idempotency-key"));
+  });
+
   it("dueState says overdue, today, soon and later", () => {
     const today = "2026-10-10";
     expect(dueState({ due_on: "2026-10-09", status: "open" }, today)).toBe("overdue");

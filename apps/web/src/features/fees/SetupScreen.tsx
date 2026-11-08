@@ -19,9 +19,10 @@ import { SaveBar } from "@/components/ui/SaveBar";
 import { SelectField } from "@/components/ui/Select";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import type { Locale } from "@/i18n/routing";
-import { newIdempotencyKey, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDate, formatInr } from "@/lib/format";
+import { useIntentKey } from "@/lib/forms";
 import {
   FINANCE_READ,
   fromPaise,
@@ -95,6 +96,7 @@ function PlanEditor({
   const [problems, setProblems] = useState<SummaryError[]>([]);
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
+  const intent = useIntentKey();
   const formId = useId();
   const fieldId = (part: string) => `${formId}-${part}`;
   const invalid = (part: string) => problems.some((p) => p.fieldId === fieldId(part));
@@ -170,10 +172,15 @@ function PlanEditor({
       return;
     }
     setSaving(true);
+    // The same key when the same plan is saved again after a lost answer (WD-02).
+    const key = intent.next({
+      ...{ yearId, classId, category, name, cells, columns },
+      ...{ lateKind, lateAmount, lateGrace, lateCap },
+    });
     try {
       await unwrap(
         api.POST("/api/v1/fees/plans", {
-          headers: { "Idempotency-Key": newIdempotencyKey() },
+          headers: { "Idempotency-Key": key },
           body: {
             academic_year_id: yearId,
             class_id: classId,
@@ -202,8 +209,10 @@ function PlanEditor({
           },
         }),
       );
+      intent.succeeded();
       onSaved();
     } catch (failure) {
+      intent.failed(failure);
       setError(failure);
     } finally {
       setSaving(false);
