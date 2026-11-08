@@ -1,9 +1,10 @@
 /**
  * US-303 / FR-STU-012 / BR-02: nobody should type or paste a full Aadhaar number. The API
  * refuses one in any field (422 `aadhaar_full_number_rejected`); this client check only
- * explains it before the request is sent. Same rule as the API: 12 digits (spaces or hyphens
- * allowed between groups) that pass the Verhoeff check, first digit 2–9.
+ * explains it before the request is sent, with the API's rule (`@/lib/aadhaar`).
  */
+
+import { containsAadhaarNumber } from "@/lib/aadhaar";
 
 const D = [
   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -54,13 +55,11 @@ export function aadhaarDisplay(value: string): string {
   return "••••";
 }
 
-const CANDIDATE = /(?<!\d)([2-9]\d{3})[\s-]?(\d{4})[\s-]?(\d{4})(?!\d)/g;
-
-/** True when the text holds something that looks like a full Aadhaar number. */
+/**
+ * True when the text holds something that looks like a full Aadhaar number. The same rule as
+ * `core.redaction` on the server (`@/lib/aadhaar`: every grouping the API refuses, any lead
+ * digit); a narrower copy here let dotted or wide-gapped numbers through to a 422 (XS-01).
+ */
 export function containsFullAadhaar(text: string): boolean {
-  for (const match of text.matchAll(CANDIDATE)) {
-    const digits = `${match[1] ?? ""}${match[2] ?? ""}${match[3] ?? ""}`;
-    if (verhoeffValid(digits)) return true;
-  }
-  return false;
+  return containsAadhaarNumber(text);
 }
