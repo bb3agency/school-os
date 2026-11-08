@@ -411,6 +411,26 @@ describe("Manage memory", () => {
     expect(second).not.toBe(first);
   });
 
+  it("a retry after a lost answer reuses the Idempotency-Key, so the memory is saved once (XO-02, FR-KB-012)", async () => {
+    let answers = 0;
+    stub.routes[`POST ${MEM}`] = () =>
+      (answers += 1) === 1 ? problem(502, "bad_gateway") : refused("memory_others");
+    renderWithIntl(<AskMemoryPage />);
+    const user = userEvent.setup();
+    const field = await screen.findByLabelText("Add something to remember");
+    await user.type(field, "I prefer short answers");
+    await user.click(screen.getByRole("button", { name: "Remember" }));
+    await waitFor(() => expect(stub.callsTo(`POST ${MEM}`)).toHaveLength(1));
+    await waitFor(() => expect(field).toHaveValue("I prefer short answers"));
+    await user.click(screen.getByRole("button", { name: "Remember" }));
+    await waitFor(() => expect(stub.callsTo(`POST ${MEM}`)).toHaveLength(2));
+    const [first, second] = stub
+      .callsTo(`POST ${MEM}`)
+      .map((call) => call.headers.get("idempotency-key"));
+    expect(first).toMatch(/^[0-9a-f-]{36}$/);
+    expect(second).toBe(first);
+  });
+
   it("explains a refused memory (422 memory_others) and keeps the text", async () => {
     stub.routes[`POST ${MEM}`] = () => refused("memory_others");
     renderWithIntl(<AskMemoryPage />);

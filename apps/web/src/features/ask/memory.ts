@@ -2,14 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { AuthRedirectError } from "@/lib/bff/fetch";
-import {
-  ApiError,
-  asList,
-  NotAvailableError,
-  newIdempotencyKey,
-  unwrap,
-  useBffClient,
-} from "@/lib/bff/query";
+import { ApiError, asList, NotAvailableError, unwrap, useBffClient } from "@/lib/bff/query";
+import { useIntentKey } from "@/lib/forms";
 import { ifMatch, type MemoryItem, type MemorySettings } from "./data";
 
 /**
@@ -110,15 +104,26 @@ export function useSetMemoryEnabled() {
 export function useAddMemory() {
   const api = useBffClient("staff");
   const client = useQueryClient();
+  const intent = useIntentKey();
   return useMutation({
-    mutationFn: (text: string): Promise<MemoryItem> =>
-      unwrap(
-        api.POST("/api/v1/knowledge/memories", {
-          // A retried request is answered once (the API keeps the key); each add is a new one.
-          headers: { "Idempotency-Key": newIdempotencyKey() },
-          body: { text },
-        }),
-      ),
+    mutationFn: async (text: string): Promise<MemoryItem> => {
+      // The same text tried again after a lost answer (5xx, offline) keeps its key, so the API
+      // saves it once (XO-02); after a success or a refusal the next add gets a new key.
+      const key = intent.next({ text });
+      try {
+        const item = await unwrap(
+          api.POST("/api/v1/knowledge/memories", {
+            headers: { "Idempotency-Key": key },
+            body: { text },
+          }),
+        );
+        intent.succeeded();
+        return item;
+      } catch (error) {
+        intent.failed(error);
+        throw error;
+      }
+    },
     onMutate: async (text) => {
       const saved = await begin(client);
       const now = new Date().toISOString();
