@@ -86,6 +86,7 @@ export function DailyScreen() {
     { enabled: me !== undefined && allowed && day !== "" },
   );
   const current = report.status === "ready" ? report.data : null;
+  const queryClient = useQueryClient();
   const csv = useCsvDownload(async () => {
     const reportDate = current?.date ?? day;
     return {
@@ -178,6 +179,11 @@ export function DailyScreen() {
                   count: current.receipts.length,
                   net: formatInr(current.net_total, locale) ?? "",
                 })}
+                // XF-02: the totals in the confirmation are what is closed, so the report is
+                // read again when it opens (receipts taken at the counter since the page loaded).
+                onOpenChange={(open) => {
+                  if (open) void queryClient.invalidateQueries({ queryKey: KEYS.daily(day) });
+                }}
                 schema={z.object({})}
                 invalidate={[KEYS.all]}
                 errorNamespace="fees"

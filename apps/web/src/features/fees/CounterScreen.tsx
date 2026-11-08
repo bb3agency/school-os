@@ -357,6 +357,7 @@ function check(
   form: Form,
   collectable: number,
   custom: Map<string, string> | null,
+  lines: readonly DueLine[],
   t: (key: string) => string,
 ): Errors {
   const errors: Errors = {};
@@ -382,6 +383,15 @@ function check(
         return errors;
       }
       sum += p;
+    }
+    // XF-04: no line takes more than is due on it (the API answers 409 amount_exceeds_due,
+    // whose message speaks of the whole amount, not the line).
+    for (const line of lines) {
+      const p = toPaise(custom.get(lineKey(line)) || "0") ?? 0;
+      if (p > (toPaise(line.due) ?? 0)) {
+        errors.allocation = t("errors.allocationAboveDue");
+        return errors;
+      }
     }
     if (sum !== paise) errors.allocation = t("errors.allocationSum");
   }
@@ -460,7 +470,7 @@ function PaymentForm({
     async (event?: FormEvent) => {
       event?.preventDefault();
       if (busyRef.current) return;
-      const found = check(form, collectable, custom, (k) => t(k as "errors.amount"));
+      const found = check(form, collectable, custom, account.lines, (k) => t(k as "errors.amount"));
       setErrors(found);
       if (Object.keys(found).length > 0) {
         setAttempt((n) => n + 1);
