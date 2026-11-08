@@ -70,6 +70,24 @@ export interface UsageFilters {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Every school's usage is one unpaged list: the API takes at most 31 days without a
+ * school (422 `range_too_long`, audit 2026-11-08 AZ-03); one school up to 400 days. */
+export const ALL_SCHOOLS_MAX_DAYS = 31;
+
+const DAY_MS = 86_400_000;
+
+/** True when an all-schools query (no school) would span more than 31 days. With no
+ * `from` the API takes the last 31 days, so only an explicit `from` can be too early. */
+export function usageRangeTooLong(
+  query: { from?: string; to?: string; tenant_id?: string },
+  today: string,
+): boolean {
+  if (query.tenant_id || !query.from) return false;
+  const end = Date.parse(`${query.to ?? today}T00:00:00Z`);
+  const start = Date.parse(`${query.from}T00:00:00Z`);
+  return (end - start) / DAY_MS + 1 > ALL_SCHOOLS_MAX_DAYS;
+}
+
 /** FR-PLT-020..021 (docs/16 §5.10): daily aggregates per school. */
 export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
   const t = useTranslations("platform.usage");
@@ -84,8 +102,11 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
       ? { tenant_id: filters.tenantId }
       : {}),
   };
-  const usage = useApiQuery([...PK.usage, "list", query], () =>
-    unwrap(api.GET("/api/v1/platform/usage", { params: { query } })),
+  const tooLong = usageRangeTooLong(query, todayInIndia());
+  const usage = useApiQuery(
+    [...PK.usage, "list", query],
+    () => unwrap(api.GET("/api/v1/platform/usage", { params: { query } })),
+    { enabled: !tooLong },
   );
   // ADR-0038 follow-up (docs/16 §19 Q16): schools at 80 % or 100 % of their included answers.
   const quotaAlerts = useApiQuery([...PK.usage, "ai-quota-alerts"], () =>
@@ -103,6 +124,11 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
       />
       <PlanLimitAlerts alerts={limitAlerts} schoolName={nameOf} />
       <AiQuotaAlerts alerts={quotaAlerts} schoolName={nameOf} />
+      {tooLong ? (
+        <Alert tone="warning" title={t("rangeTooLongTitle")}>
+          <p>{t("rangeTooLongBody", { days: ALL_SCHOOLS_MAX_DAYS })}</p>
+        </Alert>
+      ) : null}
       <UsageTable
         toolbar={
           <FilterCard
@@ -154,7 +180,7 @@ export function UsageScreen({ filters = {} }: { filters?: UsageFilters }) {
             />
           </FilterCard>
         }
-        usage={usage}
+        usage={tooLong ? ready([]) : usage}
         caption={t("title")}
         schoolName={nameOf}
       />

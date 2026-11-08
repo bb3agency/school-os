@@ -103,10 +103,22 @@ def get_affected(ctx: Reader, db: TenantDB, breach_id: uuid.UUID) -> AffectedOut
 
 
 @router.put("/breaches/{breach_id}/affected", response_model=AffectedOut)
-def set_affected(ctx: Manager, db: TenantDB, breach_id: uuid.UUID, body: AffectedIn) -> AffectedOut:
+def set_affected(
+    *,
+    ctx: Manager,
+    db: TenantDB,
+    breach_id: uuid.UUID,
+    body: AffectedIn,
+    version: IfMatch,
+    response: Response,
+) -> AffectedOut:
     """Replace the list of affected people, to prepare individual notices (ids of this school
-    only, at most 5,000; permission ``privacy.breach.manage``, step-up)."""
-    return service.set_affected(db, ctx, breach_id, body)
+    only, at most 5,000; permission ``privacy.breach.manage``, step-up). ``If-Match`` with the
+    breach's ``ETag`` (stale: 412, nothing changed; audit 2026-11-08 AZ-01); the answer carries
+    the breach's new ``ETag``."""
+    out, new_version = service.set_affected(db, ctx, breach_id, body, expected_version=version)
+    response.headers["ETag"] = etag(new_version)
+    return out
 
 
 @router.post("/breaches/{breach_id}/affected:count", response_model=AffectedCountsOut)

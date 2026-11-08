@@ -148,6 +148,28 @@ def test_FR_PLT_020_usage_rollup_counts_only(
     assert usage.collect_daily(day) >= 1
 
 
+def test_FR_PLT_020_AZ_03_all_schools_usage_is_at_most_31_days(api: Api, owner: Operator) -> None:
+    """Audit 2026-11-08 AZ-03 (API4): every school's usage in one unpaged list is limited to
+    31 days (422 ``range_too_long`` on ``from``); one school keeps the 401-day range. Without
+    dates, the all-schools list is the last 31 days."""
+    end = dt.date(2026, 10, 31)
+    ok = api.call("GET", f"/usage?from={end - dt.timedelta(days=30)}&to={end}", owner)
+    assert ok.status_code == 200, ok.text
+    long = api.call("GET", f"/usage?from={end - dt.timedelta(days=31)}&to={end}", owner)
+    assert long.status_code == 422, long.text
+    assert long.json()["errors"][0]["field"] == "from"
+    assert long.json()["errors"][0]["code"] == "range_too_long"
+    assert api.call("GET", "/usage", owner).status_code == 200
+    assert api.call("GET", f"/usage?to={end}", owner).status_code == 200
+    tid = uuid.uuid4()
+    year = api.call(
+        "GET", f"/usage?from={end - dt.timedelta(days=364)}&to={end}&tenant_id={tid}", owner
+    )
+    assert year.status_code == 200, year.text
+    per_school = api.call("GET", f"/tenants/{tid}/usage?from={end - dt.timedelta(days=364)}", owner)
+    assert per_school.status_code == 200, per_school.text
+
+
 def test_L_09_students_documents_and_storage_are_counted(
     api: Api, owner: Operator, make_plan: Callable[..., uuid.UUID], admin_engine: Engine
 ) -> None:

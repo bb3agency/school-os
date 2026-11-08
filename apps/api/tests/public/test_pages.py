@@ -14,6 +14,7 @@ without keys or names.
 
 from __future__ import annotations
 
+import datetime as dt
 import importlib.util
 import json
 import sys
@@ -28,6 +29,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from app.circulars import service as circulars
+from app.circulars.config import rules as circular_rules
 from app.core import pdf
 from app.core import ratelimit as rl
 from app.core.db import tenant_session
@@ -332,6 +334,65 @@ def test_D71_a_notice_still_being_rendered_is_being_prepared_without_a_new_job(
     assert res.status_code == 202, res.text
     assert _render_events(admin_engine, notice_id) == 0
     assert not _audit(admin_engine, world.a.tenant_id, "notice.render_requested", notice_id)
+
+
+def _fail_render(
+    admin: Engine, notice_id: uuid.UUID, monkeypatch: pytest.MonkeyPatch, minutes_ago: int
+) -> None:
+    """The render failed ``minutes_ago`` (the trigger stamps ``updated_at`` now; the
+    service's clock is moved forward instead)."""
+    with admin.begin() as c:
+        failed_at: dt.datetime = c.execute(
+            text(
+                "UPDATE ops.parent_notices SET render_status = 'failed', "
+                "render_error = 'render_failed', pdf_key = NULL, png_key = NULL, "
+                "rendered_at = NULL WHERE id = :i RETURNING updated_at"
+            ),
+            {"i": notice_id},
+        ).scalar_one()
+    later = failed_at + dt.timedelta(minutes=minutes_ago)
+    monkeypatch.setattr(circulars, "_now", lambda: later)
+
+
+def test_D71_AZ_02_a_failed_render_is_queued_again_only_after_the_cooldown(
+    world: Any,
+    admin_engine: Engine,
+    public_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Audit 2026-11-08 AZ-02 (API4; amends D71): after a FAILED render, parent requests inside
+    the cooldown (``notices.failed_render_cooldown_s``, 15 minutes) answer 202 "being prepared"
+    with Retry-After = the time left (at least 60 s) and queue nothing; after it, one request
+    queues one render."""
+    _, guardian = P.student_with_guardian(world.a)
+    owner = world.a.people["owner"]
+    with tenant_session(world.a.tenant_id, owner.user_id) as db:
+        notice_id = P.approved_notice(db, owner.user_id)
+    key = _link(world.a, "parent_notice", notice_id, guardian)
+    cooldown = circular_rules().notices.failed_render_cooldown_s
+    assert cooldown == 900
+    _fail_render(admin_engine, notice_id, monkeypatch, minutes_ago=1)
+    for _ in range(3):
+        res = P.public_call(public_client, "GET", DOCUMENT, token=key)
+        assert res.status_code == 202, res.text
+        wait = int(res.headers["retry-after"])
+        assert wait == cooldown - 60, wait
+        assert res.json() == {"status": "preparing", "retry_after_s": wait}
+    assert _render_events(admin_engine, notice_id) == 0
+    assert not _audit(admin_engine, world.a.tenant_id, "notice.render_requested", notice_id)
+    # Less than a minute left: Retry-After is never below 60 s.
+    _fail_render(admin_engine, notice_id, monkeypatch, minutes_ago=14)
+    res = P.public_call(public_client, "GET", DOCUMENT, token=key)
+    assert res.status_code == 202
+    assert res.headers["retry-after"] == "60"
+    assert _render_events(admin_engine, notice_id) == 0
+    # After the cooldown one request queues one render; repeats while queued queue nothing.
+    _fail_render(admin_engine, notice_id, monkeypatch, minutes_ago=16)
+    for _ in range(2):
+        res = P.public_call(public_client, "GET", DOCUMENT, token=key)
+        assert res.status_code == 202, res.text
+    assert _render_events(admin_engine, notice_id) == 1
+    assert len(_audit(admin_engine, world.a.tenant_id, "notice.render_requested", notice_id)) == 1
 
 
 def test_D71_a_withdrawn_notice_is_the_uniform_404_and_queues_no_render(

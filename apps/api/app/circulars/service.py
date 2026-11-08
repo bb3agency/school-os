@@ -34,6 +34,7 @@ codes only (invariant 5).
 from __future__ import annotations
 
 import datetime as dt
+import math
 import uuid
 from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
@@ -1966,18 +1967,34 @@ def parent_notice(session: Session, notice_id: uuid.UUID, language: str) -> Pare
 
 
 PDF_PREPARING: Final = "preparing"
+# The least Retry-After a parent link answers while a failed render cools down (AZ-02).
+MIN_RETRY_AFTER_S: Final = 60
+
+
+@dataclass(frozen=True, slots=True)
+class PdfCoolingDown:
+    """The last render failed less than ``failed_render_cooldown_s`` ago (audit 2026-11-08
+    AZ-02): nothing is queued; the parent page answers "being prepared" with
+    ``retry_after_s`` (the time left, at least 60 s)."""
+
+    retry_after_s: int
+
+
 """``parent_notice_pdf``: the PDF is being made by the worker; the parent tries again shortly."""
 
 
 def parent_notice_pdf(
     session: Session, notice_id: uuid.UUID
-) -> tuple[str, dt.datetime] | Literal["preparing"] | None:
+) -> tuple[str, dt.datetime] | Literal["preparing"] | PdfCoolingDown | None:
     """The approved notice's PDF for a parent link (D71; FR-PUB-009): a presigned link (at most
     5 minutes; audit ``notice.downloaded``, system, via ``parent_link``) while the stored render
     is within ``render_keep_days``; otherwise :data:`PDF_PREPARING`. A render that expired,
     failed or never ran is queued again for the worker (queue ``pdf``; the API never renders;
     audit ``notice.render_requested``, system, via ``parent_link``); while one is queued nothing
-    more is queued (the row is locked, so concurrent requests queue one job). ``None`` for a
+    more is queued (the row is locked, so concurrent requests queue one job). A render that
+    FAILED is queued again only once the failure is older than
+    ``notices.failed_render_cooldown_s`` (audit 2026-11-08 AZ-02, amends D71); before that
+    :class:`PdfCoolingDown` with the time left and nothing is queued. ``None`` for a
     notice that is not approved (withdrawn, draft) or not of this school."""
     notice = repo.get_notice(session, notice_id, lock=True)
     if notice is None or notice.status != "approved":
@@ -2002,6 +2019,14 @@ def parent_notice_pdf(
         return url, expires_at
     if notice.render_status == "queued":
         return PDF_PREPARING
+    if notice.render_status == "failed":
+        # The failure was the notice's last change (trigger parent_notices_set_updated_at).
+        cooldown = dt.timedelta(seconds=rules().notices.failed_render_cooldown_s)
+        left = notice.updated_at + cooldown - _now()
+        if left > dt.timedelta(0):
+            return PdfCoolingDown(
+                retry_after_s=max(MIN_RETRY_AFTER_S, math.ceil(left.total_seconds()))
+            )
     repo.update_notice(
         session,
         notice.id,
@@ -2194,6 +2219,7 @@ __all__ = [
     "TASK_READ",
     "NoticeForSending",
     "ParentNoticeView",
+    "PdfCoolingDown",
     "PortalTaskRef",
     "abandon_draft",
     "abandon_reading",

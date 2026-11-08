@@ -55,6 +55,7 @@ def _populate(world: Any, api: Any, admin: Engine, tag: str) -> dict[str, uuid.U
         "PUT",
         f"{BREACHES}/{breach['id']}/affected",
         json={"student_ids": [str(sid)], "guardian_ids": [str(gid)]},
+        headers={"If-Match": 'W/"1"'},
     )
     assert put.status_code == 200, put.text
     return {"student": sid, "guardian": gid, "request": uuid.UUID(req["id"])}

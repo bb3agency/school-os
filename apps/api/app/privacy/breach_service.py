@@ -467,12 +467,21 @@ def get_affected(session: Session, breach_id: uuid.UUID) -> AffectedOut:
 
 
 def set_affected(
-    session: Session, ctx: UserContext, breach_id: uuid.UUID, data: AffectedIn
-) -> AffectedOut:
+    session: Session,
+    ctx: UserContext,
+    breach_id: uuid.UUID,
+    data: AffectedIn,
+    *,
+    expected_version: int,
+) -> tuple[AffectedOut, int]:
     """Replace the list of affected people (FR-DPDP-033; ids of this school only: 422
-    ``not_found`` per list otherwise; at most ``max_affected`` in all, 422 ``too_many``). Audit
-    ``privacy.breach.affected_set`` (counts only)."""
+    ``not_found`` per list otherwise; at most ``max_affected`` in all, 422 ``too_many``).
+    ``expected_version`` is the breach's ``If-Match`` (412 when stale; audit 2026-11-08 AZ-01:
+    two managers cannot silently overwrite each other's list); the breach's version is bumped.
+    Audit ``privacy.breach.affected_set`` (counts only). Returns the list and the new version."""
     row = _get(session, breach_id, lock=True)
+    if row.version != expected_version:
+        raise PreconditionFailed("Someone else changed this breach. Reload it.")
     if row.status == "closed":
         raise Conflict("This breach is closed.", code="breach_closed")
     total = len(data.student_ids) + len(data.guardian_ids) + len(data.membership_ids)
@@ -487,6 +496,7 @@ def set_affected(
             membership_ids=data.membership_ids,
         )
         session.flush()
+    row = repo.update_record(session, breach_id)
     _audit(
         session,
         "privacy.breach.affected_set",
@@ -497,7 +507,7 @@ def set_affected(
             "staff": len(data.membership_ids),
         },
     )
-    return get_affected(session, breach_id)
+    return get_affected(session, breach_id), row.version
 
 
 def _picked_students(session: Session, ctx: UserContext, data: AffectedCountIn) -> set[uuid.UUID]:

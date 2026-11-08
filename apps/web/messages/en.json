@@ -1462,6 +1462,8 @@
       "colAiCost": "AI cost",
       "emptyTitle": "No usage recorded",
       "emptyBody": "Usage totals appear the day after a school starts using SchoolOS. Try a wider date range.",
+      "rangeTooLongTitle": "Date range too long for all schools",
+      "rangeTooLongBody": "For all schools, choose at most {days} days. Pick one school to see up to 400 days.",
       "limitsTitle": "Latest day against plan limits",
       "limitsDescription": "Counts for {date}, compared with the limits of the school's current plan.",
       "meter": "{used} of {limit}",

@@ -154,16 +154,52 @@ def test_FR_DPDP_033_affected_ids_of_this_school_only(world: Any, api: Any) -> N
         "guardian_ids": [str(ids["g9a"])],
         "membership_ids": [str(world.person("teacher").membership_id)],
     }
-    res = api.call(owner, "PUT", path, json=body)
+    res = api.call(owner, "PUT", path, json=body, headers={"If-Match": 'W/"1"'})
     assert res.status_code == 200, res.text
     assert len(res.json()["student_ids"]) == 2
     detail = api.call(owner, "GET", f"{BASE}/{out['id']}").json()
     assert detail["affected"] == {"students": 2, "guardians": 1, "staff": 1}
-    other = api.call(owner, "PUT", path, json={"student_ids": [str(ids["b_sb"])]})
+    other = api.call(
+        owner,
+        "PUT",
+        path,
+        json={"student_ids": [str(ids["b_sb"])]},
+        headers={"If-Match": 'W/"2"'},
+    )
     assert other.status_code == 422
     assert "student_ids" in other.text
     # The failed replacement changed nothing.
     assert len(api.call(owner, "GET", path).json()["student_ids"]) == 2
+
+
+def test_FR_DPDP_033_AZ_01_affected_list_needs_if_match_and_bumps_the_version(
+    world: Any, api: Any
+) -> None:
+    """Audit 2026-11-08 AZ-01 (API6, ASVS V11.1.4): the affected list is replaced only with the
+    breach's current ``If-Match``; a stale one is 412 and changes nothing (no lost update)."""
+    owner = world.person("owner")
+    ids = P.SW.ensure_students(world)
+    out = P.create_breach(api, owner)
+    path = f"{BASE}/{out['id']}/affected"
+    first = {"student_ids": [str(ids["s9a"])]}
+    missing = api.call(owner, "PUT", path, json=first)
+    assert missing.status_code == 400, missing.text
+    assert missing.json()["code"] == "if_match_required"
+    res = api.call(owner, "PUT", path, json=first, headers={"If-Match": 'W/"1"'})
+    assert res.status_code == 200, res.text
+    assert res.headers["ETag"] == 'W/"2"'
+    detail = api.call(owner, "GET", f"{BASE}/{out['id']}")
+    assert detail.headers["ETag"] == 'W/"2"'
+    # A second manager still holding version 1 cannot overwrite the first one's list.
+    stale = api.call(
+        owner,
+        "PUT",
+        path,
+        json={"student_ids": [str(ids["s9c"])]},
+        headers={"If-Match": 'W/"1"'},
+    )
+    assert stale.status_code == 412, stale.text
+    assert api.call(owner, "GET", path).json()["student_ids"] == [str(ids["s9a"])]
 
 
 def test_FR_DPDP_036_drafts_are_filled_from_the_record(world: Any, api: Any) -> None:
