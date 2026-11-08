@@ -1052,6 +1052,48 @@ def test_FR_FEE_009_per_day_late_fee_capped_never_compounding(school: Any) -> No
 # --- refunds (US-2106) ---------------------------------------------------------------------------
 
 
+def test_FR_FEE_013_YF_06_refund_mode_details_are_checked_like_the_counter(
+    school: Any,
+) -> None:
+    """YF-06: the refund cheque number and bank reference follow the counter's patterns (422
+    ``invalid_cheque_number``, ``invalid_reference``) and never carry a full Aadhaar number (422
+    ``aadhaar_full_number_rejected``). Before, any text up to 40 characters was accepted and
+    printed on the voucher."""
+    from app.core.redaction import verhoeff_check_digit
+
+    account_id = F.account(school)
+    r = F.issue(school, account_id, "500.00")
+
+    def ask(mode: str, details: ModeDetailsIn) -> Any:
+        return F.call(
+            school,
+            "accountant",
+            fees.request_refund,
+            r.id,
+            RefundCreate(
+                amount=D("10.00"),
+                mode=mode,
+                mode_details=details,
+                reason="Paid twice for the same term",
+            ),
+        )
+
+    def code(mode: str, details: ModeDetailsIn) -> str:
+        with pytest.raises(ValidationFailed) as err:
+            ask(mode, details)
+        return str(err.value.errors[0]["code"])
+
+    assert code("cheque", ModeDetailsIn(cheque_number="12AB")) == "invalid_cheque_number"
+    assert code("bank_transfer", ModeDetailsIn(reference="REF-1")) == "invalid_reference"
+    aadhaar_like = "23456789012"
+    aadhaar_like += verhoeff_check_digit(aadhaar_like)
+    assert (
+        code("bank_transfer", ModeDetailsIn(reference=aadhaar_like))
+        == "aadhaar_full_number_rejected"
+    )
+    assert ask("cheque", ModeDetailsIn(cheque_number="004512")).status == "pending"
+
+
 def test_US_2106_cash_refund_voucher_on_approval(school: Any) -> None:
     account_id = F.account(school)
     r = F.issue(school, account_id, "800.00")

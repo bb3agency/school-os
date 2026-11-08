@@ -12,6 +12,7 @@ series.
 from __future__ import annotations
 
 import datetime as dt
+import re
 import uuid
 from collections import defaultdict
 from collections.abc import Sequence
@@ -879,6 +880,26 @@ def _refund_out(session: Session, row: Refund, receipt: Receipt) -> RefundOut:
     return receipts.refund_out(row, receipt.receipt_number, _names(session, [row]))
 
 
+def _refund_details(data: RefundCreate) -> dict[str, str]:
+    """The refund's cheque number or bank reference, checked as at the counter (YF-06): the
+    configured patterns, and never a full Aadhaar number (both are printed on the voucher)."""
+    modes = c.settings().modes
+    d = data.mode_details
+    if data.mode == "cheque":
+        if not d.cheque_number:
+            raise ValidationFailed([c.error("mode_details.cheque_number", "missing")])
+        c.refuse_aadhaar("mode_details.cheque_number", d.cheque_number)
+        if not re.match(modes.cheque_number_pattern, d.cheque_number):
+            raise ValidationFailed([c.error("mode_details.cheque_number", "invalid_cheque_number")])
+        return {"cheque_number": d.cheque_number}
+    if data.mode == "bank_transfer" and d.reference:
+        c.refuse_aadhaar("mode_details.reference", d.reference)
+        if not re.match(modes.bank_reference_pattern, d.reference):
+            raise ValidationFailed([c.error("mode_details.reference", "invalid_reference")])
+        return {"reference": d.reference.upper()}
+    return {}
+
+
 def request_refund(
     session: Session, ctx: UserContext, receipt_id: uuid.UUID, data: RefundCreate
 ) -> RefundOut:
@@ -904,13 +925,7 @@ def request_refund(
             )
     elif data.mode == "original_method":
         raise ValidationFailed([c.error("mode", "original_method_online_only")])
-    details: dict[str, str] = {}
-    if data.mode == "cheque":
-        if not data.mode_details.cheque_number:
-            raise ValidationFailed([c.error("mode_details.cheque_number", "missing")])
-        details["cheque_number"] = data.mode_details.cheque_number
-    elif data.mode == "bank_transfer" and data.mode_details.reference:
-        details["reference"] = data.mode_details.reference.upper()
+    details = _refund_details(data)
     taken = receipts.committed_refunds(repo.refunds_of(session, [receipt.id]))
     if data.amount > receipt.amount - taken:
         raise Conflict(
