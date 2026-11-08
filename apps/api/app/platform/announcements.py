@@ -233,9 +233,7 @@ def update(
         return _out(row)
 
 
-def approve(
-    actor: Actor, announcement_id: uuid.UUID, *, expected_version: int
-) -> AnnouncementOut:
+def approve(actor: Actor, announcement_id: uuid.UUID, *, expected_version: int) -> AnnouncementOut:
     """Second operator approves a critical announcement (``pending_approval`` -> ``scheduled``).
 
     409 ``invalid_state`` unless it is pending; ``same_operator`` for the operator who submitted
