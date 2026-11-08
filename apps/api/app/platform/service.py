@@ -6,6 +6,9 @@ School-side (tenant API) routes that the authz owner wires with ``require(...)``
 - GET  /api/v1/tenant/billing (tenant.billing.read): ``current_subscription(tenant_session)``
   and, for that subscription, ``school_ai_bundle(tenant_id, subscription_id)``
 - GET  /api/v1/tenant/billing/invoices (tenant.billing.read): its ``["invoices"]``
+- the next invoice of that subscription: ``school_next_invoice(tenant_id, subscription_id)``;
+  on a dedicated host (no local subscription) the summary of the last verified heartbeat
+  answer: ``dedicated_billing_summary()`` (ADR-0058)
 - GET  /api/v1/announcements (any authenticated member): ``active_announcements(tenant, tier)``
 - POST /api/v1/support/tickets (support.ticket.create): ``open_ticket_from_tenant(...)``
 - GET  /api/v1/support/tickets (support.ticket.create): ``list_tenant_tickets(tenant_id, viewer)``
@@ -40,7 +43,9 @@ Provisioning helpers for dev tooling: ``invite_school_owner(platform_session, ..
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import text
@@ -51,6 +56,7 @@ from app.platform import (
     billing,
     breakglass,
     flags,
+    heartbeat_apply,
     incidents,
     repository,
     support,
@@ -61,6 +67,7 @@ from app.platform.incidents import SchoolIncidentNotice
 from app.platform.schemas import (
     AiQuotaAlertOut,
     AnnouncementBrief,
+    HbBillingSummary,
     PlanLimitAlertOut,
     SchoolAiBundle,
     SchoolTicketMessageIn,
@@ -84,6 +91,7 @@ __all__ = [
     "breakglass_requests_for_school",
     "clear_school_flag_override",
     "current_subscription",
+    "dedicated_billing_summary",
     "get_tenant_ticket",
     "incident_notices_for_school",
     "invite_school_owner",
@@ -97,6 +105,7 @@ __all__ = [
     "record_incident_reopen_pulled",
     "reply_from_tenant",
     "school_ai_bundle",
+    "school_next_invoice",
     "set_school_flag_override",
 ]
 
@@ -117,6 +126,20 @@ def school_ai_bundle(tenant_id: uuid.UUID, subscription_id: uuid.UUID) -> School
     """The calling school's AI answer bundle and this month's answer count (platform data only;
     ``None`` without a bundle). ``subscription_id`` comes from ``current_subscription``."""
     return billing.school_ai_bundle(tenant_id, subscription_id)
+
+
+def school_next_invoice(
+    tenant_id: uuid.UUID, subscription_id: uuid.UUID
+) -> tuple[dt.date | None, Decimal | None]:
+    """(day, estimated total incl. GST) of the school's next invoice; ``(None, None)`` when
+    none follows (trial, suspended, ending at the period end)."""
+    return billing.school_next_invoice(tenant_id, subscription_id)
+
+
+def dedicated_billing_summary() -> tuple[HbBillingSummary | None, dt.datetime] | None:
+    """Dedicated host: (summary or ``None`` for no live subscription, as of) of the last
+    verified heartbeat answer (ADR-0058); ``None`` before the first one."""
+    return heartbeat_apply.stored_billing_summary()
 
 
 def active_announcements(tenant_id: uuid.UUID, tier: str) -> list[AnnouncementBrief]:

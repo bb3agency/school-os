@@ -1662,6 +1662,10 @@ def get_job(
 def heartbeat(
     *,
     verified: Annotated[fleet.VerifiedHeartbeat, Depends(fleet.require_fleet_signature())],
-) -> HeartbeatOut:
-    """HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 §12)."""
-    return fleet.accept_heartbeat(verified)
+) -> Response:
+    """HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 §12). The answer
+    is signed with the same deployment key (``X-SOS-Key-Id``, ``X-SOS-Timestamp``,
+    ``X-SOS-Signature``; ADR-0058) and carries the school's flags, AI answer allowance and
+    billing summary."""
+    body, headers = fleet.signed_answer(verified, fleet.accept_heartbeat(verified))
+    return Response(content=body, media_type="application/json", headers=headers)

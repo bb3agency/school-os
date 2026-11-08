@@ -11,6 +11,11 @@ table ``sos_app`` may SELECT) in any ``sos_app`` session, or opens a context-fre
 for other modules and dev tooling: a per-school override for any school the database knows,
 shared-tier schools without a ``platform.deployments`` row included, audited on the platform
 chain as ``flag.override_set`` / ``flag.override_removed`` (actor ``system``).
+
+Dedicated hosts (ADR-0058): the control plane sends a school's effective flags in the signed
+heartbeat answer (:func:`effective_flags_for`); the host writes them as that school's overrides
+in its local ``platform.feature_flags`` as ``sos_platform`` (:func:`apply_deployment_flags`),
+audited with ``source: heartbeat``. ``sos_app`` keeps read-only access.
 """
 
 from __future__ import annotations
@@ -257,3 +262,56 @@ def clear_school_override(
             tenant_id=tenant_id,
         )
         return True
+
+
+# --- dedicated hosts: flags from the signed heartbeat answer (ADR-0058; docs/16 §19 Q5) --------
+
+HEARTBEAT_SOURCE = "heartbeat"
+
+
+def effective_flags_for(s: Session, tenant_id: uuid.UUID) -> dict[str, bool]:
+    """Control plane: every flag the school is subject to (globals and its overrides), with
+    the value it evaluates to for that school (rollout applied). No tenant data."""
+    rows = repo.flags_of_school(s, tenant_id)
+    keys = sorted({str(r["key"]) for r in rows})
+    return {key: evaluate([r for r in rows if r["key"] == key], key, tenant_id) for key in keys}
+
+
+def apply_deployment_flags(
+    tenant_id: uuid.UUID, values: Mapping[str, bool], *, source: str = HEARTBEAT_SOURCE
+) -> int:
+    """Dedicated host: make ``values`` the school's overrides in the local
+    ``platform.feature_flags`` (one ``sos_platform`` transaction). A key already at its value
+    writes nothing; an override whose key the control plane no longer sends is removed (the
+    key then follows the local global row, if any, else it is off). Returns the number of
+    changed rows; each change is audited (``flag.override_set`` / ``flag.override_removed``,
+    actor ``system``, ``source``). Idempotent."""
+    changed = 0
+    with platform_session() as s, db_errors():
+        for key in sorted(values):
+            _valid_key(key)
+            _, did = _write_override(
+                s, SYSTEM, key, tenant_id, bool(values[key]), expected_version=None, source=source
+            )
+            changed += int(did)
+        stale = [
+            r
+            for r in repo.flags_of_school(s, tenant_id)
+            if r["tenant_id"] == tenant_id and r["key"] not in values
+        ]
+        for r in stale:
+            row = repo.flag_row(s, str(r["key"]), tenant_id)
+            if row is None:
+                continue
+            repo.delete_row(s, m.feature_flags, row["id"])
+            audit_platform(
+                s,
+                SYSTEM,
+                "flag.override_removed",
+                "feature_flag",
+                row["id"],
+                {"key": row["key"], "before": _snapshot(row), "source": source},
+                tenant_id=tenant_id,
+            )
+            changed += 1
+    return changed

@@ -8,7 +8,9 @@ Mounted in BOTH deployment modes (they are tenant routes guarded by ``require``)
   school's rows). The AI answer bundle of that subscription, its ex-GST prices and this month's
   answer count are platform rows read for the caller's own tenant and subscription
   (``service.school_ai_bundle``; no tenant table, no definer). On a dedicated host there is no
-  local billing data yet (M1: heartbeat).
+  local subscription: the page shows the billing summary of the last verified heartbeat answer
+  (``service.dedicated_billing_summary``, ADR-0058; ``summary_as_of`` says when it was
+  received; invoices are sent by email).
 - ``GET /api/v1/announcements`` (any member): active banners for this school and tier.
 - ``POST/GET /api/v1/support/tickets``, ``GET /support/tickets/{id}``,
   ``POST /support/tickets/{id}/messages`` (``support.ticket.create``): the school's own tickets;
@@ -89,8 +91,9 @@ class TenantInvoice(BaseModel):
 
 
 class TenantBillingOut(BaseModel):
-    """Plan & billing page (FR-PLT-030). ``available`` is false on dedicated hosts until the
-    heartbeat carries a billing summary (M1); invoices are then sent by email."""
+    """Plan & billing page (FR-PLT-030). On a dedicated host the plan comes from the signed
+    heartbeat answer (ADR-0058): ``summary_as_of`` is set, ``usage`` is empty and invoices are
+    sent by email; ``available`` is false until the first verified answer arrives."""
 
     model_config = ConfigDict(frozen=True)
     available: bool
@@ -109,6 +112,11 @@ class TenantBillingOut(BaseModel):
     usage: list[UsageAgainstLimit] = []
     amount_due_inr: Decimal = Decimal("0.00")
     ai_bundle: SchoolAiBundle | None = None
+    # The next invoice (billing in advance) and its estimate incl. GST (ADR-0058).
+    next_invoice_on: dt.date | None = None
+    next_invoice_amount_inr: Decimal | None = None
+    # Dedicated hosts only: when the control plane's summary was received.
+    summary_as_of: dt.datetime | None = None
 
 
 def _usage(limits: dict[str, Any], usage: dict[str, Any] | None) -> list[UsageAgainstLimit]:
@@ -135,8 +143,10 @@ def get_billing(ctx: BillingReader, db: TenantDB) -> TenantBillingOut:
     ``tenant.billing.read``). ``ai_bundle`` is ``null`` when the school has no bundle."""
     data = service.current_subscription(db)
     if data is None:
-        return TenantBillingOut(available=False)
+        return _dedicated_billing() or TenantBillingOut(available=False)
     invoices = _invoices(data)
+    subscription_id = uuid.UUID(str(data["subscription_id"]))
+    next_on, next_amount = service.school_next_invoice(ctx.tenant_id, subscription_id)
     return TenantBillingOut(
         available=True,
         plan_code=data["plan_code"],
@@ -153,8 +163,21 @@ def get_billing(ctx: BillingReader, db: TenantDB) -> TenantBillingOut:
         usage_date=(data.get("usage") or {}).get("usage_date"),
         usage=_usage(dict(data.get("limits") or {}), data.get("usage")),
         amount_due_inr=sum((i.amount_due_inr for i in invoices), Decimal("0.00")),
-        ai_bundle=service.school_ai_bundle(ctx.tenant_id, uuid.UUID(str(data["subscription_id"]))),
+        ai_bundle=service.school_ai_bundle(ctx.tenant_id, subscription_id),
+        next_invoice_on=next_on,
+        next_invoice_amount_inr=next_amount,
     )
+
+
+def _dedicated_billing() -> TenantBillingOut | None:
+    """Dedicated host: the billing summary of the last verified heartbeat answer, if any."""
+    if get_settings().deployment_mode.value != "dedicated":
+        return None
+    stored = service.dedicated_billing_summary()
+    summary = None if stored is None else stored[0]
+    if stored is None or summary is None:
+        return None
+    return TenantBillingOut(available=True, **summary.model_dump(), summary_as_of=stored[1])
 
 
 @router.get("/tenant/billing/invoices", response_model=Page[TenantInvoice])

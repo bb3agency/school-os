@@ -13,6 +13,12 @@ failure:
 6. ``deployment_id`` / ``tenant_id`` in the body match the registry -> else 401;
 7. nonce not seen in the last 10 minutes -> else 409 ``replay``;
 8. at most one accepted heartbeat per deployment per minute -> else 429.
+
+The answer is signed the same way with the key that verified the request (ADR-0058, W3-05):
+``X-SOS-Key-Id``, ``X-SOS-Timestamp`` and ``X-SOS-Signature = "v1=" + hex(HMAC-SHA256(key,
+timestamp + "." + raw_answer))``; the answer echoes the request's nonce (``request_nonce``). It
+carries the school's announcements, effective feature flags, AI answer allowance and billing
+summary (platform data only, never student data).
 """
 
 from __future__ import annotations
@@ -23,7 +29,7 @@ import hmac
 import json
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Annotated, Any
 
@@ -45,7 +51,7 @@ from app.core.errors import (
 )
 from app.core.logging import get_logger
 from app.identity.service_token import InMemoryReplayStore, RedisReplayStore, ReplayStore
-from app.platform import announcements, usage
+from app.platform import announcements, billing, flags, usage
 from app.platform import models as m
 from app.platform import repository as repo
 from app.platform.common import (
@@ -64,6 +70,7 @@ from app.platform.schemas import (
     DeploymentOut,
     DeploymentPatch,
     FleetVersionOut,
+    HbAiAllowance,
     HeartbeatIn,
     HeartbeatKeyOut,
     HeartbeatOut,
@@ -268,6 +275,9 @@ def get_fleet_key_wrapper() -> KeyWrapper:
 class VerifiedHeartbeat:
     deployment: Mapping[Any, Any]
     payload: HeartbeatIn
+    # The key that verified the request signs the answer (ADR-0058). Never logged or shown.
+    key_id: str = ""
+    key: bytes = field(default=b"", repr=False)
 
 
 def sign(key: bytes, timestamp: str, body: bytes) -> str:
@@ -361,7 +371,7 @@ def verify_heartbeat(
             "One heartbeat per minute per deployment.",
             retry_after_s=int(cfg["rate_limit_seconds"]),
         )
-    return VerifiedHeartbeat(dep, payload)
+    return VerifiedHeartbeat(dep, payload, key_id=key_id, key=key)
 
 
 class RequireFleetSignature:
@@ -485,12 +495,35 @@ def accept_heartbeat(verified: VerifiedHeartbeat, *, at: dt.datetime | None = No
         if record_usage and payload.usage is not None:
             usage.ingest_heartbeat(s, dep["tenant_id"], payload.usage)
         target = dep["target_version"]
+        # What the host applies locally (ADR-0058; docs/16 §19 Q5, Q7, Q19): platform rows of
+        # this one school only, never student data.
+        school_flags = flags.effective_flags_for(s, dep["tenant_id"])
+        allowance = HbAiAllowance(included_answers=billing.ai_allowance_for(s, dep["tenant_id"]))
+        summary = billing.billing_summary(s, dep["tenant_id"])
     return HeartbeatOut(
         received_at=current,
         target_version=target,
         min_supported_version=str(fleet_cfg()["min_supported_version"]),
         announcements=announcements.for_deployment(dep["tenant_id"], "dedicated", at=current),
+        request_nonce=payload.nonce,
+        feature_flags=school_flags,
+        ai_allowance=allowance,
+        billing=summary,
     )
+
+
+def signed_answer(
+    verified: VerifiedHeartbeat, answer: HeartbeatOut, *, now_s: float | None = None
+) -> tuple[bytes, dict[str, str]]:
+    """The answer's raw JSON and signature headers (ADR-0058): the request's key id, a fresh
+    timestamp and ``v1=`` HMAC-SHA256 over ``timestamp + "." + body``, as for the request."""
+    body = answer.model_dump_json().encode()
+    timestamp = str(int(now_s if now_s is not None else now().timestamp()))
+    return body, {
+        HEADER_KEY_ID: verified.key_id,
+        HEADER_TIMESTAMP: timestamp,
+        HEADER_SIGNATURE: sign(verified.key, timestamp, body),
+    }
 
 
 def check_staleness(*, at: dt.datetime | None = None) -> int:

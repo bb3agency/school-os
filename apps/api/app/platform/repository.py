@@ -614,6 +614,24 @@ def flag_row(session: Session, key: str, tenant_id: uuid.UUID | None) -> RowMapp
     return get_by(session, m.feature_flags, m.feature_flags.c.key == key, cond, for_update=True)
 
 
+def flags_of_school(session: Session, tenant_id: uuid.UUID) -> list[RowMapping]:
+    """Every global row and this school's overrides (key, tenant_id, enabled, rollout)."""
+    return list(
+        session.execute(
+            select(
+                m.feature_flags.c.key,
+                m.feature_flags.c.tenant_id,
+                m.feature_flags.c.enabled,
+                m.feature_flags.c.rollout_percent,
+            )
+            .where(
+                or_(m.feature_flags.c.tenant_id.is_(None), m.feature_flags.c.tenant_id == tenant_id)
+            )
+            .order_by(m.feature_flags.c.key)
+        ).mappings()
+    )
+
+
 def flags_for_evaluation(session: Session, key: str, tenant_id: uuid.UUID) -> list[RowMapping]:
     return list(
         session.execute(
