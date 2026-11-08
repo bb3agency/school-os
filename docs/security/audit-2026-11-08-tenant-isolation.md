@@ -1,4 +1,4 @@
-# Security audit 2026-11-08: database and tenant isolation
+# Security audit 2026-11-08: database and tenant isolation (TI-01..TI-05)
 
 Auditor for the database and tenant-isolation area (finding prefix TI-). Worktree branch from
 `987ded97`. Scope: RLS on every tenant table (ENABLE + FORCE, standard policy, restrictive delete
@@ -31,7 +31,12 @@ raw SQL, and the platform boundary (D78 board read, D79 heartbeat apply). Code a
 | TI-02 | **Low**: consistency / defence in depth (both bodies use qualified names; `pg_temp` is never searched for functions or operators) | Trigger functions | `0067_consents_breach.py:159`, `:172` | `sis.tg_consents_append_only()` and `sis.tg_consent_purposes_frozen()` were the only functions in the tenant and platform schemas without a pinned `search_path` (every other trigger, guard and definer function has `search_path = pg_catalog, pg_temp`). Nothing tested this for non-definer functions. | Fixed in `fb0d3b3d` (same migration) and pinned by `b0b42ff6`: `tests/security/test_rls_catalog.py::test_TI_02_SEC_001_every_plpgsql_or_sql_function_pins_search_path` (reviewed exceptions: `core.current_tenant()` and `core.current_user_id()`, one-line SQL functions that RLS inlines). |
 | TI-03 | **Low**: test gap, not exploitable today (the live catalog is clean) | RLS catalog test | `tests/security/test_rls_catalog.py` (`catalog_violations`) | The catalog test only checked that a policy **named** `tenant_isolation` exists. Permissive policies are OR-ed, so a future `CREATE POLICY x ON t FOR SELECT USING (true)`, or a `tenant_isolation` with a weakened expression, a narrower command or a role list, would have passed every security suite while opening the table to every school. | Fixed in `b0b42ff6`: `test_TI_03_SEC_001_permissive_policies_are_exactly_the_reviewed_ones` requires every permissive policy in the tenant schemas to be the exact standard `tenant_isolation` (FOR ALL, TO PUBLIC, `USING` and `WITH CHECK` = `tenant_id = core.current_tenant()`), the exact `definer_access`, or one of the five reviewed variants; `test_TI_03_policy_check_detects_a_widening_policy` is its self-test. Restrictive policies only narrow access and are not limited. |
 
-No schema change other than the two trigger functions; no API schema change.
+| TI-04 | **Low**: defence in depth for a legal register (PRV-036, D58); needs an application bug | Triggers / privacy (breach register) | `migrations/versions/0075_breach_retention.py` (`breach_records_delete_expired`), column grant on `closed_at` (0067) | The 3-year delete floor trusts `ops.breach_records.closed_at`, which `sos_app` may update. An UPDATE that back-dated `closed_at` (on a closed breach, or when closing) made a recent breach deletable by the next nightly purge. | Fixed in `d7bc875a` (migration `0080_audit_ti_fixes`, lead decision): `BEFORE UPDATE` trigger `breach_records_closed_at`, every role, SQLSTATE 23514: `closed_at` never changes while the breach stays closed (`breach_records_closed_at_fixed`); closing must stamp the time of closing, between transaction start minus 5 s and `clock_timestamp()` plus 5 s (`breach_records_closed_at_now`); only leaving `closed` (the D49 reopen path) clears it. The service now writes `func.now()` in the UPDATE (`breach_repository.closing_time`), so the incident drill's pinned application clock no longer stamps a past close (drill docstring updated). Test: `tests/privacy/test_breach_retention.py::test_TI_04_D58_closed_at_cannot_be_back_dated_into_the_purge`. |
+| TI-05 | **Low**: defence in depth; the service already refused it (ADR-0028, DL-09) | RLS (`core.users`) | `migrations/versions/0003_core_schema.py:382` (`users_in_tenant_update`) | The policy let a school update a person's `core.users` row through any membership row, including an open invitation (an invited person is not yet the school's member, DL-09) or a removal, even when the account belongs to another school too. | Fixed in `8fd74808` (migration `0080_audit_ti_fixes`; lead decision, ADR-0028 amendment of 2026-11-08): only through an `active` or `suspended` membership, or when this school's membership is the person's only one (`core.user_membership_count(id) = 1`; no new function). Paths checked: own and staff profile edits (active member), `record_login` (the school signed in to, active), the invite flows (definer functions; an existing account's invite never writes `core.users`, A-18), the offboarding clean-up `clear_sole_profiles` (sole memberships, any status). The TI-03 check now pins every reviewed variant's command and expression. Test: `tests/api/test_invitation_consent.py::test_TI_05_DL_09_an_open_invitation_does_not_let_the_school_edit_an_existing_account`. |
+
+Schema changes, all in `0080_audit_ti_fixes`: the two consent trigger functions, the new trigger
+`breach_records_closed_at` with its function, and the `users_in_tenant_update` policy. No API
+schema change.
 
 ## Verified clean
 
@@ -86,16 +91,10 @@ No schema change other than the two trigger functions; no API schema change.
   `sos_platform` in the host's `platform.feature_flags`, the AI allowance through
   `tenancy.set_ai_answer_allowance`, and the billing summary to Valkey (no tenant table).
 
-## Hardening notes (not fixed, no decision needed now)
+## Hardening notes
 
-1. `core.users` policy `users_in_tenant_update` lets a school update the profile of anyone with
-   a membership row there (any status, including `invited`). A person shared with another school
-   is protected by the service (`_guard_profile_not_shared`, ADR-0028) and contact details are
-   hidden until acceptance (DL-09), not by the database. A DB-level guard would have to keep
-   `last_login_at` writable from any school; propose with an ADR if wanted.
-2. `ops.breach_records` (0075): the 3-year delete floor trusts `closed_at`, which `sos_app` may
-   update. A trigger pinning `closed_at` to the closing time would make the floor hold even
-   against an application bug that back-dates it.
+The two hardening notes of the first version of this report were fixed on the lead's decision
+(owner: every finding fixed) as TI-04 and TI-05 above.
 
 ## Outside my area
 
@@ -108,5 +107,13 @@ None found.
 - `pytest tests/extraction/test_migration.py tests/tenancy/test_offboarding_purge.py
   tests/students -k "migration or purge or guardian"`: 43 passed (includes the full migration
   up/down walk with `0080_audit_ti_fixes` and the offboarding purge).
+- TI-04 and TI-05 tests failed before the migration change (no refusal; 1 row updated).
+- After TI-04/TI-05: breach suites, consents, `tests/identity`,
+  `tests/api/test_accept_invitation_suspended.py`, `tests/api/test_invitation_consent.py`,
+  `test_rls_catalog`, `test_definer_functions`, `tests/extraction/test_migration.py`: 403 passed;
+  `tests/privacy`: 196 passed; `tests/tenancy -k "offboard or purge or user"`: 18 passed;
+  `tests/tenancy/test_offboarding_purge.py`: 11 passed; `tests/platform -k "reopen or incident or
+  invit"`: 83 passed, 1 skipped, and the incident drill (failed on the first TI-04 version
+  because it pinned the breach clock a week back) passes after the service change.
 - `ruff check` and `ruff format --check` on touched files, `mypy apps/api apps/worker evals`
   (no issues, 1242 files), `lint-imports` (52 kept, 0 broken).
