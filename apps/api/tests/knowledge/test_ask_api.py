@@ -449,6 +449,8 @@ def test_FR_KB_004_record_question_reads_named_fields_through_scoped_tools(
         "get_student_facts",
         "get_value_history",
         "list_documents",
+        # D74: tasks due in a date range (task.read; own tasks for a class teacher).
+        "list_due_tasks",
         "list_findings",
         "search_documents",
         # ADR-0034: the caller's own earlier conversations (kb.ask).
