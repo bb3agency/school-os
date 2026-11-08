@@ -424,6 +424,8 @@ function PaymentForm({
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<unknown>(undefined);
   const [intentKey] = useState(newIdempotencyKey);
+  /** Synchronous guard: React state is too late for a second Enter in the same frame (WD-06). */
+  const busyRef = useRef(false);
 
   useEffect(() => {
     amountRef.current?.focus();
@@ -457,13 +459,14 @@ function PaymentForm({
   const save = useCallback(
     async (event?: FormEvent) => {
       event?.preventDefault();
-      if (saving) return;
+      if (busyRef.current) return;
       const found = check(form, collectable, custom, (k) => t(k as "errors.amount"));
       setErrors(found);
       if (Object.keys(found).length > 0) {
         setAttempt((n) => n + 1);
         return;
       }
+      busyRef.current = true;
       setSaving(true);
       setFailure(undefined);
       const mode_details =
@@ -508,10 +511,11 @@ function PaymentForm({
           setErrors({ utr: typeof detail === "string" ? detail : t("errors.utrInUse") });
         }
       } finally {
+        busyRef.current = false;
         setSaving(false);
       }
     },
-    [account, api, collectable, custom, form, intentKey, onSaved, queryClient, saving, t],
+    [account, api, collectable, custom, form, intentKey, onSaved, queryClient, t],
   );
 
   // Ctrl+Enter saves from anywhere on the form (docs/17 §5.8).

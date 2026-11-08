@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
@@ -97,6 +97,8 @@ function PlanEditor({
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const intent = useIntentKey();
+  /** Synchronous guard: React state is too late for a second Enter in the same frame (WD-06). */
+  const busyRef = useRef(false);
   const formId = useId();
   const fieldId = (part: string) => `${formId}-${part}`;
   const invalid = (part: string) => problems.some((p) => p.fieldId === fieldId(part));
@@ -161,6 +163,7 @@ function PlanEditor({
   }
 
   async function save() {
+    if (busyRef.current) return;
     setError(undefined);
     const lines = active
       .filter((h) => rowTotal(h.id) > 0)
@@ -171,6 +174,7 @@ function PlanEditor({
       setAttempt((n) => n + 1);
       return;
     }
+    busyRef.current = true;
     setSaving(true);
     // The same key when the same plan is saved again after a lost answer (WD-02).
     const key = intent.next({
@@ -215,6 +219,7 @@ function PlanEditor({
       intent.failed(failure);
       setError(failure);
     } finally {
+      busyRef.current = false;
       setSaving(false);
     }
   }

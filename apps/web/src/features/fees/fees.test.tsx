@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -748,6 +748,22 @@ describe("new fee plan: the late fee is checked before saving (WD-01, FR-FEE-009
       });
     },
   );
+
+  it("two synchronous submits save one plan (WD-06, FR-FEE-004)", { timeout: 20_000 }, async () => {
+    setupRoutes();
+    const user = userEvent.setup();
+    renderWithIntl(<SetupScreen />);
+    await fillPlan(user);
+    await user.selectOptions(screen.getByLabelText(en.setup.lateRule), "none");
+    const form = screen.getByRole("form", { name: en.setup.editorTitle });
+    act(() => {
+      fireEvent.submit(form);
+      fireEvent.submit(form);
+    });
+    await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/fees/plans")).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stub.callsTo("POST /bff/api/v1/fees/plans")).toHaveLength(1);
+  });
 });
 
 describe("decided requests show the checker's note (WF-03, FR-FEE-026)", () => {
@@ -809,5 +825,22 @@ describe("decided requests show the checker's note (WF-03, FR-FEE-026)", () => {
     renderWithIntl(<ReceiptDetailScreen receiptId={RECEIPT} />);
     expect(await screen.findByText("The amount matches the counterfoil")).toBeInTheDocument();
     expect(screen.getByText(noteFrom)).toBeInTheDocument();
+  });
+});
+
+describe("two Enter presses in one frame record one payment (WD-06, FR-FEE-010)", () => {
+  it("the counter sends one receipt for two synchronous submits", async () => {
+    signedIn([COLLECT]);
+    stub.routes["GET /bff/api/v1/fees/status"] = () => Response.json(STATUS);
+    stub.routes[`GET /bff/api/v1/fees/accounts/${ACCOUNT}`] = () => Response.json(account());
+    stub.routes["POST /bff/api/v1/fees/receipts"] = () => Response.json(receipt(), { status: 201 });
+    renderWithIntl(<CounterScreen initialAccountId={ACCOUNT} />);
+    const form = await screen.findByRole("form", { name: en.counter.paymentTitle });
+    act(() => {
+      fireEvent.submit(form);
+      fireEvent.submit(form);
+    });
+    expect(await screen.findByText("RCT/2026-27/000123")).toBeInTheDocument();
+    expect(stub.callsTo("POST /bff/api/v1/fees/receipts")).toHaveLength(1);
   });
 });
