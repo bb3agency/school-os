@@ -56,6 +56,9 @@ def wired() -> Any:
 
 def kb(monkeypatch: pytest.MonkeyPatch, *, enabled: bool) -> None:
     monkeypatch.setattr(hooks, "get_settings", lambda: SimpleNamespace(kb_enabled=enabled))
+    # The in-transaction ACL rewrite (YK-01) needs a database; covered by
+    # test_index_lifecycle_db.py::test_SEC_018_YK_01_*.
+    monkeypatch.setattr(hooks, "apply_acl_now", lambda s, d: 0)
 
 
 def test_FR_OPS_004_hooks_and_routes_are_installed_once() -> None:
