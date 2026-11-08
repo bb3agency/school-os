@@ -105,7 +105,8 @@ def test_BL_06_FR_PAY_003_test_keys_refused_in_production(school: Any) -> None:
     ``test_keys_in_prod`` on ``key_id``: it takes no real money, yet receipts would be issued.
     A live key connects; staging and local keep test keys (the other tests here)."""
     from app.core.config import Environment
-    from app.fees.providers import FakePaymentProvider, set_provider
+    from app.fees.providers import set_provider
+    from app.fees.providers.fake import FakePaymentProvider
 
     P.disconnect_if_connected(school)
     payments_runtime.patch_for_tests({**PILOT, "env": Environment.PROD})
