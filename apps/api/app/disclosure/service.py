@@ -599,7 +599,8 @@ def get_link(session: Session, ctx: UserContext) -> LinkOut:
 
 def rotate_link(session: Session, ctx: UserContext) -> LinkOut:
     """ "Change the link" (``disclosure.publish``, step-up; FR-DISC-008): the old link answers
-    the uniform 404 at once. 409 ``not_published`` before the first publish. Audited
+    the uniform 404 at once, and the live page's HTML file and PDF are made again with the new
+    link (YP-04). 409 ``not_published`` before the first publish. Audited
     ``disclosure.link_rotated``."""
     _require_cbse(session)
     draft = repo.get_draft(session, lock=True)
@@ -611,6 +612,10 @@ def rotate_link(session: Session, ctx: UserContext) -> LinkOut:
         session, draft.id, {"link_handle_id": None, "link_key": None, "link_created_at": None}
     )
     draft = _issue_link(session, ctx, draft)
+    live = _live(session, lock=True)
+    if live is not None and (live.pdf_status != "queued" or live.html_status != "queued"):
+        # The files carry the document links of the old link: make them again (YP-04).
+        _requeue_files(session, live.id)
     _audit(
         session,
         "disclosure.link_rotated",
@@ -624,6 +629,23 @@ def rotate_link(session: Session, ctx: UserContext) -> LinkOut:
 
 
 # --- files (HTML for the school's website, A4 PDF; FR-DISC-011) --------------------------------
+
+
+def _requeue_files(session: Session, snapshot_id: uuid.UUID) -> None:
+    """Drop the snapshot's files and ask the worker to make them again (content unchanged)."""
+    repo.update_snapshot(
+        session,
+        snapshot_id,
+        {
+            "pdf_status": "queued",
+            "html_status": "queued",
+            "pdf_key": None,
+            "html_key": None,
+            "files_rendered_at": None,
+            "files_error": None,
+        },
+    )
+    ops.enqueue_event(session, RENDER_EVENT, {"snapshot_id": str(snapshot_id)})
 
 
 def _files_available(row: DisclosureSnapshot, now: dt.datetime) -> bool:
@@ -644,19 +666,7 @@ def download_url(
     status = row.pdf_status if file_format == "pdf" else row.html_status
     now = _now(session)
     if status == "ready" and key is not None and not _files_available(row, now):
-        repo.update_snapshot(
-            session,
-            row.id,
-            {
-                "pdf_status": "queued",
-                "html_status": "queued",
-                "pdf_key": None,
-                "html_key": None,
-                "files_rendered_at": None,
-                "files_error": None,
-            },
-        )
-        ops.enqueue_event(session, RENDER_EVENT, {"snapshot_id": str(row.id)})
+        _requeue_files(session, row.id)
         status, key = "queued", None
     if status == "failed":
         raise Conflict("The files could not be made. Try again later.", code="files_failed")
