@@ -192,7 +192,8 @@ class StudentDuesOut(_Out):
         "(a family ledger shared by siblings; D54)."
     )
     shared_with: int = Field(
-        description="How many other students share one of this student's ledgers (0 if none)."
+        description="How many other students the caller can see share one of this student's "
+        "ledgers (0 if none; siblings outside the caller's student scope are not counted)."
     )
     bills: list[DueBillOut] = Field(
         default_factory=list,
