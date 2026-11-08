@@ -15,9 +15,10 @@ import { Value } from "@/components/ui/Value";
 import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { Pager, useCursorStack } from "@/features/students/paging";
 import { Link, useRouter } from "@/i18n/navigation";
-import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
+import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
+import { useIntentKey } from "@/lib/forms";
 import type { Loadable } from "@/lib/loadable";
 import { KEYS, NOTICE_DRAFT, looksPersonal, useNotices, type Notice } from "./data";
 import { NoticeStatusPill } from "./parts";
@@ -31,6 +32,7 @@ function NewNoticeCard() {
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
+  const intent = useIntentKey();
   const personal = looksPersonal(text);
 
   async function start(source: "staff_text" | "blank", event?: FormEvent<HTMLFormElement>) {
@@ -38,16 +40,20 @@ function NewNoticeCard() {
     if (source === "staff_text" && (!text.trim() || personal)) return;
     setPending(true);
     setError(undefined);
+    const body = source === "blank" ? { source } : { source, text: text.trim() };
     try {
       const notice = await unwrap(
         api.POST("/api/v1/notices", {
-          headers: { "Idempotency-Key": newIdempotencyKey() },
-          body: source === "blank" ? { source } : { source, text: text.trim() },
+          // A retry after a lost answer reuses the key: one notice, one AI draft (WD-02).
+          headers: { "Idempotency-Key": intent.next(body) },
+          body,
         }),
       );
+      intent.succeeded();
       await queryClient.invalidateQueries({ queryKey: KEYS.notices });
       router.push(`/notices/${notice.id}`);
     } catch (failure) {
+      intent.failed(failure);
       setError(failure);
     } finally {
       setPending(false);

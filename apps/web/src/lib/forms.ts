@@ -2,7 +2,7 @@
 
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useCallback, useRef, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useRef, useState, type FormEvent } from "react";
 import type * as z from "@/lib/zod";
 import { apiFieldErrors } from "@/lib/api-errors";
 import { ApiError, newIdempotencyKey } from "@/lib/bff/query";
@@ -61,6 +61,49 @@ function bodySignature(data: unknown): string {
     // Not serialisable: treat every attempt as new (a fresh key is always safe).
     return newIdempotencyKey();
   }
+}
+
+export interface IntentKey {
+  /** The key to send `body` with: the same key while the same values are tried again. */
+  next: (body: unknown) => string;
+  /** The request succeeded: the next submit is a new intent. */
+  succeeded: () => void;
+  /** The request failed: a 4xx means the API kept nothing, so the next try starts afresh. */
+  failed: (error: unknown) => void;
+}
+
+/**
+ * One Idempotency-Key per user intent for screens that call the API without `useApiForm`
+ * (docs/09 §2; WD-02): a retry of the same values after a network error or 5xx (the answer
+ * may have been lost after the API saved) reuses the key, so the API replays instead of
+ * creating a second record; success, a 4xx or changed values start a new key.
+ */
+export function useIntentKey(): IntentKey {
+  const keyRef = useRef<string>("");
+  const sentRef = useRef<string | null>(null);
+  return useMemo(
+    () => ({
+      next: (body: unknown) => {
+        const signature = bodySignature(body);
+        if (!keyRef.current || (sentRef.current !== null && sentRef.current !== signature)) {
+          keyRef.current = newIdempotencyKey();
+        }
+        sentRef.current = signature;
+        return keyRef.current;
+      },
+      succeeded: () => {
+        keyRef.current = "";
+        sentRef.current = null;
+      },
+      failed: (error: unknown) => {
+        if (error instanceof ApiError && error.status < 500) {
+          keyRef.current = "";
+          sentRef.current = null;
+        }
+      },
+    }),
+    [],
+  );
 }
 
 export interface ApiFormOptions<TSchema extends z.ZodType, TResult> {

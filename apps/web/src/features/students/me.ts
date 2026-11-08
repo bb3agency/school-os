@@ -1,23 +1,19 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { unwrap, useBffClient } from "@/lib/bff/query";
+import { useStaffMeQuery } from "@/lib/bff/staff-me";
 import type { StaffMe } from "./types";
 
 /** Query key of GET /me (shared by every school screen that hides actions). */
-export const STAFF_ME_KEY = ["staff", "me"] as const;
+export { STAFF_ME_KEY } from "@/lib/bff/staff-me";
 
-/** The signed-in staff member in the active school: roles and effective permissions. */
+/**
+ * The signed-in staff member in the active school: roles and effective permissions. The one
+ * shared query, so the school's date format is applied whichever screen reads /me first
+ * (FR-TEN-012; WD-05: a second query function on the same key skipped it).
+ */
 export function useStaffMe(): StaffMe | undefined {
-  const api = useBffClient("staff");
-  const query = useQuery({
-    queryKey: STAFF_ME_KEY,
-    queryFn: () => unwrap(api.GET("/api/v1/me")),
-    staleTime: 60_000,
-    retry: false,
-  });
-  return query.data;
+  return useStaffMeQuery().data;
 }
 
 export interface Permissions {

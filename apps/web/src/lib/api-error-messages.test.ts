@@ -68,6 +68,19 @@ describe("field messages for backend codes (NFR-I18N-001)", () => {
 });
 
 describe("problem messages (FR-PLT-012, FR-DISC-005)", () => {
+  it("a 422 idempotency_key_reused says the first try may be saved, not 'check the highlighted fields' (WD-04, docs/09 §2)", () => {
+    const error = new ApiError(422, "idempotency_key_reused", { status: 422 });
+    expect(describeApiError(error)).toMatchObject({ key: "idempotency_key_reused" });
+    for (const locale of ["en", "te"] as const) {
+      const api = messages[locale].errors.api as unknown as Record<
+        string,
+        { title?: string; body?: string }
+      >;
+      expect(api.idempotency_key_reused?.title, locale).toBeTruthy();
+      expect(api.idempotency_key_reused?.body, locale).toBeTruthy();
+    }
+  });
+
   it("a 409 invoice_number_length has its own message, not the generic conflict", () => {
     const error = new ApiError(409, "invoice_number_length", { status: 409 });
     expect(describeApiError(error)).toMatchObject({ key: "invoice_number_length" });

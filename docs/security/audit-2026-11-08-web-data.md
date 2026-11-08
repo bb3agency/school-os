@@ -1,0 +1,43 @@
+# Audit 2026-11-08: web data flow, forms and API usage
+
+Web data-flow auditor of the 2026-11-08 frontend round, in a worktree from `main` at `813c3996`. Scope:
+the school console in `apps/web` and its BFF client: TanStack Query keys and cache lifetime,
+invalidation after mutations, optimistic updates, `If-Match` and `Idempotency-Key` usage, zod and
+generated API types, API error codes and their messages, double-submit guards, paging, money and
+dates, and file uploads. Priority: fees, students, certificates, imports, privacy, messaging.
+
+Each fixed finding has a test that fails before the fix.
+
+## Findings
+
+| ID | Severity | File | Description | Status |
+|---|---|---|---|---|
+| WD-01 | Medium | `apps/web/src/features/fees/SetupScreen.tsx` (plan editor `check()`, late-fee fields) | A new fee plan's late fee was not checked. A blank or non-numeric amount, grace days over 90 or a per-day cap below the amount reached the API. Its 422 named fields this screen does not map, so the clerk saw "Check the highlighted fields" with nothing highlighted. Amounts typed with Indian grouping (`1,250`) were sent as typed and refused. FR-FEE-009. | Fixed in `8a59e187`. The editor checks the fields as the API does, links each error to its field in the ErrorSummary and sends exact decimal strings. Test: `fees.test.tsx` "new fee plan: the late fee is checked before saving (WD-01, FR-FEE-009)" (2 tests). |
+| WD-02 | Medium | `features/circulars/TasksScreen.tsx` (new task), `features/circulars/NoticesScreen.tsx` (new notice), `features/fees/SetupScreen.tsx` (new plan) | These create POSTs sent a new `Idempotency-Key` on every click. If an answer was lost (502 or a time-out after the API had saved), the retry created a second task or a second notice with a second AI draft. This breaks docs/09 §2 (one key per user intent). WEB-02 fixed this in `useApiForm` only; these screens do not use it. | Fixed in `44326b07`. New `useIntentKey()` in `lib/forms.ts` follows the same rules as `useApiForm`: the key is reused when the same values are retried after a network error or 5xx, and replaced after success, after a 4xx or when the values change. Tests: `circulars.test.tsx` "a retry after a lost answer reuses the Idempotency-Key … (WD-02, FR-TASK-003)"; `lib/forms.test.tsx` "useIntentKey (WD-02 …)". |
+| WD-03 | Low | `apps/web/messages/*.json` `errors.field` | When Razorpay refuses the keys, `POST /payments/connection/manual` returns 422 `keys_rejected` on `key_secret`. The web had no message for this code, so the "Connect with keys" dialog showed only "Check this value." FR-PAY-003. | Fixed in `5dd73007` (en and te message). Test: `fees.test.tsx` "fee problems the API returns have plain-language messages" (now includes `keys_rejected`). |
+| WD-04 | Low | `apps/web/src/lib/api-errors.ts` | The API returns 422 `idempotency_key_reused` when a key is sent again with different values. This typically happens at the fee counter, which keeps one key per payment form, after a lost answer and a changed amount. The web showed it as the generic validation error ("Check the highlighted fields") with no field highlighted. That hides the fact that the first payment may already be recorded. | Fixed in `c53b4da5`. The code is now known, and the message says the first try may already be saved and asks the user to reload before trying again (en and te). Test: `lib/api-error-messages.test.ts` "a 422 idempotency_key_reused … (WD-04 …)". |
+| WD-05 | Low-Medium | `apps/web/src/features/students/me.ts` | The student, import and extraction screens had a second `GET /me` query with its own query function on the shared `["staff","me"]` key, and that function skipped `setSchoolDateFormat`. React subscribes child components before the shell, so on a direct load or reload of those screens this query function filled the cache. The school's date format (`DD-MM-YYYY` or `YYYY-MM-DD`) was then never applied, and dates showed as `DD/MM/YYYY`. FR-TEN-012. | Fixed in `6d7ff82d`. The hook now uses the single shared `useStaffMeQuery()`. Test: `features/students/me.test.tsx` (WD-05, FR-TEN-012). |
+| WD-06 | Info | `features/fees/CounterScreen.tsx` `save()`, `features/fees/SetupScreen.tsx` `save()` | Double-submit guards use React state (`saving`), not a ref. Two Enter presses in the same frame can send two requests. At the counter both requests carry the same key, so the API replays or returns 409 `idempotency_in_progress`; plans are now covered by WD-02. No duplicate record is created. | Reported (no fix needed). |
+| WD-07 | Low | `features/admin/DataExportScreen.tsx:208`, `features/exports/PdfJobButton.tsx:133`, `features/imports/ImportDetail.tsx:237` (validate), `features/imports/upload.ts` (upload and register) | Each attempt gets a new `Idempotency-Key`, so these jobs are the same kind of case as WD-02. The impact is lower: a duplicate tenant export is refused with 409 `tenant_export_in_progress`, and a duplicate PDF, validation run or orphaned upload only wastes work. | Reported. `useIntentKey()` can be applied in the same way. |
+
+## Verified clean
+
+- **If-Match.** I listed every tenant route that requires `If-Match` from the API source (the `IfMatch` dependency; `apps/api/openapi.json` does not declare tenant `If-Match` headers) and matched each route to its web call. Every call sends `If-Match` from the version it read. That includes certificates, change requests, circulars, tasks, notices, documents, fees, imports, insights, knowledge, messaging, privacy requests, breaches, consent purposes, students, guardians, enrolments, tally and academic structure. The new `If-Match` on `PUT /privacy/breaches/{id}/affected` (AZ-01) has no web caller: the picker saves counts through `PATCH /privacy/breaches/{id}`, which already sends `If-Match`. `POST /documents/{id}/archive|unarchive` and `PATCH /fees/heads|plans/{id}` are not called by the web.
+- **Idempotency-Key presence.** All 64 tenant routes that take `IdempotencyDep` are sent a key by every web caller.
+- **API keeps no key after a failure.** `authz/http.py` releases the key on a failed request, so the counter's single key per payment form is safe after a 4xx: the clerk can fix the UTR or amount and retry.
+- **New error codes.** `concession_exceeds_due`, `test_keys_in_prod` (field messages), `range_too_long` (operator usage screen) and `if_match_required` (feature namespaces) all have messages.
+- **Problem codes in fees, students, certificates, imports, privacy, messaging, payments, changes, apaar and consents.** Every `code=` these modules raise has a message, except the confirm-skipped codes (`not_in_statement`, `not_proposed`), which the reconcile screen only counts, and internal codes that never reach a screen.
+- **Money.** Fee screens add and compare amounts as integer paise (`toPaise` and `fromPaise`, 12-digit ceiling, sign handled) and send exact decimal strings. The counter's allocation sum is checked in paise.
+- **Dates.** "Today" is computed in IST (`todayIst`, `todayInIndia`). API range ends are the next IST midnight (audit filters, operator usage). Typed dates accept both day-first and year-first orders without guessing. Native date inputs send ISO.
+- **Query cache across sessions.** Sign-out, school switch and the end of a support session all do a full page load (`window.location.assign`), so the QueryClient is discarded. Staff keys start with `"staff"` and operator keys with `"operator"`, so keys never collide across consoles.
+- **Optimistic updates.** Only Ask conversations and memory use them, and both roll back in `onError`.
+- **Uploads.** Size and type are checked before upload. A presigned POST goes straight to storage with XHR progress. Scan polling has a time-out. Import creation waits through `document_not_ready` with one key.
+- **Paging.** Fee receipts and payment reconciliation put filters and the cursor in the query key. The earlier WEB-03..05 fixes still hold.
+
+## Outside my area (seen, not changed)
+
+- `features/fees/SetupScreen.tsx` and `ReportsScreens.tsx` cache the school's classes under `["staff","fees","classes"]`. A class added in academic structure appears in the fee pickers only after the 30 s stale time or a reload (`ALL_STRUCTURE_KEYS` does not include this key). This is minor and has no data risk.
+
+## Checks run
+
+From `apps/web`: `npx tsc --noEmit -p .` clean; `npx eslint . --quiet` clean on the touched features; `npx prettier --check` on the touched files clean; `npx vitest run` on fees, circulars, students, imports, extraction, `src/lib` and `src/i18n` green. Full `npx vitest run` at the end: 153 files, 2326 passed, 3 skipped (the Valkey-backed session tests). No e2e spec asserts the changed text or selectors (checked with grep on `apps/web/e2e`).

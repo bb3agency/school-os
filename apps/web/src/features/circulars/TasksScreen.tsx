@@ -30,11 +30,11 @@ import {
 import { Value } from "@/components/ui/Value";
 import { Pager, useCursorStack } from "@/features/students/paging";
 import { Link } from "@/i18n/navigation";
-import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
+import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { useDateInput } from "@/lib/date-format";
 import { formatDate } from "@/lib/format";
-import { zodErrorKeys } from "@/lib/forms";
+import { useIntentKey, zodErrorKeys } from "@/lib/forms";
 import { translateOr } from "@/lib/i18n-dynamic";
 import {
   KEYS,
@@ -198,6 +198,7 @@ function NewTaskCard() {
   const [error, setError] = useState<unknown>(undefined);
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
+  const intent = useIntentKey();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -215,16 +216,20 @@ function NewTaskCard() {
     setPending(true);
     try {
       const { details, ...rest } = parsed.data;
+      const body = { ...rest, ...(details ? { details } : {}) };
       await unwrap(
         api.POST("/api/v1/tasks", {
-          headers: { "Idempotency-Key": newIdempotencyKey() },
-          body: { ...rest, ...(details ? { details } : {}) },
+          // The same key when the same task is tried again after a lost answer (WD-02).
+          headers: { "Idempotency-Key": intent.next(body) },
+          body,
         }),
       );
+      intent.succeeded();
       form.reset();
       setSaved(true);
       await queryClient.invalidateQueries({ queryKey: KEYS.tasks });
     } catch (failure) {
+      intent.failed(failure);
       setError(failure);
     } finally {
       setPending(false);
