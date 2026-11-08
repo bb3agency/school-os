@@ -286,3 +286,22 @@ def test_ADR_0050_incident_records_never_reach_tenant_data() -> None:
     from app.platform import service
 
     assert {"incident_notices_for_school", "record_incident_notice_pulled"} <= set(service.__all__)
+
+
+def test_ADR_0058_dedicated_host_applies_the_answer_only_through_pinned_paths() -> None:
+    """The host side of the signed heartbeat answer (ADR-0058): ``heartbeat_apply`` reaches the
+    tenant side only through ``tenancy.set_ai_answer_allowance`` (ADR-0020 B3) and writes flags
+    through ``platform.flags`` (``sos_platform``); the client imports no tenant module. Neither
+    opens a tenant session nor names a tenant relation."""
+    for name, tenancy_calls in (
+        ("heartbeat_apply.py", {"set_ai_answer_allowance"}),
+        ("heartbeat_client.py", set()),
+    ):
+        found = _scan([(name, (PLATFORM_DIR / name).read_text("utf-8"))])
+        tenant_side = {
+            m for m in found.imports if not m.startswith(FREE_PREFIXES) and m != TENANCY_SERVICE
+        }
+        assert tenant_side == set(), name
+        assert found.tenancy_attrs == tenancy_calls, name
+        assert found.tenant_session_files == set(), name
+        assert found.sql_relations == set(), name
