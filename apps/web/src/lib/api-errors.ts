@@ -75,6 +75,9 @@ export const KNOWN_API_CODES = [
   "invoice_number_length",
   // A database CHECK refusal the input checks missed (D55; 422, docs/09 §3).
   "invalid_value",
+  // The same Idempotency-Key with other values after a lost answer: the first may be saved
+  // (docs/09 §2; WD-04). Not a field problem, so not the generic 422.
+  "idempotency_key_reused",
 ] as const;
 export type KnownApiCode = (typeof KNOWN_API_CODES)[number];
 

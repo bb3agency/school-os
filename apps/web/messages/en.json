@@ -2415,6 +2415,10 @@
       "invalid_value": {
         "title": "One of the values isn't allowed",
         "body": "One of the values isn't allowed. Check the form and try again."
+      },
+      "idempotency_key_reused": {
+        "title": "This may already be saved",
+        "body": "Your first try may have reached the server before the connection dropped. Reload the page to check what was saved before you try again."
       }
     },
     "stepUp": {
