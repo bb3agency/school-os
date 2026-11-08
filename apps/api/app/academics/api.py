@@ -80,7 +80,9 @@ def record_attendance(
 ) -> WriteResultOut:
     """Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a
     day again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range`` or
-    ``duplicate_entry`` per entry. The early-warning rules look at these students again."""
+    ``duplicate_entry`` per entry. An entry may carry ``expected_version`` (the ``version`` read
+    from the day): 412 ``attendance_changed`` when someone else changed that mark since, and
+    nothing is saved. The early-warning rules look at these students again."""
     return service.record_attendance(db, ctx, section_id, body)
 
 

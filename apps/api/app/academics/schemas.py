@@ -56,6 +56,11 @@ class RecordSectionOut(_Out):
 class AttendanceDayStudent(_Out):
     student: RosterStudentOut
     status: AttendanceStatus | None = Field(description="None: not marked that day")
+    version: int = Field(
+        default=0,
+        description="The mark's version (0: not marked that day). Send it back as "
+        "``expected_version`` so a save does not overwrite someone else's change.",
+    )
 
 
 class AttendanceDayOut(_Out):
@@ -85,6 +90,14 @@ class AttendanceEntryIn(_In):
     student_id: uuid.UUID
     on_date: dt.date
     status: AttendanceStatus
+    expected_version: int | None = Field(
+        default=None,
+        ge=0,
+        le=2_147_483_647,
+        description="The ``version`` read for this student and date (0: not marked then). When "
+        "sent, the save is refused (412 ``attendance_changed``) if someone else changed the mark "
+        "since; leave it out to overwrite (sheet imports).",
+    )
 
 
 class AttendanceWrite(_In):

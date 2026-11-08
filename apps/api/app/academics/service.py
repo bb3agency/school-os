@@ -70,7 +70,7 @@ from app.authz.context import UserContext
 from app.authz.scope import ensure_section_visible
 from app.core import purge as purging
 from app.core.db import tenant_session
-from app.core.errors import Conflict, NotFound, ValidationFailed
+from app.core.errors import Conflict, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
 from app.core.logging import get_context, get_logger
 from app.core.records import RecordTable
@@ -250,13 +250,19 @@ def attendance_day(
     roster = _roster(session, ctx, sec.section, ATTENDANCE_READ)
     rows = repo.section_marks(session, sec.section.id, on_date, on_date)
     by_student = {r.student_id: r.status for r in rows}
+    versions = {r.student_id: r.version for r in rows}
     shown = {s.student_id for s in roster}
     return AttendanceDayOut(
         section=sec.out,
         on_date=on_date,
         marked=bool(rows),
         students=[
-            AttendanceDayStudent(student=s, status=by_student.get(s.student_id)) for s in roster
+            AttendanceDayStudent(
+                student=s,
+                status=by_student.get(s.student_id),
+                version=versions.get(s.student_id, 0),
+            )
+            for s in roster
         ],
         counts=_counts(v for k, v in by_student.items() if k in shown),
     )
@@ -308,7 +314,8 @@ def record_attendance(
     """Store a section's statuses for one or more dates, all or nothing (``attendance.record``;
     FR-ATT-002). 422 when a student is not in the section's roster, a date is in the future or
     outside the section's academic year, or an entry repeats; and, for a scoped recorder, when
-    the day is already recorded under another section (``recorded_in_another_section``).
+    the day is already recorded under another section (``recorded_in_another_section``); 412
+    ``attendance_changed`` when an entry's ``expected_version`` is stale (XA-06).
     Audit ``attendance.recorded``."""
     cfg = load_config().attendance
     sec = _section(session, ctx, section_id, ATTENDANCE_RECORD)
@@ -336,6 +343,7 @@ def record_attendance(
             if (entry.student_id, entry.on_date) in elsewhere:
                 errors.append(_error(f"entries.{i}.on_date", OTHER_SECTION_CODE))
         _refuse(errors)
+    _check_expected_versions(session, data)
     inserted, updated = repo.upsert_attendance(
         session,
         [
@@ -372,6 +380,29 @@ def record_attendance(
         _queue_rules(session, {e.student_id for e in data.entries}, "attendance")
     log.info("academics.attendance_recorded", resource_id=sec.section.id, count=written)
     return WriteResultOut(written=written, unchanged=len(data.entries) - written, dates=dates)
+
+
+def _check_expected_versions(session: Session, data: AttendanceWrite) -> None:
+    """Optimistic concurrency per mark (XA-06): with the school's attendance of those dates
+    locked, every entry that carries ``expected_version`` must still find that version (0: not
+    marked). Otherwise 412 ``attendance_changed`` and nothing is saved, so two people marking
+    the same section and day cannot silently overwrite each other's change."""
+    repo.lock_attendance_days(session, {e.on_date for e in data.entries})
+    checked = [e for e in data.entries if e.expected_version is not None]
+    if not checked:
+        return
+    stored = repo.attendance_versions(
+        session, {e.student_id for e in checked}, {e.on_date for e in checked}
+    )
+    stale = sum(
+        1 for e in checked if stored.get((e.student_id, e.on_date), 0) != e.expected_version
+    )
+    if stale:
+        raise PreconditionFailed(
+            f"Someone else changed the attendance of {stale} student(s) since you opened it. "
+            "Reload to see their changes, then save again.",
+            code="attendance_changed",
+        )
 
 
 # --- sheets ---------------------------------------------------------------------------------------
