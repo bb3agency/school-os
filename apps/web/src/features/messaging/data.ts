@@ -154,10 +154,16 @@ export const settingsSchema = z
     absence_alert_time: z.string().regex(/^[0-2][0-9]:[0-5][0-9](:[0-5][0-9])?$/),
     quiet_start: z.string().regex(/^[0-2][0-9]:[0-5][0-9](:[0-5][0-9])?$/),
     quiet_end: z.string().regex(/^[0-2][0-9]:[0-5][0-9](:[0-5][0-9])?$/),
+    // XF-03: the API takes 1 to 1,000,000 (empty = the default from Meta's limit, D25).
     daily_cap: z
       .string()
       .trim()
-      .regex(/^[0-9]{0,7}$/, { error: "invalidNumber" }),
+      .refine(
+        (value) =>
+          value === "" ||
+          (/^[0-9]{1,7}$/.test(value) && Number(value) >= 1 && Number(value) <= 1_000_000),
+        { error: "dailyCapRange" },
+      ),
     office_phone: z
       .string()
       .trim()
