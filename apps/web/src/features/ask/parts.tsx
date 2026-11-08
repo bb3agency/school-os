@@ -15,7 +15,7 @@ import {
   splitMarkers,
   type SourceRef,
 } from "./answer";
-import { ResolveSourceLink } from "./ResolveSource";
+import { CitedPageButton, ResolveSourceLink } from "./ResolveSource";
 import { ASK_PERM } from "./data";
 
 export type AskTab = "ask" | "search" | "verified";
@@ -175,7 +175,12 @@ export function SourceChip({
               <span className="font-semibold text-ink">{name}</span>
             )}
             {ref?.kind === "doc" && ref.page !== null ? (
-              <Pill variant="tag">{t("page", { page: ref.page })}</Pill>
+              <CitedPageButton
+                documentId={ref.id}
+                version={ref.version}
+                page={ref.page}
+                name={name}
+              />
             ) : null}
             {ref?.kind === "count" ? <Pill variant="tag">{t("countNote")}</Pill> : null}
             {ref?.kind === "fee" ? <Pill variant="tag">{tt("sourceNote")}</Pill> : null}

@@ -2,9 +2,118 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import * as z from "@/lib/zod";
 import { useRouter } from "@/i18n/navigation";
 import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { isSafeAppPath } from "./answer";
+
+/**
+ * `GET /documents/{id}/pages/{n}` (D73). Local schema until the generated client carries the
+ * route (the lead regenerates apps/api/openapi.json and packages/api-client).
+ */
+export const pageLinkSchema = z.object({
+  url: z.string().min(1),
+  page: z.number().int().min(1),
+  expires_at: z.string(),
+  content_type: z.string(),
+  version_no: z.number().int().min(1),
+});
+export type PageLink = z.infer<typeof pageLinkSchema>;
+
+type PagePath = "/api/v1/documents/{document_id}/pages/{n}";
+type PageClient = {
+  GET: (
+    path: PagePath,
+    init: {
+      params: { path: { document_id: string; n: number }; query?: { version?: number } };
+    },
+  ) => Promise<{ data?: unknown; error?: unknown; response: Response }>;
+};
+
+/**
+ * Where the browser opens a cited page: the presigned link (http/https only) with
+ * `#page=n` for a PDF (the browser's viewer jumps to it); null for anything else.
+ */
+export function citedPageUrl(link: PageLink, page: number): string | null {
+  let url: URL;
+  try {
+    url = new URL(link.url);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+  url.hash = link.content_type === "application/pdf" ? `page=${page}` : "";
+  return url.toString();
+}
+
+/** Tests replace the opener (jsdom has no new tabs). */
+type Opener = (url: string) => void;
+let openerOverride: Opener | undefined;
+export function setPageOpenerForTesting(opener: Opener | undefined): void {
+  openerOverride = opener;
+}
+function openInNewTab(url: string): void {
+  if (openerOverride) {
+    openerOverride(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+/**
+ * The cited page of a document source (D73): the "page n" chip is a button that asks the API
+ * for a short-lived link to the cited version (same checks as a download) and opens it in a
+ * new tab at that page. Any error (no longer visible, not scanned yet, a file the browser
+ * cannot show) falls back to what the source title does: open the document's own screen.
+ */
+export function CitedPageButton({
+  documentId,
+  version,
+  page,
+  name,
+}: {
+  documentId: string;
+  version: number;
+  page: number;
+  name: string;
+}) {
+  const t = useTranslations("ask.answer");
+  const api = useBffClient("staff") as unknown as PageClient;
+  const router = useRouter();
+  const [opening, setOpening] = useState(false);
+
+  const open = async () => {
+    setOpening(true);
+    try {
+      const link = pageLinkSchema.parse(
+        await unwrap(
+          api.GET("/api/v1/documents/{document_id}/pages/{n}", {
+            params: { path: { document_id: documentId, n: page }, query: { version } },
+          }),
+        ),
+      );
+      const target = citedPageUrl(link, page);
+      if (!target) throw new Error("unsafe page link");
+      openInNewTab(target);
+    } catch {
+      router.push(`/documents/${documentId}`);
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => void open()}
+      disabled={opening}
+      aria-label={t("openPage", { page, title: name })}
+      className="inline-flex min-h-6 items-center gap-1 rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-xs font-semibold text-ink-muted underline-offset-4 hover:border-accent hover:bg-accent-soft hover:text-accent-strong hover:underline disabled:opacity-60 motion-safe:transition-colors"
+    >
+      {t("page", { page })}
+    </button>
+  );
+}
 
 type Outcome = "idle" | "opening" | "gone" | "noScreen" | "failed";
 
