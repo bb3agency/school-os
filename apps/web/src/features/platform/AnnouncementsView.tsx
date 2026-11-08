@@ -16,8 +16,9 @@ import { announcementTone, known } from "@/features/status";
 import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
+import { requiredInt } from "@/lib/validation";
 import { AnnouncementEditDialog, AnnouncementEditor } from "./AnnouncementEditor";
-import { LIST_PAGE_SIZE, PK, useCan, useOperatorMe, usePagedList } from "./data";
+import { ifMatch, LIST_PAGE_SIZE, PK, useCan, useOperatorMe, usePagedList } from "./data";
 import { MonoTime } from "./pills";
 import { ShowMore } from "./ShowMore";
 
@@ -162,17 +163,26 @@ export function AnnouncementsScreen() {
               title={t("approveTitle")}
               description={t("approveBody")}
               confirmLabel={t("approve")}
-              schema={z.object({})}
+              schema={z.object({ row_version: requiredInt(1, 2_147_483_647) })}
               invalidate={[PK.announcements]}
               errorNamespace="platform.announcements"
-              submit={() =>
+              submit={(value) =>
                 unwrap(
                   api.POST("/api/v1/platform/announcements/{announcement_id}/approve", {
-                    params: { path: { announcement_id: row.id } },
+                    params: {
+                      path: { announcement_id: row.id },
+                      // YI-02 (SEC-029): approve the version on screen; a change since is 412.
+                      header: { "If-Match": ifMatch(value.row_version) },
+                    },
                   }),
                 )
               }
-            />
+            >
+              {() => (
+                // Read once, when the dialog opens: a background reload must not move it.
+                <input type="hidden" name="row_version" defaultValue={row.version} />
+              )}
+            </ActionDialog>
             <ActionDialog
               triggerLabel={t("cancelAnnouncement")}
               triggerSize="sm"

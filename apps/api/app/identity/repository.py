@@ -520,6 +520,17 @@ def lock_system_role_sync(session: Session, tenant_id: uuid.UUID) -> None:
     )
 
 
+def lock_owner_set(session: Session) -> None:
+    """Serialise changes that may remove one of this school's owners (last-owner guard, YI-01;
+    transaction-level advisory lock keyed by the session's school)."""
+    session.execute(
+        text(
+            "SELECT pg_advisory_xact_lock(hashtextextended('sos:owner_set:' || "
+            "core.current_tenant()::text, 0))"
+        )
+    )
+
+
 def set_transaction_read_only(session: Session) -> None:
     """Make the current transaction read-only (dry runs: any write fails in the database)."""
     session.execute(text("SET TRANSACTION READ ONLY"))

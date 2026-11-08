@@ -1209,13 +1209,21 @@ def update_announcement(
 
 @router.post("/announcements/{announcement_id}/approve", response_model=AnnouncementOut)
 def approve_announcement(
-    *, announcement_id: uuid.UUID, ctx: Annotated[Ctx, AnnManage]
+    *,
+    announcement_id: uuid.UUID,
+    response: Response,
+    ctx: Annotated[Ctx, AnnManage],
+    if_match: IfMatch = None,
 ) -> AnnouncementOut:
     """A second operator approves a critical announcement (two-person; audit 2026-10-05).
     ``409 same_operator``, ``request_expired``, ``requester_not_authorised``,
-    ``approver_not_eligible`` or ``invalid_state``. To withdraw it, cancel it."""
-    out = announcements.approve(_actor(ctx), announcement_id)
+    ``approver_not_eligible`` or ``invalid_state``. To withdraw it, cancel it. ``If-Match``
+    with the ETag of the announcement as shown to the approver is required (400
+    ``if_match_required``): when it changed since, 412 and nothing is approved (audit
+    2026-11-09 YI-02). Answers the new ``ETag``."""
+    out = announcements.approve(_actor(ctx), announcement_id, expected_version=_version(if_match))
     announcements.publish()
+    _etag(response, out.version)
     return out
 
 
@@ -1689,7 +1697,8 @@ def heartbeat(
 ) -> Response:
     """HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 §12). The answer
     is signed with the same deployment key (``X-SOS-Key-Id``, ``X-SOS-Timestamp``,
-    ``X-SOS-Signature``; ADR-0058) and carries the school's flags, AI answer allowance and
+    ``X-SOS-Signature`` and the direction-labelled ``X-SOS-Signature-V2``; ADR-0058 and its
+    CP-03 amendment) and carries the school's flags, AI answer allowance and
     billing summary."""
     body, headers = fleet.signed_answer(verified, fleet.accept_heartbeat(verified))
     return Response(content=body, media_type="application/json", headers=headers)

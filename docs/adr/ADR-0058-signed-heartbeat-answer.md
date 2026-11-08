@@ -35,6 +35,26 @@ The heartbeat is outbound only (the host never accepts inbound calls from the co
 - Bad / costs: flags, allowance and billing summary reach a dedicated host up to 5 minutes late, and not at all while the host cannot reach the control plane (it keeps the last good state). The next-invoice amount is an estimate (per-student lines and last month's AI overage are added when the invoice is drafted). The billing summary lives in Valkey (append-only file on dedicated hosts); if it is lost the page shows "not available" until the next heartbeat.
 - Follow-up work: remove `SOS_HEARTBEAT_ANSWER_UNSIGNED_OK` in the next release; support tickets from dedicated hosts (rest of Q7) still go by email or phone.
 
+## Amendment 2026-11-09: direction-labelled signatures (audit CP-03)
+
+Requests and answers used the same MAC, `HMAC(key, timestamp "." body)`, with the same key and no
+direction label; only the two schemas kept a host's own request from passing as an answer, or
+the reverse (audit 2026-11-08 CP-03). Lead decision 2026-11-09:
+
+1. Both directions add `X-SOS-Signature-V2: v2=<hex HMAC-SHA256(key, label "." timestamp "."
+   raw_body)>` with `label` = `req` (host to control plane) or `ans` (control plane to host),
+   and **keep sending** `X-SOS-Signature: v1=...`, so a peer on the previous release still
+   verifies (it compares the whole v1 header and ignores the new one).
+2. A verifier checks v2 when the header is present and refuses a wrong v2 without trying v1.
+   Without v2 it accepts v1 only while `SOS_HEARTBEAT_ACCEPT_V1_SIGNATURE` is true (default
+   `true`; docs/10 §11).
+3. Once every dedicated host and the control plane run this release, set
+   `SOS_HEARTBEAT_ACCEPT_V1_SIGNATURE=false` on both sides; a later release may stop sending v1.
+
+No key, schema or route changes. `fleet.sign_v2`, `fleet.signature_matches`,
+`heartbeat_client.signed_request` and `verify_answer`;
+`tests/platform/test_heartbeat_answer.py::test_SEC_028_CP_03_requests_and_answers_carry_a_direction_labelled_v2_signature`.
+
 ## Alternatives considered
 
 | Option | Why not chosen |

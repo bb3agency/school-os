@@ -288,6 +288,56 @@ def test_SEC_028_key_rotation_overlap(
     fleet.verify_heartbeat(new_headers, new_raw, wrapper=wrapper, stores=stores, at=later)
 
 
+def test_SEC_028_CP_02_first_heartbeat_with_the_new_key_ends_the_old_key(
+    api: Api, dep: dict[str, Any], owner: Operator, wrapper: Any
+) -> None:
+    """Audit 2026-11-08 CP-02 (fixed 2026-11-09): after a rotation the old key stayed valid for
+    the whole 7-day overlap, even once the host signed with the new key, and a second rotation
+    was refused meanwhile. A leaked key that caused the rotation therefore kept working for up to
+    7 days. Now the first accepted heartbeat signed with the next key promotes it (audited) and
+    the old key stops working at once; a new rotation is accepted straight away."""
+    rotate = f"/deployments/{dep['deployment_id']}/heartbeat-key:rotate"
+    res = api.call("POST", rotate, owner)
+    assert res.status_code == 200, res.text
+    new = res.json()
+    raw, headers = _signed(
+        dep, _payload(dep), key=new["heartbeat_key"], key_id=new["heartbeat_key_id"]
+    )
+    answer = api.client.post(URL, content=raw, headers=headers)
+    assert answer.status_code == 200, answer.text
+    assert answer.headers[fleet.HEADER_KEY_ID] == new["heartbeat_key_id"]
+
+    stores = fleet.FleetStores(InMemoryReplayStore(), InMemoryReplayStore())
+    old_raw, old_headers = _signed(dep, _payload(dep))
+    with pytest.raises(Unauthenticated):
+        fleet.verify_heartbeat(old_headers, old_raw, wrapper=wrapper, stores=stores)
+    new_raw, new_headers = _signed(
+        dep, _payload(dep), key=new["heartbeat_key"], key_id=new["heartbeat_key_id"]
+    )
+    fleet.verify_heartbeat(new_headers, new_raw, wrapper=wrapper, stores=stores)
+    with platform_session() as s:
+        row = s.execute(
+            text(
+                "SELECT heartbeat_key_id, heartbeat_next_key_id, heartbeat_rotation_started_at "
+                "FROM platform.deployments WHERE id = :d"
+            ),
+            {"d": dep["deployment_id"]},
+        ).one()
+        actions: list[Any] = list(
+            s.execute(
+                text(
+                    "SELECT action FROM platform.audit_events "
+                    "WHERE subject_tenant_id = :t ORDER BY seq"
+                ),
+                {"t": dep["tenant_id"]},
+            ).scalars()
+        )
+    assert tuple(row) == (new["heartbeat_key_id"], None, None)
+    assert "deployment.heartbeat_key_promoted" in actions
+    again = api.call("POST", rotate, owner)
+    assert again.status_code == 200, again.text
+
+
 def test_R_15_second_rotation_while_one_is_pending_is_409_and_keeps_both_keys(
     api: Api, dep: dict[str, Any], owner: Operator, wrapper: Any
 ) -> None:

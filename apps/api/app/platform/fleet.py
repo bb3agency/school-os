@@ -7,8 +7,10 @@ failure:
    rotation; the old key stops working after the 7-day overlap) -> else 401;
 2. ``|now - X-SOS-Timestamp| <= 300 s`` -> else 401;
 3. body ≤ 16 KB -> else 422;
-4. ``X-SOS-Signature == "v1=" + hex(HMAC-SHA256(key, timestamp + "." + raw_body))`` compared in
-   constant time -> else 401;
+4. ``X-SOS-Signature-V2 == "v2=" + hex(HMAC-SHA256(key, "req." + timestamp + "." + raw_body))``
+   when sent (a wrong v2 is refused, never retried as v1); otherwise, while
+   ``SOS_HEARTBEAT_ACCEPT_V1_SIGNATURE`` (default true), ``X-SOS-Signature == "v1=" +
+   hex(HMAC-SHA256(key, timestamp + "." + raw_body))``; constant-time compares -> else 401;
 5. strict schema (unknown fields rejected, no free text) -> else 422;
 6. ``deployment_id`` / ``tenant_id`` in the body match the registry -> else 401;
 7. nonce not seen in the last 10 minutes -> else 409 ``replay``;
@@ -16,7 +18,8 @@ failure:
 
 The answer is signed the same way with the key that verified the request (ADR-0058, W3-05):
 ``X-SOS-Key-Id``, ``X-SOS-Timestamp`` and ``X-SOS-Signature = "v1=" + hex(HMAC-SHA256(key,
-timestamp + "." + raw_answer))``; the answer echoes the request's nonce (``request_nonce``). It
+timestamp + "." + raw_answer))`` plus ``X-SOS-Signature-V2`` with the ``ans.`` label (ADR-0058
+amendment, CP-03); the answer echoes the request's nonce (``request_nonce``). It
 carries the school's announcements, effective feature flags, AI answer allowance and billing
 summary (platform data only, never student data).
 """
@@ -83,6 +86,10 @@ HEADER_DEPLOYMENT = "X-SOS-Deployment"
 HEADER_KEY_ID = "X-SOS-Key-Id"
 HEADER_TIMESTAMP = "X-SOS-Timestamp"
 HEADER_SIGNATURE = "X-SOS-Signature"
+# ADR-0058 amendment (CP-03): the direction-labelled signature, sent alongside the v1 header.
+HEADER_SIGNATURE_V2 = "X-SOS-Signature-V2"
+REQUEST = "req"
+ANSWER = "ans"
 _REJECTED = "Heartbeat rejected"
 
 
@@ -286,6 +293,40 @@ def sign(key: bytes, timestamp: str, body: bytes) -> str:
     )
 
 
+def sign_v2(key: bytes, direction: str, timestamp: str, body: bytes) -> str:
+    """``v2=`` HMAC-SHA256 over ``direction + "." + timestamp + "." + body`` (``req`` for a
+    host's heartbeat, ``ans`` for the control plane's answer; ADR-0058 amendment, CP-03), so a
+    signed request can never pass as an answer, or the reverse, whatever the schemas allow."""
+    message = direction.encode("ascii") + b"." + timestamp.encode("ascii") + b"." + body
+    return "v2=" + hmac.new(key, message, hashlib.sha256).hexdigest()
+
+
+def signature_headers(key: bytes, direction: str, timestamp: str, body: bytes) -> dict[str, str]:
+    """Both signature headers: ``v1`` for peers that do not know ``v2`` yet, and ``v2``."""
+    return {
+        HEADER_SIGNATURE: sign(key, timestamp, body),
+        HEADER_SIGNATURE_V2: sign_v2(key, direction, timestamp, body),
+    }
+
+
+def signature_matches(
+    key: bytes,
+    direction: str,
+    timestamp: str,
+    body: bytes,
+    *,
+    v1: str,
+    v2: str,
+    accept_v1: bool,
+) -> bool:
+    """Prefer ``v2`` when present (a wrong ``v2`` is refused, never retried as ``v1``); a
+    ``v1``-only signature counts only while ``accept_v1`` (``SOS_HEARTBEAT_ACCEPT_V1_SIGNATURE``,
+    default true for the rollout). Constant-time compares."""
+    if v2:
+        return hmac.compare_digest(sign_v2(key, direction, timestamp, body), v2)
+    return accept_v1 and bool(v1) and hmac.compare_digest(sign(key, timestamp, body), v1)
+
+
 def _reject(reason: str) -> Unauthenticated:
     log.warning("fleet.heartbeat.rejected", error_code=reason, outcome="rejected")
     return Unauthenticated(_REJECTED)
@@ -309,8 +350,10 @@ def verify_heartbeat(
     wrapper: KeyWrapper,
     stores: FleetStores,
     at: dt.datetime | None = None,
+    accept_v1: bool | None = None,
 ) -> VerifiedHeartbeat:
     cfg = fleet_cfg()
+    v1_ok = get_settings().heartbeat_accept_v1_signature if accept_v1 is None else accept_v1
     current = at or now()
     try:
         deployment_id = uuid.UUID(headers.get(HEADER_DEPLOYMENT, ""))
@@ -319,6 +362,7 @@ def verify_heartbeat(
     key_id = headers.get(HEADER_KEY_ID, "")
     timestamp = headers.get(HEADER_TIMESTAMP, "")
     signature = headers.get(HEADER_SIGNATURE, "")
+    signature_v2 = headers.get(HEADER_SIGNATURE_V2, "")
     with platform_session() as s:
         dep = repo.get(s, m.deployments, deployment_id)
     if dep is None or dep["mode"] != "dedicated" or dep["status"] == "decommissioned":
@@ -343,7 +387,9 @@ def verify_heartbeat(
         )
     except CryptoError:
         raise _reject("key_unwrap_failed") from None
-    if not hmac.compare_digest(sign(key, timestamp, body), signature):
+    if not signature_matches(
+        key, REQUEST, timestamp, body, v1=signature, v2=signature_v2, accept_v1=v1_ok
+    ):
         raise _reject("bad_signature")
     try:
         payload = HeartbeatIn.model_validate_json(body)
@@ -471,7 +517,23 @@ def accept_heartbeat(verified: VerifiedHeartbeat, *, at: dt.datetime | None = No
             "app_version": payload.app_version,
             "status": status,
         }
+        promoted = bool(verified.key_id) and verified.key_id == dep["heartbeat_next_key_id"]
+        if promoted:
+            # CP-02 (SEC-028): the host signs with the new key, so the old one ends now instead
+            # of at the end of the overlap (as the Tally agent does, ADR-0032). Under the
+            # deployment lock; R-15 stays safe because the host already uses the promoted key.
+            values |= _promoted(dep)
         repo.update_row(s, m.deployments, dep["id"], values, bump_version=False)
+        if promoted:
+            audit_platform(
+                s,
+                SYSTEM,
+                "deployment.heartbeat_key_promoted",
+                "deployment",
+                dep["id"],
+                {"heartbeat_key_id": verified.key_id},
+                tenant_id=dep["tenant_id"],
+            )
         if dep["last_heartbeat_at"] is None:
             audit_platform(
                 s,
@@ -516,13 +578,14 @@ def signed_answer(
     verified: VerifiedHeartbeat, answer: HeartbeatOut, *, now_s: float | None = None
 ) -> tuple[bytes, dict[str, str]]:
     """The answer's raw JSON and signature headers (ADR-0058): the request's key id, a fresh
-    timestamp and ``v1=`` HMAC-SHA256 over ``timestamp + "." + body``, as for the request."""
+    timestamp and ``v1=`` HMAC-SHA256 over ``timestamp + "." + body``, as for the request, plus
+    the direction-labelled ``v2`` (``ans``; ADR-0058 amendment, CP-03)."""
     body = answer.model_dump_json().encode()
     timestamp = str(int(now_s if now_s is not None else now().timestamp()))
     return body, {
         HEADER_KEY_ID: verified.key_id,
         HEADER_TIMESTAMP: timestamp,
-        HEADER_SIGNATURE: sign(verified.key, timestamp, body),
+        **signature_headers(verified.key, ANSWER, timestamp, body),
     }
 
 

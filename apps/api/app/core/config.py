@@ -443,6 +443,11 @@ class Settings(BaseSettings):
     # then refreshes announcements only and applies no flags, allowance or billing summary.
     # Remove in the release after 2026.11.
     heartbeat_answer_unsigned_ok: bool = False
+    # ADR-0058 amendment (audit CP-03): heartbeats and answers carry a direction-labelled
+    # X-SOS-Signature-V2 next to the v1 header; a verifier checks v2 when present. True: a
+    # v1-only signature (a peer on an older release) is still accepted. Set false on both sides
+    # once every host and the control plane send v2.
+    heartbeat_accept_v1_signature: bool = True
 
     @property
     def is_production_like(self) -> bool:

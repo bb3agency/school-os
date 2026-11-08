@@ -346,7 +346,8 @@ def test_hardening_critical_announcement_needs_a_second_operator(
     body = crit.json()
     assert (body["status"], body["submitted_by"]) == ("pending_approval", str(agent.id))
     aid = body["id"]
-    same = api.call("POST", f"/announcements/{aid}/approve", agent)
+    v = {"If-Match": f'"{body["version"]}"'}
+    same = api.call("POST", f"/announcements/{aid}/approve", agent, headers=v)
     assert (same.status_code, same.json()["code"]) == (409, "same_operator")
     # Direct DB attempt to publish it without a second operator fails the CHECK.
     with (
@@ -357,7 +358,7 @@ def test_hardening_critical_announcement_needs_a_second_operator(
             text("UPDATE platform.announcements SET status = 'scheduled' WHERE id = :i"),
             {"i": uuid.UUID(aid)},
         )
-    ok = api.call("POST", f"/announcements/{aid}/approve", other)
+    ok = api.call("POST", f"/announcements/{aid}/approve", other, headers=v)
     assert ok.status_code == 200, ok.text
     assert (ok.json()["status"], ok.json()["approved_by"]) == ("scheduled", str(other.id))
     # Any change sends it back for approval.
@@ -377,10 +378,63 @@ def test_hardening_critical_announcement_needs_a_second_operator(
         uuid.UUID(aid),
         TTL + dt.timedelta(minutes=1),
     )
-    late = api.call("POST", f"/announcements/{aid}/approve", other)
+    late = api.call(
+        "POST",
+        f"/announcements/{aid}/approve",
+        other,
+        headers={"If-Match": changed.headers["ETag"]},
+    )
     assert (late.status_code, late.json()["code"]) == (409, "request_expired")
     cancelled = api.call("POST", f"/announcements/{aid}/cancel", other)
     assert cancelled.json()["status"] == "cancelled"
+
+
+def test_SEC_029_YI_02_approval_with_a_stale_etag_is_refused(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    """Audit 2026-11-09 YI-02: the second operator approved whatever the critical banner said
+    at the moment of the click. The submitter could change the text after the approver opened
+    it (the change keeps it pending under the same submitter) and the approval then published
+    text the second person never saw. ``If-Match`` on approve is now required (400
+    ``if_match_required``) and checked (412 when the banner changed since it was read;
+    nothing approved)."""
+    agent, other = make_operator("support_agent"), make_operator("support_agent")
+    crit = api.call("POST", "/announcements", agent, json=_announcement("critical"))
+    assert crit.status_code == 201, crit.text
+    seen = crit.json()
+    aid = seen["id"]
+    edited = api.call(
+        "PATCH",
+        f"/announcements/{aid}",
+        agent,
+        json=_announcement("critical", title_en="Different text"),
+        headers={"If-Match": f'"{seen["version"]}"'},
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["status"] == "pending_approval"
+    bare = api.call("POST", f"/announcements/{aid}/approve", other)
+    assert (bare.status_code, bare.json()["code"]) == (400, "if_match_required")
+    stale = api.call(
+        "POST",
+        f"/announcements/{aid}/approve",
+        other,
+        headers={"If-Match": f'"{seen["version"]}"'},
+    )
+    assert stale.status_code == 412, stale.text
+    with platform_session() as s:
+        status: Any = s.execute(
+            text("SELECT status FROM platform.announcements WHERE id = :i"), {"i": uuid.UUID(aid)}
+        ).scalar_one()
+    assert status == "pending_approval"
+    ok = api.call(
+        "POST",
+        f"/announcements/{aid}/approve",
+        other,
+        headers={"If-Match": edited.headers["ETag"]},
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["status"] == "scheduled"
+    assert ok.headers["ETag"] == f'"{ok.json()["version"]}"'
 
 
 # --- hardening: invoices ----------------------------------------------------------------------

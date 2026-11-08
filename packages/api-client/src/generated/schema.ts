@@ -4217,7 +4217,8 @@ export interface paths {
          * Heartbeat
          * @description HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 §12). The answer
          *     is signed with the same deployment key (``X-SOS-Key-Id``, ``X-SOS-Timestamp``,
-         *     ``X-SOS-Signature``; ADR-0058) and carries the school's flags, AI answer allowance and
+         *     ``X-SOS-Signature`` and the direction-labelled ``X-SOS-Signature-V2``; ADR-0058 and its
+         *     CP-03 amendment) and carries the school's flags, AI answer allowance and
          *     billing summary.
          */
         post: operations["heartbeat_api_v1_fleet_heartbeat_post"];
@@ -6158,7 +6159,10 @@ export interface paths {
          * Approve Announcement
          * @description A second operator approves a critical announcement (two-person; audit 2026-10-05).
          *     ``409 same_operator``, ``request_expired``, ``requester_not_authorised``,
-         *     ``approver_not_eligible`` or ``invalid_state``. To withdraw it, cancel it.
+         *     ``approver_not_eligible`` or ``invalid_state``. To withdraw it, cancel it. ``If-Match``
+         *     with the ETag of the announcement as shown to the approver is required (400
+         *     ``if_match_required``): when it changed since, 412 and nothing is approved (audit
+         *     2026-11-09 YI-02). Answers the new ``ETag``.
          */
         post: operations["approve_announcement_api_v1_platform_announcements__announcement_id__approve_post"];
         delete?: never;
@@ -39553,7 +39557,9 @@ export interface operations {
     approve_announcement_api_v1_platform_announcements__announcement_id__approve_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
             path: {
                 announcement_id: string;
             };
