@@ -18,7 +18,7 @@ from pydantic import AwareDatetime, BaseModel
 
 from app.authz.kv import kv_store
 from app.core.crypto import KeyWrapper
-from app.core.errors import BadRequest
+from app.core.errors import BadRequest, ValidationFailed
 from app.ops.idempotency import (
     IdempotencyRecord,
     IdempotencyStore,
@@ -470,11 +470,32 @@ def deletion_certificate_download_url(
     return offboarding.download_url(_actor(ctx), tenant_id)
 
 
-def _range(start: dt.date | None, end: dt.date | None) -> tuple[dt.date, dt.date]:
+# Every school's usage in one unpaged list: at most this many days (audit 2026-11-08 AZ-03).
+ALL_SCHOOLS_MAX_DAYS = 31
+
+
+def _range(
+    start: dt.date | None, end: dt.date | None, *, all_schools: bool = False
+) -> tuple[dt.date, dt.date]:
+    """The inclusive usage range: one school up to 401 days (default the last 90), every
+    school up to :data:`ALL_SCHOOLS_MAX_DAYS` (default the last 31; longer: 422
+    ``range_too_long`` on ``from``, AZ-03)."""
     end = end or today_ist()
-    start = start or end - dt.timedelta(days=89)
+    default_days = ALL_SCHOOLS_MAX_DAYS if all_schools else 90
+    start = start or end - dt.timedelta(days=default_days - 1)
     if start > end or (end - start).days > 400:
         raise BadRequest("Choose a range of at most 400 days.", code="bad_range")
+    if all_schools and (end - start).days + 1 > ALL_SCHOOLS_MAX_DAYS:
+        raise ValidationFailed(
+            [
+                {
+                    "field": "from",
+                    "code": "range_too_long",
+                    "message_key": "errors.range_too_long",
+                }
+            ],
+            detail=f"Choose at most {ALL_SCHOOLS_MAX_DAYS} days, or pick one school.",
+        )
     return start, end
 
 
@@ -538,7 +559,10 @@ def all_usage(
     end: Annotated[dt.date | None, Query(alias="to")] = None,
     tenant_id: uuid.UUID | None = None,
 ) -> list[UsageDailyOut]:
-    return usage.usage_for(tenant_id, *_range(start, end))
+    """Daily usage per school, oldest first. One school (``tenant_id``): up to 401 days
+    (default the last 90). Every school: up to 31 days (default the last 31; longer: 422
+    ``range_too_long``, audit 2026-11-08 AZ-03), because the list is not paged."""
+    return usage.usage_for(tenant_id, *_range(start, end, all_schools=tenant_id is None))
 
 
 # --- billing accounts -------------------------------------------------------------------------
