@@ -19,11 +19,12 @@ from structlog.testing import capture_logs
 
 from app.core.config import DeploymentMode, Settings
 from app.core.db import platform_session
+from app.core.errors import Unauthenticated
 from app.core.logging import ALLOWED_FIELDS
 from app.platform import billing, flags, fleet, heartbeat_apply, heartbeat_client, tenant_api
 from app.platform.announcements import InMemoryAnnouncementCache
 from app.platform.common import SYSTEM
-from app.platform.schemas import FlagIn, HbAiAllowance, HeartbeatOut
+from app.platform.schemas import FlagIn, HbAiAllowance, HeartbeatIn, HeartbeatOut
 
 from .conftest import Api, MakeOperator, Operator, billing_account_payload, provision_payload
 from .test_heartbeat import URL, _next_minute, _payload, _signed
@@ -123,6 +124,7 @@ def test_ADR_0058_host_refuses_unsigned_wrong_or_stale_answers(
     at: float | None = None
     if change == "unsigned":
         headers.pop(fleet.HEADER_SIGNATURE.lower(), None)
+        headers.pop(fleet.HEADER_SIGNATURE_V2.lower(), None)
     elif change == "tampered":
         data = json.loads(body)
         data["feature_flags"] = {"ask.enabled": True}
@@ -131,6 +133,7 @@ def test_ADR_0058_host_refuses_unsigned_wrong_or_stale_answers(
         other = heartbeat_client.decode_key("A" * 43)
         stamp = headers[fleet.HEADER_TIMESTAMP.lower()]
         headers[fleet.HEADER_SIGNATURE.lower()] = fleet.sign(other, stamp, body)
+        headers[fleet.HEADER_SIGNATURE_V2.lower()] = fleet.sign_v2(other, fleet.ANSWER, stamp, body)
     elif change == "key_id":
         headers[fleet.HEADER_KEY_ID.lower()] = "hk_other"
     elif change == "stale":
@@ -142,6 +145,55 @@ def test_ADR_0058_host_refuses_unsigned_wrong_or_stale_answers(
     with pytest.raises(heartbeat_client.AnswerRejected) as caught:
         heartbeat_client.verify_answer(_host(school), headers, body, request_nonce=nonce, now=at)
     assert caught.value.reason == reason
+
+
+def test_SEC_028_CP_03_requests_and_answers_carry_a_direction_labelled_v2_signature(
+    api: Api, school: dict[str, Any], fleet_stores: fleet.FleetStores, wrapper: Any
+) -> None:
+    """ADR-0058 amendment (audit 2026-11-08 CP-03): both directions send ``X-SOS-Signature-V2``
+    (``req.`` / ``ans.`` label) next to v1. A verifier checks v2 when present and never falls
+    back to v1 when v2 is wrong; v1-only counts only while
+    ``SOS_HEARTBEAT_ACCEPT_V1_SIGNATURE`` (default true). A signed request reflected as an
+    answer, or the reverse, fails whatever the schemas allow."""
+    host = _host(school)
+    key = heartbeat_client.decode_key(school["heartbeat_key"])
+    payload = HeartbeatIn.model_validate(_payload(school))
+    headers, raw = heartbeat_client.signed_request(host, payload)
+    stamp = headers[fleet.HEADER_TIMESTAMP]
+    assert headers[fleet.HEADER_SIGNATURE] == fleet.sign(key, stamp, raw)
+    assert headers[fleet.HEADER_SIGNATURE_V2] == fleet.sign_v2(key, fleet.REQUEST, stamp, raw)
+    # A request signed with the answer label is refused, even with a valid v1 next to it.
+    wrong = {**headers, fleet.HEADER_SIGNATURE_V2: fleet.sign_v2(key, fleet.ANSWER, stamp, raw)}
+    with pytest.raises(Unauthenticated):
+        fleet.verify_heartbeat(wrong, raw, wrapper=wrapper, stores=fleet_stores)
+    # v1 only: accepted during the rollout, refused once v1 is switched off.
+    v1_only = {k: v for k, v in headers.items() if k != fleet.HEADER_SIGNATURE_V2}
+    with pytest.raises(Unauthenticated):
+        fleet.verify_heartbeat(v1_only, raw, wrapper=wrapper, stores=fleet_stores, accept_v1=False)
+    fleet.verify_heartbeat(v1_only, raw, wrapper=wrapper, stores=fleet_stores)
+    _next_minute(fleet_stores)
+
+    res, nonce = _beat(api, school)
+    stamp = res.headers[fleet.HEADER_TIMESTAMP]
+    assert res.headers[fleet.HEADER_SIGNATURE_V2] == fleet.sign_v2(
+        key, fleet.ANSWER, stamp, res.content
+    )
+    strict = _host(school, heartbeat_accept_v1_signature=False)
+    assert heartbeat_client.verify_answer(strict, res.headers, res.content, request_nonce=nonce)
+    # An answer signed with the request label (a reflected request) is refused.
+    reflected = dict(res.headers)
+    reflected[fleet.HEADER_SIGNATURE_V2.lower()] = fleet.sign_v2(
+        key, fleet.REQUEST, stamp, res.content
+    )
+    with pytest.raises(heartbeat_client.AnswerRejected) as caught:
+        heartbeat_client.verify_answer(host, reflected, res.content, request_nonce=nonce)
+    assert caught.value.reason == "bad_signature"
+    # An answer from a control plane on the older release (v1 only).
+    old = {k: v for k, v in res.headers.items() if k.lower() != fleet.HEADER_SIGNATURE_V2.lower()}
+    assert heartbeat_client.verify_answer(host, old, res.content, request_nonce=nonce)
+    with pytest.raises(heartbeat_client.AnswerRejected) as caught:
+        heartbeat_client.verify_answer(strict, old, res.content, request_nonce=nonce)
+    assert caught.value.reason == "bad_signature"
 
 
 def test_ADR_0058_a_refused_answer_applies_nothing_and_keeps_the_last_good_state(
@@ -160,6 +212,7 @@ def test_ADR_0058_a_refused_answer_applies_nothing_and_keeps_the_last_good_state
     res, nonce = _beat(api, school)
     headers = dict(res.headers)
     headers[fleet.HEADER_SIGNATURE.lower()] = "v1=" + "0" * 64
+    headers[fleet.HEADER_SIGNATURE_V2.lower()] = "v2=" + "0" * 64
     with capture_logs() as logs:
         out = heartbeat_client.handle_answer(
             host, headers, res.content, request_nonce=nonce, store=store, cache=cache
@@ -177,7 +230,7 @@ def test_ADR_0058_unsigned_answer_only_with_the_one_release_setting_and_announce
     api: Api, school: dict[str, Any]
 ) -> None:
     res, nonce = _beat(api, school)
-    headers = {k: v for k, v in res.headers.items() if k.lower() != "x-sos-signature"}
+    headers = {k: v for k, v in res.headers.items() if not k.lower().startswith("x-sos-signature")}
     store = heartbeat_apply.InMemoryBillingSummaryStore()
     cache = InMemoryAnnouncementCache()
     strict = heartbeat_client.handle_answer(

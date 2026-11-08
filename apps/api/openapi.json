@@ -57822,7 +57822,7 @@
     },
     "/api/v1/fleet/heartbeat": {
       "post": {
-        "description": "HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 \u00a712). The answer\nis signed with the same deployment key (``X-SOS-Key-Id``, ``X-SOS-Timestamp``,\n``X-SOS-Signature``; ADR-0058) and carries the school's flags, AI answer allowance and\nbilling summary.",
+        "description": "HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 \u00a712). The answer\nis signed with the same deployment key (``X-SOS-Key-Id``, ``X-SOS-Timestamp``,\n``X-SOS-Signature`` and the direction-labelled ``X-SOS-Signature-V2``; ADR-0058 and its\nCP-03 amendment) and carries the school's flags, AI answer allowance and\nbilling summary.",
         "operationId": "heartbeat_api_v1_fleet_heartbeat_post",
         "responses": {
           "200": {

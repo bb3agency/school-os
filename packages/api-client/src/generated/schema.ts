@@ -4217,7 +4217,8 @@ export interface paths {
          * Heartbeat
          * @description HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 §12). The answer
          *     is signed with the same deployment key (``X-SOS-Key-Id``, ``X-SOS-Timestamp``,
-         *     ``X-SOS-Signature``; ADR-0058) and carries the school's flags, AI answer allowance and
+         *     ``X-SOS-Signature`` and the direction-labelled ``X-SOS-Signature-V2``; ADR-0058 and its
+         *     CP-03 amendment) and carries the school's flags, AI answer allowance and
          *     billing summary.
          */
         post: operations["heartbeat_api_v1_fleet_heartbeat_post"];

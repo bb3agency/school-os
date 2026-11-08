@@ -1697,7 +1697,8 @@ def heartbeat(
 ) -> Response:
     """HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 §12). The answer
     is signed with the same deployment key (``X-SOS-Key-Id``, ``X-SOS-Timestamp``,
-    ``X-SOS-Signature``; ADR-0058) and carries the school's flags, AI answer allowance and
+    ``X-SOS-Signature`` and the direction-labelled ``X-SOS-Signature-V2``; ADR-0058 and its
+    CP-03 amendment) and carries the school's flags, AI answer allowance and
     billing summary."""
     body, headers = fleet.signed_answer(verified, fleet.accept_heartbeat(verified))
     return Response(content=body, media_type="application/json", headers=headers)

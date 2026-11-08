@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import base64
 import datetime as dt
-import hmac
 import json
 import os
 import time
@@ -36,11 +35,15 @@ from app.core.logging import get_logger
 from app.platform import announcements, heartbeat_apply, invoice_storage, usage
 from app.platform.common import fleet_cfg, today_ist
 from app.platform.fleet import (
+    ANSWER,
     HEADER_DEPLOYMENT,
     HEADER_KEY_ID,
     HEADER_SIGNATURE,
+    HEADER_SIGNATURE_V2,
     HEADER_TIMESTAMP,
-    sign,
+    REQUEST,
+    signature_headers,
+    signature_matches,
 )
 from app.platform.schemas import HeartbeatIn, HeartbeatOut
 
@@ -188,7 +191,7 @@ def signed_request(
         HEADER_DEPLOYMENT: str(payload.deployment_id),
         HEADER_KEY_ID: settings.heartbeat_key_id,
         HEADER_TIMESTAMP: timestamp,
-        HEADER_SIGNATURE: sign(key, timestamp, body),
+        **signature_headers(key, REQUEST, timestamp, body),
     }
     return headers, body
 
@@ -239,8 +242,9 @@ def verify_answer(
         raise HeartbeatNotConfigured("SOS_HEARTBEAT_KEY_ID and SOS_HEARTBEAT_KEY are required")
     lower = {str(k).lower(): str(v) for k, v in headers.items()}  # HTTP names: any case
     signature = lower.get(HEADER_SIGNATURE.lower(), "")
+    signature_v2 = lower.get(HEADER_SIGNATURE_V2.lower(), "")
     timestamp = lower.get(HEADER_TIMESTAMP.lower(), "")
-    if not signature:
+    if not signature and not signature_v2:
         raise AnswerRejected("unsigned")
     if lower.get(HEADER_KEY_ID.lower(), "") != settings.heartbeat_key_id:
         raise AnswerRejected("unknown_key")
@@ -250,7 +254,16 @@ def verify_answer(
     if abs(current - int(timestamp)) > int(fleet_cfg()["skew_seconds"]):
         raise AnswerRejected("stale")
     key = decode_key(settings.heartbeat_key.get_secret_value())
-    if not hmac.compare_digest(sign(key, timestamp, body), signature):
+    # CP-03: the ``ans``-labelled v2 when sent; v1 only while the rollout setting allows it.
+    if not signature_matches(
+        key,
+        ANSWER,
+        timestamp,
+        body,
+        v1=signature,
+        v2=signature_v2,
+        accept_v1=settings.heartbeat_accept_v1_signature,
+    ):
         raise AnswerRejected("bad_signature")
     try:
         answer = HeartbeatOut.model_validate_json(body)
