@@ -49,10 +49,13 @@ interface AttentionItem {
 export function DashboardView({
   kpis,
   notice,
+  liveClocks,
 }: {
   kpis: DashboardKpis | null;
   /** Shown under the page header, e.g. a load error. */
   notice?: ReactNode;
+  /** The incident clocks as last asked (every minute), newer than the KPI snapshot (WP-05). */
+  liveClocks?: DashboardKpis["incident_clocks"];
 }) {
   const t = useTranslations("platform.dashboard");
   const tp = useTranslations("platform");
@@ -64,6 +67,8 @@ export function DashboardView({
   const fleet = kpis?.fleet_by_status;
   const tickets = kpis?.open_tickets_by_priority;
   const planLimits = kpis?.plan_limit_alerts;
+  // Shown only when the snapshot has the clocks (the operator may read incidents).
+  const incidentClocks = kpis?.incident_clocks ? (liveClocks ?? kpis.incident_clocks) : null;
   const fleetTotal = sum(fleet);
   const cards: Tile[] = [];
   const add = (present: boolean, tile: Tile) => {
@@ -266,7 +271,7 @@ export function DashboardView({
     <div className="space-y-6">
       <PageHeader title={t("title")} description={t("description")} />
       {notice}
-      {kpis?.incident_clocks ? <IncidentClockAlerts clocks={kpis.incident_clocks} /> : null}
+      {incidentClocks ? <IncidentClockAlerts clocks={incidentClocks} /> : null}
       <section aria-label={t("kpisLabel")}>
         {cards.length === 0 ? (
           <Alert tone="info">{t("noTiles")}</Alert>

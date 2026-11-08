@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { messages, renderWithIntl } from "@/test/render";
 import { DashboardView } from "../DashboardView";
+import { DashboardScreen } from "../screens";
 import {
   clockFromMinutes,
   reopenTellPending,
@@ -177,6 +178,41 @@ describe("incident clock alerts in the console (D49 part 2; FR-DPDP-031)", () =>
     renderWithIntl(<IncidentsScreen />);
     const banner = await screen.findByRole("region", { name: im.clockAlerts.label });
     expect(within(banner).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("the dashboard's clocks move on while it stays open (WP-05, FR-DPDP-031)", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(NOW);
+    setPermissions(["platform.incidents.read"]);
+    const clock = (minutes: number): IncidentClock => ({
+      ...CLOCKS[1]!,
+      stage: "due_soon",
+      minutes_left: minutes,
+    });
+    // The dashboard's snapshot says 2 h left; the clocks list then counts down.
+    stub.routes["GET /bff/api/v1/platform/dashboard"] = () =>
+      Response.json({ incident_clocks: [clock(150)] });
+    let minutesLeft = 150;
+    stub.routes["GET /bff/api/v1/platform/incidents/clocks"] = () =>
+      Response.json([clock(minutesLeft)]);
+    renderWithIntl(<DashboardScreen />);
+    const tile = await screen.findByRole("region", { name: im.clockAlerts.label });
+    expect(await within(tile).findByText(/due in 2 h/)).toBeInTheDocument();
+    minutesLeft = 30;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(await within(tile).findByText(/due within the hour/)).toBeInTheDocument();
+    expect(stub.callsTo("GET /bff/api/v1/platform/incidents/clocks").length).toBeGreaterThanOrEqual(
+      2,
+    );
+  });
+
+  it("the dashboard does not ask for the clocks without the incident role (WP-05)", async () => {
+    setPermissions(["platform.tenants.read"]);
+    stub.routes["GET /bff/api/v1/platform/dashboard"] = () =>
+      Response.json({ incident_clocks: null, schools_by_status: { active: 2 } });
+    renderWithIntl(<DashboardScreen />);
+    expect(await screen.findByText(messages.en.platform.dashboard.activeSchools)).toBeVisible();
+    expect(stub.callsTo("GET /bff/api/v1/platform/incidents/clocks")).toEqual([]);
   });
 
   it("an operator without the incident role never asks for the clocks", async () => {
