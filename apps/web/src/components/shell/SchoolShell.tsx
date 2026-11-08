@@ -533,6 +533,12 @@ export function SchoolShell({
       navLabel={t("school.nav.label")}
       sections={sections}
       actions={actions}
+      // D72: the palette's "Students" group only for people who can read students (UX only;
+      // POST /students/search checks the permission and the caller's scope). Unknown
+      // permissions (null) do not offer it.
+      studentSearch={
+        permissions?.includes("student.read_basic") === true ? (account?.kind ?? "staff") : null
+      }
       bottomBar={bottomBar}
       context={context}
       account={
