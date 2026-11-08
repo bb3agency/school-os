@@ -1245,7 +1245,13 @@ def _claim(session: Session, message_id: uuid.UUID, now: dt.datetime) -> _Claim 
             session, message.id, {"next_attempt_at": rules.next_morning(now, quiet_end)}
         )
         return "deferred"
-    values: dict[str, Any] = {"next_attempt_at": now + dt.timedelta(seconds=cfg.claim_seconds)}
+    # BL-01: the claim runs from the moment of claiming, not from the run's start: a long run
+    # reaches its last messages minutes after ``now``, and a claim already over would let the
+    # next sweep send the same message again while this one is still with the provider.
+    claimed_at = max(now, mrepo.now(session))
+    values: dict[str, Any] = {
+        "next_attempt_at": claimed_at + dt.timedelta(seconds=cfg.claim_seconds)
+    }
     key: str | None = None
     handle_id: uuid.UUID | None = None
     kind = LINKS.get(message.purpose)

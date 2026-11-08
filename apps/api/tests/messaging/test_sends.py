@@ -300,6 +300,39 @@ def test_FR_MSG_016_permanent_error_is_final(
     assert S.handle(admin_engine, row["public_handle_id"])["revoked_at"] is not None
 
 
+def test_BL_01_FR_MSG_016_a_claim_late_in_a_long_run_is_not_sent_twice(
+    send_school: Any, api: Any, admin_engine: Engine, fake_state: Any, monkeypatch: Any
+) -> None:
+    """BL-01: a run takes its clock once, at the start, and may reach a message minutes later
+    (300 messages, slow or timing-out provider calls). The claim must run from the moment the
+    message is claimed, or the next minute's sweep claims it again while the first run is still
+    talking to Meta: the parent gets the message twice and the first link is revoked."""
+    from app.messaging import repository as mrepo
+    from app.messaging.providers.fake import FakeMessagingProvider
+
+    school = send_school
+    _reset(school)
+    guardian, mobile = _queue_notice(api, school)
+    start = S.at(12, days=1)
+    # Run A started at ``start`` and reaches this message 400 s later.
+    monkeypatch.setattr(mrepo, "now", lambda session: start + dt.timedelta(seconds=400))
+    original = FakeMessagingProvider.send_template
+    nested: list[dict[str, int]] = []
+
+    def slow_send(self: Any, *args: Any) -> Any:
+        if not nested:
+            # While A talks to Meta, the next sweep (a minute later) runs.
+            nested.append(sends.send_due(school.tenant_id, now=start + dt.timedelta(seconds=460)))
+        return original(self, *args)
+
+    monkeypatch.setattr(FakeMessagingProvider, "send_template", slow_send)
+    sends.send_due(school.tenant_id, now=start)
+    assert len(_sent_to(mobile)) == 1, nested
+    row = S.message_rows(admin_engine, guardian_id=guardian)[0]
+    assert row["status"] == "sent"
+    assert S.handle(admin_engine, row["public_handle_id"])["revoked_at"] is None
+
+
 def test_D31_nothing_is_sent_while_the_school_is_suspended(
     send_school: Any, api: Any, admin_engine: Engine, fake_state: Any
 ) -> None:
