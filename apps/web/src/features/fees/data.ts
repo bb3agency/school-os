@@ -73,6 +73,13 @@ export const KEYS = {
   daily: (date: string) => ["staff", "fees", "daily", date] as const,
   dues: (sectionId: string, classId: string) =>
     ["staff", "fees", "dues", sectionId, classId] as const,
+  /**
+   * The school's years and classes for the fee pickers. Under the academic-structure prefixes
+   * (STRUCTURE_KEYS.years / .classes), so a year or class added or renamed there shows here
+   * without a reload (WD-08).
+   */
+  years: ["staff", "academic-years", "fees-picker"] as const,
+  classes: ["staff", "classes", "fees-picker"] as const,
 } as const;
 
 /** `W/"3"` for If-Match (the API's ETag format). */

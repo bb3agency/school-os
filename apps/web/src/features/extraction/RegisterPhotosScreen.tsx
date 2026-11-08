@@ -12,13 +12,18 @@ import { Icon } from "@/components/ui/Icon";
 import { Field } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FileDropZone, fileInputClasses } from "@/features/imports/parts";
-import { extensionOf, uploadDocument, type UploadProgress } from "@/features/imports/upload";
+import {
+  extensionOf,
+  uploadDocument,
+  useUploadKeys,
+  type UploadProgress,
+} from "@/features/imports/upload";
 import { PERM, useStaffPermissions, type Permissions } from "@/features/students/me";
 import { Pager, useCursorStack } from "@/features/students/paging";
 import { ProblemAlert } from "@/features/students/ProblemAlert";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
-import { newIdempotencyKey, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatBytes, formatCount, formatDateTime } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
 import {
@@ -85,22 +90,26 @@ export function UploadPhotos({ onStarted }: { onStarted: (batch: ExtractionBatch
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<unknown>(undefined);
   const busy = progress !== null;
+  const uploadKeys = useUploadKeys();
 
   async function start(files: readonly File[]) {
     const ids: string[] = [];
+    // Each photo keeps its keys while the same photos are tried again after a lost answer, so
+    // a retry replays what was saved instead of adding second copies (WD-07).
     for (const [index, file] of files.entries()) {
       setProgress({ current: index + 1, total: files.length, step: null, starting: false });
       ids.push(
         await uploadDocument(api, file, "register_scan", {
           onProgress: (step) =>
             setProgress({ current: index + 1, total: files.length, step, starting: false }),
+          keys: uploadKeys.keys({ file }),
         }),
       );
     }
     setProgress({ current: files.length, total: files.length, step: null, starting: true });
     return unwrap(
       api.POST("/api/v1/extraction-batches", {
-        headers: { "Idempotency-Key": newIdempotencyKey() },
+        headers: { "Idempotency-Key": uploadKeys.keys({ files }).create },
         body: { document_ids: ids },
       }),
     );
@@ -121,11 +130,13 @@ export function UploadPhotos({ onStarted }: { onStarted: (batch: ExtractionBatch
     }
     start(files)
       .then((batch) => {
+        uploadKeys.succeeded();
         form.reset();
         setProgress(null);
         onStarted(batch);
       })
       .catch((failure: unknown) => {
+        uploadKeys.failed(failure);
         setProgress(null);
         setError(failure);
       });

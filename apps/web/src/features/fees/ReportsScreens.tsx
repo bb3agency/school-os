@@ -437,7 +437,7 @@ export function DuesScreen() {
     setRemindOpen(true);
   }, []);
   const classes = useApiQuery(
-    ["staff", "fees", "classes"],
+    KEYS.classes,
     () => unwrap(api.GET("/api/v1/classes", { params: { query: { limit: 200 } } })),
     { enabled: me !== undefined && allowed },
   );

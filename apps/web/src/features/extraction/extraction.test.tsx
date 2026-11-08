@@ -214,6 +214,41 @@ describe("US-402 AC1: upload register photos", () => {
   });
 });
 
+describe("register photos: a retry after a lost answer (WD-07, FR-IMP-020)", () => {
+  it("reuses each photo's keys, so no second copy of a page is stored", async () => {
+    let n = 0;
+    stub.routes["POST /bff/api/v1/documents/uploads"] = () =>
+      Response.json({ upload_id: ID.upload, url: "https://files.schoolos.example/u", fields: {} });
+    stub.routes["POST /bff/api/v1/documents"] = () => {
+      n += 1;
+      if (n === 2) return problem(502, "bad_gateway");
+      return Response.json({ id: n % 2 === 1 ? ID.doc : ID.page2 }, { status: 202 });
+    };
+    stub.routes[`GET /bff/api/v1/documents/${ID.doc}`] = () =>
+      Response.json({ id: ID.doc, current_version: { status: "ready" } });
+    stub.routes[`GET /bff/api/v1/documents/${ID.page2}`] = () =>
+      Response.json({ id: ID.page2, current_version: { status: "ready" } });
+    stub.routes["POST /bff/api/v1/extraction-batches"] = () =>
+      Response.json(extractionBatch({ status: "queued" }), { status: 202 });
+    setStoragePostForTesting(async () => undefined);
+    const started = vi.fn();
+    const user = userEvent.setup();
+    renderWithIntl(<UploadPhotos onStarted={started} />);
+    await user.upload(screen.getByLabelText(xm.upload.photos), [photo("p1.jpg"), photo("p2.png")]);
+    await user.click(screen.getByRole("button", { name: xm.upload.submit }));
+    await screen.findByText(messages.en.errors.api.bad_gateway.title);
+    await user.click(screen.getByRole("button", { name: xm.upload.submit }));
+    await waitFor(() => expect(started).toHaveBeenCalled());
+    const keys = stub
+      .callsTo("POST /bff/api/v1/documents")
+      .map((c) => c.headers.get("idempotency-key"));
+    expect(keys).toHaveLength(4);
+    expect(keys[0]).not.toBe(keys[1]);
+    expect(keys[2]).toBe(keys[0]);
+    expect(keys[3]).toBe(keys[1]);
+  });
+});
+
 describe("US-402 AC4 / PRV-016: a batch", () => {
   it("shows progress per page, which photos were blacked out or withheld, and the queue", async () => {
     stub.routes["GET /bff/api/v1/extraction-items"] = () =>

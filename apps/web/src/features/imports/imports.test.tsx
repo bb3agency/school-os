@@ -129,6 +129,39 @@ describe("FR-IMP-001: which files can be imported", () => {
     });
   });
 
+  it("a retry after a lost answer reuses the upload and register keys, so one document is made (WD-07, FR-IMP-001)", async () => {
+    stub.routes["POST /bff/api/v1/documents/uploads"] = () =>
+      Response.json(
+        { upload_id: ID.upload, url: "https://files.schoolos.example/u", fields: {} },
+        { status: 201 },
+      );
+    let registers = 0;
+    stub.routes["POST /bff/api/v1/documents"] = () =>
+      (registers += 1) === 1
+        ? problem(502, "bad_gateway")
+        : Response.json({ id: ID.doc }, { status: 202 });
+    stub.routes[`GET /bff/api/v1/documents/${ID.doc}`] = () =>
+      Response.json({ id: ID.doc, current_version: { status: "ready" } });
+    stub.routes["POST /bff/api/v1/imports"] = () => Response.json(importBatch(), { status: 202 });
+    setStoragePostForTesting(async () => undefined);
+    const started = vi.fn();
+    const user = userEvent.setup();
+    renderWithIntl(<UploadSpreadsheet onStarted={started} />);
+    await user.upload(screen.getByLabelText(im.upload.file), file("class9.csv", 1024, "text/csv"));
+    await user.selectOptions(screen.getByLabelText(im.upload.source), "udise_plus");
+    await user.click(screen.getByRole("button", { name: im.upload.submit }));
+    await screen.findByText(messages.en.errors.api.bad_gateway.title);
+    await user.click(screen.getByRole("button", { name: im.upload.submit }));
+    await waitFor(() => expect(started).toHaveBeenCalled());
+    const key = (route: string, n: number) =>
+      stub.callsTo(route)[n]?.headers.get("idempotency-key");
+    expect(key("POST /bff/api/v1/documents/uploads", 0)).toBeTruthy();
+    expect(key("POST /bff/api/v1/documents/uploads", 1)).toBe(
+      key("POST /bff/api/v1/documents/uploads", 0),
+    );
+    expect(key("POST /bff/api/v1/documents", 1)).toBe(key("POST /bff/api/v1/documents", 0));
+  });
+
   it("explains a blocked file in plain language", async () => {
     stub.routes["POST /bff/api/v1/documents/uploads"] = () =>
       Response.json({ upload_id: ID.upload, url: "https://files.schoolos.example/u", fields: {} });
@@ -295,6 +328,35 @@ describe("US-401 AC1..AC3: one import", () => {
         { index: 2, target: "dob" },
       ],
     });
+  });
+
+  it("a retry after a lost check answer keeps the saved mapping and the Idempotency-Key (WD-07, FR-IMP-003)", async () => {
+    stub.routes[`PUT /bff/api/v1/imports/${ID.import}/mapping`] = () =>
+      Response.json(importBatch({ version: 4 }));
+    let answers = 0;
+    stub.routes[`POST /bff/api/v1/imports/${ID.import}/validate`] = () =>
+      (answers += 1) === 1
+        ? problem(502, "bad_gateway")
+        : Response.json(importBatch({ status: "validating", version: 5 }), { status: 202 });
+    const user = userEvent.setup();
+    renderWithIntl(
+      <ImportDetailView
+        batch={ready(importBatch())}
+        attributes={ready(ATTRIBUTES)}
+        permissions={perms}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: im.mapping.submit }));
+    await screen.findByText(messages.en.errors.api.bad_gateway.title);
+    await user.click(screen.getByRole("button", { name: im.mapping.submit }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/imports/${ID.import}/validate`)).toHaveLength(2),
+    );
+    // The mapping was saved the first time (version 3 -> 4): not sent again with a stale If-Match.
+    expect(stub.callsTo(`PUT /bff/api/v1/imports/${ID.import}/mapping`)).toHaveLength(1);
+    const [first, second] = stub.callsTo(`POST /bff/api/v1/imports/${ID.import}/validate`);
+    expect(first?.headers.get("Idempotency-Key")).toBeTruthy();
+    expect(second?.headers.get("Idempotency-Key")).toBe(first?.headers.get("Idempotency-Key"));
   });
 
   it("requires the admission number column", async () => {

@@ -22,7 +22,7 @@ import { ProblemAlert } from "@/features/students/ProblemAlert";
 import { VALUE_SOURCES, isValueSource } from "@/features/students/types";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
-import { ApiError, newIdempotencyKey, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { ApiError, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formValues } from "@/lib/forms";
 import { formatBytes, formatCount, formatDateTime } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
@@ -35,7 +35,7 @@ import {
 } from "./types";
 import { FileDropZone, fileInputClasses } from "./parts";
 import { ERP_PRESET, TemplateLibrary } from "./presets";
-import { extensionOf, uploadDocument, type UploadProgress } from "./upload";
+import { extensionOf, uploadDocument, useUploadKeys, type UploadProgress } from "./upload";
 
 export const IMPORTS_KEY = ["staff", "imports"] as const;
 /** FR-IMP-001: XLSX or CSV (a Google Sheets download), at most 10 MB. */
@@ -153,10 +153,16 @@ export function UploadSpreadsheet({
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<unknown>(undefined);
   const busy = progress !== null;
+  const uploadKeys = useUploadKeys();
 
   async function start(file: File, source: ImportSource) {
-    const documentId = await uploadDocument(api, file, "import_file", { onProgress: setProgress });
-    const key = newIdempotencyKey();
+    // The same file and source tried again after a lost answer reuse their keys (WD-07).
+    const keys = uploadKeys.keys({ file, source });
+    const documentId = await uploadDocument(api, file, "import_file", {
+      onProgress: setProgress,
+      keys,
+    });
+    const key = keys.create;
     // The scan result can take a moment to reach the import service: retry briefly.
     for (let attempt = 0; ; attempt += 1) {
       try {
@@ -191,11 +197,13 @@ export function UploadSpreadsheet({
     }
     start(file, parsed.data.source)
       .then((batch) => {
+        uploadKeys.succeeded();
         form.reset();
         setProgress(null);
         onStarted(batch);
       })
       .catch((failure: unknown) => {
+        uploadKeys.failed(failure);
         setProgress(null);
         setError(failure);
       });

@@ -1,7 +1,9 @@
 "use client";
 
 import type { ApiClient, components } from "@schoolos/api-client";
-import { newIdempotencyKey, unwrap } from "@/lib/bff/query";
+import { useMemo, useRef } from "react";
+import { ApiError, newIdempotencyKey, unwrap } from "@/lib/bff/query";
+import { intentSignature } from "@/lib/forms";
 
 /**
  * Upload one file the documents way (docs/09 §4 Documents; FR-DOC-001..005):
@@ -108,6 +110,63 @@ export interface UploadOptions {
   pollMs?: number;
   /** Give up waiting for the scan after this long (the document stays; try again later). */
   timeoutMs?: number;
+  /** Idempotency-Keys of this intent (useUploadKeys); new ones for each call when omitted. */
+  keys?: UploadKeys;
+}
+
+export interface UploadKeys {
+  /** POST /documents/uploads. */
+  upload: string;
+  /** POST /documents. */
+  register: string;
+  /** The create that follows (an import, a statement, an extraction batch). */
+  create: string;
+}
+
+export interface UploadIntent {
+  /** The keys for one file (or file set) of this intent: the same values get the same keys. */
+  keys: (signature: unknown) => UploadKeys;
+  /** Everything worked: the next submit is a new intent. */
+  succeeded: () => void;
+  /**
+   * A network error, a 5xx or a scan that is still running keep the keys, so a retry replays
+   * what the API saved instead of making a second document (WD-07). A 4xx, a file storage
+   * refused (its presigned form may have expired) or a blocked file start afresh.
+   */
+  failed: (error: unknown) => void;
+}
+
+const RENEW: readonly UploadErrorCode[] = ["storage_rejected", "quarantined", "scan_failed"];
+
+/** Idempotency-Keys per user intent for the upload, register and create steps (docs/09 §2). */
+export function useUploadKeys(): UploadIntent {
+  const keysRef = useRef(new Map<string, UploadKeys>());
+  return useMemo(() => {
+    const clear = () => keysRef.current.clear();
+    return {
+      keys: (signature: unknown) => {
+        const id = intentSignature(signature);
+        const known = keysRef.current.get(id);
+        if (known) return known;
+        const fresh = {
+          upload: newIdempotencyKey(),
+          register: newIdempotencyKey(),
+          create: newIdempotencyKey(),
+        };
+        keysRef.current.set(id, fresh);
+        return fresh;
+      },
+      succeeded: clear,
+      failed: (error: unknown) => {
+        if (
+          (error instanceof ApiError && error.status < 500) ||
+          (error instanceof UploadError && RENEW.includes(error.code))
+        ) {
+          clear();
+        }
+      },
+    };
+  }, []);
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -145,7 +204,7 @@ export async function uploadDocument(
   report({ stage: "requesting" });
   const upload = await unwrap(
     api.POST("/api/v1/documents/uploads", {
-      headers: { "Idempotency-Key": newIdempotencyKey() },
+      headers: { "Idempotency-Key": options.keys?.upload ?? newIdempotencyKey() },
       body: {
         filename: file.name.slice(0, 255) || "file",
         content_type: contentTypeOf(file),
@@ -161,7 +220,7 @@ export async function uploadDocument(
   report({ stage: "registering" });
   const doc = await unwrap(
     api.POST("/api/v1/documents", {
-      headers: { "Idempotency-Key": newIdempotencyKey() },
+      headers: { "Idempotency-Key": options.keys?.register ?? newIdempotencyKey() },
       body: {
         upload_id: upload.upload_id,
         title: titleOf(file.name),
