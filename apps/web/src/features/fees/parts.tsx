@@ -86,6 +86,28 @@ export function RequestStatusPill({ status }: { status: string }) {
   return <Pill variant={REQUEST_PILL[status] ?? "tag"}>{t(status as "pending")}</Pill>;
 }
 
+/**
+ * WF-03 (FR-FEE-026): the second person's note on a decided request (the reason for a
+ * rejection, or an approval note). The maker's "request decided" notification opens the
+ * screen that shows it.
+ */
+export function DecisionNote({
+  request,
+}: {
+  request: { status: string; decided_by_name: string | null; decision_note: string | null };
+}) {
+  const t = useTranslations("fees");
+  if (request.status === "pending" || !request.decision_note) return null;
+  return (
+    <p className="text-sm break-words">
+      <span className="font-semibold">
+        {t("decisionNote", { name: request.decided_by_name ?? "—" })}
+      </span>{" "}
+      <span className="whitespace-pre-line">{request.decision_note}</span>
+    </p>
+  );
+}
+
 export function ModeText({ mode }: { mode: string }) {
   const t = useTranslations("fees.modes");
   return <>{t(mode as "cash")}</>;

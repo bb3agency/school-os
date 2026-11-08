@@ -9879,7 +9879,8 @@
         "minimum": "Enter an amount of 0 or more, with at most 2 decimals.",
         "gstNote": "Write the line, in at most 200 characters."
       }
-    }
+    },
+    "decisionNote": "Note from {name}:"
   },
   "payments": {
     "nav": {
