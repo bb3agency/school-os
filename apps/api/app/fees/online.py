@@ -1673,11 +1673,18 @@ def _apply_event(  # noqa: PLR0911 - one branch per event type
     return "ignored"
 
 
+def _next_ist_day(now: dt.datetime) -> dt.datetime:
+    """The start of the next IST day (a minute after midnight, Asia/Kolkata)."""
+    tomorrow = now.astimezone(IST).date() + dt.timedelta(days=1)
+    return dt.datetime.combine(tomorrow, dt.time(0, 1), tzinfo=IST)
+
+
 def process_events(tenant_id: uuid.UUID) -> dict[str, int]:
     """Worker: apply the school's stored events, one transaction each, oldest first (FR-PAY-008,
-    FR-PAY-009). A provider that cannot be reached or a closed day retries the event later with
-    backoff; after the last attempt it is ``failed`` (shown on the reconciliation screen). One
-    event's failure never blocks the others."""
+    FR-PAY-009). A provider that cannot be reached retries the event later with backoff; after
+    the last attempt it is ``failed`` (shown on the reconciliation screen). A closed day waits
+    for the next IST day without spending an attempt (YF-01). One event's failure never blocks
+    the others."""
     inbox = cfg().inbox
     totals: Counter[str] = Counter()
     for _ in range(inbox.batch_size):
@@ -1707,6 +1714,15 @@ def process_events(tenant_id: uuid.UUID) -> dict[str, int]:
                 savepoint.commit()
             except _Retry as retry:
                 savepoint.rollback()
+                if retry.code == "day_closed":
+                    # YF-01 (FR-FEE-022): today is closed, so the receipt can only be dated
+                    # tomorrow. Wait for the next IST day without spending an attempt: the
+                    # backoff alone runs out after ~8 hours and a failed event is never
+                    # receipted.
+                    attempts = event.attempts
+                    wake = _next_ist_day(now)
+                else:
+                    wake = now + dt.timedelta(seconds=inbox.backoff(attempts))
                 final = attempts >= inbox.max_attempts
                 orepo.finish_event(
                     session,
@@ -1715,7 +1731,7 @@ def process_events(tenant_id: uuid.UUID) -> dict[str, int]:
                         "status": "failed" if final else "received",
                         "attempts": attempts,
                         "error_code": retry.code[:60],
-                        "next_attempt_at": now + dt.timedelta(seconds=inbox.backoff(attempts)),
+                        "next_attempt_at": wake,
                         "processed_at": now if final else None,
                     },
                 )

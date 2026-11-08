@@ -312,7 +312,8 @@ def test_FR_FEE_022_day_closed_waits_for_the_next_day(
         t=school.tenant_id,
     )
     assert row
-    assert row[0]["attempts"] == 1
+    # Waiting for the next day spends no attempt (YF-01).
+    assert row[0]["attempts"] == 0
     monkeypatch.undo()
     with admin_engine.begin() as c:
         c.execute(
@@ -322,6 +323,57 @@ def test_FR_FEE_022_day_closed_waits_for_the_next_day(
             ),
             {"t": school.tenant_id},
         )
+    P.process(school)
+    assert P.receipts_for_payment(admin_engine, school.tenant_id, payment.id) == 1
+
+
+def _wake_events(admin: Engine, tenant_id: uuid.UUID) -> None:
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "UPDATE fin.provider_events SET next_attempt_at = now() WHERE tenant_id = :t "
+                "AND status = 'received'"
+            ),
+            {"t": tenant_id},
+        )
+
+
+def test_FR_FEE_022_YF_01_day_closed_never_exhausts_the_retries(
+    school: Any, api: Any, admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """YF-01: a payment captured after today's close waits for the next IST day, however many
+    passes that takes. Before, each pass counted as an attempt, so after ``max_attempts`` (about
+    7.7 hours of backoff) the event was marked failed and the payment was never receipted
+    (reconciliation only opens an exception; no other path writes a Razorpay receipt)."""
+    conn = P.connect(school)
+    intent = P.link(school, F.account(school), [1])
+    body, payment = _paid_body(intent)
+    P.deliver(api, conn, body)
+
+    def closed(*_: Any, **__: Any) -> None:
+        raise common.DayClosed()
+
+    monkeypatch.setattr(common, "ensure_day_open", closed)
+    P.process(school)
+    # The next try is at the start of the next IST day, not after a few seconds.
+    assert P.scalar(
+        admin_engine,
+        "SELECT next_attempt_at >= ((date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata') "
+        "+ interval '1 day') AT TIME ZONE 'Asia/Kolkata') FROM fin.provider_events "
+        "WHERE tenant_id = :t AND error_code = 'day_closed'",
+        t=school.tenant_id,
+    )
+    for _ in range(online.cfg().inbox.max_attempts + 1):
+        _wake_events(admin_engine, school.tenant_id)
+        P.process(school)
+    rows = P.rows(
+        admin_engine,
+        "SELECT status FROM fin.provider_events WHERE tenant_id = :t AND error_code = 'day_closed'",
+        t=school.tenant_id,
+    )
+    assert [r["status"] for r in rows] == ["received"]
+    monkeypatch.undo()
+    _wake_events(admin_engine, school.tenant_id)
     P.process(school)
     assert P.receipts_for_payment(admin_engine, school.tenant_id, payment.id) == 1
 
