@@ -462,6 +462,25 @@ describe("document detail (US-701 AC3..AC4, FR-DOC-002, FR-DOC-004, FR-DOC-006)"
     ).toBeInTheDocument();
   });
 
+  it("a failed poll keeps the document shown and asks again (XO-07)", async () => {
+    setMe([READ]);
+    let calls = 0;
+    stub.routes[`GET /bff/api/v1/documents/${DOC}`] = () => {
+      calls += 1;
+      if (calls >= 2 && calls <= 5) return problem(502, "bad_gateway");
+      return Response.json(
+        detail({ versions: [version({ status: calls === 1 ? "queued" : "ready" })] }),
+      );
+    };
+    renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    expect(await screen.findByText("Version 1 is being checked")).toBeInTheDocument();
+    await waitFor(() => expect(calls).toBeGreaterThanOrEqual(3), { timeout: 4000 });
+    expect(screen.getByText("Version 1 is being checked")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Download version 1" }, { timeout: 6000 }),
+    ).toBeInTheDocument();
+  });
+
   it("keeps restricted (C3) files closed for members without sensitive access", async () => {
     setMe([READ], OTHER_USER);
     stub.routes[`GET /bff/api/v1/documents/${DOC}`] = () =>
