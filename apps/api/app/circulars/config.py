@@ -33,6 +33,8 @@ class NoticeRules(_Model):
     max_body_chars: int = Field(ge=200, le=5000)
     render_keep_days: int = Field(ge=1, le=6)
     """Below the 7-day bucket rule for exports/ (docs/05 §13)."""
+    failed_render_cooldown_s: int = Field(ge=60, le=86_400)
+    """Parent links re-queue a failed render only after this long (AZ-02)."""
     image_width_px: int = Field(ge=480, le=2000)
 
 

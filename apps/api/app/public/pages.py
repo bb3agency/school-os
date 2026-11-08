@@ -227,6 +227,11 @@ def document(
             return ParentDocumentPreparingOut(
                 status="preparing", retry_after_s=rules().document_retry_after_s
             )
+        if isinstance(notice_pdf, circulars.PdfCoolingDown):
+            # A failed render cools down (AZ-02): the time left, nothing queued.
+            return ParentDocumentPreparingOut(
+                status="preparing", retry_after_s=notice_pdf.retry_after_s
+            )
         found = None if isinstance(notice_pdf, str) else notice_pdf
     elif handle.kind == "parent_receipt":
         _receipt(session, handle)
