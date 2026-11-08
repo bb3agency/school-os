@@ -428,7 +428,7 @@ def update_breach(  # noqa: PLR0912 - one branch per field
                     "Record the open duties, or give the reason they were not needed.",
                     code="duties_open",
                 )
-            values["closed_at"] = repo.now(session)
+            values["closed_at"] = repo.closing_time()
     if data.close_reason is not None:
         if data.status != "closed":
             # A reason is given only when closing (FR-DPDP-034); on an open breach it would be

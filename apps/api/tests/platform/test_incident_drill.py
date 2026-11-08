@@ -18,7 +18,9 @@ review, once (D49) → the school closes it again → audit on both chains, code
 The clock: every ``now()`` the flow reads (the incident service, the two-person rules, the
 breach register's DB clock) is pinned to ``clock.at``, which the drill moves forward. The
 timeline sits a week in the past so that every "not in the future" check uses the pinned time
-and real time agrees. Synthetic data only.
+and real time agrees. One exception: a breach's ``closed_at`` is always the database's real
+transaction time (trigger ``breach_records_closed_at``, audit 2026-11-08 TI-04), so closing
+does not follow the pinned clock. Synthetic data only.
 """
 
 from __future__ import annotations
