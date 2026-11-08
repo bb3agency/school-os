@@ -674,6 +674,10 @@ class Settings(BaseSettings):
             return
         if self.effective_payments_provider_mode is PaymentsProviderMode.FAKE:
             raise ValueError(f"SOS_PAYMENTS_PROVIDER_MODE=fake is not allowed in {self.env}")
+        # Audit 2026-11-08 CP-01: test mode moves no money, so in production its "captured"
+        # payments would become real receipts. Test mode is for staging only (docs/10 §11).
+        if self.env is Environment.PROD and self.razorpay_oauth_mode != "live":
+            raise ValueError("SOS_RAZORPAY_OAUTH_MODE must be live in prod")
         secret = self.razorpay_partner_client_secret
         if secret is not None and (
             "dev-only" in secret.get_secret_value() or len(secret.get_secret_value()) < 16
