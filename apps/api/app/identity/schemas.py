@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -21,6 +22,9 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic_core import PydanticCustomError
+
+from app.core.redaction import contains_full_aadhaar
 
 
 def _nfc(value: Any) -> Any:
@@ -29,9 +33,21 @@ def _nfc(value: Any) -> Any:
     return value
 
 
+def _no_full_aadhaar(value: str) -> str:
+    """Staff names and emails are shown on every audit line, assignment and notification: never
+    a full Aadhaar number (invariant 4; web audit 2026-11-08 XS-04, SEC-013). 422 with the field
+    and code ``aadhaar_full_number_rejected``; the value is never echoed."""
+    if contains_full_aadhaar(value):
+        raise PydanticCustomError("aadhaar_full_number_rejected", "Don't enter Aadhaar numbers.")
+    return value
+
+
 _NO_CONTROL = r"^[^\x00-\x1f\x7f]+$"
 DisplayName = Annotated[
-    str, BeforeValidator(_nfc), StringConstraints(min_length=1, max_length=200, pattern=_NO_CONTROL)
+    str,
+    BeforeValidator(_nfc),
+    StringConstraints(min_length=1, max_length=200, pattern=_NO_CONTROL),
+    AfterValidator(_no_full_aadhaar),
 ]
 Email = Annotated[
     str,
@@ -39,6 +55,7 @@ Email = Annotated[
     StringConstraints(
         max_length=254, pattern=r"^[^@\s\x00-\x1f]+@[^@\s\x00-\x1f]+\.[^@\s\x00-\x1f]+$"
     ),
+    AfterValidator(_no_full_aadhaar),
 ]
 Subject = Annotated[
     str, StringConstraints(min_length=1, max_length=255, pattern=r"^[A-Za-z0-9._:@|+=-]+$")
