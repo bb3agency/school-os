@@ -83,6 +83,28 @@ describe("PDF of slips and forms (FR-DQ-047, FR-APC-007)", () => {
     expect(stub.callsTo(LINK)[0]?.url.searchParams.get("format")).toBe("pdf");
   });
 
+  it("a retry after a lost answer reuses the Idempotency-Key, so one PDF is made (WD-07, FR-DQ-047)", async () => {
+    let answers = 0;
+    stub.routes[FORMS] = () =>
+      (answers += 1) === 1
+        ? problem(502, "bad_gateway")
+        : Response.json(slipsRow("queued"), { status: 202 });
+    stub.routes[ONE] = () => Response.json(slipsRow("queued"));
+    renderWithIntl(
+      <PdfJobButton
+        label="Make PDF of the form"
+        request={{ kind: "apaar_consent_forms", body: { student_id: STUDENT } }}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Make PDF of the form" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Make PDF of the form" }));
+    await waitFor(() => expect(stub.callsTo(FORMS)).toHaveLength(2));
+    const [first, second] = stub.callsTo(FORMS);
+    expect(first?.headers.get("Idempotency-Key")).toBeTruthy();
+    expect(second?.headers.get("Idempotency-Key")).toBe(first?.headers.get("Idempotency-Key"));
+  });
+
   it("shows why the consent forms could not be requested and offers another try after a failure", async () => {
     stub.routes[FORMS] = () => problem(409, "no_forms");
     renderWithIntl(

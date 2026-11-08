@@ -14,9 +14,10 @@ import { Steps } from "@/components/ui/Steps";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Value } from "@/components/ui/Value";
 import type { Locale } from "@/i18n/routing";
-import { ApiError, newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
+import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatBytes, formatCount, formatDateTime } from "@/lib/format";
+import { useIntentKey } from "@/lib/forms";
 import { translateOr } from "@/lib/i18n-dynamic";
 import {
   ADMIN_KEYS,
@@ -196,22 +197,27 @@ function RequestCard({ busy, ready }: { busy: boolean; ready: boolean }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
   const [requested, setRequested] = useState(false);
+  const intent = useIntentKey();
   const mayIncludeSensitive = can(READ_SENSITIVE);
 
   async function request() {
     setPending(true);
     setError(undefined);
     setRequested(false);
+    const body = { include_sensitive: includeSensitive && mayIncludeSensitive };
     try {
       await unwrap(
         api.POST("/api/v1/admin/tenant-export", {
-          headers: { "Idempotency-Key": newIdempotencyKey() },
-          body: { include_sensitive: includeSensitive && mayIncludeSensitive },
+          // A retry after a lost answer reuses the key: one export (WD-07).
+          headers: { "Idempotency-Key": intent.next(body) },
+          body,
         }),
       );
+      intent.succeeded();
       setRequested(true);
       await queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.exports });
     } catch (failure) {
+      intent.failed(failure);
       setError(failure);
       if (failure instanceof ApiError && failure.code === "tenant_export_in_progress") {
         void queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.exports });

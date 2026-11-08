@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
-import { newIdempotencyKey, unwrap, useBffClient } from "@/lib/bff/query";
+import { unwrap, useBffClient } from "@/lib/bff/query";
+import { useIntentKey } from "@/lib/forms";
 import { EXPORT_KEYS, startDownload, useExport } from "./data";
 import type {
   ConsentFormsCreate,
@@ -126,11 +127,13 @@ export function PdfJobButton({
   const [exportId, setExportId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
+  const intent = useIntentKey();
 
   async function start() {
     setPending(true);
     setError(undefined);
-    const headers = { "Idempotency-Key": newIdempotencyKey() };
+    // A retry after a lost answer reuses the key: one PDF job (WD-07).
+    const headers = { "Idempotency-Key": intent.next(request) };
     try {
       const created =
         request.kind === "readiness_slips"
@@ -144,9 +147,11 @@ export function PdfJobButton({
             : await unwrap(
                 api.POST("/api/v1/exports/consent-forms", { headers, body: request.body }),
               );
+      intent.succeeded();
       setExportId(created.id);
       void queryClient.invalidateQueries({ queryKey: EXPORT_KEYS.all });
     } catch (failure) {
+      intent.failed(failure);
       setError(failure);
     } finally {
       setPending(false);

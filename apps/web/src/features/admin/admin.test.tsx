@@ -128,6 +128,25 @@ describe("data export screen (US-1201 AC1, FR-ADM-001)", () => {
     expect(screen.getByRole("button", { name: en.dataExport.requestButton })).toBeDisabled();
   });
 
+  it("a retry after a lost answer reuses the Idempotency-Key, so one export is made (WD-07, FR-ADM-001)", async () => {
+    signedIn([EXPORT_ALL]);
+    let answers = 0;
+    stub.routes["POST /bff/api/v1/admin/tenant-export"] = () =>
+      (answers += 1) === 1
+        ? problem(502, "bad_gateway")
+        : Response.json(exportRow({ status: "queued" }), { status: 202 });
+    renderWithIntl(<DataExportScreen />);
+    const button = await screen.findByRole("button", { name: en.dataExport.requestButton });
+    await userEvent.click(button);
+    await screen.findByText(messages.en.errors.api.bad_gateway.title);
+    await userEvent.click(screen.getByRole("button", { name: en.dataExport.requestButton }));
+    await waitFor(() =>
+      expect(stub.callsTo("POST /bff/api/v1/admin/tenant-export")).toHaveLength(2),
+    );
+    const [first, second] = stub.callsTo("POST /bff/api/v1/admin/tenant-export");
+    expect(second?.headers.get("Idempotency-Key")).toBe(first?.headers.get("Idempotency-Key"));
+  });
+
   it("includes restricted details only when asked, by someone allowed to see them", async () => {
     signedIn([EXPORT_ALL, SENSITIVE]);
     stub.routes["POST /bff/api/v1/admin/tenant-export"] = () =>
