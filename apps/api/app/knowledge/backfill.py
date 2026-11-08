@@ -11,6 +11,11 @@ transaction per school, with one audit event ``kb.backfill.enqueued`` (actor ``s
 school's id and the count only). Without ``--apply`` (the default) it is a dry run: it prints
 the counts and changes nothing.
 
+It also prunes (audit 2026-11-09 YK-02): with ``--apply`` it deletes the chunks (and cached
+vectors) of every document that has chunks but is no longer indexable (its purpose was excluded
+or its sensitivity is not indexed since it was indexed, e.g. certificate PDFs, or the document
+is gone), in the same transaction, audited ``kb.backfill.pruned`` (ids and counts only).
+
 Safe to repeat: ingestion is idempotent per version. Output carries school ids and counts only,
 never titles or names (invariant 5). Refuses ``--apply`` while ``SOS_KB_ENABLED`` is off.
 """
@@ -29,9 +34,11 @@ from app.core.config import get_settings
 from app.core.db import context_free_session, tenant_session
 from app.core.logging import get_logger
 from app.documents import service as documents
+from app.knowledge import repository as repo
 from app.knowledge.config.chunking import load_chunking_config
-from app.knowledge.ingestion.documents_source import system_context
+from app.knowledge.ingestion.documents_source import DocumentsServiceSource, system_context
 from app.knowledge.ingestion.hooks import READY_EVENT
+from app.knowledge.store import SqlChunkStore
 from app.ops import service as ops
 from app.tenancy import service as tenancy
 
@@ -42,6 +49,8 @@ log = get_logger(__name__)
 
 PAGE: Final = 200
 EXIT_REFUSED: Final = 2
+AUDIT_IDS: Final = 100
+"""At most this many document ids in the ``kb.backfill.pruned`` summary."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +58,24 @@ class SchoolBackfill:
     tenant_id: uuid.UUID
     documents: int
     enqueued: int
+    pruned: int = 0
+
+
+def not_indexable(session: Session, tenant_id: uuid.UUID) -> list[uuid.UUID]:
+    """Documents of the school that have chunks but may not be indexed now (YK-02): gone, an
+    excluded purpose, or a sensitivity that is not indexed."""
+    rules = load_chunking_config().extraction
+    source = DocumentsServiceSource()
+    out: list[uuid.UUID] = []
+    for document_id in repo.indexed_document_ids(session):
+        facts = source.document(session, tenant_id, document_id)
+        if (
+            facts is None
+            or facts.purpose in rules.excluded_purposes
+            or facts.sensitivity not in rules.indexed_sensitivities
+        ):
+            out.append(document_id)
+    return out
 
 
 def ready_versions(session: Session, tenant_id: uuid.UUID) -> list[tuple[uuid.UUID, uuid.UUID]]:
@@ -77,6 +104,24 @@ def ready_versions(session: Session, tenant_id: uuid.UUID) -> list[tuple[uuid.UU
 def backfill_school(tenant_id: uuid.UUID, *, apply: bool) -> SchoolBackfill:
     with tenant_session(tenant_id) as s:
         found = ready_versions(s, tenant_id)
+        prune = not_indexable(s, tenant_id)
+        if apply and prune:
+            store = SqlChunkStore()
+            for document_id in prune:
+                store.lock_document(s, document_id)
+                store.delete_document(s, document_id)
+            audit.record(
+                s,
+                action="kb.backfill.pruned",
+                resource_type="tenant",
+                resource_id=tenant_id,
+                summary={
+                    "documents": len(prune),
+                    "document_ids": [str(d) for d in prune[:AUDIT_IDS]],
+                    "ids_truncated": len(prune) > AUDIT_IDS,
+                },
+                actor_type="system",
+            )
         if apply and found:
             for document_id, version_id in found:
                 ops.enqueue_event(
@@ -95,9 +140,9 @@ def backfill_school(tenant_id: uuid.UUID, *, apply: bool) -> SchoolBackfill:
         "knowledge.backfill.school",
         tenant_id=tenant_id,
         count=len(found),
-        outcome="enqueued" if apply else "dry_run",
+        outcome=f"{'enqueued' if apply else 'dry_run'},pruned:{len(prune)}",
     )
-    return SchoolBackfill(tenant_id, len(found), enqueued)
+    return SchoolBackfill(tenant_id, len(found), enqueued, len(prune))
 
 
 def school_ids(named: Sequence[uuid.UUID]) -> list[uuid.UUID]:
@@ -123,6 +168,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         total += result.documents
         verb = "enqueued" if args.apply else "would enqueue"
         sys.stdout.write(f"{tenant_id}: {verb} {result.documents} document(s)\n")
+        if result.pruned:
+            pruned = "pruned" if args.apply else "would prune"
+            sys.stdout.write(f"{tenant_id}: {pruned} {result.pruned} not indexable document(s)\n")
     mode = "applied" if args.apply else "dry run (use --apply to enqueue)"
     sys.stdout.write(f"total: {total} document(s); {mode}\n")
     return 0
@@ -132,4 +180,11 @@ if __name__ == "__main__":  # pragma: no cover - operator entry point
     raise SystemExit(main())
 
 
-__all__ = ["SchoolBackfill", "backfill_school", "main", "ready_versions", "school_ids"]
+__all__ = [
+    "SchoolBackfill",
+    "backfill_school",
+    "main",
+    "not_indexable",
+    "ready_versions",
+    "school_ids",
+]
