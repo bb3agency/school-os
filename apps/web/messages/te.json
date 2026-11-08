@@ -7698,7 +7698,8 @@
       "discard": "Discard",
       "keep": "Keep marking"
     },
-    "unsavedLeave": "Attendance for this day is not saved. Leave and lose it?"
+    "unsavedLeave": "Attendance for this day is not saved. Leave and lose it?",
+    "changedBySomeone": "Someone else saved attendance for this day while you were marking it, so nothing was saved. The register now shows their changes, with the statuses you changed kept. Check them, then save again."
   },
   "marks": {
     "nav": "మార్కులు",
@@ -7753,7 +7754,8 @@
       "previous": "మునుపటి విద్యార్థి",
       "next": "తదుపరి విద్యార్థి",
       "keyboardHint": "తదుపరి విద్యార్థికి వెళ్ళడానికి Enter లేదా కింది బాణం నొక్కండి.",
-      "discard": "టైప్ చేసిన మార్కులను తీసివేయండి"
+      "discard": "టైప్ చేసిన మార్కులను తీసివేయండి",
+      "changedBySomeone": "Someone else saved marks for this exam while you were typing, so nothing was saved. The table now shows their marks and your typed marks are kept. Check them, then save again."
     },
     "import": {
       "title": "షీట్ నుండి మార్కులు జోడించండి",
