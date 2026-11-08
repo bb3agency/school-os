@@ -489,6 +489,8 @@ describe("fee problems the API returns have plain-language messages (FR-FEE-007.
     "in_future",
     "too_old",
     "invalid_range",
+    // Razorpay refused the key id and secret at connect (WD-03, FR-PAY-003).
+    "keys_rejected",
   ];
 
   it("has a title and body for every fee problem code, in en and te", () => {

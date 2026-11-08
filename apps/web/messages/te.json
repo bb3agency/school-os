@@ -2180,7 +2180,8 @@
       "confirmation_required": "కొనసాగే ముందు నిర్ధారించడానికి పెట్టెను టిక్ చేయండి.",
       "ai_bundle": "ఈ AI సమాధానాల బండిల్ ఇప్పుడు అందుబాటులో లేదు. వేరే బండిల్ ఎంచుకోండి.",
       "quiet_hours_empty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00.",
-      "invalid_time": "Enter a time as HH:MM, for example 07:00."
+      "invalid_time": "Enter a time as HH:MM, for example 07:00.",
+      "keys_rejected": "Razorpay ఈ కీ ఐడీ, సీక్రెట్‌ను అంగీకరించలేదు. Razorpay డాష్‌బోర్డ్ (Account & Settings > API keys) నుండి రెండింటినీ మళ్లీ కాపీ చేయండి."
     },
     "api": {
       "generic": {

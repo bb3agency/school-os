@@ -2180,7 +2180,8 @@
       "confirmation_required": "Tick the box to confirm before you go on.",
       "ai_bundle": "This AI answer bundle is no longer offered. Choose another bundle.",
       "quiet_hours_empty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00.",
-      "invalid_time": "Enter a time as HH:MM, for example 07:00."
+      "invalid_time": "Enter a time as HH:MM, for example 07:00.",
+      "keys_rejected": "Razorpay did not accept this key id and secret. Copy both again from the Razorpay dashboard (Account & Settings > API keys)."
     },
     "api": {
       "generic": {
