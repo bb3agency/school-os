@@ -1,5 +1,5 @@
 import { optinFromForm } from "@/server/public/actions";
-import { getAuthRuntime } from "@/server/runtime";
+import { getPublicRuntime } from "@/server/public/runtime";
 
 /**
  * POST /p/optin: the parent's message language from the opt-in page (R2-3H; ADR-0044 decision 4;
@@ -8,5 +8,5 @@ import { getAuthRuntime } from "@/server/runtime";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
-  return optinFromForm(await getAuthRuntime(), request);
+  return optinFromForm(await getPublicRuntime(), request);
 }

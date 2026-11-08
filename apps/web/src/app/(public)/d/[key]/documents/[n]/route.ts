@@ -1,5 +1,5 @@
 import { disclosureDocumentRedirect } from "@/server/public/disclosure";
-import { getAuthRuntime } from "@/server/runtime";
+import { getPublicRuntime } from "@/server/public/runtime";
 
 /**
  * GET /d/{key}/documents/{n}: a document of the published disclosure (ADR-0051; FR-DISC-009).
@@ -12,5 +12,5 @@ export async function GET(
   { params }: { params: Promise<{ key: string; n: string }> },
 ): Promise<Response> {
   const { key, n } = await params;
-  return disclosureDocumentRedirect(await getAuthRuntime(), request, key, n);
+  return disclosureDocumentRedirect(await getPublicRuntime(), request, key, n);
 }

@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { BusyLink, LinkFrame, type PageNotice } from "@/features/public/PublicPages";
 import { PAY_ERRORS, type PayError } from "@/server/public/actions";
-import { getAuthRuntime } from "@/server/runtime";
+import { getPublicRuntime } from "@/server/public/runtime";
 import { loadLinkView } from "@/server/public/view";
 
 /**
@@ -37,7 +37,7 @@ export default async function ParentLinkPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const runtime = await getAuthRuntime();
+  const runtime = await getPublicRuntime();
   const view = await loadLinkView(runtime, new Headers(await headers()));
   if (view.state === "expired") notFound();
   if (view.state === "busy") return <BusyLink />;

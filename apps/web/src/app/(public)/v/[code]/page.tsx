@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
 import { VerifyBusy, VerifyResult } from "@/features/public/VerifyPages";
 import { normaliseCode } from "@/lib/verification-code";
-import { getAuthRuntime } from "@/server/runtime";
+import { getPublicRuntime } from "@/server/public/runtime";
 import { loadVerification } from "@/server/public/verify";
 
 /**
@@ -17,7 +17,7 @@ export default async function VerifyCodePage({ params }: { params: Promise<{ cod
   const canonical = normaliseCode(code);
   if (canonical === null) notFound();
   if (canonical !== code) permanentRedirect(`/v/${canonical}`);
-  const runtime = await getAuthRuntime();
+  const runtime = await getPublicRuntime();
   const view = await loadVerification(runtime, new Headers(await headers()), canonical);
   if (view.state === "not_found") notFound();
   if (view.state === "busy") return <VerifyBusy />;

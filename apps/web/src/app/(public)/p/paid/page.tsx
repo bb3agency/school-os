@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { BusyLink, PaidPage } from "@/features/public/PublicPages";
 import { loadPayment } from "@/server/public/actions";
 import { loadLinkView } from "@/server/public/view";
-import { getAuthRuntime } from "@/server/runtime";
+import { getPublicRuntime } from "@/server/public/runtime";
 import { notFound } from "next/navigation";
 
 /**
@@ -26,7 +26,7 @@ export default async function ParentPaidPage({
   const query = await searchParams;
   const ref = one(query.ref) ?? one(query.razorpay_payment_link_reference_id);
   const checks = Math.min(Math.max(Number(one(query.n) ?? "0") || 0, 0), MAX_CHECKS);
-  const runtime = await getAuthRuntime();
+  const runtime = await getPublicRuntime();
   const incoming = new Headers(await headers());
   const view = await loadLinkView(runtime, incoming);
   if (view.state === "expired" || (view.state === "ok" && view.envelope.kind !== "parent_dues")) {
