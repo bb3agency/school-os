@@ -327,6 +327,85 @@ def test_FR_IMP_005_revert_refused_when_a_batch_value_was_superseded(
     assert err.value.code == "import_has_dependents"
 
 
+@pytest.mark.parametrize("decision", ["verified", "rejected"])
+def test_YS_01_FR_IMP_005_revert_refused_when_a_batch_value_was_checked_since(
+    world: Any, admin_engine: Engine, decision: str
+) -> None:
+    """YS-01: a clerk verified (or rejected) a value the batch added to an existing student.
+    The value stays current, so the revert saw nothing "on top" and silently withdrew it,
+    discarding the person's later decision. A human check is a later edit: 409."""
+    rows, numbers = S.class_list(1)
+    S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
+    sid = S.student_by_adm(admin_engine, world.a.tenant_id, numbers[0])
+    assert sid is not None
+    udise = [["Admission Number", "Mother Tongue", "Remarks"], [numbers[0], "Telugu", ""]]
+    batch_id = S.imported(admin_engine, world.a, S.xlsx_bytes(udise), source="udise_plus")
+    with admin_engine.connect() as c:
+        value_id: uuid.UUID = c.execute(
+            text("SELECT id FROM sis.attribute_values WHERE import_batch_id = :b"), {"b": batch_id}
+        ).scalar_one()
+    ctx = S.SW.admin_ctx(world.a)
+    with tenant_session(world.a.tenant_id, ctx.user_id) as s:
+        students.verify_value(s, ctx, sid, value_id, decision)  # type: ignore[arg-type]
+    with pytest.raises(Conflict) as err:
+        _revert(world.a, batch_id)
+    assert err.value.code == "import_has_dependents"
+    with admin_engine.connect() as c:
+        status: str = c.execute(
+            text("SELECT verification_status FROM sis.attribute_values WHERE id = :v"),
+            {"v": value_id},
+        ).scalar_one()
+    assert status == decision
+    assert S.batch(admin_engine, batch_id)["status"] == "committed"
+
+
+def test_YS_02_FR_IMP_005_revert_refused_when_a_later_import_confirmed_a_batch_value(
+    world: Any, admin_engine: Engine
+) -> None:
+    """YS-02: a later import with the same value on the same source reuses the batch's value
+    (``record_value`` is a no-op for an identical value), and shows it as added. Reverting the
+    first batch withdrew that value under the later import: 409 while that import is live.
+    A later import of other fields does not block the revert."""
+    rows, numbers = S.class_list(1)
+    S.imported(admin_engine, world.a, S.xlsx_bytes(rows))
+    sid = S.student_by_adm(admin_engine, world.a.tenant_id, numbers[0])
+    assert sid is not None
+    head = ["Admission Number", "Mother Tongue", "Caste"]
+    first = S.imported(
+        admin_engine,
+        world.a,
+        S.xlsx_bytes([head, [numbers[0], "Telugu", ""]]),
+        source="udise_plus",
+    )
+    later = S.imported(
+        admin_engine,
+        world.a,
+        S.xlsx_bytes([head, [numbers[0], "Telugu", "Synthetic Caste A"]]),
+        source="udise_plus",
+    )
+    with pytest.raises(Conflict) as err:
+        _revert(world.a, first)
+    assert err.value.code == "import_has_dependents"
+    assert S.batch(admin_engine, first)["status"] == "committed"
+    # Once the later import is reverted, the first one can be reverted too.
+    assert _revert(world.a, later).status == "reverted"
+    assert _revert(world.a, first).status == "reverted"
+    # Another field only: no dependency.
+    third = S.imported(
+        admin_engine,
+        world.a,
+        S.xlsx_bytes([head, [numbers[0], "Urdu", ""]]),
+        source="udise_plus",
+    )
+    S.imported(
+        admin_engine,
+        world.a,
+        S.xlsx_bytes([head, [numbers[0], "", "Synthetic Caste B"]]),
+        source="udise_plus",
+    )
+    assert _revert(world.a, third).status == "reverted"
+
+
 def test_FR_IMP_005_students_are_deleted_only_by_their_import_revert(
     world: Any, admin_engine: Engine, shared: dict[str, Any]
 ) -> None:

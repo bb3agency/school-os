@@ -123,6 +123,21 @@ def get_page(
     return session.execute(stmt).scalar_one_or_none()
 
 
+def lock_documents(session: Session, document_ids: Collection[uuid.UUID]) -> None:
+    """Transaction advisory lock per register photo (YS-04), in id order:
+    ``hashtextextended('extraction.document:' || <tenant id> || ':' || <document id>, 0)``. A
+    second batch for the same photo waits until the first commits, then sees it."""
+    tenant = str(current_tenant_id(session))
+    for document_id in sorted({str(d) for d in document_ids}):
+        session.execute(
+            text(
+                "SELECT pg_advisory_xact_lock("
+                "hashtextextended('extraction.document:' || :t || ':' || :d, 0))"
+            ),
+            {"t": tenant, "d": document_id},
+        )
+
+
 def documents_in_open_batches(
     session: Session, document_ids: Collection[uuid.UUID]
 ) -> set[uuid.UUID]:

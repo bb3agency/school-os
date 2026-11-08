@@ -1945,13 +1945,36 @@ def _notify_reverted(session: Session, ctx: UserContext, batch: ImportBatch, row
     )
 
 
+def _refuse_if_confirmed_later(session: Session, batch: ImportBatch) -> None:
+    """YS-02: a later live import from the same source that names a field this batch recorded
+    for the same student found the value already there (identical: ``record_value`` kept it) and
+    shows it as added. Withdrawing it would undo that import too: 409 ``import_has_dependents``
+    until the later import is reverted. A different later value would have superseded the
+    batch's value, which :func:`students.plan_import_revert` already refuses."""
+    current = students.import_batch_current_keys(session, batch.id)
+    if not current:
+        return
+    for row in repo.later_live_rows(session, batch, {sid for sid, _ in current}):
+        parsed = row.parsed or {}
+        values = parsed.get("values") or {}
+        keys = {k for k, v in values.items() if v not in (None, "")}
+        keys |= set(parsed.get("sensitive") or [])
+        if any((row.student_id, key) in current for key in keys):
+            raise Conflict(
+                "A later import added the same values, so this one cannot be reverted. "
+                "Revert the later import first, or correct the records instead.",
+                code="import_has_dependents",
+            )
+
+
 def revert(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut:
     """Undo a committed batch within 24 hours (``import.commit``; FR-IMP-005).
 
     The student records are the students module's: :func:`students.plan_import_revert` refuses
     (409 ``import_has_dependents``) when anything was recorded on top of the batch (a student it
     created was changed since, one of its values was superseded, a value it replaced is a
-    verified or register identity value), and :func:`students.revert_import` then, in this
+    verified or register identity value) and when a later live import from the same source
+    confirmed one of its values (YS-02), and :func:`students.revert_import` then, in this
     transaction, withdraws its values, restores the values they replaced, refreshes the
     profiles and removes the students it created (other records pointing at them, such as
     change requests, refuse the revert). Data-quality findings about removed students are
@@ -1967,6 +1990,7 @@ def revert(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut
     rows = repo.committed_rows(session, batch.id)
     created = {r.student_id: r.student_version for r in rows if r.created_student and r.student_id}
     plan = students.plan_import_revert(session, batch.id, created)
+    _refuse_if_confirmed_later(session, batch)
     with _db_errors():
         repo.update_batch(session, batch.id, status="reverting")
         result = students.revert_import(session, ctx, plan)

@@ -2074,9 +2074,10 @@ def plan_import_revert(
 
     ``created_students`` maps each student the batch created to the version the batch left it
     at. Refused (409 ``import_has_dependents``) when anything was recorded on top of the batch:
-    a student it created was changed since (version), one of its values was superseded, or a
-    value it replaced is a verified or admission-register identity value (BR-01: those change
-    only through a change request, never by a revert). Not read-only: it locks the students
+    a student it created was changed since (version), one of its values was superseded,
+    verified or rejected since (YS-01), or a value it replaced is a verified or
+    admission-register identity value (BR-01: those change only through a change request,
+    never by a revert). Not read-only: it locks the students
     the batch touched until the caller's transaction ends (BL-02).
     """
     # BL-02: lock every student the revert touches before checking, so a value saved while it
@@ -2086,7 +2087,9 @@ def plan_import_revert(
     if any(versions.get(sid) != version for sid, version in created_students.items()):
         raise _import_has_dependents()
     values = repo.batch_values(session, batch_id)
-    if any(v.superseded_by is not None for v in values):
+    # An import records every value unverified; a person verifying or rejecting one since
+    # (it stays current, so nothing supersedes it) is a later edit too (YS-01).
+    if any(v.superseded_by is not None or v.verification_status != "unverified" for v in values):
         raise _import_has_dependents()
     priors = repo.superseded_by_any(session, [v.id for v in values])
     defs = _definitions(session)
@@ -2107,6 +2110,16 @@ def plan_import_revert(
         withdraw=tuple(v.id for v in values if v.id not in replaced),
         replaced=tuple(sorted(replaced, key=str)),
     )
+
+
+def import_batch_current_keys(session: Session, batch_id: uuid.UUID) -> set[tuple[uuid.UUID, str]]:
+    """(student, attribute key) of the values import batch ``batch_id`` recorded that are still
+    current and not rejected: what its revert would withdraw (YS-02; ``app.imports`` only)."""
+    return {
+        (v.student_id, v.attribute_key)
+        for v in repo.batch_values(session, batch_id)
+        if v.superseded_by is None and v.verification_status != "rejected"
+    }
 
 
 def revert_import(session: Session, ctx: UserContext, plan: ImportRevertPlan) -> ImportRevertResult:

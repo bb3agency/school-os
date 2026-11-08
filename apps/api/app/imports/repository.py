@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from typing import Any
 
 from sqlalchemy import delete, func, insert, select, text, update
@@ -190,6 +190,31 @@ def committed_rows(session: Session, batch_id: uuid.UUID) -> list[ImportRow]:
             .order_by(ImportRow.row_no)
         ).scalars()
     )
+
+
+def later_live_rows(
+    session: Session, batch: ImportBatch, student_ids: Collection[uuid.UUID]
+) -> list[ImportRow]:
+    """Committed rows about ``student_ids`` of other imports from the same source that were
+    added after ``batch`` and are not reverted (YS-02)."""
+    if not student_ids or batch.committed_at is None:
+        return []
+    stmt = (
+        select(ImportRow)
+        .join(
+            ImportBatch,
+            (ImportBatch.tenant_id == ImportRow.tenant_id) & (ImportBatch.id == ImportRow.batch_id),
+        )
+        .where(
+            ImportBatch.status == "committed",
+            ImportBatch.source == batch.source,
+            ImportBatch.id != batch.id,
+            ImportBatch.committed_at > batch.committed_at,
+            ImportRow.status == "committed",
+            ImportRow.student_id.in_(list(student_ids)),
+        )
+    )
+    return list(session.execute(stmt).scalars())
 
 
 def rows_by_no(session: Session, batch_id: uuid.UUID, row_nos: Sequence[int]) -> list[ImportRow]:

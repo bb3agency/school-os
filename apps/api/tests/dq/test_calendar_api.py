@@ -520,6 +520,102 @@ def test_FR_RDY_010_a_circular_task_confirms_the_closing_date(
     assert res.status_code == 404
 
 
+def test_YS_03_FR_RDY_010_racing_first_links_refuse_the_second_with_412(
+    admin_engine: Engine, api: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """YS-03: two first links of one unconfirmed event found no row to lock; the second insert
+    hit ``portal_calendar_dates_once`` and was a 500. As for ``confirm``, it is a 412."""
+    from app.core.errors import PreconditionFailed
+    from app.dq import repository as dq_repo
+    from app.dq.schemas import CalendarConfirmIn, PortalTaskLinkIn
+
+    s = school(admin_engine)
+    principal = s.people["principal"]
+    ctx = DS.ctx(s, "principal")
+    task = _task(admin_engine, s, source="circular")
+    real = dq_repo.calendar_row
+
+    def racing(session: Any, year_id: Any, key: str, *, lock: bool = False) -> Any:
+        row = real(session, year_id, key, lock=lock)
+        if lock and row is None:  # another office PC confirms first, between read and write
+            monkeypatch.setattr(dq_repo, "calendar_row", real)
+            with tenant_session(s.tenant_id, principal.user_id) as other:
+                calendar_service.confirm(
+                    other,
+                    ctx,
+                    SSC_EVENT,
+                    CalendarConfirmIn(
+                        academic_year_id=s.ids["year"],
+                        opens_on=dt.date(2027, 2, 2),
+                        closes_on=dt.date(2027, 2, 4),
+                        source_kind="portal",
+                    ),
+                    expected_version=None,
+                )
+        return row
+
+    monkeypatch.setattr(dq_repo, "calendar_row", racing)
+    with pytest.raises(PreconditionFailed), tenant_session(s.tenant_id, principal.user_id) as db:
+        portal_tasks.link_task(db, ctx, task, PortalTaskLinkIn(event_key=SSC_EVENT))
+    with admin_engine.connect() as c:
+        kept = c.execute(
+            text(
+                "SELECT closes_on, source_kind FROM ops.portal_calendar_dates "
+                "WHERE tenant_id = :t AND event_key = :k"
+            ),
+            {"t": s.tenant_id, "k": SSC_EVENT},
+        ).one()
+    assert (kept.closes_on, kept.source_kind) == (dt.date(2027, 2, 4), "portal")
+
+
+def test_YS_03_FR_RDY_010_a_link_with_a_stale_if_match_is_refused(
+    admin_engine: Engine, api: Any
+) -> None:
+    """YS-03: a link replaced a confirmation without ``If-Match``. A sent ``If-Match`` is now
+    checked (412 when stale); without one the link behaves as before."""
+    s = school(admin_engine)
+    principal = s.people["principal"]
+    task = _task(admin_engine, s, source="circular")
+    path = f"/api/v1/tasks/{task}/portal-event"
+    first = confirm(api, principal, s, SSC_EVENT)
+    assert first.status_code == 200, first.text
+    version = first.json()["version"]
+    changed = confirm(api, principal, s, SSC_EVENT, version=version, closes_on="2027-02-05")
+    assert changed.status_code == 200, changed.text
+    stale = api.call(
+        principal,
+        "POST",
+        path,
+        json={"event_key": SSC_EVENT},
+        headers={"If-Match": f'W/"{version}"'},
+    )
+    assert stale.status_code == 412, stale.text
+    assert events(api, principal)[SSC_EVENT]["closes_on"] == "2027-02-05"
+    fresh = api.call(
+        principal,
+        "POST",
+        path,
+        json={"event_key": SSC_EVENT},
+        headers={"If-Match": f'W/"{changed.json()["version"]}"'},
+    )
+    assert fresh.status_code == 200, fresh.text
+    assert fresh.json()["closes_on"] == "2027-02-03"
+    # Without If-Match: unchanged behaviour (the link replaces the confirmation).
+    again = api.call(principal, "POST", path, json={"event_key": SSC_EVENT})
+    assert again.status_code == 200, again.text
+    # A stale If-Match on an event nobody confirmed yet is stale too.
+    other = school(admin_engine)
+    task2 = _task(admin_engine, other, source="circular")
+    res = api.call(
+        other.people["principal"],
+        "POST",
+        f"/api/v1/tasks/{task2}/portal-event",
+        json={"event_key": SSC_EVENT},
+        headers={"If-Match": 'W/"3"'},
+    )
+    assert res.status_code == 412, res.text
+
+
 # --- reminders (US-3103, FR-RDY-006..008, D45, D31) --------------------------------------------
 
 

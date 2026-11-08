@@ -282,6 +282,8 @@ def create_batch(session: Session, ctx: UserContext, data: BatchCreate) -> Batch
             errors.append(_error(field, "unsupported_file_type"))
         else:
             stored.append(obj)
+    # YS-04: two submits of one photo at once; the second waits here and sees the first batch.
+    repo.lock_documents(session, [o.document_id for o in stored])
     busy = repo.documents_in_open_batches(session, [o.document_id for o in stored])
     errors.extend(
         _error(f"document_ids.{ids.index(o.document_id)}", "already_extracted")

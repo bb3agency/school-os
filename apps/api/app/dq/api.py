@@ -462,17 +462,23 @@ tasks_router = APIRouter(prefix="/api/v1/tasks", tags=["data-quality"])
 
 @tasks_router.post("/{task_id}/portal-event", response_model=CalendarEventOut)
 def link_task_to_portal_event(
+    *,
     ctx: CalendarManager,
     db: TenantDB,
     task_id: uuid.UUID,
     body: PortalTaskLinkIn,
     idem: IdempotencyDep,
+    version: HttpOptionalIfMatch,
 ) -> Response:
     """Link a task confirmed from a circular's deadline to a portal calendar event: the task's
     due date becomes the event's confirmed closing date, from that circular (permission
     ``readiness.calendar.manage`` and a school-wide ``task.manage``, else 403; a task you cannot
     reach: 404; a task not from a circular: 422 ``not_circular_task``). A person's action, never
-    automatic. Accepts ``Idempotency-Key``. Audited."""
+    automatic. Optional ``If-Match`` with the event's ETag (412 when stale). Accepts
+    ``Idempotency-Key``. Audited."""
     return idem.run(
-        db, body, lambda: portal_tasks.link_task(db, ctx, task_id, body), status_code=200
+        db,
+        body,
+        lambda: portal_tasks.link_task(db, ctx, task_id, body, expected_version=version),
+        status_code=200,
     )
