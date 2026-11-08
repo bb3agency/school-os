@@ -16,7 +16,7 @@ import {
   fakeAadhaar,
   summary,
 } from "@/test/records-fixtures";
-import { messages, renderWithIntl } from "@/test/render";
+import { messages, renderWithIntl, testQueryClient } from "@/test/render";
 import { afterActionOf } from "./after";
 import { BatchView, lowestConfidence } from "./BatchScreen";
 import {
@@ -69,7 +69,12 @@ function photo(name: string, size = 2048) {
   return blob;
 }
 
-function view(item = extractionItem(), permissions = perms, batch = extractionBatch()) {
+function view(
+  item = extractionItem(),
+  permissions = perms,
+  batch = extractionBatch(),
+  client = testQueryClient(),
+) {
   const done = vi.fn();
   const broken = vi.fn();
   const result = renderWithIntl(
@@ -82,6 +87,8 @@ function view(item = extractionItem(), permissions = perms, batch = extractionBa
       onDone={done}
       onImageBroken={broken}
     />,
+    "en",
+    client,
   );
   return { ...result, done, broken };
 }
@@ -325,6 +332,19 @@ describe("US-402 AC1/AC2: check one row beside its page photo", () => {
     expect(screen.queryByLabelText(/Father's name/)).toBeNull();
     expect(document.body.textContent).not.toMatch(/\d{12}/);
     expect(screen.getByLabelText(/Gender/)).toHaveValue("female");
+  });
+
+  it("XS-02 (FR-IMP-021): a saved row refreshes the student lists and adds or links the student", async () => {
+    stub.routes[`POST /bff/api/v1/extraction-items/${ID.item}/confirm`] = () =>
+      Response.json({ ...extractionItem(), status: "confirmed" });
+    const client = testQueryClient();
+    const spy = vi.spyOn(client, "invalidateQueries");
+    const user = userEvent.setup();
+    const { done } = view(extractionItem(), perms, extractionBatch(), client);
+    await user.selectOptions(screen.getByLabelText(xm.review.section), ID.section);
+    await user.click(screen.getByRole("button", { name: xm.review.confirm }));
+    await waitFor(() => expect(done).toHaveBeenCalledWith("confirmed"));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ["staff", "students"] }));
   });
 
   it("saves the row as read (dates as ISO), without the masked field, with an Idempotency-Key", async () => {

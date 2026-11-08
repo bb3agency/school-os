@@ -792,12 +792,31 @@ export interface ImportDetailViewProps {
 }
 
 /** US-401 / FR-IMP-002..005: one import from mapping to check, add and (within 24 h) undo. */
+/**
+ * Adding and undoing run in a worker (202, then polled): once a batch seen busy settles as
+ * added or undone, student lists and pages refresh, so they do not show the cached (up to 30 s
+ * old) records from before (XS-02).
+ */
+function useRefreshStudentsWhenSettled(status: ImportBatch["status"] | null) {
+  const queryClient = useQueryClient();
+  const previous = useRef(status);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = status;
+    const settled =
+      (before === "committing" && status === "committed") ||
+      (before === "reverting" && status === "reverted");
+    if (settled) void queryClient.invalidateQueries({ queryKey: ["staff", "students"] });
+  }, [status, queryClient]);
+}
+
 export function ImportDetailView({
   batch,
   attributes,
   permissions,
   initialPreset,
 }: ImportDetailViewProps) {
+  useRefreshStudentsWhenSettled(batch.status === "ready" ? batch.data.status : null);
   const t = useTranslations("imports.detail");
   const tl = useTranslations("imports.list");
   const tn = useTranslations("school.nav");

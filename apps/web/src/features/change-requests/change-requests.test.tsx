@@ -4,7 +4,7 @@ import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { verhoeffValid } from "@/lib/aadhaar";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
-import { intlErrors, messages, renderWithIntl } from "@/test/render";
+import { intlErrors, messages, renderWithIntl, testQueryClient } from "@/test/render";
 import { changeRequest, me, ME_MEMBERSHIP, STUDENT } from "@/test/school-fixtures";
 import { ChangeRequestDetailScreen } from "./ChangeRequestDetailScreen";
 import { ChangeRequestsScreen } from "./ChangeRequestsScreen";
@@ -190,6 +190,26 @@ describe("change request detail (US-601 AC1–AC4, FR-CR-002, FR-CR-004)", () =>
     const call = stub.callsTo(`POST /bff/api/v1/change-requests/${CR}/approve`)[0];
     expect(call?.headers.get("if-match")).toBe('W/"1"');
     expect(JSON.parse(call?.body ?? "{}")).toEqual({ note: null });
+  });
+
+  it("XS-02 (FR-CR-003): an approval refreshes the student record it changed", async () => {
+    detail([APPROVE, "student.read_basic"]);
+    stub.routes[`POST /bff/api/v1/change-requests/${CR}/approve`] = () =>
+      Response.json(changeRequest({ status: "approved", can_decide: false }));
+    const client = testQueryClient();
+    const spy = vi.spyOn(client, "invalidateQueries");
+    renderWithIntl(<ChangeRequestDetailScreen changeRequestId={CR} />, "en", client);
+    await userEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    const dialog = screen.getByRole("dialog", { name: "Approve this correction" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Approve" }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/change-requests/${CR}/approve`)).toHaveLength(1),
+    );
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: ["staff", "students"] }),
+      ),
+    );
   });
 
   it("says the consequence just above each decision button, and the button is described by it", async () => {

@@ -131,7 +131,13 @@ function EvidenceViewer({ documentId }: { documentId: string }) {
 function Decisions({ request, mode }: { request: ChangeRequest; mode: "decide" | "cancel" }) {
   const t = useTranslations("changeRequests.detail");
   const api = useBffClient("staff");
-  const invalidate = [CR_KEYS.all, DQ_KEYS.findings, DQ_KEYS.summary] as const;
+  // An approval writes the new value onto the student (FR-CR-003): its pages refresh (XS-02).
+  const invalidate = [
+    CR_KEYS.all,
+    DQ_KEYS.findings,
+    DQ_KEYS.summary,
+    ["staff", "students"],
+  ] as const;
   const path = { change_request_id: request.id };
   const headers = { "If-Match": ifMatch(request.version) };
   const decide = mode === "decide";

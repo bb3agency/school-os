@@ -13,7 +13,7 @@ import {
   importBatch,
   importRow,
 } from "@/test/records-fixtures";
-import { messages, renderWithIntl } from "@/test/render";
+import { messages, renderWithIntl, testQueryClient } from "@/test/render";
 import { ImportDetailView, duplicateTargets, initialTarget } from "./ImportDetail";
 import {
   ImportsView,
@@ -509,6 +509,40 @@ describe("US-401 AC1..AC3: one import", () => {
     expect(
       await within(dialog).findByText(im.errors.import_has_dependents.title),
     ).toBeInTheDocument();
+  });
+
+  it("XS-02 (FR-IMP-005): student pages refresh once an add or an undo has finished", async () => {
+    stub.routes[`GET /bff/api/v1/imports/${ID.import}/rows`] = () => page([]);
+    const client = testQueryClient();
+    const spy = vi.spyOn(client, "invalidateQueries");
+    const students = expect.objectContaining({ queryKey: ["staff", "students"] });
+    const steps = ["committing", "committed", "reverting", "reverted"] as const;
+    function Harness() {
+      const [step, setStep] = useState(0);
+      return (
+        <>
+          <button type="button" onClick={() => setStep((value) => value + 1)}>
+            next status
+          </button>
+          <ImportDetailView
+            batch={ready(importBatch({ status: steps[step] ?? "reverted" }))}
+            attributes={ready(ATTRIBUTES)}
+            permissions={perms}
+          />
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    renderWithIntl(<Harness />, "en", client);
+    const next = screen.getByRole("button", { name: "next status" });
+    expect(spy).not.toHaveBeenCalledWith(students);
+    await user.click(next);
+    expect(spy).toHaveBeenCalledWith(students);
+    spy.mockClear();
+    await user.click(next);
+    expect(spy).not.toHaveBeenCalledWith(students);
+    await user.click(next);
+    expect(spy).toHaveBeenCalledWith(students);
   });
 
   it("after 24 hours says undo is closed and hides the button", () => {
