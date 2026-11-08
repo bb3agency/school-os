@@ -83,6 +83,7 @@ describe("restricted markdown (docs/06 §9 rule 5)", () => {
           'Hi <script>alert(1)</script><img src=x onerror="alert(1)"> [click](javascript:alert(1)) [site](https://evil.example) <a href="https://evil.example">x</a> [doc](sos://doc/0192f3a4-0000-7000-8000-00000000c701/v2#p1)'
         }
         citations={CITES}
+        sources={new Set(["sos://doc/0192f3a4-0000-7000-8000-00000000c701/v2#p1"])}
         cite={(n) => <sup data-testid="cite">{n}</sup>}
       />,
     );
@@ -91,6 +92,23 @@ describe("restricted markdown (docs/06 §9 rule 5)", () => {
     expect(hrefs).toEqual(["/documents/0192f3a4-0000-7000-8000-00000000c701"]);
     expect(container).toHaveTextContent("Hi alert(1) click site x doc");
     expect(container.innerHTML).not.toContain("javascript:");
+  });
+
+  it("links a sos:// source in the prose only when it is one of the answer's citations (XO-06, invariant 8)", () => {
+    const cited = "sos://doc/0192f3a4-0000-7000-8000-00000000c701/v2#p1";
+    const other = "sos://student/0192f3a4-0000-7000-8000-00000000c702";
+    const text = `See [the circular](${cited}) and [Ravi's record](${other}).`;
+    const { container, unmount } = renderWithIntl(
+      <Markdown text={text} citations={CITES} sources={new Set([cited])} cite={() => null} />,
+    );
+    expect([...container.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual([
+      "/documents/0192f3a4-0000-7000-8000-00000000c701",
+    ]);
+    expect(container).toHaveTextContent("See the circular and Ravi's record.");
+    unmount();
+    // The unchecked preview has no citations yet: no links at all.
+    const preview = renderWithIntl(<Markdown text={text} citations={CITES} cite={() => null} />);
+    expect(preview.container.querySelector("a")).toBeNull();
   });
 
   it("turns only known [n] markers into citations; others stay text", () => {

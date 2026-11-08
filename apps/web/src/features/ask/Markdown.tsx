@@ -13,8 +13,12 @@ const ALIGN: Record<Exclude<Align, null>, string> = {
   right: "text-end",
 };
 
+const NO_SOURCES: ReadonlySet<string> = new Set();
+
 interface RenderContext {
   cite: (index: number) => ReactNode;
+  /** The `sos://` sources of this answer's citations: the only prose links that open. */
+  sources: ReadonlySet<string>;
   tableLabel: string;
 }
 
@@ -47,8 +51,9 @@ function renderInline(nodes: readonly Inline[], ctx: RenderContext): ReactNode[]
       case "cite":
         return <Fragment key={i}>{ctx.cite(node.index)}</Fragment>;
       case "link": {
-        // Only sos:// sources reach here; they open the existing screen (never a URL from prose).
-        const ref = parseSource(node.href);
+        // Only sos:// sources reach here. One opens its screen only when it is a source this
+        // answer cites (checked by the API, invariant 8); any other is its label (XO-06).
+        const ref = ctx.sources.has(node.href) ? parseSource(node.href) : null;
         const href = ref ? sourceHref(ref) : null;
         const label = renderInline(node.children, ctx);
         return href ? (
@@ -170,6 +175,7 @@ function renderBlock(block: Block, key: number, ctx: RenderContext): ReactNode {
 export function Markdown({
   text,
   citations,
+  sources = NO_SOURCES,
   cite,
   trailing,
   className,
@@ -177,6 +183,8 @@ export function Markdown({
   text: string;
   /** Indexes that are citations of this answer; other `[n]` stay text. */
   citations: ReadonlySet<number>;
+  /** Sources of this answer's citations (`sos://…`); prose links to others stay text. */
+  sources?: ReadonlySet<string>;
   cite: (index: number) => ReactNode;
   /** Inline content after the last word (the streaming caret). */
   trailing?: ReactNode;
@@ -184,7 +192,7 @@ export function Markdown({
 }) {
   const t = useTranslations("ask.answer");
   const blocks = useMemo(() => parseMarkdown(text, citations), [text, citations]);
-  const ctx: RenderContext = { cite, tableLabel: t("tableLabel") };
+  const ctx: RenderContext = { cite, sources, tableLabel: t("tableLabel") };
   const last = blocks[blocks.length - 1];
   const inlineTrailing = trailing !== undefined && last?.type === "paragraph";
   return (

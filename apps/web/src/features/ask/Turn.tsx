@@ -283,6 +283,11 @@ function FinalText({ state, prefix, fade }: { state: AskState; prefix: string; f
     [state.citations],
   );
   const known = useMemo(() => new Set(byIndex.keys()), [byIndex]);
+  // A source the member can no longer open (withheld) gets no link either.
+  const sources = useMemo(
+    () => new Set(state.citations.filter((c) => !c.withheld).map((c) => c.source)),
+    [state.citations],
+  );
   const cite = (index: number) => {
     const citation = byIndex.get(index);
     return citation ? <CitationChip citation={citation} prefix={prefix} /> : `[${index}]`;
@@ -290,7 +295,7 @@ function FinalText({ state, prefix, fade }: { state: AskState; prefix: string; f
   return (
     <div className={cn(fade && "chat-fade")}>
       <Suspense fallback={<PlainText text={state.text} />}>
-        <Markdown text={state.text} citations={known} cite={cite} />
+        <Markdown text={state.text} citations={known} sources={sources} cite={cite} />
       </Suspense>
     </div>
   );
