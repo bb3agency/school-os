@@ -1,5 +1,6 @@
 "use client";
 
+import { pollHeaders } from "@/lib/bff/poll";
 import { useQuery, type Query } from "@tanstack/react-query";
 import { runPollDelay } from "@/features/findings/RunChecks";
 import { AuthRedirectError } from "@/lib/bff/fetch";
@@ -90,9 +91,10 @@ export function useDocumentList(
   const api = useBffClient("staff");
   const query = useQuery({
     queryKey: DOCUMENT_KEYS.list(filters, cursor),
-    queryFn: () =>
+    queryFn: (context) =>
       unwrap(
         api.GET("/api/v1/documents", {
+          headers: pollHeaders(context),
           params: {
             query: {
               limit: 25,
@@ -117,9 +119,10 @@ export function useDocument(documentId: string, enabled: boolean): Loadable<Docu
   const api = useBffClient("staff");
   const query = useQuery({
     queryKey: DOCUMENT_KEYS.one(documentId),
-    queryFn: () =>
+    queryFn: (context) =>
       unwrap(
         api.GET("/api/v1/documents/{document_id}", {
+          headers: pollHeaders(context),
           params: { path: { document_id: documentId } },
         }),
       ),

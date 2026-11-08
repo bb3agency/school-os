@@ -1,5 +1,6 @@
 "use client";
 
+import { pollHeaders } from "@/lib/bff/poll";
 import type { components } from "@schoolos/api-client";
 import { useQuery, type Query } from "@tanstack/react-query";
 import * as z from "@/lib/zod";
@@ -106,9 +107,10 @@ export function useCirculars(
   const api = useBffClient("staff");
   const query = useQuery({
     queryKey: KEYS.circularList(cursor),
-    queryFn: () =>
+    queryFn: (context) =>
       unwrap(
         api.GET("/api/v1/circulars", {
+          headers: pollHeaders(context),
           params: { query: { limit: 50, ...(cursor ? { cursor } : {}) } },
         }),
       ),
@@ -128,8 +130,13 @@ export function useCircular(id: string, enabled: boolean): Loadable<CircularDeta
   const api = useBffClient("staff");
   const query = useQuery({
     queryKey: KEYS.circular(id),
-    queryFn: () =>
-      unwrap(api.GET("/api/v1/circulars/{document_id}", { params: { path: { document_id: id } } })),
+    queryFn: (context) =>
+      unwrap(
+        api.GET("/api/v1/circulars/{document_id}", {
+          headers: pollHeaders(context),
+          params: { path: { document_id: id } },
+        }),
+      ),
     enabled,
     retry,
     refetchInterval: (q: Query<CircularDetail, Error, CircularDetail, readonly unknown[]>) =>
@@ -194,9 +201,10 @@ export function useNotices(enabled: boolean, cursor?: string): Loadable<Paged<No
   const api = useBffClient("staff");
   const query = useQuery({
     queryKey: [...KEYS.noticeList, cursor ?? null],
-    queryFn: () =>
+    queryFn: (context) =>
       unwrap(
         api.GET("/api/v1/notices", {
+          headers: pollHeaders(context),
           params: { query: { limit: 50, ...(cursor ? { cursor } : {}) } },
         }),
       ),
@@ -216,8 +224,13 @@ export function useNotice(id: string, enabled: boolean): Loadable<Notice> {
   const api = useBffClient("staff");
   const query = useQuery({
     queryKey: KEYS.notice(id),
-    queryFn: () =>
-      unwrap(api.GET("/api/v1/notices/{notice_id}", { params: { path: { notice_id: id } } })),
+    queryFn: (context) =>
+      unwrap(
+        api.GET("/api/v1/notices/{notice_id}", {
+          headers: pollHeaders(context),
+          params: { path: { notice_id: id } },
+        }),
+      ),
     enabled,
     retry,
     refetchInterval: (q: Query<Notice, Error, Notice, readonly unknown[]>) =>
