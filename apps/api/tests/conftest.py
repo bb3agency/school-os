@@ -186,7 +186,9 @@ def platform_engine(test_database: TestDatabase) -> Iterator[Engine]:
 
 @pytest.fixture(scope="session")
 def readonly_engine(test_database: TestDatabase) -> Iterator[Engine]:
-    engine = create_engine(test_database.readonly_url, future=True, pool_size=2)
+    # sos_readonly has idle_session_timeout = 30min (infra/db/bootstrap.sql): in a full run that
+    # lasts longer, the server closes the pooled connection, so check it before reuse.
+    engine = create_engine(test_database.readonly_url, future=True, pool_size=2, pool_pre_ping=True)
     yield engine
     engine.dispose()
 
