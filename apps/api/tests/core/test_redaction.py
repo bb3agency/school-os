@@ -744,3 +744,41 @@ def test_PRV_015_D52_adversarial_input_is_scanned_in_linear_time(name: str) -> N
     contains_full_aadhaar(adversarial)
     redact(adversarial)
     assert time.perf_counter() - started < 5.0
+
+
+# --- audit 2026-11-08 DPA-01: the maskers join every gap the input check collapses ------------
+
+
+@pytest.mark.parametrize(
+    "gap", ["    ", "\t\t\t\t", "\n\n\n\n\n", " -   ", "   -   ", "　 \t \n ", " " * 40]
+)
+def test_PRV_015_DPA_01_masking_joins_any_whitespace_gap_the_input_check_refuses(gap: str) -> None:
+    """Invariant 4 / SEC-013 (audit 2026-11-08 DPA-01): ``contains_full_aadhaar`` refuses a
+    number however wide its whitespace gaps are (DL-01), but the maskers stopped at 3 gap
+    characters, so text that is masked rather than refused (an Ask question, every string the
+    AI gateway sends, model output, log lines) carried ``2345    6789    0124`` unmasked to the
+    LLM provider and the embedding search. Every gap that collapses into a space is a join."""
+    text = f"Is {gap.join([VALID[:4], VALID[4:8], VALID[8:]])} enrolled?"
+    assert contains_full_aadhaar(text)
+    for out in (mask_aadhaar(text), redact(text), redact_log(text)):
+        assert VALID[:4] not in out, repr(out)
+        assert masked(VALID) in out, repr(out)
+    assert [m.verhoeff for m in find_aadhaar(text)] == [True]
+
+
+ADVERSARIAL_WIDE = {
+    "wide gaps then a letter": ("1234" + " " * 50 + "x") * 2000,
+    "wide gaps around dashes": ("1234" + " " * 30 + "-" + " " * 30) * 2000,
+    "alternating gap and dash": "1234" + " -" * 50000 + "x",
+}
+
+
+@pytest.mark.parametrize("name", sorted(ADVERSARIAL_WIDE))
+def test_PRV_015_DPA_01_unbounded_gaps_are_scanned_in_linear_time(name: str) -> None:
+    adversarial = ADVERSARIAL_WIDE[name]
+    started = time.perf_counter()
+    mask_aadhaar(adversarial)
+    contains_full_aadhaar(adversarial)
+    redact(adversarial)
+    redact_log(adversarial)
+    assert time.perf_counter() - started < 5.0

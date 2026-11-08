@@ -24,9 +24,10 @@ Public API
 
 Detection rules (defined and tested in ``tests/core/test_redaction.py``)
 -----------------------------------------------------------------------
-Text is NFC-normalised. A *run* is a sequence of digit *groups* joined by a short separator
-(1-3 whitespace or invisible format (Cf) characters of any kind, or a hyphen/dash/minus with
-up to 2 of them on each side; dots, slashes, underscores and commas are not run separators, so
+Text is NFC-normalised. A *run* is a sequence of digit *groups* joined by a separator (any
+number of whitespace or invisible format (Cf) characters of any kind, or a hyphen/dash/minus
+with any number of them on each side: every gap the input check collapses, audit 2026-11-08
+DPA-01; dots, slashes, underscores and commas are not run separators, so
 structured numbers such as invoice numbers ``SOS/2026-27/000123`` and dates stay intact; rule 4
 covers them for numbers grouped 4-4-4). Input checks also collapse every
 whitespace run first, as stored text is (``contains_full_aadhaar``). Digits in any script
@@ -137,7 +138,7 @@ def verhoeff_check_digit(digits: str) -> str:
 # --- Candidate runs -----------------------------------------------------------------------
 
 # A gap is any Unicode whitespace (tab, line break, NBSP, thin/em/narrow spaces...) or an
-# invisible zero-width character; up to 3 of them, or a dash with up to 2 on each side.
+# invisible zero-width character; any number of them, or a dash with any number on each side.
 # Input checks run on raw text that is later stored with its whitespace collapsed (NFC, single
 # spaces), so every gap that collapses into a space must already join the groups here, or a
 # number typed as "1234<TAB>5678<TAB>9012" would pass the check and be stored as a full Aadhaar
@@ -153,7 +154,11 @@ _INVISIBLE = (
 )
 _GAP = rf"[\s{_INVISIBLE}]"
 _DASH = r"[-\u2010-\u2015\u2212\ufe58\ufe63\uff0d]"
-_SEP = rf"(?:{_GAP}{{1,3}}|{_GAP}{{0,2}}{_DASH}{_GAP}{{0,2}})"
+# Any number of gap characters joins (audit 2026-11-08 DPA-01): the input check collapses every
+# whitespace run before it looks, so a masker that stopped at 3 let "2345    6789    0124"
+# through wherever text is masked rather than refused (Ask questions, AI gateway requests, model
+# output, logs). Gaps and digits are disjoint classes, so the scan stays linear.
+_SEP = rf"(?:{_GAP}+|{_GAP}*{_DASH}{_GAP}*)"
 _RUN_RE = re.compile(rf"\+?\d+(?:{_SEP}\d+)*")
 _GROUP_RE = re.compile(r"\+?\d+")
 # UUIDs are identifiers, never Aadhaar candidates: their decimal digits across hyphens pass
