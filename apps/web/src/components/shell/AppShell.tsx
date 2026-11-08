@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/SidebarNav";
 import { ToastProvider } from "@/components/ui/Toaster";
 import { Link, usePathname } from "@/i18n/navigation";
+import type { SessionKind } from "@/lib/bff/session-client";
 import { cn } from "@/lib/cn";
 import { useDialogClose } from "@/lib/dialog-motion";
 import { Wordmark } from "./Brand";
@@ -33,6 +34,7 @@ import { Sidebar } from "./Sidebar";
 import { sidebarControlClasses, sidebarThemes } from "./sidebar-theme";
 import { useSidebarCollapsed } from "./sidebar-state";
 import { SkipLink } from "./SkipLink";
+import { useStudentPaletteSearch } from "./student-search";
 
 const topbars: Record<
   SidebarTheme,
@@ -74,6 +76,11 @@ export interface AppShellProps {
   sections: readonly NavSection[];
   /** Palette "Actions" (permission-filtered by the console that passes them). */
   actions?: readonly ShellAction[];
+  /**
+   * Palette "Students" group (D72): the session kind to search with, only for people who can
+   * read students (the school console decides); null or absent: no student search.
+   */
+  studentSearch?: SessionKind | null;
   /**
    * Phone bottom bar (below md) for roles with a phone-first job: teachers, principals.
    * At most four items, each an existing page from `sections`.
@@ -155,6 +162,7 @@ export function AppShell({
   navLabel,
   sections,
   actions = [],
+  studentSearch = null,
   bottomBar = [],
   context,
   account,
@@ -171,6 +179,7 @@ export function AppShell({
   const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const paletteSearch = useStudentPaletteSearch(studentSearch);
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const [density, setDensity] = useDensity();
   const [tip, setTip] = useState<Tip | null>(null);
@@ -602,6 +611,8 @@ export function AppShell({
             }}
             items={commands}
             groups={groups}
+            search={paletteSearch}
+            searchPlaceholder={tu("palette.placeholderStudents")}
           />
 
           {bottomBar.length > 0 ? (

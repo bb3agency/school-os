@@ -85,7 +85,15 @@
       "askSchool": "Ask the school",
       "inviteUser": "Invite a staff member",
       "studentList": "Download a student list",
-      "provisionSchool": "Set up a new school"
+      "provisionSchool": "Set up a new school",
+      "groupRecent": "Recent",
+      "groupStudents": "Students",
+      "placeholderStudents": "Type a page, an action or a student's name…",
+      "studentsLoading": "Searching students…",
+      "studentsEmpty": "No students match. Try part of the name or the admission number.",
+      "studentsError": "Could not search students. Try again in a moment.",
+      "studentsOffline": "You are offline. Student search needs a connection; pages still open.",
+      "studentNoName": "Name not recorded"
     },
     "shell": {
       "breadcrumb": "Where you are",
