@@ -553,7 +553,7 @@ def update_adjustment(session: Session, row_id: uuid.UUID, values: Mapping[str, 
 
 def plan_change_sums(
     session: Session, account_ids: Collection[uuid.UUID], plan_ids: Collection[uuid.UUID]
-) -> dict[tuple[uuid.UUID, int, uuid.UUID], Decimal]:
+) -> dict[tuple[uuid.UUID, int, uuid.UUID | None], Decimal]:
     """Plan-change adjustments proposed by ``plan_ids`` that stand (pending or approved), summed
     per (account, instalment, head): what earlier versions already changed (FR-FEE-004)."""
     if not account_ids or not plan_ids:
