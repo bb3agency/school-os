@@ -7,12 +7,13 @@ import {
   type AnnouncementInput,
 } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
+import { ErrorSummary, fieldIdsByName, summaryFor } from "@/components/ui/ErrorSummary";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SelectField } from "@/components/ui/Select";
 import { Tabs } from "@/components/ui/Tabs";
@@ -221,6 +222,7 @@ function AnnouncementFields({
             <label key={school.tenant_id} className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
+                id={`${schoolsErrorId}-${school.tenant_id}`}
                 name="audience_tenant_ids"
                 value={school.tenant_id}
                 defaultChecked={chosen.has(school.tenant_id)}
@@ -257,11 +259,20 @@ export function AnnouncementEditor() {
   // A new round of empty fields after each save (also resets the audience choice).
   const [round, setRound] = useState(0);
   const telugu = useTeluguEnabled();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [fieldIds, setFieldIds] = useState<Record<string, string>>({});
+  const [attempt, setAttempt] = useState(0);
 
   const form = useApiForm({
     schema: announcementSchemaFor(telugu),
     extra: tenantIds,
     invalidate: [PK.announcements],
+    // docs/17 §4.4: after a failed submit the summary on top takes focus and links each field.
+    focusInvalid: false,
+    onInvalid: (fields) => {
+      setFieldIds(fieldIdsByName(formRef.current, fields));
+      setAttempt((value) => value + 1);
+    },
     submit: (data, key) => {
       setSaved(false);
       return unwrap(
@@ -279,7 +290,8 @@ export function AnnouncementEditor() {
   });
 
   return (
-    <form noValidate onSubmit={form.onSubmit} className="space-y-4">
+    <form ref={formRef} noValidate onSubmit={form.onSubmit} className="space-y-4">
+      <ErrorSummary errors={summaryFor(form.errors, fieldIds)} attempt={attempt} />
       <AnnouncementFields key={round} errors={form.errors} />
       <ApiErrorAlert error={form.error} />
       {saved ? (
@@ -345,6 +357,8 @@ export function AnnouncementEditDialog({
       title={t("editTitle")}
       description={t("editBody")}
       confirmLabel={t("editSave")}
+      errorSummary
+      unsavedStatus
       schema={announcementEditSchemaFor(telugu)}
       errorNamespace="platform.announcements"
       extra={tenantIds}

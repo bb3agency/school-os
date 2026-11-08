@@ -82,6 +82,7 @@ export function SubscriptionActions({
     <div className="relative flex flex-wrap gap-2">
       {status === "trial" ? (
         <ActionDialog
+          errorSummary
           triggerLabel={t("activate")}
           triggerSize="sm"
           triggerDescription={label}
@@ -102,6 +103,7 @@ export function SubscriptionActions({
       ) : null}
       {status === "trial" ? (
         <ActionDialog
+          errorSummary
           triggerLabel={t("extendTrial")}
           triggerSize="sm"
           triggerDescription={label}
@@ -133,6 +135,7 @@ export function SubscriptionActions({
       ) : null}
       {status !== "cancelled" ? (
         <ActionDialog
+          errorSummary
           triggerLabel={t("changePlan")}
           triggerSize="sm"
           triggerDescription={label}
@@ -170,6 +173,8 @@ export function SubscriptionActions({
       ) : null}
       {status !== "cancelled" && monthly ? (
         <ActionDialog
+          errorSummary
+          unsavedStatus
           triggerLabel={t("chooseAiBundle")}
           triggerSize="sm"
           triggerDescription={label}
@@ -215,6 +220,7 @@ export function SubscriptionActions({
       ) : null}
       {status !== "cancelled" && subscription.ai_bundle_id ? (
         <ActionDialog
+          errorSummary
           triggerLabel={t("removeAiBundle")}
           triggerVariant="ghost"
           triggerSize="sm"
@@ -238,6 +244,8 @@ export function SubscriptionActions({
       ) : null}
       {status !== "cancelled" ? (
         <ActionDialog
+          errorSummary
+          unsavedStatus
           triggerLabel={
             subscription.price_override_inr === null ? t("setOverride") : t("changeOverride")
           }
@@ -278,6 +286,7 @@ export function SubscriptionActions({
       ) : null}
       {status !== "cancelled" && subscription.price_override_inr !== null ? (
         <ActionDialog
+          errorSummary
           triggerLabel={t("removeOverride")}
           triggerVariant="ghost"
           triggerSize="sm"
@@ -302,6 +311,7 @@ export function SubscriptionActions({
       ) : null}
       {status === "past_due" ? (
         <ActionDialog
+          errorSummary
           triggerLabel={t("suspend")}
           triggerVariant="danger"
           triggerSize="sm"
@@ -350,6 +360,7 @@ export function SubscriptionActions({
       ) : null}
       {status === "suspended" ? (
         <ActionDialog
+          errorSummary
           triggerLabel={t("reactivate")}
           triggerSize="sm"
           triggerDescription={label}
@@ -370,6 +381,7 @@ export function SubscriptionActions({
       ) : null}
       {status !== "cancelled" && !subscription.cancel_at_period_end ? (
         <ActionDialog
+          errorSummary
           triggerLabel={t("cancel")}
           triggerVariant="danger"
           triggerSize="sm"

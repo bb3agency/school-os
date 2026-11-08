@@ -2,7 +2,15 @@
 
 import type { QueryKey } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useCallback, useId, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import type * as z from "@/lib/zod";
 import { cn } from "@/lib/cn";
 import { useDialogClose } from "@/lib/dialog-motion";
@@ -12,6 +20,55 @@ import { ApiErrorAlert, type ErrorNamespace } from "./ApiErrorAlert";
 import { Button, type ButtonSize, type ButtonVariant } from "./Button";
 import { useControlledOpen, useReturnFocus } from "./controlled-dialog";
 import { DialogCloseButton } from "./DialogCloseButton";
+import { ErrorSummary, fieldIdsByName, summaryFor } from "./ErrorSummary";
+import { Icon } from "./Icon";
+
+/** The form's values as text, to tell whether anything changed since the dialog opened. */
+function snapshot(form: HTMLFormElement): string {
+  const pairs: [string, string][] = [];
+  for (const [name, value] of new FormData(form).entries()) {
+    if (typeof value === "string") pairs.push([name, value]);
+  }
+  return JSON.stringify(pairs);
+}
+
+/**
+ * The `SaveBar` status line for an edit dialog (docs/17 §4.4): "Changes not saved" once a
+ * value differs from what the dialog opened with, otherwise "No changes". Mounted with the
+ * form, so every opening starts clean.
+ */
+function UnsavedStatus({ formRef }: { formRef: RefObject<HTMLFormElement | null> }) {
+  const t = useTranslations("ui.saveBar");
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const initial = snapshot(form);
+    const check = () => setDirty(snapshot(form) !== initial);
+    form.addEventListener("input", check);
+    form.addEventListener("change", check);
+    return () => {
+      form.removeEventListener("input", check);
+      form.removeEventListener("change", check);
+    };
+  }, [formRef]);
+  return (
+    <p
+      role="status"
+      data-dirty={dirty ? "" : undefined}
+      className="me-auto flex min-w-0 items-center gap-2 self-center text-sm max-sm:w-full"
+    >
+      {dirty ? (
+        <>
+          <Icon name="alert" className="size-4 shrink-0 text-warning-ink" />
+          <span className="font-semibold text-warning-ink">{t("unsaved")}</span>
+        </>
+      ) : (
+        <span className="text-ink-muted">{t("noChanges")}</span>
+      )}
+    </p>
+  );
+}
 
 /** Renders a one-time result (e.g. a secret) with a way to close the dialog. */
 function ResultSlot<TResult>({
@@ -80,6 +137,16 @@ export interface ActionDialogProps<TSchema extends z.ZodType, TResult> {
   className?: string;
   /** Feature messages for problem codes (`<namespace>.errors.<code>`), see ApiErrorAlert. */
   errorNamespace?: ErrorNamespace;
+  /**
+   * Form dialogs (docs/17 §4.4): after a failed submit an `ErrorSummary` at the top of the
+   * body takes focus and links to each field (by the field's id, found by its name).
+   */
+  errorSummary?: boolean;
+  /**
+   * Edit dialogs: the footer says "Changes not saved" / "No changes" beside the buttons, as
+   * `SaveBar` does on a page form.
+   */
+  unsavedStatus?: boolean;
 }
 
 /**
@@ -115,6 +182,8 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
   onSuccess,
   className,
   errorNamespace,
+  errorSummary = false,
+  unsavedStatus = false,
 }: ActionDialogProps<TSchema, TResult>) {
   const t = useTranslations("common");
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -125,6 +194,9 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
   const consequenceId = useId();
   const [open, setOpen] = useState(false);
   const focus = useReturnFocus();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [fieldIds, setFieldIds] = useState<Record<string, string>>({});
+  const [attempt, setAttempt] = useState(0);
 
   // Fades out before it closes (Escape too); instant under reduced motion.
   const close = useDialogClose(dialogRef, "modal");
@@ -135,6 +207,22 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
     ...(fieldMap ? { fieldMap } : {}),
     ...(invalidate ? { invalidate } : {}),
     ...(extra ? { extra } : {}),
+    ...(errorSummary
+      ? {
+          focusInvalid: false,
+          onInvalid: (fields: string[]) => {
+            const ids = fieldIdsByName(formRef.current, fields);
+            setFieldIds(ids);
+            setAttempt((value) => value + 1);
+            // No field to link to (unnamed or without an id): focus the first invalid field.
+            if (Object.keys(ids).length === 0) {
+              requestAnimationFrame(() =>
+                formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus(),
+              );
+            }
+          },
+        }
+      : {}),
     onSuccess: (result) => {
       onSuccess?.(result);
       if (!renderResult) close();
@@ -213,8 +301,11 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
                 <ResultSlot render={renderResult} result={result} onDone={close} />
               </div>
             ) : (
-              <form noValidate onSubmit={form.onSubmit}>
+              <form ref={formRef} noValidate onSubmit={form.onSubmit}>
                 <div className="max-h-[60vh] space-y-4 overflow-y-auto overscroll-contain px-4 py-4 max-sm:max-h-none sm:px-6">
+                  {errorSummary ? (
+                    <ErrorSummary errors={summaryFor(form.errors, fieldIds)} attempt={attempt} />
+                  ) : null}
                   {note ? <Alert tone="info">{note}</Alert> : null}
                   {children?.(form.errors)}
                   {stepUp ? <p className="text-sm text-ink-muted">{t("stepUpNote")}</p> : null}
@@ -237,6 +328,7 @@ export function ActionDialog<TSchema extends z.ZodType, TResult>({
                       consequence ? "pt-2 sm:pt-3" : undefined,
                     )}
                   >
+                    {unsavedStatus ? <UnsavedStatus formRef={formRef} /> : null}
                     <Button variant="secondary" onClick={close}>
                       {t("cancel")}
                     </Button>

@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CSRF,
@@ -16,6 +17,18 @@ import { BreakGlassScreen, FleetScreen, FlagsScreen, PlatformAuditScreen } from 
 import { OperatorsScreen } from "./OperatorsView";
 import { SchoolDetailScreen } from "./SchoolDetailView";
 import { PlatformTicketScreen } from "./SupportScreens";
+
+// The operator lists show URL filters as chips; removing one navigates (D75, docs/17 §4.3).
+vi.mock("next/navigation", async (importOriginal) => {
+  const actual = await importOriginal<typeof Navigation>();
+  return {
+    ...actual,
+    usePathname: () => "/platform",
+    useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+    useSearchParams: () => new URLSearchParams(),
+    useParams: () => ({ locale: "en" }),
+  };
+});
 
 /**
  * Control-plane actions against the generated API shapes (FR-PLT-001..030): confirm

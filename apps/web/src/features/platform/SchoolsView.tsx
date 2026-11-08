@@ -12,6 +12,7 @@ import { Value } from "@/components/ui/Value";
 import { deploymentTone, known, subscriptionTone } from "@/features/status";
 import { Link } from "@/i18n/navigation";
 import type { Loadable } from "@/lib/loadable";
+import { UrlFilterChips, activeFilters, knownLabel } from "./FilterCard";
 import { MonoTime, SchoolStatusPill, TierTag } from "./pills";
 
 export interface SchoolFilters {
@@ -124,6 +125,39 @@ export function SchoolsView({
   const filtered = Boolean(
     filters.q || filters.status || filters.tier || filters.trialEnding || filters.pastDue,
   );
+  // The filters in the URL as chips (docs/17 §4.3); the parameter names are the form's.
+  const active = activeFilters([
+    {
+      param: "q",
+      raw: filters.q?.trim() ?? "",
+      label: t("searchLabel"),
+      value: filters.q?.trim() ?? "",
+    },
+    {
+      param: "status",
+      raw: filters.status ?? "",
+      label: t("filterStatus"),
+      value: knownLabel(TENANT_STATUSES, filters.status ?? "", tstatus),
+    },
+    {
+      param: "tier",
+      raw: filters.tier ?? "",
+      label: t("filterTier"),
+      value: knownLabel(["shared", "dedicated"] as const, filters.tier ?? "", tmode),
+    },
+    filters.trialEnding && {
+      param: "trial_ending",
+      raw: "true",
+      label: t("filterTrialEnding"),
+      value: tc("yes"),
+    },
+    filters.pastDue && {
+      param: "past_due",
+      raw: "true",
+      label: t("filterPastDue"),
+      value: tc("yes"),
+    },
+  ]);
 
   return (
     <div className="space-y-6">
@@ -136,71 +170,74 @@ export function SchoolsView({
       <DataTableV2
         id="platform.schools"
         toolbar={
-          <form method="get" role="search" className="flex flex-wrap items-end gap-3">
-            <SearchInput
-              wrapperClassName="min-w-64 flex-1"
-              name="q"
-              label={t("searchLabel")}
-              labelVisible
-              placeholder={t("searchHint")}
-              defaultValue={filters.q ?? ""}
-              autoComplete="off"
-              maxLength={100}
-            />
-            <SelectField
-              name="status"
-              label={t("filterStatus")}
-              placeholder={tc("all")}
-              defaultValue={filters.status ?? ""}
-              options={TENANT_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
-              className="w-44"
-            />
-            <SelectField
-              name="tier"
-              label={t("filterTier")}
-              placeholder={tc("all")}
-              defaultValue={filters.tier ?? ""}
-              options={(["shared", "dedicated"] as const).map((value) => ({
-                value,
-                label: tmode(value),
-              }))}
-              className="w-44"
-            />
-            <fieldset className="flex min-h-10 flex-wrap items-center gap-4">
-              <legend className="sr-only">{t("filterMore")}</legend>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  name="trial_ending"
-                  value="true"
-                  defaultChecked={filters.trialEnding ?? false}
-                  className="size-4 accent-primary"
-                />
-                {t("filterTrialEnding")}
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  name="past_due"
-                  value="true"
-                  defaultChecked={filters.pastDue ?? false}
-                  className="size-4 accent-primary"
-                />
-                {t("filterPastDue")}
-              </label>
-            </fieldset>
-            <div className="relative flex flex-wrap gap-2">
-              <Button type="submit" variant="secondary">
-                <Icon name="filter" className="size-4" />
-                {tc("search")}
-              </Button>
-              {filtered ? (
-                <ButtonLink href="/platform/schools" variant="ghost">
-                  {t("clearFilters")}
-                </ButtonLink>
-              ) : null}
-            </div>
-          </form>
+          <div className="space-y-3">
+            <form method="get" role="search" className="flex flex-wrap items-end gap-3">
+              <SearchInput
+                wrapperClassName="min-w-64 flex-1"
+                name="q"
+                label={t("searchLabel")}
+                labelVisible
+                placeholder={t("searchHint")}
+                defaultValue={filters.q ?? ""}
+                autoComplete="off"
+                maxLength={100}
+              />
+              <SelectField
+                name="status"
+                label={t("filterStatus")}
+                placeholder={tc("all")}
+                defaultValue={filters.status ?? ""}
+                options={TENANT_STATUSES.map((value) => ({ value, label: tstatus(value) }))}
+                className="w-44"
+              />
+              <SelectField
+                name="tier"
+                label={t("filterTier")}
+                placeholder={tc("all")}
+                defaultValue={filters.tier ?? ""}
+                options={(["shared", "dedicated"] as const).map((value) => ({
+                  value,
+                  label: tmode(value),
+                }))}
+                className="w-44"
+              />
+              <fieldset className="flex min-h-10 flex-wrap items-center gap-4">
+                <legend className="sr-only">{t("filterMore")}</legend>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="trial_ending"
+                    value="true"
+                    defaultChecked={filters.trialEnding ?? false}
+                    className="size-4 accent-primary"
+                  />
+                  {t("filterTrialEnding")}
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="past_due"
+                    value="true"
+                    defaultChecked={filters.pastDue ?? false}
+                    className="size-4 accent-primary"
+                  />
+                  {t("filterPastDue")}
+                </label>
+              </fieldset>
+              <div className="relative flex flex-wrap gap-2">
+                <Button type="submit" variant="secondary">
+                  <Icon name="filter" className="size-4" />
+                  {tc("search")}
+                </Button>
+                {filtered ? (
+                  <ButtonLink href="/platform/schools" variant="ghost">
+                    {t("clearFilters")}
+                  </ButtonLink>
+                ) : null}
+              </div>
+            </form>
+            {active.length > 0 ? <UrlFilterChips path="/platform/schools" active={active} /> : null}
+          </div>
         }
         stacked
         caption={t("title")}

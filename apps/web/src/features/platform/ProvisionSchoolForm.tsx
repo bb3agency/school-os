@@ -7,10 +7,11 @@ import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { cardClasses } from "@/components/ui/Card";
-import { Icon } from "@/components/ui/Icon";
+import { ErrorSummary } from "@/components/ui/ErrorSummary";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { SecretOnce } from "@/components/ui/SecretOnce";
 import { SelectField } from "@/components/ui/Select";
+import { Steps } from "@/components/ui/Steps";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import { formValues, useApiForm, zodErrorKeys } from "@/lib/forms";
@@ -47,7 +48,9 @@ export function ProvisionSchoolForm() {
 
   const formRef = useRef<HTMLFormElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
-  const summaryRef = useRef<HTMLDivElement>(null);
+  // A failed check moves focus to the error summary, not to the step heading.
+  const summaryFocus = useRef(false);
+  const [attempt, setAttempt] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
   const [stepOnlyErrors, setStepOnlyErrors] = useState<Record<string, string>>({});
   const [review, setReview] = useState<Record<string, string>>({});
@@ -59,6 +62,7 @@ export function ProvisionSchoolForm() {
   const form = useApiForm({
     schema: provisionSchema,
     fieldMap: (field) => field,
+    focusInvalid: false,
     invalidate: [PK.tenants, PK.dashboard, PK.subscriptions, PK.deployments],
     submit: (data, key) =>
       unwrap(
@@ -73,11 +77,12 @@ export function ProvisionSchoolForm() {
     },
     // After a failed submit (client or server), go to the first step with an error.
     onInvalid: (fields) => {
+      summaryFocus.current = true;
+      setAttempt((value) => value + 1);
       const target = firstStepWith(fields);
       if (!target) return;
       hasNavigated.current = true;
       setStepIndex(PROVISION_STEPS.indexOf(target));
-      requestAnimationFrame(() => summaryRef.current?.focus());
     },
   });
 
@@ -86,8 +91,13 @@ export function ProvisionSchoolForm() {
   const errorFields = Object.keys(errors);
 
   useEffect(() => {
+    // The ErrorSummary (a child) has already taken focus after a failed check.
+    if (summaryFocus.current) {
+      summaryFocus.current = false;
+      return;
+    }
     if (hasNavigated.current) stepHeadingRef.current?.focus();
-  }, [stepIndex]);
+  }, [stepIndex, attempt]);
 
   function goTo(index: number) {
     hasNavigated.current = true;
@@ -108,7 +118,8 @@ export function ProvisionSchoolForm() {
     );
     setStepOnlyErrors(found);
     if (Object.keys(found).length > 0) {
-      requestAnimationFrame(() => summaryRef.current?.focus());
+      summaryFocus.current = true;
+      setAttempt((value) => value + 1);
       return;
     }
     if (PROVISION_STEPS[stepIndex + 1] === "review") setReview(values);
@@ -230,59 +241,22 @@ export function ProvisionSchoolForm() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <ol
-        aria-label={t("stepsLabel")}
-        className={cn(cardClasses({ padding: "sm" }), "flex flex-wrap gap-x-2 gap-y-3 text-sm")}
-      >
-        {PROVISION_STEPS.map((id, index) => {
-          const current = index === stepIndex;
-          const done = index < stepIndex;
-          return (
-            <li
-              key={id}
-              aria-current={current ? "step" : undefined}
-              className="flex items-center gap-2 pr-2"
-            >
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "flex size-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold tabular-nums",
-                  current
-                    ? "border-platform bg-platform text-platform-ink"
-                    : done
-                      ? "border-success bg-success text-white"
-                      : "border-border-control bg-surface text-ink-muted",
-                )}
-              >
-                {done ? <Icon name="check" className="size-3.5" /> : index + 1}
-              </span>
-              <span className={current ? "font-semibold text-ink" : "text-ink-muted"}>
-                {stepLabels[id]}
-                {done ? <span className="sr-only"> ({t("stepDone")})</span> : null}
-              </span>
-              {index < PROVISION_STEPS.length - 1 ? (
-                <Icon name="chevronRight" className="size-4 text-ink-muted" />
-              ) : null}
-            </li>
-          );
-        })}
-      </ol>
+      <div className={cardClasses({ padding: "sm" })}>
+        <Steps
+          label={t("stepsLabel")}
+          current={stepIndex}
+          steps={PROVISION_STEPS.map((id) => ({ id, label: stepLabels[id] }))}
+        />
+      </div>
 
-      {errorFields.length > 0 ? (
-        <div ref={summaryRef} tabIndex={-1}>
-          <Alert tone="danger" title={t("errorSummary", { count: errorFields.length })} live>
-            <ul className="list-disc pl-5">
-              {errorFields.map((field) => (
-                <li key={field}>
-                  <a href={`#${fieldId(field)}`} className="underline">
-                    {errors[field]}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </Alert>
-        </div>
-      ) : null}
+      <ErrorSummary
+        title={t("errorSummary", { count: errorFields.length })}
+        errors={errorFields.map((field) => ({
+          fieldId: fieldId(field),
+          message: errors[field] ?? "",
+        }))}
+        attempt={attempt}
+      />
 
       <form
         ref={formRef}
