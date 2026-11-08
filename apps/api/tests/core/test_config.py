@@ -204,3 +204,16 @@ def test_SEC_011_dedicated_hosts_and_local_do_not_need_postgres_tls() -> None:
     s = _prod(deployment_mode=DeploymentMode.DEDICATED, database_url=plain)
     assert s.deployment_mode is DeploymentMode.DEDICATED
     assert Settings(env=Environment.LOCAL, database_url=plain).database_url == plain
+
+
+def test_CP_01_SEC_009_prod_rejects_razorpay_oauth_test_mode() -> None:
+    """Audit 2026-11-08 CP-01: Razorpay test mode moves no money; in production its "captured"
+    payments would become real receipts in the school's gap-free series."""
+    with pytest.raises(ValidationError, match="SOS_RAZORPAY_OAUTH_MODE"):
+        _prod(razorpay_oauth_mode="test")
+
+
+def test_CP_01_staging_allows_razorpay_oauth_test_mode() -> None:
+    s = _prod(env=Environment.STAGING, razorpay_oauth_mode="test")
+    assert s.razorpay_oauth_mode == "test"
+    assert _prod().razorpay_oauth_mode == "live"
