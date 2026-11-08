@@ -7596,7 +7596,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** All Usage */
+        /**
+         * All Usage
+         * @description Daily usage per school, oldest first. One school (``tenant_id``): up to 401 days
+         *     (default the last 90). Every school: up to 31 days (default the last 31; longer: 422
+         *     ``range_too_long``, audit 2026-11-08 AZ-03), because the list is not paged.
+         */
         get: operations["all_usage_api_v1_platform_usage_get"];
         put?: never;
         post?: never;
@@ -7725,7 +7730,9 @@ export interface paths {
         /**
          * Set Affected
          * @description Replace the list of affected people, to prepare individual notices (ids of this school
-         *     only, at most 5,000; permission ``privacy.breach.manage``, step-up).
+         *     only, at most 5,000; permission ``privacy.breach.manage``, step-up). ``If-Match`` with the
+         *     breach's ``ETag`` (stale: 412, nothing changed; audit 2026-11-08 AZ-01); the answer carries
+         *     the breach's new ``ETag``.
          */
         put: operations["set_affected_api_v1_privacy_breaches__breach_id__affected_put"];
         post?: never;
@@ -23376,7 +23383,7 @@ export interface components {
             shared_ledger: boolean;
             /**
              * Shared With
-             * @description How many other students share one of this student's ledgers (0 if none).
+             * @description How many other students the caller can see share one of this student's ledgers (0 if none; siblings outside the caller's student scope are not counted).
              */
             shared_with: number;
             /**
