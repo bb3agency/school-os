@@ -297,6 +297,35 @@ describe("US-401 AC1..AC3: one import", () => {
     });
   });
 
+  it("a retry after a lost check answer keeps the saved mapping and the Idempotency-Key (WD-07, FR-IMP-003)", async () => {
+    stub.routes[`PUT /bff/api/v1/imports/${ID.import}/mapping`] = () =>
+      Response.json(importBatch({ version: 4 }));
+    let answers = 0;
+    stub.routes[`POST /bff/api/v1/imports/${ID.import}/validate`] = () =>
+      (answers += 1) === 1
+        ? problem(502, "bad_gateway")
+        : Response.json(importBatch({ status: "validating", version: 5 }), { status: 202 });
+    const user = userEvent.setup();
+    renderWithIntl(
+      <ImportDetailView
+        batch={ready(importBatch())}
+        attributes={ready(ATTRIBUTES)}
+        permissions={perms}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: im.mapping.submit }));
+    await screen.findByText(messages.en.errors.api.bad_gateway.title);
+    await user.click(screen.getByRole("button", { name: im.mapping.submit }));
+    await waitFor(() =>
+      expect(stub.callsTo(`POST /bff/api/v1/imports/${ID.import}/validate`)).toHaveLength(2),
+    );
+    // The mapping was saved the first time (version 3 -> 4): not sent again with a stale If-Match.
+    expect(stub.callsTo(`PUT /bff/api/v1/imports/${ID.import}/mapping`)).toHaveLength(1);
+    const [first, second] = stub.callsTo(`POST /bff/api/v1/imports/${ID.import}/validate`);
+    expect(first?.headers.get("Idempotency-Key")).toBeTruthy();
+    expect(second?.headers.get("Idempotency-Key")).toBe(first?.headers.get("Idempotency-Key"));
+  });
+
   it("requires the admission number column", async () => {
     const user = userEvent.setup();
     renderWithIntl(

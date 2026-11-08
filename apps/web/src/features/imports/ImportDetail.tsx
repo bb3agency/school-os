@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import * as z from "@/lib/zod";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
@@ -28,8 +28,8 @@ import type { Attribute } from "@/features/students/types";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { apiFieldErrors } from "@/lib/api-errors";
-import { newIdempotencyKey, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
-import { formValues } from "@/lib/forms";
+import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
+import { formValues, useIntentKey } from "@/lib/forms";
 import { formatCount, formatDateTime } from "@/lib/format";
 import { translateOr } from "@/lib/i18n-dynamic";
 import type { Loadable } from "@/lib/loadable";
@@ -170,6 +170,9 @@ function MappingForm({ batch, attributes, label, onChecked, initialPreset }: Map
   const [formError, setFormError] = useState<string | null>(null);
   const [failure, setFailure] = useState<unknown>(undefined);
   const [pending, setPending] = useState(false);
+  const intent = useIntentKey();
+  /** The mapping already saved in this intent and the version it got (WD-07). */
+  const savedRef = useRef<{ columns: string; version: number } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const selectId = (index: number) => `${errorId}-col-${index}`;
   const headerOf = (column: ImportColumn) =>
@@ -223,26 +226,37 @@ function MappingForm({ batch, attributes, label, onChecked, initialPreset }: Map
       .filter(([, target]) => target !== IGNORE)
       .map(([index, target]) => ({ index: Number(index), target }));
     setPending(true);
+    const mapping = JSON.stringify(columns);
     (async () => {
-      await unwrap(
-        api.PUT("/api/v1/imports/{import_id}/mapping", {
-          params: { path: { import_id: batch.id } },
-          headers: { "If-Match": `W/"${batch.version}"` },
-          body: { columns },
-        }),
-      );
+      // A retry after a lost check answer: the mapping is already saved (its version moved
+      // on), so it is not sent again with the old If-Match, and the check reuses its key.
+      const saved = savedRef.current;
+      if (saved?.columns !== mapping) {
+        const version = saved && saved.version > batch.version ? saved.version : batch.version;
+        const out = await unwrap(
+          api.PUT("/api/v1/imports/{import_id}/mapping", {
+            params: { path: { import_id: batch.id } },
+            headers: { "If-Match": `W/"${version}"` },
+            body: { columns },
+          }),
+        );
+        savedRef.current = { columns: mapping, version: out.version };
+      }
       await unwrap(
         api.POST("/api/v1/imports/{import_id}/validate", {
           params: { path: { import_id: batch.id } },
-          headers: { "Idempotency-Key": newIdempotencyKey() },
+          headers: { "Idempotency-Key": intent.next(columns) },
         }),
       );
     })()
       .then(async () => {
+        intent.succeeded();
+        savedRef.current = null;
         await queryClient.invalidateQueries({ queryKey: importKey(batch.id) });
         onChecked();
       })
       .catch((error: unknown) => {
+        intent.failed(error);
         const server: Record<number, string> = {};
         let unmapped = false;
         for (const { field, key } of apiFieldErrors(error)) {
