@@ -14,6 +14,7 @@ import {
   type CertificateStatus,
   type CertificateTypeInfo,
 } from "./types";
+import { openFileUrl } from "@/lib/open-file-url";
 
 /** Workflow pill with the status in words (never colour alone). */
 export function CertificateStatusBadge({
@@ -142,7 +143,7 @@ export function DownloadPdfButton({
           params: { path: { certificate_id: certificate.id } },
         }),
       );
-      window.location.assign(link.url);
+      openFileUrl(link.url);
     } catch (failure) {
       setError(failure);
     } finally {

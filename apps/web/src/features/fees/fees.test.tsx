@@ -384,6 +384,27 @@ describe("receipt page", () => {
     expect(call?.headers.get("Idempotency-Key")).toBeTruthy();
   });
 
+  it("SEC-010 WS-03: a receipt PDF link that is not https is refused with an error, never opened", async () => {
+    signedIn([COLLECT]);
+    stub.routes[`GET /bff/api/v1/fees/receipts/${RECEIPT}`] = () =>
+      Response.json(receipt({ pdf_status: "ready" }));
+    stub.routes[`GET /bff/api/v1/fees/receipts/${RECEIPT}/download-url`] = () =>
+      Response.json({
+        url: "javascript:alert(1)",
+        expires_at: "2026-10-17T05:05:00Z",
+        filename: "receipt.pdf",
+      });
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    const user = userEvent.setup();
+    renderWithIntl(<ReceiptDetailScreen receiptId={RECEIPT} />);
+    await user.click(await screen.findByRole("button", { name: messages.en.ui.more }));
+    await user.click(screen.getByRole("menuitem", { name: en.receipt.downloadPdf }));
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it("opens a More dialog without a hidden trigger, returns focus to More and opens it again", async () => {
     signedIn([COLLECT]);
     stub.routes[`GET /bff/api/v1/fees/receipts/${RECEIPT}`] = () => Response.json(receipt());

@@ -234,6 +234,21 @@ describe("Online payments settings (US-2107)", () => {
     expect(await screen.findByText(en.off.title)).toBeInTheDocument();
   });
 
+  it("SEC-010 WS-03: a provider sign-in link that is not https is refused, never opened", async () => {
+    signedIn([CONFIGURE, FINANCE_READ]);
+    stub.routes["GET /bff/api/v1/payments/connection"] = () =>
+      Response.json(connection({ oauth_available: true }));
+    stub.routes["POST /bff/api/v1/payments/connection/oauth/start"] = () =>
+      Response.json({ authorize_url: "javascript:alert(1)" });
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    renderWithIntl(<PaymentsSettingsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: en.connect.oauth }));
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it("explains the school is the merchant and connects with keys; the secret is shown once", async () => {
     signedIn([CONFIGURE, FINANCE_READ]);
     stub.routes["GET /bff/api/v1/payments/connection"] = () => Response.json(connection());

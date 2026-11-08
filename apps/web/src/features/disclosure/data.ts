@@ -3,6 +3,7 @@
 import type { components } from "@schoolos/api-client";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { Loadable } from "@/lib/loadable";
+import { checkedFileUrl } from "@/lib/open-file-url";
 
 /**
  * CBSE Appendix IX disclosure (R3-1C; ADR-0051; US-2901..US-2904; FR-DISC-001..012).
@@ -192,5 +193,6 @@ export function setDisclosureDownloadOpenerForTesting(
   openDownload = opener ?? ((url) => window.location.assign(url));
 }
 export function startDownload(url: string): void {
-  openDownload(url);
+  // Only an https link (WS-03); anything else is the caller's usual error.
+  openDownload(checkedFileUrl(url));
 }

@@ -1,6 +1,6 @@
 import { logEvent } from "@/server/log";
 import { exchangeParentLink, UNAVAILABLE_TEXT } from "@/server/public/exchange";
-import { getAuthRuntime } from "@/server/runtime";
+import { getPublicRuntime } from "@/server/public/runtime";
 
 /**
  * GET /p/{token}: a parent link from a WhatsApp message (ADR-0046 decision 6, FR-PUB-010).
@@ -16,7 +16,7 @@ export async function GET(
 ): Promise<Response> {
   const { token } = await params;
   try {
-    return await exchangeParentLink(request, await getAuthRuntime(), token);
+    return await exchangeParentLink(request, await getPublicRuntime(), token);
   } catch {
     logEvent("public_exchange_unavailable", {}, "error");
     return new Response(UNAVAILABLE_TEXT, {

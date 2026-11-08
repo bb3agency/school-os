@@ -26,6 +26,7 @@ import { formatDateTime } from "@/lib/format";
 import { CR_KEYS } from "./ChangeRequestsScreen";
 import { ChangeRequestStatusBadge, DisplayValue, ExpiryText, fieldLabel } from "./parts";
 import { CR_APPROVE, CR_REQUEST, ifMatch, TEXT_MAX, TEXT_MIN, type ChangeRequest } from "./types";
+import { checkedFileUrl, openFileUrl } from "@/lib/open-file-url";
 
 /** Decision note or rejection reason: 10–1000 characters (FR-CR-004). */
 const decisionText = z
@@ -88,8 +89,8 @@ function EvidenceViewer({ documentId }: { documentId: string }) {
           params: { path: { document_id: documentId } },
         }),
       );
-      if (link.mime_type.startsWith("image/")) setImage(link.url);
-      else window.location.assign(link.url);
+      if (link.mime_type.startsWith("image/")) setImage(checkedFileUrl(link.url));
+      else openFileUrl(link.url);
     } catch (failure) {
       setError(failure);
     } finally {

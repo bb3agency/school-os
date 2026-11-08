@@ -31,6 +31,7 @@ import {
   type ManualConnect,
   type WebhookSetup,
 } from "./data";
+import { openFileUrl } from "@/lib/open-file-url";
 
 /** Loading, "fees are off" (404 module_hidden), an error, or the content. */
 export function PaymentsGate<T>({
@@ -177,7 +178,7 @@ function OAuthButton() {
     setError(undefined);
     try {
       const out = await unwrap(api.POST("/api/v1/payments/connection/oauth/start"));
-      window.location.assign(out.authorize_url);
+      openFileUrl(out.authorize_url);
     } catch (failure) {
       setError(failure);
       setPending(false);

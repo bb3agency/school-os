@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { DisclosureBusy, DisclosurePage } from "@/features/public/DisclosurePages";
-import { getAuthRuntime } from "@/server/runtime";
+import { getPublicRuntime } from "@/server/public/runtime";
 import { DISCLOSURE_KEY, loadDisclosure } from "@/server/public/disclosure";
 
 /**
@@ -22,7 +22,7 @@ export default async function DisclosureKeyPage({
   // WP-03: set by /d/{key}/documents/{n} when a document did not open.
   const documentFailed = (await searchParams).doc === "0";
   if (!DISCLOSURE_KEY.test(key)) notFound();
-  const runtime = await getAuthRuntime();
+  const runtime = await getPublicRuntime();
   const view = await loadDisclosure(runtime, new Headers(await headers()), key);
   if (view.state === "not_found") notFound();
   if (view.state === "busy") return <DisclosureBusy />;

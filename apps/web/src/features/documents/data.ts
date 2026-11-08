@@ -20,6 +20,7 @@ import {
   type DocumentRow,
   type DocumentVersion,
 } from "./types";
+import { checkedFileUrl } from "@/lib/open-file-url";
 
 /** Query-key roots; uploads, ACL changes and deletes invalidate `all`. */
 export const DOCUMENT_KEYS = {
@@ -172,5 +173,6 @@ export function setDocumentDownloadOpenerForTesting(opener: ((url: string) => vo
   openDownload = opener ?? ((url) => window.location.assign(url));
 }
 export function startDocumentDownload(url: string): void {
-  openDownload(url);
+  // Only an https link (WS-03); anything else is the caller's usual error.
+  openDownload(checkedFileUrl(url));
 }

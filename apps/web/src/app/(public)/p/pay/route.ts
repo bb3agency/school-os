@@ -1,5 +1,5 @@
 import { payFromForm } from "@/server/public/actions";
-import { getAuthRuntime } from "@/server/runtime";
+import { getPublicRuntime } from "@/server/public/runtime";
 
 /**
  * POST /p/pay: "Pay online" from a dues page (R2-3H; ADR-0046 decision 9; FR-PAY-005). A plain
@@ -9,5 +9,5 @@ import { getAuthRuntime } from "@/server/runtime";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
-  return payFromForm(await getAuthRuntime(), request);
+  return payFromForm(await getPublicRuntime(), request);
 }
