@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import RowMapping, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -48,6 +48,29 @@ def purge_delivered_outbox(session: Session, *, older_than_days: int) -> int:
         .returning(o.c.id)
     )
     return len(result.all())
+
+
+def claim_consumer(
+    session: Session, event_id: uuid.UUID
+) -> Literal["claimed", "consumed", "missing"]:
+    """Stamp ``consumed_at`` on the current school's event unless it is already stamped (audit
+    YM-06). ``missing``: no such event (never written, or purged after delivery)."""
+    o = m.outbox
+    claimed = session.execute(
+        update(o)
+        .where(o.c.id == event_id, o.c.consumed_at.is_(None))
+        .values(consumed_at=func.now())
+        .returning(o.c.id)
+    ).first()
+    if claimed is not None:
+        return "claimed"
+    exists = session.execute(select(o.c.id).where(o.c.id == event_id)).first()
+    return "consumed" if exists is not None else "missing"
+
+
+def release_consumer(session: Session, event_id: uuid.UUID) -> None:
+    o = m.outbox
+    session.execute(update(o).where(o.c.id == event_id).values(consumed_at=None))
 
 
 def claim_outbox(session: Session, batch: int) -> list[RowMapping]:

@@ -6,7 +6,9 @@
   ``notification.email.requested`` (IDs only; a 100 % alert email also names its in-app
   notice, D70); renders and sends one email through the
   configured provider (``app.notifications.email``). Retries with backoff while the provider is
-  unavailable; a permanent refusal is logged with its code and not retried. Addresses and
+  unavailable; a permanent refusal is logged with its code and not retried. At most once per
+  outbox event (audit YM-06): the event is claimed before the provider call, a run of an event
+  already claimed sends nothing, and an unknown outcome is not retried. Addresses and
   message text are never logged or returned.
 """
 
@@ -70,10 +72,20 @@ def send_email(self: Task[Any, Any], tenant_id: str, event_id: str, payload: dic
             user_id,
             template_key,
             notification_id=uuid.UUID(str(notice)) if notice else None,
+            event_id=uuid.UUID(str(event_id)),
         )
     except email.EmailRejected as exc:
         log.error("notifications.email.rejected", action=template_key, error_code=exc.code)
         return "rejected"
+    except email.EmailOutcomeUnknown as exc:
+        # Audit YM-06: it may have been sent; a retry would only skip it (at most once).
+        log.error(
+            "notifications.email.outcome_unknown",
+            action=template_key,
+            resource_id=event_id,
+            error_code=exc.code,
+        )
+        return "unknown"
     except email.EmailUnavailable as exc:
         if self.request.retries >= EMAIL_MAX_RETRIES:
             log.error("notifications.email.failed", action=template_key, error_code=exc.code)

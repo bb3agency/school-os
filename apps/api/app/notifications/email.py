@@ -26,7 +26,13 @@ from typing import Any, Final, Protocol
 import boto3
 import yaml
 from botocore.config import Config
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import (
+    BotoCoreError,
+    ClientError,
+    ConnectTimeoutError,
+    EndpointConnectionError,
+    NoCredentialsError,
+)
 
 from app.core.config import EmailProviderKind, Settings, get_settings
 from app.core.languages import output_language
@@ -66,6 +72,17 @@ class EmailUnavailable(EmailError):
     """Temporary provider failure: the task retries with backoff."""
 
     code = "email_unavailable"
+
+
+class EmailOutcomeUnknown(EmailUnavailable):
+    """The request may have reached the provider (a time-out or a dropped connection after it
+    was sent): the e-mail may have gone out, so it is not sent again (audit YM-06)."""
+
+    code = "email_outcome_unknown"
+
+
+# Transport errors raised before the request left this host: certainly not sent.
+_NOT_SENT_ERRORS: Final = (ConnectTimeoutError, EndpointConnectionError, NoCredentialsError)
 
 
 class EmailRejected(EmailError):
@@ -140,7 +157,9 @@ class SesEmailSender:
                 raise EmailRejected(code) from None
             raise EmailUnavailable(code or "client_error") from None
         except BotoCoreError as exc:
-            raise EmailUnavailable(type(exc).__name__) from None
+            if isinstance(exc, _NOT_SENT_ERRORS):
+                raise EmailUnavailable(type(exc).__name__) from None
+            raise EmailOutcomeUnknown(type(exc).__name__) from None
         return str(response.get("MessageId", ""))
 
 

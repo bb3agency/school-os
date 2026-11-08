@@ -420,6 +420,36 @@ def test_FR_TASK_007_reminders_are_sent_once(ai_on: Any, admin_engine: Engine) -
         assert set(r.params) <= {"task_id", "days"}  # ids and counts only
 
 
+def test_YM_07_FR_TASK_007_a_reassigned_task_reminds_its_new_owner(
+    ai_on: Any, admin_engine: Engine
+) -> None:
+    """The reminder dedupe is per recipient (notification key and recipient), so a task
+    reassigned after its reminder went out still reminds the new owner, once."""
+    school = ai_on.a
+    today = service.today_ist()
+    task_id = C.task(school, due_on=today + dt.timedelta(days=1), title="Reassigned")
+    new_owner = school.people["principal"]
+    with tenant_session(school.tenant_id) as db:
+        service.send_reminders(db, today=today)
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE ops.tasks SET owner_membership_id = :m WHERE id = :t"),
+            {"m": new_owner.membership_id, "t": task_id},
+        )
+    for _ in range(2):
+        with tenant_session(school.tenant_id) as db:
+            service.send_reminders(db, today=today)
+    with admin_engine.connect() as c:
+        count: int = c.execute(
+            text(
+                "SELECT count(*) FROM ops.notifications WHERE recipient_membership_id = :m "
+                "AND template_key = 'task.due_soon' AND resource_id = :t"
+            ),
+            {"m": new_owner.membership_id, "t": task_id},
+        ).scalar_one()
+    assert count == 1
+
+
 # --- notices (US-1605, US-1606) -------------------------------------------------------------
 
 

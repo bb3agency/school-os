@@ -1209,7 +1209,8 @@ def record_optin(
         data.status == "opted_in"
         and previous is not None
         and previous.method == "whatsapp_stop"
-        and data.method not in _PARENT_ACTIONS
+        # YM-04: a form signed before the STOP is not a new parent action.
+        and (data.method not in _PARENT_ACTIONS or data.decided_on < previous.decided_on)
     ):
         raise OptedOutByParent(
             "The parent stopped messages from WhatsApp. Record a new signed form, or ask the "
@@ -1832,6 +1833,7 @@ def store_events(
         ):
             log.warning("messaging.webhook.no_account", tenant_id=tenant_id, outcome="dropped")
             return 0
+        events = _fresh_events(session, tenant_id, events)
         if tenancy.get_tenant(session).status == "suspended":
             return _record_suspended_stops(session, tenant_id, account, events)
         stored = 0
@@ -1858,6 +1860,26 @@ def store_events(
         if stored:
             ops.enqueue_event(session, INBOX_EVENT, {"count": stored})
         return stored
+
+
+def _fresh_events(
+    session: Session, tenant_id: uuid.UUID, events: Sequence[ParsedEvent]
+) -> list[ParsedEvent]:
+    """Audit YM-03 (FR-MSG-020, SEC-034): drop events whose Meta timestamp is older than
+    ``inbox.max_event_age_hours``. Meta retries a delivery for at most 7 days, so an older one
+    is a replay of a captured body that the guard's replay window and the inbox dedupe have
+    both forgotten (a replayed STOP would undo a later signed-form opt-in). Events without a
+    timestamp (template and account updates) are kept: they only record Meta's state."""
+    oldest = repo.now(session) - dt.timedelta(hours=load_config().inbox.max_event_age_hours)
+    kept = [e for e in events if e.event_at is None or e.event_at >= oldest]
+    if len(kept) < len(events):
+        log.warning(
+            "messaging.webhook.stale",
+            tenant_id=tenant_id,
+            count=len(events) - len(kept),
+            outcome="dropped",
+        )
+    return kept
 
 
 def _record_suspended_stops(
@@ -2010,7 +2032,11 @@ def _stop(session: Session, guardian_ids: Sequence[uuid.UUID], today: dt.date) -
 
 
 def _join(
-    session: Session, code: str | None, guardian_ids: Sequence[uuid.UUID], today: dt.date
+    session: Session,
+    code: str | None,
+    guardian_ids: Sequence[uuid.UUID],
+    today: dt.date,
+    sent_at: dt.datetime | None = None,
 ) -> tuple[str, uuid.UUID | None]:
     if code is None:
         return "join_without_code", None
@@ -2024,6 +2050,15 @@ def _join(
         return "join_other_number", None
     phone = students.guardian_phone_index(session, row.guardian_id)
     current = repo.current_optins(session, [row.guardian_id])
+    if sent_at is not None and any(
+        (stop := current.get((row.guardian_id, category))) is not None
+        and stop.method == "whatsapp_stop"
+        and stop.recorded_at > sent_at
+        for category in row.categories
+    ):
+        # Audit YM-02 (FR-MSG-010): Meta delivered this JOIN late, after a STOP the parent sent
+        # later; the parent's latest word wins. The code stays unused for a new JOIN.
+        return "join_before_stop", None
     for category in row.categories:
         _insert_decision(
             session,
@@ -2042,7 +2077,11 @@ def _join(
 
 
 def _apply_inbound(  # noqa: PLR0911 - one return per inbound outcome
-    session: Session, event_id: uuid.UUID, payload: Mapping[str, Any], outbox: _Outbox
+    session: Session,
+    event_id: uuid.UUID,
+    payload: Mapping[str, Any],
+    outbox: _Outbox,
+    sent_at: dt.datetime | None = None,
 ) -> str:
     mobile = rules.mobile_from_wa_id(payload.get("wa_id"))
     if mobile is None:
@@ -2084,7 +2123,7 @@ def _apply_inbound(  # noqa: PLR0911 - one return per inbound outcome
         repo.mark_inbound(session, inbound.id, replied=True, outcome="stopped")
         return "processed"
     if kind == "join":
-        outcome, guardian_id = _join(session, payload.get("code"), guardian_ids, today)
+        outcome, guardian_id = _join(session, payload.get("code"), guardian_ids, today, sent_at)
         if guardian_id is not None:
             queued = queue_message(
                 session,
@@ -2100,7 +2139,7 @@ def _apply_inbound(  # noqa: PLR0911 - one return per inbound outcome
                 outbox.deliveries.append((queued.message_id, mobile, None))
             repo.mark_inbound(session, inbound.id, replied=True, outcome=outcome)
             return "processed"
-        if outcome == "join_other_number":
+        if outcome in ("join_other_number", "join_before_stop"):
             repo.mark_inbound(session, inbound.id, replied=False, outcome=outcome)
             return "processed"
         # A join without a valid code is answered like any other message.
@@ -2230,7 +2269,7 @@ def process_inbox(tenant_id: uuid.UUID) -> dict[str, int]:  # noqa: PLR0912 - on
                     elif event.event_type == "message_status":
                         outcome = _apply_status(session, payload, statuses)
                     elif event.event_type == "inbound_message":
-                        outcome = _apply_inbound(session, event.id, payload, outbox)
+                        outcome = _apply_inbound(session, event.id, payload, outbox, event.event_at)
                     elif event.event_type in ("template_status", "template_category"):
                         outcome = _apply_template_event(session, account, event.event_type, payload)
                     elif event.event_type in ("phone_quality", "account_update"):

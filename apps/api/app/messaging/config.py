@@ -15,7 +15,7 @@ from importlib import resources
 from typing import Final, Literal, get_args
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
 OptinCategory = Literal["notices", "attendance", "fees"]
 OPTIN_CATEGORIES: Final[tuple[OptinCategory, ...]] = get_args(OptinCategory)
@@ -134,6 +134,8 @@ class RetentionConfig(_Model):
 class InboxConfig(_Model):
     max_attempts: int = Field(ge=1, le=20)
     batch_size: int = Field(ge=1, le=5000)
+    # Meta retries for 7 days (168 h); older events are replays (YM-03).
+    max_event_age_hours: int = Field(ge=168, le=24 * 60)
 
 
 class MessagingConfig(_Model):
@@ -149,6 +151,13 @@ class MessagingConfig(_Model):
     inbox: InboxConfig
     broadcasts: BroadcastConfig
     automatic: AutomaticConfig
+
+    @model_validator(mode="after")
+    def _age_inside_dedupe(self) -> MessagingConfig:
+        # YM-03: every signed event young enough to be stored is still in the inbox dedupe.
+        if self.inbox.max_event_age_hours >= self.retention.provider_events_days * 24:
+            raise ValueError("inbox.max_event_age_hours must be below provider_events_days")
+        return self
 
     def limit_for(self, tier: str | None) -> int | None:
         """Unique users per 24 hours for a Meta messaging-limit tier (``None`` when unknown)."""

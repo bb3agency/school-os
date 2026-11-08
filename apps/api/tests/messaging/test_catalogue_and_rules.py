@@ -187,6 +187,12 @@ def _reason(**kw: object) -> str | None:
         ({"template": rules.TemplateState("rejected", "UTILITY", False)}, "template_not_approved"),
         ({"template": rules.TemplateState("approved", "MARKETING", True)}, "template_paused"),
         ({"template": rules.TemplateState("paused", "UTILITY", False)}, "template_paused"),
+        # YM-05 (D32, FR-MSG-006): no category reported yet is not "utility": fail closed.
+        ({"template": rules.TemplateState("approved", None, False)}, "template_not_approved"),
+        (
+            {"template": rules.TemplateState("approved", "MARKETING", False)},
+            "template_not_approved",
+        ),
         ({"template": None, "needs_template": False}, None),
         ({"optin": None}, "no_optin"),
         ({"optin": rules.OptinState("opted_out", False)}, "opted_out"),
@@ -198,6 +204,13 @@ def _reason(**kw: object) -> str | None:
 )
 def test_FR_MSG_011_eligibility_matrix(change: dict[str, object], reason: str | None) -> None:
     assert _reason(**change) == reason
+
+
+def test_YM_05_D32_FR_MSG_006_only_a_template_meta_reports_as_utility_is_usable() -> None:
+    assert rules.template_usable(rules.TemplateState("approved", "UTILITY", False))
+    assert rules.template_usable(rules.TemplateState("approved", "utility", False))
+    assert not rules.template_usable(rules.TemplateState("approved", None, False))
+    assert not rules.template_usable(rules.TemplateState("approved", "AUTHENTICATION", False))
 
 
 def test_FR_MSG_021_default_daily_cap_is_meta_limit_minus_ten_percent() -> None:

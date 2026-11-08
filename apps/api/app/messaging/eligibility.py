@@ -60,12 +60,14 @@ def currency_ok(account: AccountState, today: dt.date, inr_required_from: dt.dat
 
 
 def template_usable(template: TemplateState | None) -> bool:
-    """Approved, still utility and not paused by SchoolOS (FR-MSG-006, FR-MSG-007)."""
+    """Approved, still utility and not paused by SchoolOS (FR-MSG-006, FR-MSG-007). A template
+    whose category Meta has not reported is not usable (audit YM-05, D32: fail closed)."""
     return (
         template is not None
         and template.status == "approved"
         and not template.paused_by_sos
-        and (template.category is None or template.category.upper() == "UTILITY")
+        and template.category is not None
+        and template.category.upper() == "UTILITY"
     )
 
 
