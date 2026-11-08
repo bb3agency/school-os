@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
@@ -70,6 +71,7 @@ export function ReceiptWhatsApp({ receiptId }: { receiptId: string }) {
   );
   // One key per receipt shown: a retried click is answered once (docs/09 §2).
   const key = useMemo(() => newIdempotencyKey(), []);
+  const queryClient = useQueryClient();
   const send = useApiMutation(
     () =>
       unwrap(
@@ -78,10 +80,15 @@ export function ReceiptWhatsApp({ receiptId }: { receiptId: string }) {
           headers: { "Idempotency-Key": key },
         }),
       ),
-    { invalidate: [KEYS.receipt(receiptId)] },
+    {
+      // XF-05: the answer goes into the receipt's query, then the reload replaces it, so the
+      // line moves on to delivered or read instead of staying on the POST's "queued".
+      onSuccess: (result) => queryClient.setQueryData(KEYS.receipt(receiptId), result),
+      invalidate: [KEYS.receipt(receiptId)],
+    },
   );
   if (!allowed || state.status !== "ready") return null;
-  const data = send.data ?? state.data;
+  const data = state.data;
   if (data.blocked_reason === "messaging_not_connected") return null;
   return (
     <div className="space-y-2" data-print="hide">

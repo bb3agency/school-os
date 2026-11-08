@@ -2546,7 +2546,9 @@
     "waiverReducesLateFee": "ఆలస్య రుసుము మాఫీ రుసుమును తగ్గిస్తుంది: మైనస్ గుర్తుతో నమోదు చేయండి, ఉదా. -100.",
     "waiverOnLateFee": "ఆలస్య రుసుము మాఫీ కోసం వాయిదాలోని ఆలస్య రుసుము వరుసను ఎంచుకోండి.",
     "lateFeeWaiverOnly": "ఆలస్య రుసుము వరుసకు ఆలస్య రుసుము మాఫీ మాత్రమే వర్తిస్తుంది. ఆ కారణాన్ని లేదా వేరే వరుసను ఎంచుకోండి.",
-    "quietHoursEmpty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00."
+    "quietHoursEmpty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00.",
+    "refundAboveLeft": "The refund is more than this receipt took less the refunds already asked for. Lower it.",
+    "dailyCapRange": "Enter a whole number from 1 to 10,00,000, or leave it empty for the default."
   },
   "support": {
     "piiWarningTitle": "విద్యార్థుల వ్యక్తిగత వివరాలు చేర్చవద్దు",
@@ -9257,7 +9259,8 @@
         "utr": "12 అంకెల UPI రిఫరెన్స్ (UTR) ఇవ్వండి.",
         "allocation": "ప్రతి మొత్తాన్ని రూపాయలలో ఇవ్వండి, లేదా ఖాళీగా ఉంచండి.",
         "allocationSum": "మొత్తాలు రసీదు మొత్తానికి సమానం కావాలి.",
-        "utrInUse": "ఈ UTR ఇప్పటికే మరో రసీదులో ఉంది. ఆ రసీదు తెరవండి."
+        "utrInUse": "ఈ UTR ఇప్పటికే మరో రసీదులో ఉంది. ఆ రసీదు తెరవండి.",
+        "allocationAboveDue": "A line takes no more than what is due on it. Lower that amount."
       },
       "upi": {
         "showQr": "పాఠశాల UPI QR చూపించండి",
@@ -10037,7 +10040,10 @@
         "expires": "పనిచేసే వరకు",
         "receipt": "రసీదు",
         "action": "చర్య"
-      }
+      },
+      "testModeTitle": "Test mode: payment links do not collect real money",
+      "testModeBody": "Do not send them to parents. The owner connects live Razorpay keys in Settings > Online payments.",
+      "testBadge": "Test"
     },
     "recon": {
       "title": "ఆన్‌లైన్ సరిపోలిక",

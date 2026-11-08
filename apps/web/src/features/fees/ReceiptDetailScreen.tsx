@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
@@ -44,7 +44,9 @@ import {
   type DialogControl,
   type MoreItem,
 } from "./parts";
+import { PASSIVE_HEADER } from "@/lib/bff/fetch";
 import { openFileUrl } from "@/lib/open-file-url";
+import { runPollDelay } from "@/features/findings/RunChecks";
 
 const reason = z
   .string()
@@ -52,24 +54,54 @@ const reason = z
   .min(1, { error: "required" })
   .min(REASON_MIN, { error: "reasonTooShort" })
   .max(REASON_MAX, { error: "tooLong" });
+const CANCEL_REASONS = [
+  "wrong_student",
+  "wrong_amount",
+  "cheque_dishonoured",
+  "duplicate_entry",
+  "other",
+] as const;
+
 const cancelSchema = z.object({
-  reason_code: z.enum([
-    "wrong_student",
-    "wrong_amount",
-    "cheque_dishonoured",
-    "duplicate_entry",
-    "other",
-  ]),
+  reason_code: z.enum(CANCEL_REASONS),
   reason,
 });
-const refundSchema = z.object({
-  amount: z
-    .string()
-    .trim()
-    .refine((v) => (toPaise(v) ?? 0) > 0, { error: "invalidAmount" }),
-  mode: z.enum(["original_method", "cash", "cheque", "bank_transfer"]),
-  reason,
-});
+/** Refunds that hold part of the receipt (asked for, approved, in progress or paid), as the API. */
+const LIVE_REFUNDS: ReadonlySet<string> = new Set([
+  "pending",
+  "approved",
+  "processing",
+  "processed",
+]);
+
+/** Paise of the receipt that live refunds hold; the rest can still be refunded (XF-01). */
+export function refundsHeld(r: Pick<Receipt, "refunds">): number {
+  return r.refunds
+    .filter((x) => LIVE_REFUNDS.has(x.status))
+    .reduce((sum, x) => sum + (toPaise(x.amount) ?? 0), 0);
+}
+
+/** The refund form; `leftPaise` is what the receipt took less live refunds (409 refund_exceeds_paid). */
+export function refundSchema(leftPaise: number) {
+  return z.object({
+    amount: z
+      .string()
+      .trim()
+      .refine((v) => (toPaise(v) ?? 0) > 0, { error: "invalidAmount" })
+      .refine((v) => (toPaise(v) ?? 0) <= leftPaise, { error: "refundAboveLeft" }),
+    mode: z.enum(["original_method", "cash", "cheque", "bank_transfer"]),
+    reason,
+  });
+}
+
+/**
+ * Pause before reading the receipt again while its PDF is made (2 s, 3 s, 4.5 s … at most
+ * 15 s; XF-07, as certificates XO-03). Tests shorten it.
+ */
+let pdfPollDelay: (attempt: number) => number = runPollDelay;
+export function setReceiptPollDelayForTesting(delay: ((attempt: number) => number) | null) {
+  pdfPollDelay = delay ?? runPollDelay;
+}
 
 /** The stored PDF through a short-lived link (the API client runs any step-up first). */
 function useDownloadPdf(receipt: Receipt | null) {
@@ -129,14 +161,11 @@ function CancelDialog({ receipt, control }: { receipt: Receipt; control: DialogC
             name="reason_code"
             label={t("reasonCode")}
             error={errors.reason_code}
-            options={(
-              [
-                "wrong_student",
-                "wrong_amount",
-                "cheque_dishonoured",
-                "duplicate_entry",
-                "other",
-              ] as const
+            // An online receipt is cancelled only as a duplicate entry; its money goes back by
+            // an online refund (409 refund_first; XF-01).
+            options={(receipt.mode === "razorpay"
+              ? (["duplicate_entry"] as const)
+              : CANCEL_REASONS
             ).map((v) => ({ value: v, label: tf(`cancelReasons.${v}`) }))}
           />
           <TextAreaField
@@ -153,7 +182,15 @@ function CancelDialog({ receipt, control }: { receipt: Receipt; control: DialogC
   );
 }
 
-function RefundDialog({ receipt, control }: { receipt: Receipt; control: DialogControl }) {
+function RefundDialog({
+  receipt,
+  leftPaise,
+  control,
+}: {
+  receipt: Receipt;
+  leftPaise: number;
+  control: DialogControl;
+}) {
   const t = useTranslations("fees.receipt");
   const tf = useTranslations("fees");
   const api = useBffClient("staff");
@@ -165,7 +202,7 @@ function RefundDialog({ receipt, control }: { receipt: Receipt; control: DialogC
       description={receipt.mode === "razorpay" ? t("refundOnlineBody") : t("refundBody")}
       confirmLabel={t("requestRefund")}
       consequence={t("refundConsequence")}
-      schema={refundSchema}
+      schema={refundSchema(leftPaise)}
       invalidate={[KEYS.all]}
       errorNamespace="fees"
       submit={(input, key) =>
@@ -345,15 +382,30 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
   const me = useStaffMe();
   const allowed = can([COLLECT, FINANCE_READ]);
   const api = useBffClient("staff");
+  // XF-07: the PDF is made in the background after the receipt is saved; read the receipt
+  // again until it is ready or failed, so Download opens without a reload. The re-reads are
+  // passive: they do not keep an unattended office PC's session awake.
+  const pdfPolls = useRef(0);
   const receipt = useApiQuery(
     KEYS.receipt(receiptId),
     () =>
       unwrap(
         api.GET("/api/v1/fees/receipts/{receipt_id}", {
           params: { path: { receipt_id: receiptId } },
+          ...(pdfPolls.current > 0 ? { headers: { [PASSIVE_HEADER]: "1" } } : {}),
         }),
       ),
-    { enabled: me !== undefined && allowed },
+    {
+      enabled: me !== undefined && allowed,
+      refetchInterval: (current) => {
+        if (current?.status !== "issued" || current.pdf_status !== "queued") {
+          pdfPolls.current = 0;
+          return false;
+        }
+        pdfPolls.current += 1;
+        return pdfPollDelay(pdfPolls.current - 1);
+      },
+    },
   );
   const pdf = useDownloadPdf(receipt.status === "ready" ? receipt.data : null);
   const header = (r: Receipt | null) => {
@@ -365,15 +417,20 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
         disabled: !pdf.ready || pdf.pending,
         onSelect: () => void pdf.download(),
       });
-      const refundable = (toPaise(r.amount) ?? 0) - (toPaise(r.refunded) ?? 0);
+      // XF-01: live refunds (asked for, approved, in progress or paid) hold their amount, and a
+      // receipt with one is not cancelled (409 refund_exceeds_paid, receipt_has_refunds).
+      const held = refundsHeld(r);
+      const refundable = (toPaise(r.amount) ?? 0) - held;
       if (r.status === "issued" && refundable > 0 && can(REFUND_REQUEST)) {
         items.push({
           id: "refund",
           label: t("requestRefund"),
-          dialog: (control) => <RefundDialog receipt={r} control={control} />,
+          dialog: (control) => (
+            <RefundDialog receipt={r} leftPaise={refundable} control={control} />
+          ),
         });
       }
-      if (r.status === "issued" && !r.cancellation && can([COLLECT, MANAGE])) {
+      if (r.status === "issued" && !r.cancellation && held === 0 && can([COLLECT, MANAGE])) {
         items.push({
           id: "cancel",
           label: t("requestCancel"),

@@ -93,27 +93,28 @@ function receiptState(overrides: Partial<ReceiptState> = {}): ReceiptState {
 describe("Send on WhatsApp for a receipt (FR-MSG-026)", () => {
   it("sends once with an idempotency key and shows the status", async () => {
     signedIn(["fee.collect"]);
+    // After the send the API's GET answers what the POST answered (the message is queued).
+    let sent: ReceiptState | null = null;
     stub.routes[`GET /bff/api/v1/fees/receipts/${RECEIPT}/whatsapp`] = () =>
-      Response.json(receiptState());
-    stub.routes[`POST /bff/api/v1/fees/receipts/${RECEIPT}/whatsapp`] = () =>
-      Response.json(
-        receiptState({
-          can_send: false,
-          blocked_reason: "already_queued",
-          messages: [
-            {
-              id: "0192f3a4-0000-7000-8000-00000000m001",
-              status: "queued",
-              skip_reason: null,
-              failure_reason: null,
-              language: "en",
-              queued_at: "2026-10-21T05:00:00Z",
-              status_at: "2026-10-21T05:00:00Z",
-            },
-          ],
-        }),
-        { status: 202 },
-      );
+      Response.json(sent ?? receiptState());
+    stub.routes[`POST /bff/api/v1/fees/receipts/${RECEIPT}/whatsapp`] = () => {
+      sent = receiptState({
+        can_send: false,
+        blocked_reason: "already_queued",
+        messages: [
+          {
+            id: "0192f3a4-0000-7000-8000-00000000m001",
+            status: "queued",
+            skip_reason: null,
+            failure_reason: null,
+            language: "en",
+            queued_at: "2026-10-21T05:00:00Z",
+            status_at: "2026-10-21T05:00:00Z",
+          },
+        ],
+      });
+      return Response.json(sent, { status: 202 });
+    };
     renderWithIntl(<ReceiptWhatsApp receiptId={RECEIPT} />);
     const send = await screen.findByRole("button", { name: en.messaging.receipt.send });
     expect(send).not.toHaveFocus();
@@ -126,6 +127,36 @@ describe("Send on WhatsApp for a receipt (FR-MSG-026)", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: en.messaging.receipt.send })).toBeNull(),
     );
+  });
+
+  it("FR-MSG-026 XF-05: after sending, the status line follows the reloaded status", async () => {
+    signedIn(["fee.collect"]);
+    const message = (status: "queued" | "delivered") => ({
+      id: "0192f3a4-0000-7000-8000-00000000m001",
+      status,
+      skip_reason: null,
+      failure_reason: null,
+      language: "en",
+      queued_at: "2026-10-21T05:00:00Z",
+      status_at: "2026-10-21T05:00:00Z",
+    });
+    let gets = 0;
+    stub.routes[`GET /bff/api/v1/fees/receipts/${RECEIPT}/whatsapp`] = () => {
+      gets += 1;
+      return Response.json(
+        gets === 1
+          ? receiptState()
+          : receiptState({ can_send: false, messages: [message("delivered")] }),
+      );
+    };
+    stub.routes[`POST /bff/api/v1/fees/receipts/${RECEIPT}/whatsapp`] = () =>
+      Response.json(receiptState({ can_send: false, messages: [message("queued")] }), {
+        status: 202,
+      });
+    renderWithIntl(<ReceiptWhatsApp receiptId={RECEIPT} />);
+    await userEvent.click(await screen.findByRole("button", { name: en.messaging.receipt.send }));
+    expect(await screen.findByText(en.messaging.receipt.delivered)).toBeInTheDocument();
+    expect(gets).toBe(2);
   });
 
   it("says when no guardian agreed and offers no button", async () => {

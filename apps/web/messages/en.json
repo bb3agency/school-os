@@ -2546,7 +2546,9 @@
     "waiverReducesLateFee": "A late-fee waiver reduces the fee: enter it with a minus sign, like -100.",
     "waiverOnLateFee": "Choose the late-fee line of the instalment for a late-fee waiver.",
     "lateFeeWaiverOnly": "The late-fee line takes only a late-fee waiver. Choose that reason or another line.",
-    "quietHoursEmpty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00."
+    "quietHoursEmpty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00.",
+    "refundAboveLeft": "The refund is more than this receipt took less the refunds already asked for. Lower it.",
+    "dailyCapRange": "Enter a whole number from 1 to 10,00,000, or leave it empty for the default."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -9257,7 +9259,8 @@
         "utr": "Enter the 12-digit UPI reference (UTR).",
         "allocation": "Enter each amount in rupees, or leave it empty.",
         "allocationSum": "The amounts must add up to the receipt amount.",
-        "utrInUse": "This UTR is already on another receipt. Open that receipt."
+        "utrInUse": "This UTR is already on another receipt. Open that receipt.",
+        "allocationAboveDue": "A line takes no more than what is due on it. Lower that amount."
       },
       "upi": {
         "showQr": "Show the school's UPI QR",
@@ -10037,7 +10040,10 @@
         "expires": "Works until",
         "receipt": "Receipt",
         "action": "Action"
-      }
+      },
+      "testModeTitle": "Test mode: payment links do not collect real money",
+      "testModeBody": "Do not send them to parents. The owner connects live Razorpay keys in Settings > Online payments.",
+      "testBadge": "Test"
     },
     "recon": {
       "title": "Online reconciliation",

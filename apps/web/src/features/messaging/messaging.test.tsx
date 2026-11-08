@@ -264,6 +264,32 @@ describe("helpers", () => {
     expect(messages.en.errors.field.quiet_hours_empty).toBeTruthy();
   });
 
+  it("FR-MSG-011 XF-03: the daily cap is checked against the API's range (1 to 10,00,000)", () => {
+    const form = {
+      notices_enabled: "on",
+      absence_alerts_enabled: "off",
+      fee_reminders_enabled: "off",
+      fee_receipts_enabled: "on",
+      absence_alert_time: "11:00",
+      quiet_start: "21:00",
+      quiet_end: "07:00",
+      daily_cap: "",
+      office_phone: "",
+      no_message_dates: "",
+    };
+    const cap = (daily_cap: string) =>
+      settingsSchema
+        .safeParse({ ...form, daily_cap })
+        .error?.issues.map((issue) => [issue.path.join("."), issue.message]) ?? [];
+    expect(cap("")).toEqual([]);
+    expect(cap("1")).toEqual([]);
+    expect(cap("1000000")).toEqual([]);
+    expect(cap("0")).toEqual([["daily_cap", "dailyCapRange"]]);
+    expect(cap("1000001")).toEqual([["daily_cap", "dailyCapRange"]]);
+    expect(cap("12a")).toEqual([["daily_cap", "dailyCapRange"]]);
+    expect(messages.en.validation.dailyCapRange).toBeTruthy();
+  });
+
   it("allows Meta's SDK and popups on the WhatsApp settings page only", () => {
     const base = { nonce: "abc", isDev: false, upgradeInsecureRequests: true };
     expect(buildContentSecurityPolicy(base)).not.toContain("facebook");
