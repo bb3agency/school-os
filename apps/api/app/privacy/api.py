@@ -188,7 +188,10 @@ def update_request(
     response: Response,
 ) -> PrivacyRequestOut:
     """Change the status, notes, verification or response, or withdraw a nomination
-    (permission ``privacy.request.manage``; ``If-Match``). Errors: ``request_closed`` (409),
+    (permission ``privacy.request.manage``; ``If-Match``). Withdrawing an access, erasure or
+    grievance request needs ``withdrawal_note`` (how the requester withdrew; 422 ``required``)
+    and a recent MFA sign-in (428 ``step_up_required``); a grievance is not withdrawn by the
+    person who logged it (403 ``self_approval_forbidden``). Errors: ``request_closed`` (409),
     ``request_decided`` (409, a decided request can only be closed),
     stale ``If-Match`` (412)."""
     out = service.update_request(db, ctx, request_id, body, expected_version=version)

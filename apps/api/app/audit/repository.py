@@ -127,6 +127,14 @@ def iter_events_after(session: Session, tenant_id: uuid.UUID, seq: int) -> Itera
     yield from result.mappings()
 
 
+def count_events_between(session: Session, tenant_id: uuid.UUID, after: int, upto: int) -> int:
+    """How many events have ``after < seq <= upto`` (one statement: one snapshot; YP-01)."""
+    stmt = select(func.count()).where(
+        events.c.tenant_id == tenant_id, events.c.seq > after, events.c.seq <= upto
+    )
+    return int(session.execute(stmt).scalar_one())
+
+
 # ---- stored verification results (R-19) ----
 
 
@@ -191,6 +199,12 @@ def iter_platform_events(session: Session) -> Iterator[RowMapping]:
     stmt = select(platform_events).order_by(platform_events.c.seq, platform_events.c.id)
     result = session.execute(stmt.execution_options(yield_per=STREAM_BATCH))
     yield from result.mappings()
+
+
+def count_platform_events_between(session: Session, after: int, upto: int) -> int:
+    """How many control-plane events have ``after < seq <= upto`` (YP-01)."""
+    stmt = select(func.count()).where(platform_events.c.seq > after, platform_events.c.seq <= upto)
+    return int(session.execute(stmt).scalar_one())
 
 
 # ---- partitions ----

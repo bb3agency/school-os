@@ -205,6 +205,14 @@ class PrivacyRequestPatch(_In):
     notes: LongText | None = None
     verification_method: Verification | None = None
     response_text: LongText | None = None
+    withdrawal_note: LongText | None = Field(
+        default=None,
+        description=(
+            "How the requester withdrew (who, when, how it was confirmed). Required with status "
+            "withdrawn for access, erasure and grievance requests (with a recent MFA sign-in; a "
+            "grievance not by the person who logged it); stored as the request's response."
+        ),
+    )
     nomination_withdrawn: bool | None = Field(
         default=None, description="true: the nomination is withdrawn (nominations only)."
     )

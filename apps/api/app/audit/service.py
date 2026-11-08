@@ -214,6 +214,24 @@ def _check_head(
     return None
 
 
+def _walk(
+    rows: Iterable[Mapping[Any, Any]],
+    to_dict: Callable[[Mapping[Any, Any]], Mapping[str, JsonValue]],
+    start_seq: int,
+    start_prev_hash: bytes,
+) -> tuple[VerifyResult | None, int, bytes]:
+    """Check the rows; return ``(problem or None, last seq walked intact, its hash)``."""
+    expected = start_seq
+    prev = start_prev_hash
+    for row in rows:
+        problem = _check_row(row, expected, prev, to_dict)
+        if problem is not None:
+            return VerifyResult(False, expected - start_seq, *problem), expected - 1, prev
+        prev = bytes(row["hash"])
+        expected += 1
+    return None, expected - 1, prev
+
+
 def verify_events(
     rows: Iterable[Mapping[Any, Any]],
     head: tuple[int, bytes] | None,
@@ -227,34 +245,74 @@ def verify_events(
 
     With ``check_head=False`` the head is not compared (partial ranges, e.g. one archived day).
     """
-    expected = start_seq
-    prev = start_prev_hash
-    checked = 0
-    for row in rows:
-        problem = _check_row(row, expected, prev, to_dict)
-        if problem is not None:
-            return VerifyResult(False, checked, *problem)
-        prev = bytes(row["hash"])
-        expected += 1
-        checked += 1
+    problem, last_seq, last_hash = _walk(rows, to_dict, start_seq, start_prev_hash)
+    if problem is not None:
+        return problem
+    checked = last_seq - start_seq + 1
     if check_head:
-        problem = _check_head(head, expected - 1, prev)
-        if problem is not None:
-            return VerifyResult(False, checked, *problem)
+        head_problem = _check_head(head, last_seq, last_hash)
+        if head_problem is not None:
+            return VerifyResult(False, checked, *head_problem)
     return VerifyResult(True, checked)
 
 
-def verify_chain(session: Session, tenant_id: uuid.UUID) -> VerifyResult:
-    """Verify one tenant's chain (run in ``tenant_session(tenant_id)``; SEC-007)."""
+def verify_live(
+    rows: Iterable[Mapping[Any, Any]],
+    read_head: Callable[[], tuple[int, bytes] | None],
+    count_between: Callable[[int, int], int],
+    to_dict: Callable[[Mapping[Any, Any]], Mapping[str, JsonValue]],
+    *,
+    start_seq: int = 1,
+    start_prev_hash: bytes = ZERO_HASH,
+) -> tuple[VerifyResult, int, bytes]:
+    """Verify a chain that may grow while it is walked (YP-01; READ COMMITTED).
+
+    The walk sees the events committed when its query started. The head is read *after* the
+    walk: an event and its head move commit together, so a head beyond the last event walked is
+    an append committed meanwhile, accepted when every event up to that head exists now (the
+    next run checks their hashes). A head behind the walk (rolled back, or an event appended
+    behind the app's back) or missing events (a deleted tail) is a break, as before. Returns
+    the result and the seq and hash of the last event verified intact (the checkpoint)."""
+    problem, last_seq, last_hash = _walk(rows, to_dict, start_seq, start_prev_hash)
+    if problem is not None:
+        return problem, last_seq, last_hash
+    checked = last_seq - start_seq + 1
+    head = read_head()
+    if head is not None and head[0] > last_seq:
+        if count_between(last_seq, head[0]) == head[0] - last_seq:
+            return VerifyResult(True, checked), last_seq, last_hash
+        return VerifyResult(False, checked, last_seq + 1, "head_mismatch"), last_seq, last_hash
+    head_problem = _check_head(head, last_seq, last_hash)
+    if head_problem is not None:
+        return VerifyResult(False, checked, *head_problem), last_seq, last_hash
+    return VerifyResult(True, checked), last_seq, last_hash
+
+
+def verify_chain_live(session: Session, tenant_id: uuid.UUID) -> tuple[VerifyResult, int, bytes]:
+    """Verify one tenant's whole chain while it may grow (:func:`verify_live`); also returns
+    the last event verified. Run in ``tenant_session(tenant_id)``."""
     if repository.current_tenant(session) != tenant_id:
         raise AuditContextError("verify_chain must run inside tenant_session(tenant_id)")
-    head = repository.get_head(session, tenant_id)
-    rows = repository.iter_events(session, tenant_id)
-    return verify_events(rows, head, tenant_event_dict)
+    return verify_live(
+        repository.iter_events(session, tenant_id),
+        lambda: repository.get_head(session, tenant_id),
+        lambda after, upto: repository.count_events_between(session, tenant_id, after, upto),
+        tenant_event_dict,
+    )
+
+
+def verify_chain(session: Session, tenant_id: uuid.UUID) -> VerifyResult:
+    """Verify one tenant's chain (run in ``tenant_session(tenant_id)``; SEC-007). Appends
+    committed while it runs are not breaks (YP-01)."""
+    return verify_chain_live(session, tenant_id)[0]
 
 
 def verify_platform_chain(session: Session) -> VerifyResult:
-    """Verify the control-plane chain (run in ``platform_session``)."""
-    head = repository.get_platform_head(session)
-    rows = repository.iter_platform_events(session)
-    return verify_events(rows, head, platform_event_dict)
+    """Verify the control-plane chain (run in ``platform_session``; appends committed while it
+    runs are not breaks, YP-01)."""
+    return verify_live(
+        repository.iter_platform_events(session),
+        lambda: repository.get_platform_head(session),
+        lambda after, upto: repository.count_platform_events_between(session, after, upto),
+        platform_event_dict,
+    )[0]

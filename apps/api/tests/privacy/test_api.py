@@ -574,3 +574,68 @@ def test_FR_DPDP_013_decided_request_cannot_be_reopened_or_withdrawn(
     )
     assert notes.status_code == 200, notes.text
     assert notes.json()["status"] == "decided"
+
+
+# --- withdrawing a request (YP-03, FR-DPDP-016) -------------------------------------------------
+
+NOTE = "The parent phoned on 9 Nov and asked us to stop; confirmed by callback."
+
+
+def _patch(api: Any, who: Any, request_id: str, body: dict[str, Any], **kw: Any) -> Any:
+    current = api.call(who, "GET", f"{BASE}/{request_id}")
+    return api.call(
+        who,
+        "PATCH",
+        f"{BASE}/{request_id}",
+        json=body,
+        headers={"If-Match": current.headers["ETag"]},
+        **kw,
+    )
+
+
+@pytest.mark.parametrize("kind", ["access", "erasure", "grievance"])
+def test_FR_DPDP_016_YP_03_withdrawal_needs_a_note_and_step_up(
+    school: Any, api: Any, admin_engine: Engine, kind: str
+) -> None:
+    out = P.logged(api, school.people["office_admin"], P.body(kind, student_id=P.student(school)))
+    who = school.people["principal"]
+    res = _patch(api, who, out["id"], {"status": "withdrawn"})
+    assert res.status_code == 422, res.text
+    assert res.json()["errors"][0]["field"] == "withdrawal_note"
+    stale = _patch(
+        api, who, out["id"], {"status": "withdrawn", "withdrawal_note": NOTE}, auth_age_s=3600
+    )
+    assert stale.status_code == 428, stale.text
+    ok = _patch(api, who, out["id"], {"status": "withdrawn", "withdrawal_note": NOTE})
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["status"] == "withdrawn"
+    assert ok.json()["response_text"] == NOTE
+    event = _events(admin_engine, school.tenant_id, "privacy.request.updated")[-1]
+    assert "withdrawal_note" in event["summary"]["fields"]
+    assert NOTE not in str(event["summary"])
+
+
+def test_FR_DPDP_016_YP_03_grievance_is_not_withdrawn_by_the_person_who_logged_it(
+    school: Any, api: Any
+) -> None:
+    admin = school.people["office_admin"]
+    out = P.logged(api, admin, P.body("grievance", student_id=P.student(school)))
+    res = _patch(api, admin, out["id"], {"status": "withdrawn", "withdrawal_note": NOTE})
+    assert res.status_code == 403, res.text
+    assert res.json()["code"] == "self_approval_forbidden"
+
+
+def test_FR_DPDP_016_YP_03_other_kinds_withdraw_as_before(school: Any, api: Any) -> None:
+    admin = school.people["office_admin"]
+    out = P.logged(api, admin, P.body("correction", student_id=P.student(school)))
+    res = _patch(api, admin, out["id"], {"status": "withdrawn"}, auth_age_s=3600)
+    assert res.status_code == 200, res.text
+    assert res.json()["status"] == "withdrawn"
+    note = _patch(
+        api,
+        admin,
+        P.logged(api, admin, P.body("correction", student_id=P.student(school)))["id"],
+        {"withdrawal_note": NOTE},
+    )
+    assert note.status_code == 422, note.text
+    assert note.json()["errors"][0]["code"] == "only_when_withdrawing"

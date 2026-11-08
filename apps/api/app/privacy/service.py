@@ -910,7 +910,28 @@ def _open(row: PrivacyRequest) -> None:
         raise Conflict("This request is closed.", code="request_closed")
 
 
-def update_request(  # noqa: PLR0912 - one branch per optional field of the PATCH
+def _check_withdrawal(ctx: UserContext, row: PrivacyRequest, data: PrivacyRequestPatch) -> None:
+    """Withdrawing an access, erasure or grievance request ends it without a decision: it needs
+    a written note of how the requester withdrew and a recent MFA sign-in, and a grievance is
+    not withdrawn by the person who logged it (the rule of closing it; YP-03, FR-DPDP-016).
+    Other kinds keep the plain status change."""
+    withdrawing = data.status == "withdrawn" and row.status != "withdrawn"
+    if withdrawing and row.status == "decided":
+        return  # update_request answers 409 request_decided
+    if data.withdrawal_note is not None and not withdrawing:
+        raise _invalid("withdrawal_note", "only_when_withdrawing")
+    if not withdrawing or row.kind not in DECIDE_KINDS:
+        return
+    if data.withdrawal_note is None:
+        raise _invalid("withdrawal_note", "required")
+    if data.response_text is not None:
+        raise _invalid("response_text", "use_withdrawal_note")
+    _require_step_up(ctx)
+    if row.kind == "grievance" and row.logged_by == ctx.user_id:
+        raise SelfApproval()
+
+
+def update_request(  # noqa: PLR0912, PLR0915 - one branch per optional field of the PATCH
     session: Session,
     ctx: UserContext,
     request_id: uuid.UUID,
@@ -919,24 +940,32 @@ def update_request(  # noqa: PLR0912 - one branch per optional field of the PATC
     expected_version: int,
 ) -> PrivacyRequestOut:
     """Change status, notes, verification, response or withdraw a nomination
-    (``privacy.request.manage``; ``If-Match``). Audit ``privacy.request.updated`` with the field
-    names only."""
+    (``privacy.request.manage``; ``If-Match``). Withdrawing an access, erasure or grievance
+    request needs ``withdrawal_note`` and step-up, and a grievance someone other than the
+    person who logged it (:func:`_check_withdrawal`). Audit ``privacy.request.updated`` with
+    the field names only."""
     row = _load(session, ctx, request_id, lock=True)
     _check_version(row, expected_version)
     _open(row)
     values: dict[str, Any] = {}
     changed: list[str] = []
-    for field, value in (("notes", data.notes), ("response_text", data.response_text)):
+    for field, value in (
+        ("notes", data.notes),
+        ("response_text", data.response_text),
+        ("withdrawal_note", data.withdrawal_note),
+    ):
         _no_aadhaar(field, value)
+    _check_withdrawal(ctx, row, data)
     if data.notes is not None:
         values["notes_ciphertext"] = _encrypt(session, row.id, "notes_ciphertext", data.notes)
         changed.append("notes")
-    if data.response_text is not None:
-        values["response_ciphertext"] = _encrypt(
-            session, row.id, "response_ciphertext", data.response_text
-        )
+    # A withdrawal note is stored as the request's written response, like the answer of a
+    # decided close (the two never come together: _check_withdrawal).
+    response = data.response_text if data.withdrawal_note is None else data.withdrawal_note
+    if response is not None:
+        values["response_ciphertext"] = _encrypt(session, row.id, "response_ciphertext", response)
         values["responded_on"] = _today(session)
-        changed.append("response_text")
+        changed.append("response_text" if data.withdrawal_note is None else "withdrawal_note")
     if data.verification_method is not None and data.verification_method != (
         row.verification_method
     ):
@@ -972,7 +1001,7 @@ def update_request(  # noqa: PLR0912 - one branch per optional field of the PATC
         _event(session, ctx, row, "verified", {"method": row.verification_method})
     if "notes" in changed:
         _event(session, ctx, row, "notes_changed")
-    if "response_text" in changed:
+    if "response_text" in changed or "withdrawal_note" in changed:
         _event(session, ctx, row, "responded")
     if "nomination_withdrawn" in changed:
         _event(session, ctx, row, "nomination_withdrawn")

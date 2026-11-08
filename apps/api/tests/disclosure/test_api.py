@@ -421,6 +421,37 @@ def test_FR_DISC_008_changing_the_link_kills_the_old_one(
     assert api.call(school.people["office_admin"], "POST", f"{BASE}/link/rotate").status_code == 403
 
 
+def test_FR_DISC_008_YP_04_changing_the_link_remakes_the_files(
+    api: Any, school: Any, renderer: Any, admin_engine: Engine
+) -> None:
+    """The HTML file and PDF carry the document links of the link current when they were
+    made; after "Change the link" they are made again with the new link (YP-04)."""
+    owner = school.people["owner"]
+    doc = S.document(admin_engine, school)
+    snap = _published(api, school, documents={"fire_safety": [str(doc)]})
+    snapshot_id = uuid.UUID(snap["id"])
+    assert service.render_files(school.tenant_id, snapshot_id) == "ready"
+    old = S.link_key(api, owner)
+    assert old in renderer.pages[-1]
+    res = api.call(owner, "POST", f"{BASE}/link/rotate")
+    assert res.status_code == 200, res.text
+    new = res.json()["url"].rsplit("/", 1)[1]
+    detail = api.call(owner, "GET", f"{BASE}/snapshots/{snap['id']}").json()
+    assert detail["pdf_status"] == "queued"
+    res = api.call(owner, "GET", f"{BASE}/snapshots/{snap['id']}/download-url?format=pdf")
+    assert res.json()["code"] == "files_not_ready"
+    outbox = S.scalar(
+        admin_engine,
+        "SELECT count(*) FROM ops.outbox WHERE tenant_id = :t AND event_type = :e",
+        t=school.tenant_id,
+        e=service.RENDER_EVENT,
+    )
+    assert outbox == 2
+    assert service.render_files(school.tenant_id, snapshot_id) == "ready"
+    assert new in renderer.pages[-1]
+    assert old not in renderer.pages[-1]
+
+
 def test_FR_DISC_010_a_suspended_school_page_is_the_uniform_404(
     api: Any, school: Any, public_client: TestClient, admin_engine: Engine
 ) -> None:

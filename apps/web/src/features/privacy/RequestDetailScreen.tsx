@@ -957,7 +957,8 @@ function ClosePanel({ request }: { request: PrivacyRequest }) {
 /**
  * Whether "Mark as withdrawn" is offered (R3-1A open item, D60): the person withdrew the
  * request. Only while it is open and not decided (the API answers 409 `request_decided` or
- * `request_closed` otherwise), and only with `privacy.request.manage` (no step-up).
+ * `request_closed` otherwise), and only with `privacy.request.manage`. Access, erasure and
+ * complaint requests also need a written note and a fresh sign-in (YP-03).
  */
 export function canWithdraw(
   request: Pick<PrivacyRequest, "status">,
@@ -966,42 +967,99 @@ export function canWithdraw(
   return isOpen(request.status) && request.status !== "decided" && can(PRIVACY_MANAGE);
 }
 
+const withdrawalSchema = z.object({
+  withdrawal_note: z
+    .string()
+    .trim()
+    .min(1, { error: "required" })
+    .max(RESPONSE_MAX, { error: "tooLong" }),
+});
+
+/** Access, erasure and complaint requests: withdrawing ends them without a decision (YP-03). */
+export function withdrawNeedsNote(kind: PrivacyRequest["kind"]): boolean {
+  return kind === "access" || kind === "erasure" || kind === "grievance";
+}
+
 /**
- * PATCH status `withdrawn` with If-Match. A 409 (`request_closed`, `request_decided`) or 412
- * (someone changed it first) shows its message in the dialog; closing the dialog reloads the
- * request, so the page then shows it as it is now.
+ * PATCH status `withdrawn` with If-Match. Access, erasure and complaint requests send the
+ * written note of how the person withdrew (`withdrawal_note`, required) and may ask for a fresh
+ * sign-in (428, handled by the step-up host); a complaint is not withdrawn by the person who
+ * logged it. A 403, 409 (`request_closed`, `request_decided`) or 412 (someone changed it first)
+ * shows its message in the dialog; closing the dialog reloads the request, so the page then
+ * shows it as it is now.
  */
 function WithdrawAction({ request }: { request: PrivacyRequest }) {
   const t = useTranslations("privacy.withdraw");
+  const tn = useTranslations("privacy.withdrawNote");
   const api = useBffClient("staff");
   const can = useStaffCan();
   const queryClient = useQueryClient();
+  const base = useId();
   if (!canWithdraw(request, can)) return null;
+  const withNote = withdrawNeedsNote(request.kind);
+  const ownComplaint = request.kind === "grievance" && request.logged_by_me;
+  const send = (body: PrivacyRequestPatch) =>
+    unwrap(
+      api.PATCH("/api/v1/privacy/requests/{request_id}", {
+        params: { path: { request_id: request.id } },
+        headers: { "If-Match": ifMatch(request.version) },
+        body,
+      }),
+    );
+  const onOpenChange = (open: boolean) => {
+    if (open) return;
+    void queryClient.invalidateQueries({ queryKey: PRIVACY_KEYS.request(request.id) });
+  };
+  if (!withNote) {
+    return (
+      <ActionDialog
+        triggerLabel={t("action")}
+        triggerVariant="secondary"
+        onOpenChange={onOpenChange}
+        title={t("title")}
+        description={t("body")}
+        confirmLabel={t("confirm")}
+        confirmVariant="danger"
+        consequence={t("consequence")}
+        schema={emptySchema}
+        invalidate={[PRIVACY_KEYS.all]}
+        errorNamespace="privacy"
+        submit={() => send({ status: "withdrawn" })}
+      />
+    );
+  }
   return (
-    <ActionDialog
-      triggerLabel={t("action")}
-      triggerVariant="secondary"
-      onOpenChange={(open) => {
-        if (open) return;
-        void queryClient.invalidateQueries({ queryKey: PRIVACY_KEYS.request(request.id) });
-      }}
-      title={t("title")}
-      description={t("body")}
-      confirmLabel={t("confirm")}
-      confirmVariant="danger"
-      consequence={t("consequence")}
-      schema={emptySchema}
-      invalidate={[PRIVACY_KEYS.all]}
-      errorNamespace="privacy"
-      submit={() =>
-        unwrap(
-          api.PATCH("/api/v1/privacy/requests/{request_id}", {
-            params: { path: { request_id: request.id } },
-            headers: { "If-Match": ifMatch(request.version) },
-            body: { status: "withdrawn" },
-          }),
-        )
-      }
-    />
+    <>
+      <ActionDialog
+        triggerLabel={t("action")}
+        triggerVariant="secondary"
+        triggerDisabled={ownComplaint}
+        onOpenChange={onOpenChange}
+        title={t("title")}
+        description={tn("body")}
+        confirmLabel={t("confirm")}
+        confirmVariant="danger"
+        stepUp
+        consequence={t("consequence")}
+        schema={withdrawalSchema}
+        fieldMap={(field) => field.split(".").pop()}
+        invalidate={[PRIVACY_KEYS.all]}
+        errorNamespace="privacy"
+        submit={(input) => send({ status: "withdrawn", withdrawal_note: input.withdrawal_note })}
+      >
+        {(errors) => (
+          <TextAreaField
+            id={`${base}-withdrawal-note`}
+            name="withdrawal_note"
+            label={tn("label")}
+            hint={tn("hint")}
+            error={errors.withdrawal_note}
+            maxLength={RESPONSE_MAX}
+            rows={4}
+          />
+        )}
+      </ActionDialog>
+      {ownComplaint ? <p className="text-sm font-semibold text-ink">{tn("someoneElse")}</p> : null}
+    </>
   );
 }

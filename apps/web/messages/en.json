@@ -11379,6 +11379,12 @@
       "body": "Use this when the person who asked takes the request back.",
       "confirm": "Mark as withdrawn",
       "consequence": "The request is closed as withdrawn and cannot be opened again. Log a new request if they ask again."
+    },
+    "withdrawNote": {
+      "label": "How they withdrew it",
+      "hint": "Who asked to stop, when, and how you confirmed it was them. Never write an Aadhaar number.",
+      "body": "For an access, erasure or complaint request, write down how the person withdrew it. It is kept as the answer on the request.",
+      "someoneElse": "Someone other than the person who logged this complaint must mark it as withdrawn."
     }
   }
 }

@@ -182,3 +182,70 @@ def test_R_19_daily_job_runs_full_and_stores_each_school(
     stored_good, stored_bad = _latest(good), _latest(bad)
     assert (stored_good.ok, stored_good.source, stored_good.mode) == (True, "daily", "full")
     assert (stored_bad.ok, stored_bad.first_bad_seq, stored_bad.reason) == (False, 2, "seq_gap")
+
+
+def _append_before(
+    monkeypatch: pytest.MonkeyPatch, record_events: Any, tenant: uuid.UUID, name: str
+) -> None:
+    """Commit one more event (another clerk's request) just before the run calls repository
+    function ``name`` (READ COMMITTED: each statement sees the latest commits)."""
+    from app.audit import repository
+
+    original = getattr(repository, name)
+    fired: list[bool] = []
+
+    def _wrapped(*args: Any, **kwargs: Any) -> Any:
+        if not fired:
+            fired.append(True)
+            record_events(tenant, 1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(repository, name, _wrapped)
+
+
+@pytest.mark.parametrize("moment", ["iter_events", "get_head"])
+def test_SEC_007_YP_01_full_run_is_not_broken_by_a_concurrent_append(
+    tenant: uuid.UUID, record_events: Any, monkeypatch: pytest.MonkeyPatch, moment: str
+) -> None:
+    record_events(tenant, 3)
+    _append_before(monkeypatch, record_events, tenant, moment)
+    out = _run(tenant, full=True, source="daily")
+    assert (out.ok, out.reason, out.first_bad_seq) == (True, None, None)
+    # The checkpoint is an event this run verified, never one appended after its walk.
+    assert out.checkpoint_seq == out.checked
+    monkeypatch.undo()
+    again = _run(tenant)
+    assert (again.ok, again.mode, again.checkpoint_seq) == (True, "incremental", 4)
+    assert out.checked + again.checked == 4
+
+
+@pytest.mark.parametrize("moment", ["iter_events_after", "get_head"])
+def test_SEC_007_YP_01_incremental_run_is_not_broken_by_a_concurrent_append(
+    tenant: uuid.UUID, record_events: Any, monkeypatch: pytest.MonkeyPatch, moment: str
+) -> None:
+    record_events(tenant, 2)
+    assert _run(tenant, full=True).checkpoint_seq == 2
+    record_events(tenant, 2)
+    _append_before(monkeypatch, record_events, tenant, moment)
+    out = _run(tenant)
+    assert (out.ok, out.reason, out.mode) == (True, None, "incremental")
+    assert out.checkpoint_seq == 2 + out.checked
+    monkeypatch.undo()
+    again = _run(tenant)
+    assert (again.ok, again.checkpoint_seq) == (True, 5)
+
+
+def test_SEC_007_YP_01_deleted_tail_behind_the_head_is_still_a_break(
+    tenant: uuid.UUID, record_events: Any, tamper: Tamper
+) -> None:
+    """A head ahead of the walk is accepted only when the events up to it exist."""
+    record_events(tenant, 4)
+    with tamper() as c:
+        c.execute(text("DELETE FROM audit.events WHERE tenant_id = :t AND seq >= 3"), {"t": tenant})
+    out = _run(tenant, full=True, source="daily")
+    assert (out.ok, out.first_bad_seq, out.reason, out.checkpoint_seq) == (
+        False,
+        3,
+        "head_mismatch",
+        0,
+    )
