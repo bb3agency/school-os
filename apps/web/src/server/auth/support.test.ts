@@ -9,6 +9,7 @@ import {
   handleLogin,
   handleLogout,
   handleSessionInfo,
+  handleStepUp,
   handleSupportLogin,
 } from "./handlers";
 
@@ -246,6 +247,30 @@ describe("support session in the school console", () => {
     expect(h.jar.has("__Host-sos_support_session")).toBe(false);
     const after = await proxyToApi(h.request("/bff/api/v1/sections"), h.runtime);
     expect(after.status).toBe(401);
+  });
+
+  it("SEC-021 WS-01: another operator signing in at the support step-up prompt gets no support session", async () => {
+    apiWithSupport(200);
+    await supportSignIn();
+    const before = await h.runtime.store.load(h.jar.get("__Host-sos_support_session"), {
+      touch: false,
+    });
+    const stepUp = h.absorb(
+      await handleStepUp(h.request("/bff/auth/support/step-up"), h.runtime, "support"),
+    );
+    const back = h.idp.support.authorize(stepUp.headers.get("location") ?? "", {
+      sub: "op-sub-2",
+      name: "Other Operator",
+      mfa: true,
+    });
+    const done = h.absorb(await handleCallback(h.request(back.href), h.runtime, "support"));
+    expect(done.headers.get("location")).toContain("error=support_not_allowed");
+    const after = await h.runtime.store.load(h.jar.get("__Host-sos_support_session"), {
+      touch: false,
+    });
+    // The first operator's grant session is untouched; nobody else got one.
+    expect(after?.id).toBe(before?.id);
+    expect(after?.subject).toBe(operator.sub);
   });
 
   it("a 428 on a support session points at the support step-up route", async () => {
