@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { headingSkips } from "@/test/headings";
 import { me } from "@/test/records-fixtures";
 import { intlErrors } from "@/test/render";
 import {
@@ -159,6 +160,8 @@ describe("Ask chat: a new conversation (FR-KB-008, FR-KB-012)", () => {
     expect(within(answer).getByRole("list", { name: "Steps SchoolOS took" })).toHaveTextContent(
       "Searching school documents… 3 found",
     );
+    // WA-02 (WCAG 1.3.1): the chat title is the h1, so "Sources" is an h2, not an h3.
+    expect(headingSkips()).toEqual([]);
   });
 
   it("a chip shows its source in a popover on focus; Escape closes it (WCAG 1.4.13)", async () => {

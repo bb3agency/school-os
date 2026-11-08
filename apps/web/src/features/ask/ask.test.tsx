@@ -13,6 +13,7 @@ import {
   uninstallBffStub,
   type BffStub,
 } from "@/test/bff-stub";
+import { headingSkips } from "@/test/headings";
 import { fakeAadhaar, ID, me } from "@/test/records-fixtures";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { renderChat } from "./chat-test-utils";
@@ -768,6 +769,8 @@ describe("verified answers (US-802, FR-KB-030)", () => {
       screen.getAllByRole("link", { name: /Source 1 \(open the document\)/ })[0],
     ).toHaveAttribute("href", `/documents/${DOC}`);
     expect(screen.queryByRole("button", { name: "Add a verified answer" })).toBeNull();
+    // WA-02 (WCAG 1.3.1): each answer's question is an h2 under the page's h1.
+    expect(headingSkips()).toEqual([]);
   });
 
   it("shows the verifier's name when the API gives it (VerifiedAnswerOut.verified_by_name)", async () => {
