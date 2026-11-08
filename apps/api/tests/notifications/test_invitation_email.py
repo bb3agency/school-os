@@ -189,6 +189,111 @@ def test_US_102_worker_retries_while_the_provider_is_unavailable(
         )
 
 
+def _event_id(admin: Engine, tenant_id: uuid.UUID, user_id: str) -> uuid.UUID:
+    with admin.connect() as c:
+        rows = c.execute(
+            text(
+                "SELECT id, payload FROM ops.outbox WHERE tenant_id = :t AND event_type = :e "
+                "ORDER BY created_at"
+            ),
+            {"t": tenant_id, "e": service.EMAIL_EVENT},
+        )
+        (found,) = [r[0] for r in rows if dict(r[1])["user_id"] == user_id]
+        return uuid.UUID(str(found))
+
+
+def _run_event(tenant_id: uuid.UUID, event_id: uuid.UUID, payload: dict[str, Any]) -> Any:
+    kv_store().delete(f"sos:outbox-done:{service.EMAIL_TASK}:{event_id}")  # lease gone
+    return tasks.send_email.apply(
+        kwargs={"tenant_id": str(tenant_id), "event_id": str(event_id), "payload": payload}
+    ).get()
+
+
+def test_YM_06_FR_NOT_001_an_email_is_sent_at_most_once_per_outbox_event(
+    world: Any,
+    api: Any,
+    admin_engine: Engine,
+    email_on: email.FakeEmailSender,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A redelivery of the same outbox event (a worker that died after the provider accepted
+    the e-mail; the Valkey lease ended or Valkey was down) must not send it again: the claim
+    is committed before the provider call. A provider refusal to retry releases the claim; an
+    unknown outcome (a timeout after sending) keeps it (at most once, lead decision)."""
+    tenant = world.a.tenant_id
+    address = _address()
+    invited = _invite(api, world.person("owner"), email=address)
+    (payload,) = _email_events(admin_engine, tenant, invited["id"])
+    event_id = _event_id(admin_engine, tenant, invited["id"])
+    assert _run_event(tenant, event_id, payload) == "sent"
+    capsys.readouterr()
+    assert _run_event(tenant, event_id, payload) == "already_sent"
+    assert len(email_on.sent) == 1
+    logs = capsys.readouterr()
+    assert str(event_id) in logs.out + logs.err
+    assert address not in logs.out + logs.err
+
+    # A definite refusal (SES answered "try later") releases the claim: the retry sends.
+    second = _invite(api, world.person("owner"))
+    (payload2,) = _email_events(admin_engine, tenant, second["id"])
+    event2 = _event_id(admin_engine, tenant, second["id"])
+    user2 = uuid.UUID(second["id"])
+
+    class Busy:
+        def send(self, message: email.EmailMessage) -> str:
+            raise email.EmailUnavailable("TooManyRequestsException")
+
+    class Lost:
+        def send(self, message: email.EmailMessage) -> str:
+            raise email.EmailOutcomeUnknown("ReadTimeoutError")
+
+    with pytest.raises(email.EmailUnavailable):
+        service.send_requested_email(
+            tenant, user2, "invitation.staff", sender=Busy(), event_id=event2
+        )
+    # An unknown outcome keeps the claim: nothing is sent again.
+    with pytest.raises(email.EmailOutcomeUnknown):
+        service.send_requested_email(
+            tenant, user2, "invitation.staff", sender=Lost(), event_id=event2
+        )
+    assert _run_event(tenant, event2, payload2) == "already_sent"
+    assert len(email_on.sent) == 1
+
+
+def test_YM_06_an_unknown_outcome_from_ses_is_not_retried() -> None:
+    """A transport error after the request left (a read time-out) may have sent the e-mail."""
+    from botocore.exceptions import EndpointConnectionError, ReadTimeoutError
+
+    from app.notifications.email import SesEmailSender
+
+    class Client:
+        def __init__(self, exc: Exception) -> None:
+            self.exc = exc
+
+        def send_email(self, **_: Any) -> dict[str, Any]:
+            raise self.exc
+
+    message = email.EmailMessage(
+        to="someone@example.test",
+        subject="s",
+        text="t",
+        template_key="invitation.staff",
+        language="en",
+    )
+    timed_out = SesEmailSender(
+        Client(ReadTimeoutError(endpoint_url="https://email.example.test")), sender="x@example.test"
+    )
+    with pytest.raises(email.EmailOutcomeUnknown):
+        timed_out.send(message)
+    unreachable = SesEmailSender(
+        Client(EndpointConnectionError(endpoint_url="https://email.example.test")),
+        sender="x@example.test",
+    )
+    with pytest.raises(email.EmailUnavailable) as caught:
+        unreachable.send(message)
+    assert not isinstance(caught.value, email.EmailOutcomeUnknown)
+
+
 def test_US_102_resend_has_a_cool_down_and_is_audited(
     world: Any, api: Any, admin_engine: Engine, email_on: email.FakeEmailSender
 ) -> None:

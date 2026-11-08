@@ -559,8 +559,15 @@ def send_requested_email(
     notification_id: uuid.UUID | None = None,
     sender: email.EmailSender | None = None,
     now: dt.datetime | None = None,
+    event_id: uuid.UUID | None = None,
 ) -> str:
     """Worker (outbox ``notification.email.requested``): render and send one email.
+
+    At most once per outbox event (audit YM-06): with ``event_id``, the event is claimed in its
+    own committed transaction right before the provider call, and a later run of the same event
+    answers ``already_sent`` without sending. A provider refusal to retry
+    (:class:`email.EmailUnavailable`) releases the claim; an unknown outcome
+    (:class:`email.EmailOutcomeUnknown`) and a permanent refusal keep it.
 
     Returns an outcome code (``sent``, ``disabled``, ``no_member``, ``not_invited``,
     ``invitation_expired``, ``email_missing``; for a 100 % alert email also ``not_active`` and
@@ -594,7 +601,15 @@ def send_requested_email(
             {**limit_values, "school": school.name, "sign_in_url": _app_url("/")},
             user.preferred_language,
         )
-        return _deliver(provider, user, template_key, user.email, content)
+        return _deliver(
+            provider,
+            user,
+            template_key,
+            user.email,
+            content,
+            tenant_id=tenant_id,
+            event_id=event_id,
+        )
     problem = _invitation_problem(user, moment)
     if problem is not None or not user.email:
         outcome = problem or "email_missing"
@@ -609,7 +624,9 @@ def send_requested_email(
         "expires_on": expires.strftime(_DATE_FORMATS[school.settings.date_format]),
     }
     content = email.render_email(template_key, params, user.preferred_language)
-    return _deliver(provider, user, template_key, user.email, content)
+    return _deliver(
+        provider, user, template_key, user.email, content, tenant_id=tenant_id, event_id=event_id
+    )
 
 
 def _deliver(
@@ -618,16 +635,35 @@ def _deliver(
     template_key: str,
     address: str,
     content: email.EmailContent,
+    *,
+    tenant_id: uuid.UUID,
+    event_id: uuid.UUID | None,
 ) -> str:
-    provider.send(
-        email.EmailMessage(
-            to=address,
-            subject=content.subject,
-            text=content.text,
-            template_key=template_key,
-            language=content.language,
+    if event_id is not None and ops.claim_event_consumer(tenant_id, event_id) == "consumed":
+        log.info(
+            "notifications.email.skipped",
+            action=template_key,
+            user_id=user.id,
+            resource_id=event_id,
+            outcome="already_sent",
         )
-    )
+        return "already_sent"
+    try:
+        provider.send(
+            email.EmailMessage(
+                to=address,
+                subject=content.subject,
+                text=content.text,
+                template_key=template_key,
+                language=content.language,
+            )
+        )
+    except email.EmailOutcomeUnknown:
+        raise  # it may have gone out: the claim stays (at most once)
+    except email.EmailUnavailable:
+        if event_id is not None:
+            ops.release_event_consumer(tenant_id, event_id)  # certainly not sent: retry may
+        raise
     log.info("notifications.email.sent", action=template_key, user_id=user.id, outcome="sent")
     return "sent"
 

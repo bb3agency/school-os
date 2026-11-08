@@ -34,6 +34,7 @@ outbox = Table(
     Column("payload", JSONB, nullable=False),
     Column("created_at", DateTime(timezone=True)),
     Column("dispatched_at", DateTime(timezone=True)),
+    Column("consumed_at", DateTime(timezone=True)),
 )
 
 idempotency_keys = Table(

@@ -264,6 +264,28 @@ class TenantTask(Task):  # type: ignore[type-arg]
         return result
 
 
+# --- at-most-once consumers (audit 2026-11-09 YM-06) ----------------------------------------
+
+ConsumerClaim = Literal["claimed", "consumed", "missing"]
+
+
+def claim_event_consumer(tenant_id: uuid.UUID, event_id: uuid.UUID) -> ConsumerClaim:
+    """Record, in its own committed transaction, that a consumer is about to act on this outbox
+    event outside the database (an e-mail). ``claimed``: go ahead; ``consumed``: an earlier run
+    already claimed it, do not act again (at most once; the Valkey lease of
+    :class:`TenantTask` ends and fails open, this does not); ``missing``: the event row is gone
+    (purged long after delivery) or was never written, so nothing durable can be recorded."""
+    with tenant_session(tenant_id) as session:
+        return repo.claim_consumer(session, event_id)
+
+
+def release_event_consumer(tenant_id: uuid.UUID, event_id: uuid.UUID) -> None:
+    """Undo :func:`claim_event_consumer` when the outside action certainly did not happen (the
+    provider answered with a refusal to retry), so the retry may act."""
+    with tenant_session(tenant_id) as session:
+        repo.release_consumer(session, event_id)
+
+
 # --- job runs ---------------------------------------------------------------------------------
 
 
@@ -472,11 +494,13 @@ __all__ = [
     "OUTBOX_RETENTION_STATUSES",
     "OUTBOX_ROUTES",
     "RUN_WHILE_SUSPENDED",
+    "ConsumerClaim",
     "DispatchResult",
     "JobRun",
     "OutboxPurgeResult",
     "TenantTask",
     "begin_idempotent",
+    "claim_event_consumer",
     "complete_idempotent",
     "dispatch_outbox",
     "enqueue_event",
@@ -486,6 +510,7 @@ __all__ = [
     "purge_idempotency_keys",
     "purge_tenant_data",
     "register_outbox_route",
+    "release_event_consumer",
     "school_work_decision",
     "start_job",
     "tenant_data_counts",
