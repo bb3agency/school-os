@@ -750,7 +750,7 @@ def test_PRV_015_D52_adversarial_input_is_scanned_in_linear_time(name: str) -> N
 
 
 @pytest.mark.parametrize(
-    "gap", ["    ", "\t\t\t\t", "\n\n\n\n\n", " -   ", "   -   ", "　 \t \n ", " " * 40]
+    "gap", ["    ", "\t\t\t\t", "\n\n\n\n\n", " -   ", "   -   ", "\u3000 \t \n ", " " * 40]
 )
 def test_PRV_015_DPA_01_masking_joins_any_whitespace_gap_the_input_check_refuses(gap: str) -> None:
     """Invariant 4 / SEC-013 (audit 2026-11-08 DPA-01): ``contains_full_aadhaar`` refuses a

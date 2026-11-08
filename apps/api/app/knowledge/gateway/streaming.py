@@ -15,10 +15,13 @@ from __future__ import annotations
 import re
 from typing import Final
 
-from app.core.redaction import mask_aadhaar
+from app.core.redaction import NUMBER_RUN_CHARACTER, mask_aadhaar
 
-_TAIL: Final = re.compile(r"[+0-9 \u00a0\-\u2010-\u2013]*$")
-"""Characters that may still continue a number at the end of the buffer."""
+_TAIL: Final = re.compile(rf"{NUMBER_RUN_CHARACTER}*$")
+"""Characters that may still continue a number at the end of the buffer: every digit, gap,
+dash and separator ``mask_aadhaar`` joins (audit 2026-11-08 DPA-02: line breaks, tabs, wide
+or thin spaces, em dashes, dots, slashes and Telugu digits used to be emitted group by
+group)."""
 CONTEXT_CHARS: Final = 40
 """How much already-emitted text is used as keyword context (the redaction distance is 20).
 

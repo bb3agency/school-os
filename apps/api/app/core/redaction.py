@@ -64,6 +64,7 @@ from dataclasses import dataclass, field
 __all__ = [
     "AADHAAR_GROUP_SEPARATOR",
     "EMAIL_MASK",
+    "NUMBER_RUN_CHARACTER",
     "AadhaarMatch",
     "contains_full_aadhaar",
     "contains_grouped_aadhaar",
@@ -318,6 +319,10 @@ _WIDE_SEP = rf"(?:[\s{_INVISIBLE}\-\u2010-\u2015\u2212\ufe58\ufe63\uff0d._/]{{1,
 _TIGHT = r"[./,_]"
 AADHAAR_GROUP_SEPARATOR = _WIDE_SEP
 """Regex fragment for what may join two 4-digit groups (rule 4); other maskers reuse it."""
+NUMBER_RUN_CHARACTER = rf"[+\d\s{_INVISIBLE}\-\u2010-\u2015\u2212\ufe58\ufe63\uff0d._/,]"
+"""Regex class of every character that may continue a number the maskers look at (digits of
+any script, every gap, dash and rule-4 separator). A masker that sees text in pieces (the AI
+stream, audit 2026-11-08 DPA-02) holds back a trailing run of these until the run has ended."""
 _PUNCT_RE = re.compile(
     rf"(?<!\d)(?<!\d{_TIGHT})(?<!\d{_TIGHT}{{2}})(?<!\d{_TIGHT}{{3}})"
     rf"(?=(\d{{4}}){_WIDE_SEP}(\d{{4}}){_WIDE_SEP}(\d{{4}})(?!{_TIGHT}{{0,3}}\d))"

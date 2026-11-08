@@ -136,6 +136,39 @@ def test_invariant_4_keyword_context_before_a_held_number_still_masks_it() -> No
     assert shown.endswith(f"XXXX XXXX {digits[-4:]} ok")
 
 
+_VALID = "23456789012" + verhoeff_check_digit("23456789012")
+_TELUGU = str.maketrans("0123456789", "౦౧౨౩౪౫౬౭౮౯")
+
+
+@pytest.mark.parametrize(
+    "number",
+    [
+        "\n".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),  # one group per line
+        "\t".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),  # table cells
+        "\u2014".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),  # em dash
+        "\u2009".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),  # thin space
+        ".".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),  # rule 4 (D52)
+        "/".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),
+        " ".join([_VALID[:4], _VALID[4:8], _VALID[8:]]).translate(_TELUGU),  # Telugu digits
+        "      ".join([_VALID[:4], _VALID[4:8], _VALID[8:]]),  # wide gap (DPA-01)
+    ],
+)
+def test_invariant_4_DPA_02_every_separator_the_masker_joins_is_held_back(number: str) -> None:
+    """Invariant 4 (audit 2026-11-08 DPA-02): the stream masker held back only ASCII digits,
+    spaces, NBSP and hyphens, so a number whose groups are joined by a line break, a tab, an
+    em dash, a thin space, a dot or a slash (all separators of ``mask_aadhaar``), or written in
+    Telugu digits, was emitted group by group: each delta alone holds no 12-digit window and
+    the client joined the full number on screen. Every split point is tried."""
+    text = f"On file: {number} for the pupil."
+    for cut in range(1, len(text)):
+        masker = AadhaarStreamMasker()
+        pieces = [masker.feed(text[:cut]), masker.feed(text[cut:]), masker.flush()]
+        shown = "".join(pieces)
+        assert _VALID[:4] not in shown, (cut, pieces)
+        assert _VALID[:4].translate(_TELUGU) not in shown, (cut, pieces)
+        assert "XXXX XXXX" in shown, (cut, pieces)
+
+
 def test_NFR_AVL_004_a_failure_before_the_first_event_is_retried() -> None:
     r = streaming_rig(TransportError("rate_limited", status=429), G.text_response())
     items = stream(r)
