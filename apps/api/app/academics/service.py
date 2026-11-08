@@ -609,7 +609,11 @@ def section_marks(
                 student=s,
                 marks=[
                     MarkOut(
-                        subject=m.subject, max_marks=m.max_marks, marks=m.marks, absent=m.absent
+                        subject=m.subject,
+                        max_marks=m.max_marks,
+                        marks=m.marks,
+                        absent=m.absent,
+                        version=m.version,
                     )
                     for m in by_student.get(s.student_id, [])
                 ],
@@ -639,6 +643,27 @@ def _marks_in_other_sections(
     ]
 
 
+def _check_expected_mark_versions(existing: Iterable[ExamMark], entries: Sequence[MarkIn]) -> None:
+    """Optimistic concurrency per mark (YA-05): with the exam's marks locked, every entry that
+    carries ``expected_version`` must still find that version (0: no mark). Otherwise 412
+    ``marks_changed`` and nothing is saved."""
+    checked = [e for e in entries if e.expected_version is not None]
+    if not checked:
+        return
+    versions = {(m.student_id, m.subject.casefold()): m.version for m in existing}
+    stale = sum(
+        1
+        for e in checked
+        if versions.get((e.student_id, e.subject.casefold()), 0) != e.expected_version
+    )
+    if stale:
+        raise PreconditionFailed(
+            f"Someone else changed {stale} mark(s) since you opened them. "
+            "Reload to see their changes, then save again.",
+            code="marks_changed",
+        )
+
+
 def record_marks(
     session: Session,
     ctx: UserContext,
@@ -650,7 +675,8 @@ def record_marks(
     when a student is not in the roster, marks exceed the maximum, absent papers carry marks,
     a subject is too long or holds an Aadhaar-like number, or an entry repeats; and, for a scoped
     recorder, when the paper is already recorded under another section
-    (``recorded_in_another_section``). Subjects match
+    (``recorded_in_another_section``); 412 ``marks_changed`` when an entry's
+    ``expected_version`` is stale (YA-05). Subjects match
     whatever their case: a paper already stored corrects in place under its first spelling.
     Audit ``marks.recorded``."""
     cfg = load_config().marks
@@ -691,9 +717,11 @@ def record_marks(
     spelling: dict[str, str] = {}
     for subject in repo.exam_subjects(session, exam.id):
         spelling.setdefault(subject.casefold(), subject)
+    repo.lock_exam_marks(session, exam.id)
     existing = repo.exam_marks(session, exam.id, {e.student_id for e in data.entries})
     stored = {(m.student_id, m.subject.casefold()): m.subject for m in existing}
     _refuse(_marks_in_other_sections(ctx, sec.section.id, existing, data.entries))
+    _check_expected_mark_versions(existing, data.entries)
 
     def _subject(entry: MarkIn) -> str:
         folded = entry.subject.casefold()

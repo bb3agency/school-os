@@ -77,6 +77,19 @@ def lock_attendance_days(session: Session, dates: Collection[dt.date]) -> None:
         )
 
 
+def lock_exam_marks(session: Session, exam_id: uuid.UUID) -> None:
+    """Serialise marks writes of one exam until the transaction ends (transaction-level
+    advisory lock), so the ``expected_version`` check and the upsert see no write in between
+    (YA-05)."""
+    session.execute(
+        text(
+            "SELECT pg_advisory_xact_lock(hashtextextended("
+            "'sis.exam_marks:' || core.current_tenant()::text || ':' || :e, 0))"
+        ),
+        {"e": str(exam_id)},
+    )
+
+
 def attendance_versions(
     session: Session, student_ids: Collection[uuid.UUID], dates: Collection[dt.date]
 ) -> dict[tuple[uuid.UUID, dt.date], int]:
@@ -350,6 +363,7 @@ __all__ = [
     "insert_exam",
     "list_exams",
     "lock_attendance_days",
+    "lock_exam_marks",
     "marks_of_student",
     "results_of",
     "section_marks",

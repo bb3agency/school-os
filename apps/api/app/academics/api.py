@@ -148,7 +148,8 @@ def record_marks(
 ) -> WriteResultOut:
     """Save marks per student and subject with the maximum marks, or absent, all or nothing
     (``marks.record``). 422 ``not_in_section``, ``marks_over_max``, ``absent_has_no_marks``,
-    ``exam_other_year``..."""
+    ``exam_other_year``...; an entry may carry ``expected_version`` (the mark's ``version``):
+    412 ``marks_changed`` when someone else changed that mark since, and nothing is saved."""
     return service.record_marks(db, ctx, section_id, exam_id, body)
 
 

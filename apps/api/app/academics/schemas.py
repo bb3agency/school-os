@@ -157,6 +157,14 @@ class MarkIn(_In):
     max_marks: Decimal = Field(gt=0, le=1000, max_digits=6, decimal_places=2)
     marks: Decimal | None = Field(default=None, ge=0, max_digits=6, decimal_places=2)
     absent: bool = False
+    expected_version: int | None = Field(
+        default=None,
+        ge=0,
+        le=2_147_483_647,
+        description="The ``version`` read for this student and subject (0: no mark then). When "
+        "sent, the save is refused (412 ``marks_changed``) if someone else changed the mark "
+        "since; leave it out to overwrite (sheet imports).",
+    )
 
 
 class MarksWrite(_In):
@@ -169,6 +177,11 @@ class MarkOut(_Out):
     max_marks: Decimal
     marks: Decimal | None
     absent: bool
+    version: int = Field(
+        default=1,
+        description="The mark's version. Send it back as ``expected_version`` so a save does "
+        "not overwrite someone else's change.",
+    )
 
 
 class MarksStudentOut(_Out):
