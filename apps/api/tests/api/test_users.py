@@ -397,3 +397,83 @@ def test_US_102_office_admin_cannot_invite_privileged_roles(world: Any, api: Any
     for role in ("principal", "office_admin"):
         res = api.call(world.person("office_admin"), "POST", USERS, json=invite_body(roles=[role]))
         assert res.status_code == 403, role
+
+
+def _owner_ctx(tenant_id: uuid.UUID, person: Any) -> Any:
+    from app.authz.context import Scopes, UserContext
+
+    return UserContext(
+        user_id=person.user_id,
+        tenant_id=tenant_id,
+        membership_id=person.membership_id,
+        roles=frozenset({"owner"}),
+        permissions=frozenset({"user.manage", "role.assign"}),
+        scopes=Scopes(school=True),
+        mfa=True,
+        auth_time=dt.datetime.now(dt.UTC),
+    )
+
+
+def _active_owners(admin: Engine, tenant_id: uuid.UUID) -> int:
+    with admin.connect() as c:
+        return int(
+            c.execute(
+                text(
+                    "SELECT count(*) FROM core.memberships m "
+                    "JOIN core.membership_roles mr "
+                    "  ON mr.tenant_id = m.tenant_id AND mr.membership_id = m.id "
+                    "JOIN core.roles r ON r.tenant_id = mr.tenant_id AND r.id = mr.role_id "
+                    "WHERE m.tenant_id = :t AND m.status = 'active' AND r.key = 'owner'"
+                ),
+                {"t": tenant_id},
+            ).scalar_one()
+        )
+
+
+@pytest.mark.parametrize("how", ["suspend", "demote"])
+def test_US_102_YI_01_two_owners_removing_each_other_at_once_keep_one_owner(
+    api: Any, admin_engine: Engine, how: str
+) -> None:
+    """Audit 2026-11-09 YI-01 (SEC-003, FR-IAM-014): the last-owner guard counted the active
+    owners without serialising, so two owners suspending (or demoting) each other in concurrent
+    requests both saw two owners and the school was left with none. The second change now waits
+    for the first and is refused with 409 ``last_owner``."""
+    import threading
+
+    from app.core.db import tenant_session
+    from app.core.errors import Conflict
+    from app.identity import service as identity
+
+    tid = W.provision_school()
+    a = W.add_member(admin_engine, tid, ["owner"])
+    b = W.add_member(admin_engine, tid, ["owner"])
+
+    def change(session: Any, actor: Any, target: Any) -> None:
+        ctx = _owner_ctx(tid, actor)
+        if how == "suspend":
+            version = identity.get_user(session, target.user_id).version
+            identity.set_membership_status(
+                session, ctx, target.user_id, status="suspended", expected_version=version
+            )
+        else:
+            identity.set_roles(session, ctx, target.user_id, ["principal"])
+
+    outcome: dict[str, str] = {}
+
+    def second() -> None:
+        try:
+            with tenant_session(tid, b.user_id) as s2:
+                change(s2, b, a)
+            outcome["second"] = "done"
+        except Conflict as refused:
+            outcome["second"] = str(refused.code)
+
+    worker = threading.Thread(target=second)
+    with tenant_session(tid, a.user_id) as s1:
+        change(s1, a, b)
+        worker.start()
+        worker.join(timeout=1.5)  # without the lock it commits now; with it, it waits
+    worker.join(timeout=30)
+    assert not worker.is_alive()
+    assert outcome["second"] == "last_owner"
+    assert _active_owners(admin_engine, tid) == 1

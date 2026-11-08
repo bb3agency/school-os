@@ -320,6 +320,13 @@ def _guard_last_owner(session: Session, membership: Membership) -> None:
     if owner is None:
         return
     holders = repo.active_membership_ids_with_role(session, owner.id)
+    if membership.id not in holders:
+        return
+    # YI-01: two owners taking each other's access at once both counted two owners. Changes
+    # that may remove an owner are serialised per school, and the owners are counted again
+    # once the lock is held (READ COMMITTED: this statement sees the other change committed).
+    repo.lock_owner_set(session)
+    holders = repo.active_membership_ids_with_role(session, owner.id)
     if membership.id in holders and len(holders) == 1:
         raise Conflict(
             "The school must keep at least one active owner. Add another owner first.",
