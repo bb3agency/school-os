@@ -18,17 +18,13 @@ relative to `apps/api/` unless they start with `apps/` or `docs/`. Synthetic dat
 |---|---|---|---|---|---|
 | DPA-01 | **Medium** (invariant 4; a full Aadhaar number reaches the LLM provider, the embedding search and model output) | Aadhaar masking | `app/core/redaction.py:157` (`_SEP`); used by `app/knowledge/service.py:328` (Ask question), `app/knowledge/gateway/wire.py:61` (every request string), `gemini_wire.py:317`, `streaming.py`, `redact`/`redact_log` | `contains_full_aadhaar` (input refusal) collapses every whitespace run before it looks (DL-01), but `mask_aadhaar`, `redact` and `redact_log` joined digit groups only across 1-3 gap characters. Text that is masked rather than refused therefore kept a number typed or extracted with a wider gap: an Ask question `Is 2345    6789    0124 enrolled?` (four spaces, tabs, blank lines, `   -   `) went unmasked into `kb.queries`, the hybrid search query (embedding provider) and the Vertex AI prompt; model output and log lines with such a gap were not masked either. Document ingestion was safe only because `ingestion/clean.py` collapses whitespace first. | **Fixed** in ce3558d0: a separator is any number of gap characters, or a dash with any number of gaps on each side (gaps and digits are disjoint classes, so the scan stays linear). Tests: `tests/core/test_redaction.py::test_PRV_015_DPA_01_masking_joins_any_whitespace_gap_the_input_check_refuses` (7 gaps x `mask_aadhaar`/`redact`/`redact_log`/`find_aadhaar`), `::test_PRV_015_DPA_01_unbounded_gaps_are_scanned_in_linear_time` |
 | DPA-02 | **Medium** (invariant 4; the full number is shown on screen while the answer streams; the stored answer was masked) | AI gateway streaming | `app/knowledge/gateway/streaming.py:20` (`_TAIL`) | `AadhaarStreamMasker` holds back the trailing "may still continue a number" characters until the run ends, but its class was `[+0-9  \-‐-–]`: no line break, tab, other Unicode spaces, em dash, minus, Cf characters, the rule-4 separators `. / _ ,`, and no non-ASCII digits. A model answer containing `2345\n6789\n0124`, `2345.6789.0124`, `2345—6789—0124` or the number in Telugu digits was emitted group by group; no single delta held a 12-digit window, the fallback in `_emit` masked the new piece alone, and the browser joined the deltas into the full number (the final `ModelTurn` was masked again, so only the live stream leaked). Seven of eight separators failed at some split point. | **Fixed** in 16e82df6: the tail uses `core.redaction.NUMBER_RUN_CHARACTER`, every digit (any script), gap, dash and rule-4 separator the maskers join. Test: `tests/knowledge/test_gateway_streaming.py::test_invariant_4_DPA_02_every_separator_the_masker_joins_is_held_back` (every split point of 8 separator forms) |
+| DPA-03 | **Low-Medium** (invariant 4; extension decided by the lead on 2026-11-08, extends D52) | Aadhaar masking, web form guard | `app/core/redaction.py` (`_WIDE_SEP`, `NUMBER_RUN_CHARACTER`), `apps/web/src/lib/aadhaar.ts` (`AADHAAR_GROUP_SEPARATOR`), `evals/sos_evals/metrics.py` (`_GROUP_SEP`) | A number grouped 4-4-4 with `|`, `:` or `*` between the groups, as OCR and PDF extraction write table cells (`2345 | 6789 | 0124`, `2345:6789:0124`), was neither refused nor masked. The web form guard still used the old 1-3 character rule, so it missed the wide gaps of DPA-01 as well. The eval leak check was no longer a superset of the server rule. | **Fixed** in f1766542 (server, stream tail, eval leak check, docs/07 and docs/08 PRV-015) and 746355f0 (web). One table separator with any whitespace around it now joins 4-4-4 groups, in the input checks, all maskers, `find_aadhaar` and the stream tail. It applies only to the 4-4-4 rule, so clock times (`09:30`) and ratios never join. `x` and parentheses are not separators. The web guard now uses the same rule. Tests: `tests/core/test_redaction.py::test_PRV_015_DPA_03_*` (10 table forms; Verhoeff required; `x`, parentheses and times left alone; linear-time cases), the streaming test now covers ` | `, `:` and ` * `, `evals/tests/test_metrics.py` cases, and `apps/web/src/lib/aadhaar.test.ts` (wide gaps, table rows, linear time) |
 
-Neither fix changes the API schema, a migration or a permission.
+No fix changes the API schema, a migration or a permission. The lead's D52 text in docs/14 is not edited: DPA-03 extends D52 (lead decision 2026-11-08).
 
 ### Note on design limits (not findings)
 
-`mask_aadhaar` still does not join groups separated by `|`, `:`, `*`, `x` or parentheses
-(`(2345) 6789 0124`), or by 4+ punctuation characters (D52, pinned by
-`test_PRV_015_D52_four_separator_characters_are_not_a_group_join`). The input check refuses
-neither. That is the D52 trade-off (invoice numbers, dates, amounts). Change it only if the owner
-wants to widen D52 again. A table cell separator `|` between the groups is the most plausible of
-these in OCR output.
+`mask_aadhaar` still does not join groups separated by `x` or parentheses (`(2345) 6789 0124`), or by 4+ punctuation characters other than whitespace (D52, pinned by `test_PRV_015_D52_four_separator_characters_are_not_a_group_join`). The table separators join only 4-4-4 groups, not other groupings. These limits are deliberate (lead decision 2026-11-08).
 
 ## Verified clean (with the evidence)
 
@@ -100,18 +96,24 @@ these in OCR output.
 
 ## Outside my area (not fixed)
 
-- `apps/web/src/lib/aadhaar.ts:52` (`AADHAAR_GROUP_SEPARATOR`, `{1,3}`) mirrors the old
-  backend rule. If the web masks or refuses typed text by itself, it has the same wide-gap
-  gap as DPA-01 (web area; the API still masks and refuses).
+None open. The web mirror noted in the first pass is fixed as part of DPA-03.
 
 ## Checks run
 
-- `uv run pytest tests/core tests/knowledge/test_gateway.py test_gateway_gemini.py
-  test_gateway_streaming.py test_ingestion_extract.py test_ingestion_pdf.py test_contextual.py
-  test_circular_reading.py tests/extraction/test_sanitize.py test_imaging.py
-  test_providers.py tests/devtools/test_fake_ids.py tests/{certificates,changes,fees,insights}/test_log_redaction.py`:
-  868 passed (after DPA-01). After DPA-02: redaction, streaming, gateway and Gemini wire
-  tests passed (275). `tests/fees/test_upi_parse.py` passed (46).
-- `cd evals && uv run pytest -q`: 219 passed.
-- `ruff check` and `ruff format --check` on the touched files; `uv run mypy apps/api apps/worker
-  evals`: no issues (1241 files); `uv run lint-imports`: 52 contracts kept.
+- After DPA-01: `uv run pytest` on `tests/core` and on the knowledge gateway, Gemini wire,
+  streaming, ingestion extract and PDF, contextual and circular reading tests, plus
+  `tests/extraction/test_sanitize.py`, `test_imaging.py`, `test_providers.py`,
+  `tests/devtools/test_fake_ids.py` and the four `test_log_redaction.py` suites: 868 passed.
+- After DPA-03: `tests/core`, the knowledge streaming, gateway, Gemini, circular reading,
+  contextual and ingestion extract tests, `tests/extraction/test_sanitize.py` and
+  `test_imaging.py`, `tests/imports/test_validation.py` and `tests/fees/test_upi_parse.py`:
+  917 passed.
+- DB-backed: `tests/knowledge/test_ask_api.py` and `test_ingestion_pipeline.py`: 62 passed.
+- `cd evals && uv run pytest -q`: 223 passed.
+- Web, using the tools in `D:\school-os\node_modules` because the worktree has no
+  node_modules: `vitest run src/lib/aadhaar.test.ts` with a lib-only config (the project config
+  needs `@vitejs/plugin-react` from the main checkout), 8 passed. `tsc --strict` on the two lib
+  files: clean. `eslint`: clean. `prettier --check`: clean. The project-wide `tsc` and the
+  vitest runs of the screens that use the guard were not run here.
+- `ruff check` and `ruff format --check` on the touched files: clean. `uv run mypy apps/api
+  apps/worker evals`: no issues (1241 files). `uv run lint-imports`: 52 contracts kept.
