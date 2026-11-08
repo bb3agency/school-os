@@ -441,7 +441,7 @@ The system instruction of a tool-use turn ends with `citations.marker_instructio
 
 | Kind | URI | Opens in UI |
 |---|---|---|
-| Document page | `sos://doc/{document_id}/v{n}#p{page}` | Document viewer at page, highlighted snippet |
+| Document page | `sos://doc/{document_id}/v{n}#p{page}` | Title: the document screen. As built (D73): the "page n" chip asks `GET /documents/{id}/pages/{n}?version={n}` (same checks as a download) and opens the cited version in a new tab (`noopener`) at `#page=n` (PDF; images open as they are); on any error it opens the document screen. No page images are made |
 | Record field | `sos://student/{student_id}/field/{attribute}?src={source}` | Student record, field row |
 | Finding | `sos://finding/{finding_id}` | Finding detail |
 | Change request | `sos://change/{change_request_id}` | Change request |
