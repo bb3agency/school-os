@@ -650,3 +650,91 @@ describe("account requests check what the API checks (FR-FEE-007, FR-FEE-009)", 
     }
   });
 });
+
+describe("new fee plan: the late fee is checked before saving (WD-01, FR-FEE-009)", () => {
+  const YEAR = "0192f3a4-0000-7000-8000-00000000f301";
+  const CLASS = "0192f3a4-0000-7000-8000-00000000f303";
+
+  function setupRoutes() {
+    signedIn(["fee.manage"]);
+    stub.routes["GET /bff/api/v1/fees/status"] = () => Response.json(STATUS);
+    stub.routes["GET /bff/api/v1/fees/heads"] = () =>
+      Response.json([
+        {
+          id: HEAD,
+          code: "TUI",
+          name: "Tuition fee",
+          kind: "tuition",
+          gst_exempt: true,
+          active: true,
+          sort_order: 1,
+          version: 1,
+        },
+      ]);
+    stub.routes["GET /bff/api/v1/fees/plans"] = () => Response.json([]);
+    stub.routes["GET /bff/api/v1/academic-years"] = () =>
+      Response.json({
+        data: [
+          {
+            id: YEAR,
+            label: "2026-27",
+            starts_on: "2026-06-01",
+            ends_on: "2027-04-30",
+            is_current: true,
+          },
+        ],
+        next_cursor: null,
+      });
+    stub.routes["GET /bff/api/v1/classes"] = () =>
+      Response.json({ data: [{ id: CLASS, display_en: "Class IX" }], next_cursor: null });
+    stub.routes["POST /bff/api/v1/fees/plans"] = () =>
+      Response.json({ id: "0192f3a4-0000-7000-8000-00000000f399" }, { status: 201 });
+  }
+
+  async function fillPlan(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole("button", { name: en.setup.newPlan }));
+    await user.type(await screen.findByLabelText(en.setup.planName), "Class IX 2026-27");
+    await user.type(screen.getByRole("textbox", { name: "Tuition fee, instalment 1" }), "12000");
+    await user.selectOptions(screen.getByLabelText(en.setup.lateRule), "per_day");
+  }
+
+  it("refuses a missing amount, too many grace days and a cap below the amount without calling the API", async () => {
+    setupRoutes();
+    const user = userEvent.setup();
+    renderWithIntl(<SetupScreen />);
+    await fillPlan(user);
+    await user.type(screen.getByLabelText(en.setup.lateCap), "5");
+    await user.clear(screen.getByLabelText(en.setup.lateGrace));
+    await user.type(screen.getByLabelText(en.setup.lateGrace), "120");
+    await user.click(screen.getByRole("button", { name: en.setup.saveDraft }));
+    expect((await screen.findAllByText(en.setup.check.lateAmount)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(en.setup.check.lateGrace).length).toBeGreaterThan(0);
+    expect(stub.callsTo("POST /bff/api/v1/fees/plans")).toHaveLength(0);
+
+    await user.type(screen.getByLabelText(en.setup.lateAmount), "10");
+    await user.clear(screen.getByLabelText(en.setup.lateGrace));
+    await user.type(screen.getByLabelText(en.setup.lateGrace), "5");
+    await user.click(screen.getByRole("button", { name: en.setup.saveDraft }));
+    expect((await screen.findAllByText(en.setup.check.lateCap)).length).toBeGreaterThan(0);
+    expect(stub.callsTo("POST /bff/api/v1/fees/plans")).toHaveLength(0);
+  });
+
+  it("sends the late fee as exact decimal strings (1,250 -> 1250.00)", async () => {
+    setupRoutes();
+    const user = userEvent.setup();
+    renderWithIntl(<SetupScreen />);
+    await fillPlan(user);
+    await user.type(screen.getByLabelText(en.setup.lateAmount), "10");
+    await user.type(screen.getByLabelText(en.setup.lateCap), "1,250");
+    await user.click(screen.getByRole("button", { name: en.setup.saveDraft }));
+    await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/fees/plans")).toHaveLength(1));
+    const [call] = stub.callsTo("POST /bff/api/v1/fees/plans");
+    const body = JSON.parse(call?.body ?? "{}") as { late_fee_rule: Record<string, unknown> };
+    expect(body.late_fee_rule).toEqual({
+      kind: "per_day",
+      amount: "10.00",
+      grace_days: 0,
+      cap: "1250.00",
+    });
+  });
+});

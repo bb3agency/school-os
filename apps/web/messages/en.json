@@ -9552,7 +9552,10 @@
         "amounts": "Enter at least one amount in the grid",
         "badAmount": "Enter amounts in rupees with at most two decimals, for example 1250 or 1250.50",
         "instalmentName": "Enter a name for instalment {no}",
-        "instalmentDue": "Enter the due date of instalment {no}"
+        "instalmentDue": "Enter the due date of instalment {no}",
+        "lateAmount": "Enter the late fee in rupees, more than 0, for example 50 or 50.50",
+        "lateGrace": "Enter grace days as a whole number from 0 to 90",
+        "lateCap": "Enter a cap in rupees that is not less than the late fee amount"
       },
       "discard": "Discard plan",
       "instalmentsOf": "Instalments of {name}",

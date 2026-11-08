@@ -54,6 +54,9 @@ interface Column {
   due_on: string;
 }
 
+/** Grace days: a whole number (the API takes 0..90). */
+const GRACE_DAYS = /^\d{1,3}$/;
+
 /**
  * The plan editor (docs/17 §5.8): a grid of heads × instalments with live totals; each head's
  * annual amount is the sum of its row (so instalments always add up, FR-FEE-003). Saves a draft.
@@ -134,6 +137,24 @@ function PlanEditor({
         });
       }
     });
+    // The late fee as the API checks it (FR-FEE-009; WD-01): a positive amount, 0..90 grace
+    // days and, per day, a cap not below the amount. Otherwise the API's 422 named no field.
+    if (lateKind !== "none") {
+      const amount = toPaise(lateAmount);
+      if (amount === null || amount <= 0) {
+        found.push({ fieldId: fieldId("late-amount"), message: t("check.lateAmount") });
+      }
+      const grace = lateGrace.trim() || "0";
+      if (!GRACE_DAYS.test(grace) || Number(grace) > 90) {
+        found.push({ fieldId: fieldId("late-grace"), message: t("check.lateGrace") });
+      }
+      if (lateKind === "per_day") {
+        const cap = toPaise(lateCap);
+        if (cap === null || cap <= 0 || (amount !== null && amount > 0 && cap < amount)) {
+          found.push({ fieldId: fieldId("late-cap"), message: t("check.lateCap") });
+        }
+      }
+    }
     return found;
   }
 
@@ -174,9 +195,9 @@ function PlanEditor({
                 ? { kind: "none", grace_days: 0 }
                 : {
                     kind: lateKind as "flat_per_instalment" | "per_day",
-                    amount: lateAmount,
-                    grace_days: Number(lateGrace || "0"),
-                    cap: lateKind === "per_day" ? lateCap : null,
+                    amount: fromPaise(toPaise(lateAmount) ?? 0),
+                    grace_days: Number(lateGrace.trim() || "0"),
+                    cap: lateKind === "per_day" ? fromPaise(toPaise(lateCap) ?? 0) : null,
                   },
           },
         }),
@@ -356,16 +377,20 @@ function PlanEditor({
           {lateKind !== "none" ? (
             <>
               <TextField
+                id={fieldId("late-amount")}
                 name="late_amount"
                 label={t("lateAmount")}
                 inputMode="decimal"
+                error={invalid("late-amount") ? t("check.lateAmount") : undefined}
                 value={lateAmount}
                 onChange={(e) => setLateAmount(e.target.value)}
               />
               <TextField
+                id={fieldId("late-grace")}
                 name="late_grace"
                 label={t("lateGrace")}
                 inputMode="numeric"
+                error={invalid("late-grace") ? t("check.lateGrace") : undefined}
                 value={lateGrace}
                 onChange={(e) => setLateGrace(e.target.value)}
               />
@@ -373,9 +398,11 @@ function PlanEditor({
           ) : null}
           {lateKind === "per_day" ? (
             <TextField
+              id={fieldId("late-cap")}
               name="late_cap"
               label={t("lateCap")}
               inputMode="decimal"
+              error={invalid("late-cap") ? t("check.lateCap") : undefined}
               value={lateCap}
               onChange={(e) => setLateCap(e.target.value)}
             />
