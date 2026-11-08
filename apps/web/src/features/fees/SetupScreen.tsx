@@ -629,12 +629,12 @@ export function SetupScreen() {
   const heads = useHeads(enabled);
   const plans = useApiQuery(KEYS.plans, () => unwrap(api.GET("/api/v1/fees/plans")), { enabled });
   const years = useApiQuery(
-    ["staff", "fees", "years"],
+    KEYS.years,
     () => unwrap(api.GET("/api/v1/academic-years", { params: { query: { limit: 200 } } })),
     { enabled },
   );
   const classes = useApiQuery(
-    ["staff", "fees", "classes"],
+    KEYS.classes,
     () => unwrap(api.GET("/api/v1/classes", { params: { query: { limit: 200 } } })),
     { enabled },
   );

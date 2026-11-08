@@ -2,8 +2,9 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ALL_STRUCTURE_KEYS } from "@/features/academic-structure/data";
 import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
-import { intlErrors, messages, renderWithIntl } from "@/test/render";
+import { intlErrors, messages, renderWithIntl, testQueryClient } from "@/test/render";
 import { me, STUDENT } from "@/test/school-fixtures";
 import { AccountScreen, adjustmentSchema, concessionSchema } from "./AccountScreen";
 import { ApprovalsScreen } from "./ApprovalsScreen";
@@ -763,6 +764,29 @@ describe("new fee plan: the late fee is checked before saving (WD-01, FR-FEE-009
     await waitFor(() => expect(stub.callsTo("POST /bff/api/v1/fees/plans")).toHaveLength(1));
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(stub.callsTo("POST /bff/api/v1/fees/plans")).toHaveLength(1);
+  });
+
+  it("a class added in academic structure appears in the plan's class picker without a reload (WD-08, FR-TEN-010)", async () => {
+    setupRoutes();
+    const client = testQueryClient();
+    const user = userEvent.setup();
+    renderWithIntl(<SetupScreen />, "en", client);
+    await user.click(await screen.findByRole("button", { name: en.setup.newPlan }));
+    const picker = await screen.findByLabelText(en.setup.class);
+    expect(within(picker).queryByRole("option", { name: "Class X" })).toBeNull();
+    stub.routes["GET /bff/api/v1/classes"] = () =>
+      Response.json({
+        data: [
+          { id: CLASS, display_en: "Class IX" },
+          { id: "0192f3a4-0000-7000-8000-00000000f304", display_en: "Class X" },
+        ],
+        next_cursor: null,
+      });
+    // What every structure write does (AcademicStructureScreen: invalidate ALL_STRUCTURE_KEYS).
+    await act(() =>
+      Promise.all(ALL_STRUCTURE_KEYS.map((queryKey) => client.invalidateQueries({ queryKey }))),
+    );
+    expect(await within(picker).findByRole("option", { name: "Class X" })).toBeInTheDocument();
   });
 });
 
