@@ -7,7 +7,10 @@ import { notificationHref } from "@/features/notifications/data";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, renderWithIntl } from "@/test/render";
 import { me, ME_MEMBERSHIP, OTHER_MEMBERSHIP, STUDENT } from "@/test/school-fixtures";
-import { CertificateDetailScreen } from "./CertificateDetailScreen";
+import {
+  CertificateDetailScreen,
+  setCertificatePollDelayForTesting,
+} from "./CertificateDetailScreen";
 import { CertificatesScreen } from "./CertificatesScreen";
 import { parseCertificateFilters, parseIssueType } from "./filters";
 import { buildInputSchema, IssueCertificateScreen } from "./IssueCertificateScreen";
@@ -414,6 +417,27 @@ describe("certificate detail (US-1102..US-1107)", () => {
     });
     expect(screen.getByText("Reason for leaving")).toBeInTheDocument();
     expect(screen.getByText("Parent transferred")).toBeInTheDocument();
+  });
+
+  it("an issued certificate whose PDF is being made asks again until it is ready (XO-03, FR-CERT-011)", async () => {
+    setCertificatePollDelayForTesting(() => 20);
+    try {
+      let reads = 0;
+      stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([READ]));
+      stub.routes[`GET /bff/api/v1/certificates/${CERT}`] = () =>
+        Response.json(issued({ pdf_status: (reads += 1) < 3 ? "queued" : "ready" }));
+      renderWithIntl(<CertificateDetailScreen certificateId={CERT} />);
+      expect(await screen.findByRole("button", { name: "Download PDF" })).toBeDisabled();
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Download PDF" })).toBeEnabled(),
+      );
+      const settled = stub.callsTo(`GET /bff/api/v1/certificates/${CERT}`).length;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Ready: no more polling.
+      expect(stub.callsTo(`GET /bff/api/v1/certificates/${CERT}`)).toHaveLength(settled);
+    } finally {
+      setCertificatePollDelayForTesting(null);
+    }
   });
 
   it("a draft changed since it was read says to reload and check it again (A-11)", async () => {
