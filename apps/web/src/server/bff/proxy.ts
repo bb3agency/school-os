@@ -318,12 +318,20 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
       continue;
     }
 
-    if (upstream.status === 403 && MEMBERSHIP_GONE.has((await problemCode(upstream)) ?? "")) {
-      // Suspended or removed (the API refuses at once): end this BFF session too, so the
-      // person is not left signed in until the idle timeout (audit 2026-10-05 hardening).
+    const membershipGone =
+      upstream.status === 403 && MEMBERSHIP_GONE.has((await problemCode(upstream)) ?? "");
+    // Suspended or removed (the API refuses at once): end this BFF session too, so the person
+    // is not left signed in until the idle timeout (audit 2026-10-05 hardening). XB-02: a 401
+    // that a fresh token did not cure (or that is not about expiry) ends it as well; a live BFF
+    // session would make /bff/auth/login send the browser straight back to the page, whose next
+    // call gets the same 401, in an endless reload loop.
+    if (membershipGone || upstream.status === 401) {
       await upstream.body?.cancel();
       await runtime.store.revoke(session.id);
-      logEvent("session_ended_membership_gone", { kind: session.kind });
+      logEvent(
+        membershipGone ? "session_ended_membership_gone" : "session_ended_api_unauthenticated",
+        { kind: session.kind, request_id: requestId },
+      );
       const secure = runtime.config.secureCookies;
       const ended = sessionEnded(requestId, session.kind);
       ended.headers.append(

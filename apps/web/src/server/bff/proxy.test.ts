@@ -429,6 +429,38 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
     expect(h.apiCalls).toHaveLength(2);
   });
 
+  it("XB-02 (FR-IAM-004): a 401 the refresh does not cure ends the BFF session, so sign-in does not bounce back", async () => {
+    await h.signIn("staff", clerk);
+    const session = (await h.runtime.store.load(h.jar.get("__Host-sos_session"), {
+      touch: false,
+    }))!;
+    h.setApi(() => json({ status: 401, code: "token_expired" }, 401));
+    const response = await call("/bff/api/v1/users");
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "unauthenticated",
+      login_url: "/bff/auth/login",
+    });
+    expect(response.headers.get("set-cookie")).toContain("__Host-sos_session=;");
+    // Otherwise /bff/auth/login sees a live session and sends the browser straight back to the
+    // page, whose next call gets the same 401: an endless reload loop.
+    expect(await h.runtime.store.get(session.id)).toBeNull();
+  });
+
+  it("XB-02 (FR-IAM-004): any other 401 from the API ends the BFF session too", async () => {
+    await h.signIn("staff", clerk);
+    const session = (await h.runtime.store.load(h.jar.get("__Host-sos_session"), {
+      touch: false,
+    }))!;
+    h.apiCalls.length = 0;
+    h.setApi(() => json({ status: 401, code: "unauthenticated" }, 401));
+    const response = await call("/bff/api/v1/users");
+    expect(response.status).toBe(401);
+    expect(h.apiCalls).toHaveLength(1);
+    await expect(response.json()).resolves.toMatchObject({ login_url: "/bff/auth/login" });
+    expect(await h.runtime.store.get(session.id)).toBeNull();
+  });
+
   it("returns 401 when the refresh token was reused and the family is revoked", async () => {
     await h.signIn("staff", clerk);
     const session = (await h.runtime.store.load(h.jar.get("__Host-sos_session"), {
