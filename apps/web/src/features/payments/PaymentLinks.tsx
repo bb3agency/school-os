@@ -56,8 +56,29 @@ function choices(account: Account): InstalmentChoice[] {
   return [...per.values()].sort((a, b) => a.no - b.no);
 }
 
+/**
+ * XF-06 (FR-PAY-003): a Razorpay test-mode connection takes no real money, so its links must not
+ * reach parents. Production refuses test keys (backend CP-01/BL-06); this guards pilots and staging.
+ */
+function TestModeAlert() {
+  const t = useTranslations("payments.links");
+  return (
+    <Alert tone="warning" title={t("testModeTitle")}>
+      {t("testModeBody")}
+    </Alert>
+  );
+}
+
 /** The link to share, with a copy button (it carries no personal data, ADR-0042 decision 8). */
-function ShareLink({ intent, onDone }: { intent: Intent; onDone: () => void }) {
+function ShareLink({
+  intent,
+  testMode,
+  onDone,
+}: {
+  intent: Intent;
+  testMode: boolean;
+  onDone: () => void;
+}) {
   const t = useTranslations("payments.links");
   const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
   async function copy() {
@@ -70,6 +91,7 @@ function ShareLink({ intent, onDone }: { intent: Intent; onDone: () => void }) {
   }
   return (
     <div className="space-y-4">
+      {testMode ? <TestModeAlert /> : null}
       <Alert tone="success" title={intent.reused ? t("reusedTitle") : t("createdTitle")}>
         {t("createdBody", { date: formatDate(intent.expires_at) ?? "" })}
       </Alert>
@@ -95,7 +117,7 @@ function ShareLink({ intent, onDone }: { intent: Intent; onDone: () => void }) {
   );
 }
 
-function CreateLink({ account }: { account: Account }) {
+function CreateLink({ account, testMode }: { account: Account; testMode: boolean }) {
   const t = useTranslations("payments.links");
   const api = useBffClient("staff");
   const options = choices(account);
@@ -121,7 +143,9 @@ function CreateLink({ account }: { account: Account }) {
           }),
         )
       }
-      renderResult={(result: Intent, close) => <ShareLink intent={result} onDone={close} />}
+      renderResult={(result: Intent, close) => (
+        <ShareLink intent={result} testMode={testMode} onDone={close} />
+      )}
     >
       {(errors) => (
         <fieldset
@@ -197,15 +221,17 @@ export function PaymentLinks({ account }: { account: Account }) {
   const connection = useConnection();
   const intents = useIntents(account.id);
   const connected = connection.status === "ready" && connection.data.connected;
+  const testMode = connection.status === "ready" && connection.data.environment === "test";
   return (
     <div className="space-y-4">
+      {testMode ? <TestModeAlert /> : null}
       {connection.status === "ready" && !connected ? (
         <Alert tone="info" title={t("notConnectedTitle")}>
           {t("notConnectedBody")}
         </Alert>
       ) : null}
       {connected && canCollect && account.status === "open" ? (
-        <CreateLink account={account} />
+        <CreateLink account={account} testMode={testMode} />
       ) : null}
       <FeesGate data={intents}>
         {(rows) =>
@@ -230,6 +256,11 @@ export function PaymentLinks({ account }: { account: Account }) {
                     <Tr key={intent.id}>
                       <Td className="whitespace-nowrap">
                         <code className="font-mono">{intent.intent_code}</code>
+                        {testMode ? (
+                          <Pill variant="sample" size="sm" icon={null} className="ms-2">
+                            {t("testBadge")}
+                          </Pill>
+                        ) : null}
                         <span className="num block text-xs text-ink-muted">
                           {formatDateTime(intent.created_at)}
                           {intent.created_by_name ? (

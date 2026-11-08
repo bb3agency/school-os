@@ -347,6 +347,37 @@ describe("Payment links (US-2108)", () => {
     expect(call?.headers.get("Idempotency-Key")).toBeTruthy();
   });
 
+  it("FR-PAY-003 XF-06: in test mode warns not to send links to parents and marks each link Test", async () => {
+    signedIn([COLLECT]);
+    stub.routes["GET /bff/api/v1/payments/connection"] = () => Response.json(connected());
+    stub.routes[`GET /bff/api/v1/fees/accounts/${ACCOUNT}/payment-intents`] = () =>
+      Response.json([intent(), intent({ id: ITEM, intent_code: "EFGH5678", status: "paid" })]);
+    stub.routes[`POST /bff/api/v1/fees/accounts/${ACCOUNT}/payment-intents`] = () =>
+      Response.json(intent(), { status: 201 });
+    renderWithIntl(<PaymentLinks account={feeAccount()} />);
+    expect(await screen.findByText(en.links.testModeTitle)).toBeInTheDocument();
+    expect(screen.getByText(en.links.testModeBody)).toBeInTheDocument();
+    const table = await screen.findByRole("table");
+    expect(within(table).getAllByText(en.links.testBadge)).toHaveLength(2);
+    // The share step repeats the warning where the link is copied.
+    await userEvent.click(screen.getByRole("button", { name: en.links.create }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: en.links.create }));
+    expect(await within(dialog).findByText(en.links.testModeTitle)).toBeInTheDocument();
+  });
+
+  it("FR-PAY-003 XF-06: live mode shows no test warning or badge", async () => {
+    signedIn([COLLECT]);
+    stub.routes["GET /bff/api/v1/payments/connection"] = () =>
+      Response.json(connected({ environment: "live", key_id_hint: "rzp_live_…ABCD" }));
+    stub.routes[`GET /bff/api/v1/fees/accounts/${ACCOUNT}/payment-intents`] = () =>
+      Response.json([intent()]);
+    renderWithIntl(<PaymentLinks account={feeAccount()} />);
+    expect(await screen.findByText("ABCD1234")).toBeInTheDocument();
+    expect(screen.queryByText(en.links.testModeTitle)).toBeNull();
+    expect(screen.queryByText(en.links.testBadge)).toBeNull();
+  });
+
   it("says when online payments are not connected", async () => {
     signedIn([COLLECT]);
     stub.routes["GET /bff/api/v1/payments/connection"] = () => Response.json(connection());

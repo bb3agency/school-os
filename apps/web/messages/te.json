@@ -10040,7 +10040,10 @@
         "expires": "పనిచేసే వరకు",
         "receipt": "రసీదు",
         "action": "చర్య"
-      }
+      },
+      "testModeTitle": "Test mode: payment links do not collect real money",
+      "testModeBody": "Do not send them to parents. The owner connects live Razorpay keys in Settings > Online payments.",
+      "testBadge": "Test"
     },
     "recon": {
       "title": "ఆన్‌లైన్ సరిపోలిక",
