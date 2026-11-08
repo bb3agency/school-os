@@ -148,6 +148,119 @@ def test_ADR_0013_security_definer_functions_are_allowlisted(admin_engine: Engin
         assert "search_path=" in r.config, f"{r.fq} must pin search_path"
 
 
+STANDARD_ISOLATION = "(tenant_id = core.current_tenant())"
+DEFINER_ACCESS = "(CURRENT_USER = 'sos_definer'::name)"
+# Reviewed permissive policies other than the standard tenant_isolation (rls_allowlist.yaml
+# policy_variants and definer_access_tables). Restrictive policies only narrow access.
+PERMISSIVE_VARIANTS = {
+    ("core.tenants", "own_tenant"),
+    ("core.users", "users_in_tenant"),
+    ("core.users", "users_in_tenant_update"),
+    ("sis.attribute_definitions", "attrdef_read"),
+    ("sis.attribute_definitions", "attrdef_write"),
+}
+
+
+def policy_violations(conn: Connection, schemas: list[str]) -> list[str]:
+    """Permissive policies are OR-ed, so one extra permissive policy (``USING (true)``) or a
+    weakened ``tenant_isolation`` opens a table to every school while the name check above still
+    passes. Every permissive policy must be the exact standard one, ``definer_access`` or a
+    reviewed variant."""
+    rows = conn.execute(
+        text(
+            """
+            SELECT n.nspname || '.' || c.relname AS fq, p.polname, p.polpermissive, p.polcmd,
+                   p.polroles = '{0}'::oid[] AS to_public,
+                   pg_get_expr(p.polqual, p.polrelid) AS qual,
+                   pg_get_expr(p.polwithcheck, p.polrelid) AS chk
+            FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = ANY(:schemas) AND NOT c.relispartition AND p.polpermissive
+            """
+        ),
+        {"schemas": schemas},
+    ).mappings()
+    problems: list[str] = []
+    for r in rows:
+        name = f"{r['fq']}.{r['polname']}"
+        if (r["fq"], r["polname"]) in PERMISSIVE_VARIANTS:
+            continue
+        if r["polname"] == "tenant_isolation":
+            expected = STANDARD_ISOLATION
+        elif r["polname"] == "definer_access":
+            expected = DEFINER_ACCESS
+        else:
+            problems.append(f"{name}: permissive policy not reviewed")
+            continue
+        if not (r["polcmd"] == "*" and r["to_public"]):
+            problems.append(f"{name}: must be FOR ALL TO PUBLIC")
+        if r["qual"] != expected or r["chk"] != expected:
+            problems.append(f"{name}: expression is not {expected}")
+    return problems
+
+
+def test_TI_03_SEC_001_permissive_policies_are_exactly_the_reviewed_ones(
+    admin_engine: Engine,
+) -> None:
+    with admin_engine.connect() as conn:
+        problems = policy_violations(conn, ALLOWLIST["tenant_schemas"])
+    assert problems == []
+
+
+def test_TI_03_policy_check_detects_a_widening_policy(admin_engine: Engine) -> None:
+    """Self-test: an extra permissive policy and a weakened tenant_isolation are both flagged."""
+    schema = f"rls_selftest_{uuid.uuid4().hex[:8]}"
+    with admin_engine.begin() as conn:
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
+        conn.execute(text(f"CREATE TABLE {schema}.t (id uuid, tenant_id uuid NOT NULL)"))
+        conn.execute(
+            text(
+                f"CREATE POLICY tenant_isolation ON {schema}.t "
+                "USING (tenant_id = core.current_tenant()) "
+                "WITH CHECK (tenant_id = core.current_tenant())"
+            )
+        )
+        conn.execute(text(f"CREATE POLICY peek ON {schema}.t FOR SELECT USING (true)"))
+        conn.execute(text(f"CREATE TABLE {schema}.w (id uuid, tenant_id uuid NOT NULL)"))
+        conn.execute(text(f"CREATE POLICY tenant_isolation ON {schema}.w USING (true)"))
+        try:
+            problems = policy_violations(conn, [schema])
+        finally:
+            conn.execute(text(f"DROP SCHEMA {schema} CASCADE"))
+    joined = "\n".join(problems)
+    assert f"{schema}.t.peek: permissive policy not reviewed" in joined
+    assert f"{schema}.w.tenant_isolation: expression is not" in joined
+    assert f"{schema}.t.tenant_isolation" not in joined
+
+
+def test_TI_02_SEC_001_every_plpgsql_or_sql_function_pins_search_path(
+    admin_engine: Engine,
+) -> None:
+    """Audit 2026-11-08 TI-02: every function in the tenant and platform schemas (trigger guards,
+    purge checks, definer functions) runs with a pinned ``search_path``, so a caller's
+    ``search_path`` (``pg_temp`` first) can never change what a guard resolves. The two 0067
+    consent trigger functions were the exceptions. ``core.current_tenant()`` and
+    ``core.current_user_id()`` are one-line SQL functions on ``current_setting`` that RLS inlines
+    (a ``SET`` clause would stop the inlining), so they are the reviewed exceptions."""
+    inlined = {"core.current_tenant", "core.current_user_id"}
+    with admin_engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT n.nspname || '.' || p.proname AS fq,
+                       coalesce(array_to_string(p.proconfig, ','), '') AS config
+                FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                JOIN pg_language l ON l.oid = p.prolang
+                WHERE n.nspname = ANY(:schemas) AND l.lanname IN ('plpgsql', 'sql')
+                """
+            ),
+            {"schemas": [*ALLOWLIST["tenant_schemas"], "platform"]},
+        ).all()
+    assert rows
+    unpinned = sorted(r.fq for r in rows if "search_path=" not in r.config and r.fq not in inlined)
+    assert unpinned == []
+
+
 def test_ADR_0013_platform_role_has_no_access_to_tenant_tables(admin_engine: Engine) -> None:
     with admin_engine.connect() as conn:
         leaked: list[str] = list(
