@@ -9,7 +9,7 @@ import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@
 import { fakeAadhaar } from "@/test/records-fixtures";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { me, SECTION, structureRoutes } from "@/test/school-fixtures";
-import { InviteUserScreen } from "./InviteUserScreen";
+import { inviteSchema, InviteUserScreen } from "./InviteUserScreen";
 import { scopesBody } from "./parts";
 import { profileBody, profileSchema } from "./UserDetailScreen";
 import { UserDetailScreen } from "./UserDetailScreen";
@@ -693,6 +693,29 @@ describe("edit a staff member's details (US-102, FR-IAM-010)", () => {
         preferred_language: "en",
       }).success,
     ).toBe(false);
+  });
+
+  it("XS-04 (FR-STU-012, invariant 4): the invite form refuses a full Aadhaar number too", () => {
+    const valid = {
+      display_name: "Lakshmi Sample",
+      email: "",
+      idp_subject: "lakshmi.k",
+      preferred_language: "en",
+      roles: ["clerk"],
+      scope_mode: "school",
+      class_refs: [],
+      section_refs: [],
+    };
+    expect(inviteSchema.safeParse(valid).success).toBe(true);
+    for (const field of ["display_name", "email"] as const) {
+      const value = field === "email" ? `${fakeAadhaar()}@school.example` : `L ${fakeAadhaar()}`;
+      const result = inviteSchema.safeParse({ ...valid, [field]: value });
+      expect(result.success).toBe(false);
+      expect(result.error?.issues.map((issue) => [issue.path[0], issue.message])).toContainEqual([
+        field,
+        "noAadhaar",
+      ]);
+    }
   });
 
   it("edits name, email and language with If-Match; the global step-up retries the same call", async () => {

@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SaveBar } from "@/components/ui/SaveBar";
 import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import { useRouter } from "@/i18n/navigation";
+import { containsAadhaarNumber } from "@/lib/aadhaar";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffMe, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { formList, useApiForm } from "@/lib/forms";
@@ -56,7 +57,16 @@ export const inviteSchema = z
     roles: rolesField,
     ...scopeFields,
   })
-  .superRefine(refineScopes);
+  .superRefine((data, context) => {
+    refineScopes(data, context);
+    // Invariant 4, as on the edit form: no full Aadhaar number in a name or email (XS-04).
+    if (containsAadhaarNumber(data.display_name)) {
+      context.addIssue({ code: "custom", path: ["display_name"], message: "noAadhaar" });
+    }
+    if (data.email !== null && containsAadhaarNumber(data.email)) {
+      context.addIssue({ code: "custom", path: ["email"], message: "noAadhaar" });
+    }
+  });
 
 /** Ids of the invite form's fields (and id prefixes of its choice lists), for the summary. */
 const IDS = {
