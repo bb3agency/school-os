@@ -21,23 +21,14 @@ import { invoiceTone, known, subscriptionTone } from "@/features/status";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDate, formatDateTime, formatInr } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
-import * as z from "@/lib/zod";
 
-/**
- * ADR-0058 fields of GET /tenant/billing (the next invoice; on a dedicated host when the
- * control plane's summary was received). A local schema until the generated client has them.
- */
-const billingExtras = z.object({
-  next_invoice_on: z.string().nullish(),
-  next_invoice_amount_inr: z.string().nullish(),
-  summary_as_of: z.string().nullish(),
-});
-type BillingExtras = z.infer<typeof billingExtras>;
+/** ADR-0058 fields of GET /tenant/billing (the next invoice; on a dedicated host, when the summary was received). */
+type BillingExtras = Partial<
+  Pick<TenantBilling, "next_invoice_on" | "next_invoice_amount_inr" | "summary_as_of">
+>;
 
 function extrasOf(plan: TenantBilling | null): BillingExtras {
-  if (plan === null) return {};
-  const parsed = billingExtras.safeParse(plan);
-  return parsed.success ? parsed.data : {};
+  return plan ?? {};
 }
 
 export interface BillingViewProps {

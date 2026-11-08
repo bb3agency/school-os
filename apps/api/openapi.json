@@ -14572,6 +14572,142 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HbAiAllowance": {
+        "description": "The AI answer bundle's included answers a month (ADR-0020 B3, ADR-0058); ``None``: no\nbundle, the school's own ``ai_monthly_budget_inr`` applies.",
+        "properties": {
+          "included_answers": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Included Answers"
+          }
+        },
+        "title": "HbAiAllowance",
+        "type": "object"
+      },
+      "HbBillingSummary": {
+        "description": "The school's subscription for its Plan and billing page on a dedicated host (ADR-0058;\ndocs/16 \u00a719 Q7). Platform billing data only, never student data.",
+        "properties": {
+          "amount_due_inr": {
+            "default": "0.00",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount Due Inr",
+            "type": "string"
+          },
+          "billing_period": {
+            "title": "Billing Period",
+            "type": "string"
+          },
+          "cancel_at_period_end": {
+            "default": false,
+            "title": "Cancel At Period End",
+            "type": "boolean"
+          },
+          "current_period_end": {
+            "format": "date",
+            "title": "Current Period End",
+            "type": "string"
+          },
+          "current_period_start": {
+            "format": "date",
+            "title": "Current Period Start",
+            "type": "string"
+          },
+          "grace_ends_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grace Ends On"
+          },
+          "next_invoice_amount_inr": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Invoice Amount Inr"
+          },
+          "next_invoice_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Invoice On"
+          },
+          "past_due_since": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Past Due Since"
+          },
+          "plan_code": {
+            "title": "Plan Code",
+            "type": "string"
+          },
+          "plan_name": {
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          },
+          "trial_ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trial Ends At"
+          }
+        },
+        "required": [
+          "plan_code",
+          "plan_name",
+          "tier",
+          "billing_period",
+          "status",
+          "current_period_start",
+          "current_period_end"
+        ],
+        "title": "HbBillingSummary",
+        "type": "object"
+      },
       "HeadCreate": {
         "additionalProperties": false,
         "description": "A fee head (FR-FEE-002). ``gst_exempt = false`` marks a taxable head: it can be planned but\nnever collected through receipts in R2 (FR-FEE-023).",
@@ -14793,13 +14929,47 @@
         "type": "object"
       },
       "HeartbeatOut": {
+        "description": "The heartbeat answer, signed by the control plane with the deployment's key (ADR-0058).\n\nOld hosts ignore the fields after ``announcements``. A signed answer always carries the\ndeployment's effective ``feature_flags`` (the host makes them its per-school overrides),\n``ai_allowance`` and ``billing`` (``None``: no live subscription). ``request_nonce`` echoes\nthe heartbeat it answers.",
         "properties": {
+          "ai_allowance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HbAiAllowance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "announcements": {
             "items": {
               "$ref": "#/components/schemas/AnnouncementBrief"
             },
             "title": "Announcements",
             "type": "array"
+          },
+          "billing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HbBillingSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "feature_flags": {
+            "maxProperties": 200,
+            "patternProperties": {
+              "^[a-z0-9_]+(\\.[a-z0-9_]+)+$": {
+                "type": "boolean"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 100
+            },
+            "title": "Feature Flags",
+            "type": "object"
           },
           "min_supported_version": {
             "title": "Min Supported Version",
@@ -14809,6 +14979,18 @@
             "format": "date-time",
             "title": "Received At",
             "type": "string"
+          },
+          "request_nonce": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Nonce"
           },
           "target_version": {
             "anyOf": [
@@ -37086,7 +37268,7 @@
         "type": "object"
       },
       "TenantBillingOut": {
-        "description": "Plan & billing page (FR-PLT-030). ``available`` is false on dedicated hosts until the\nheartbeat carries a billing summary (M1); invoices are then sent by email.",
+        "description": "Plan & billing page (FR-PLT-030). On a dedicated host the plan comes from the signed\nheartbeat answer (ADR-0058): ``summary_as_of`` is set, ``usage`` is empty and invoices are\nsent by email; ``available`` is false until the first verified answer arrives.",
         "properties": {
           "ai_bundle": {
             "anyOf": [
@@ -37166,6 +37348,30 @@
             ],
             "title": "Grace Ends On"
           },
+          "next_invoice_amount_inr": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Invoice Amount Inr"
+          },
+          "next_invoice_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Invoice On"
+          },
           "past_due_since": {
             "anyOf": [
               {
@@ -37210,6 +37416,18 @@
               }
             ],
             "title": "Status"
+          },
+          "summary_as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary As Of"
           },
           "tier": {
             "anyOf": [
@@ -57604,7 +57822,7 @@
     },
     "/api/v1/fleet/heartbeat": {
       "post": {
-        "description": "HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 \u00a712).",
+        "description": "HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 \u00a712). The answer\nis signed with the same deployment key (``X-SOS-Key-Id``, ``X-SOS-Timestamp``,\n``X-SOS-Signature``; ADR-0058) and carries the school's flags, AI answer allowance and\nbilling summary.",
         "operationId": "heartbeat_api_v1_fleet_heartbeat_post",
         "responses": {
           "200": {

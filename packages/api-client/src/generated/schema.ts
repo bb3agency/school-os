@@ -4215,7 +4215,10 @@ export interface paths {
         put?: never;
         /**
          * Heartbeat
-         * @description HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 §12).
+         * @description HMAC-authenticated heartbeat from a dedicated host (SEC-028; docs/16 §12). The answer
+         *     is signed with the same deployment key (``X-SOS-Key-Id``, ``X-SOS-Timestamp``,
+         *     ``X-SOS-Signature``; ADR-0058) and carries the school's flags, AI answer allowance and
+         *     billing summary.
          */
         post: operations["heartbeat_api_v1_fleet_heartbeat_post"];
         delete?: never;
@@ -15659,6 +15662,62 @@ export interface components {
             relationship?: ("father" | "mother" | "guardian") | null;
         };
         /**
+         * HbAiAllowance
+         * @description The AI answer bundle's included answers a month (ADR-0020 B3, ADR-0058); ``None``: no
+         *     bundle, the school's own ``ai_monthly_budget_inr`` applies.
+         */
+        HbAiAllowance: {
+            /** Included Answers */
+            included_answers?: number | null;
+        };
+        /**
+         * HbBillingSummary
+         * @description The school's subscription for its Plan and billing page on a dedicated host (ADR-0058;
+         *     docs/16 §19 Q7). Platform billing data only, never student data.
+         */
+        HbBillingSummary: {
+            /**
+             * Amount Due Inr
+             * @default 0.00
+             */
+            amount_due_inr: string;
+            /** Billing Period */
+            billing_period: string;
+            /**
+             * Cancel At Period End
+             * @default false
+             */
+            cancel_at_period_end: boolean;
+            /**
+             * Current Period End
+             * Format: date
+             */
+            current_period_end: string;
+            /**
+             * Current Period Start
+             * Format: date
+             */
+            current_period_start: string;
+            /** Grace Ends On */
+            grace_ends_on?: string | null;
+            /** Next Invoice Amount Inr */
+            next_invoice_amount_inr?: string | null;
+            /** Next Invoice On */
+            next_invoice_on?: string | null;
+            /** Past Due Since */
+            past_due_since?: string | null;
+            /** Plan Code */
+            plan_code: string;
+            /** Plan Name */
+            plan_name: string;
+            /** Status */
+            status: string;
+            /** Tier */
+            tier: string;
+            /** Trial Ends At */
+            trial_ends_at?: string | null;
+        };
+        /**
          * HeadCreate
          * @description A fee head (FR-FEE-002). ``gst_exempt = false`` marks a taxable head: it can be planned but
          *     never collected through receipts in R2 (FR-FEE-023).
@@ -15742,10 +15801,24 @@ export interface components {
             /** Heartbeat Key Id */
             heartbeat_key_id: string;
         };
-        /** HeartbeatOut */
+        /**
+         * HeartbeatOut
+         * @description The heartbeat answer, signed by the control plane with the deployment's key (ADR-0058).
+         *
+         *     Old hosts ignore the fields after ``announcements``. A signed answer always carries the
+         *     deployment's effective ``feature_flags`` (the host makes them its per-school overrides),
+         *     ``ai_allowance`` and ``billing`` (``None``: no live subscription). ``request_nonce`` echoes
+         *     the heartbeat it answers.
+         */
         HeartbeatOut: {
+            ai_allowance?: components["schemas"]["HbAiAllowance"] | null;
             /** Announcements */
             announcements: components["schemas"]["AnnouncementBrief"][];
+            billing?: components["schemas"]["HbBillingSummary"] | null;
+            /** Feature Flags */
+            feature_flags?: {
+                [key: string]: boolean;
+            };
             /** Min Supported Version */
             min_supported_version: string;
             /**
@@ -15753,6 +15826,8 @@ export interface components {
              * Format: date-time
              */
             received_at: string;
+            /** Request Nonce */
+            request_nonce?: string | null;
             /** Target Version */
             target_version: string | null;
         };
@@ -23897,8 +23972,9 @@ export interface components {
         };
         /**
          * TenantBillingOut
-         * @description Plan & billing page (FR-PLT-030). ``available`` is false on dedicated hosts until the
-         *     heartbeat carries a billing summary (M1); invoices are then sent by email.
+         * @description Plan & billing page (FR-PLT-030). On a dedicated host the plan comes from the signed
+         *     heartbeat answer (ADR-0058): ``summary_as_of`` is set, ``usage`` is empty and invoices are
+         *     sent by email; ``available`` is false until the first verified answer arrives.
          */
         TenantBillingOut: {
             ai_bundle?: components["schemas"]["SchoolAiBundle"] | null;
@@ -23919,6 +23995,10 @@ export interface components {
             current_period_start?: string | null;
             /** Grace Ends On */
             grace_ends_on?: string | null;
+            /** Next Invoice Amount Inr */
+            next_invoice_amount_inr?: string | null;
+            /** Next Invoice On */
+            next_invoice_on?: string | null;
             /** Past Due Since */
             past_due_since?: string | null;
             /** Plan Code */
@@ -23927,6 +24007,8 @@ export interface components {
             plan_name?: string | null;
             /** Status */
             status?: string | null;
+            /** Summary As Of */
+            summary_as_of?: string | null;
             /** Tier */
             tier?: string | null;
             /** Trial Ends At */
