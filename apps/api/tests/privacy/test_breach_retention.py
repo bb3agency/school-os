@@ -277,6 +277,50 @@ def test_D58_app_role_cannot_delete_open_or_recent_breaches(
     assert _children(admin_engine, other_expired) == (2, 0)
 
 
+def _closed_at(admin: Engine, breach: uuid.UUID) -> Any:
+    with admin.connect() as c:
+        return c.execute(
+            text("SELECT closed_at FROM ops.breach_records WHERE id = :b"), {"b": breach}
+        ).scalar_one()
+
+
+@pytest.mark.db
+def test_TI_04_D58_closed_at_cannot_be_back_dated_into_the_purge(
+    admin_engine: Engine, engines: None
+) -> None:
+    """Audit 2026-11-08 TI-04: the 3-year delete floor (0075) trusts ``closed_at``. A closed
+    breach keeps its ``closed_at``; closing stamps the time of closing; only leaving ``closed``
+    (the SchoolOS reopen path) clears it. Holds for every role (``sos_app`` and the owner)."""
+    tenant = _tenant(admin_engine)
+    recent = _breach(admin_engine, tenant, closed_days_ago=30)
+    still_open = _breach(admin_engine, tenant, closed_days_ago=None)
+    before = _closed_at(admin_engine, recent)
+    back_date = "UPDATE ops.breach_records SET closed_at = now() - interval '4 years' WHERE id = :b"
+    with pytest.raises(Exception, match="closed_at"), tenant_session(tenant) as s:
+        s.execute(text(back_date), {"b": recent})
+    with pytest.raises(Exception, match="closed_at"), admin_engine.begin() as c:
+        c.execute(text(back_date), {"b": recent})
+    assert _closed_at(admin_engine, recent) == before
+    # Closing with a back-dated time is refused; closing now works.
+    close = (
+        "UPDATE ops.breach_records SET status = 'closed', close_reason = 'Synthetic close.', "
+        "closed_at = {} WHERE id = :b"
+    )
+    with pytest.raises(Exception, match="closed_at"), tenant_session(tenant) as s:
+        s.execute(text(close.format("now() - interval '4 years'")), {"b": still_open})
+    with tenant_session(tenant) as s:
+        s.execute(text(close.format("now()")), {"b": still_open})
+        s.execute(text("DELETE FROM ops.breach_records WHERE id = :b"), {"b": still_open})
+    assert still_open in _ids(admin_engine, tenant)
+    # The reopen path (status leaves closed) clears it; closing again restarts the clock.
+    with tenant_session(tenant) as s:
+        s.execute(
+            text("UPDATE ops.breach_records SET status = 'open', closed_at = NULL WHERE id = :b"),
+            {"b": recent},
+        )
+    assert _closed_at(admin_engine, recent) is None
+
+
 @pytest.mark.db
 def test_D58_affected_lists_purged_and_subject_report_still_works(
     school: Any, admin_engine: Engine, engines: None

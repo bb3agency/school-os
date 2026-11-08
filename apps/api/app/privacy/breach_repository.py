@@ -37,6 +37,13 @@ def now(session: Session) -> dt.datetime:
     return value
 
 
+def closing_time() -> Any:
+    """``closed_at`` when a breach is closed: the database's own transaction time, written in
+    the UPDATE itself. Trigger ``breach_records_closed_at`` (0080, audit TI-04) refuses any other
+    time, so the 3-year delete floor cannot be reached by back-dating."""
+    return func.now()
+
+
 # The newest closed breaches the register lists; open breaches are always listed in full (an
 # old open breach must never drop off the register behind newer closed ones).
 CLOSED_LIMIT = 500

@@ -18,6 +18,8 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine, text
 
+from app.core.db import tenant_session
+
 pytestmark = pytest.mark.db
 W = sys.modules["sos_test_api_world"]
 USERS = "/api/v1/users"
@@ -269,3 +271,52 @@ def test_A_18_inviting_school_sees_the_name_it_typed_and_not_the_other_schools_p
     assert accepted.status_code == 200, accepted.text
     after = api.call(owner_b, "GET", f"{USERS}/{person.user_id}").json()
     assert (after["display_name"], after["profile_shared"]) == (stored, True)
+
+
+def _rename_as_school(tenant: uuid.UUID, user_id: uuid.UUID, name: str) -> int:
+    with tenant_session(tenant) as s:
+        result = s.execute(
+            text("UPDATE core.users SET display_name = :n WHERE id = :u"),
+            {"n": name, "u": user_id},
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
+
+
+def _name(admin: Engine, user_id: uuid.UUID) -> str:
+    with admin.connect() as c:
+        return str(
+            c.execute(
+                text("SELECT display_name FROM core.users WHERE id = :u"), {"u": user_id}
+            ).scalar_one()
+        )
+
+
+def test_TI_05_DL_09_an_open_invitation_does_not_let_the_school_edit_an_existing_account(
+    api: Any, admin_engine: Engine
+) -> None:
+    """Audit 2026-11-08 TI-05 (ADR-0028 amendment): the database, not only the service, keeps a
+    school from changing the profile of a person it merely invited (or removed) while that
+    person's account belongs to another school too. Its own members (active, suspended), and an
+    account whose only membership is this school (a brand-new invite; the offboarding clean-up
+    of sole profiles), stay editable."""
+    person, _owner_b, b, _invited = _invite_existing(api, admin_engine)
+    stored = person.display_name
+    assert _rename_as_school(b, person.user_id, "Synthetic Overwritten Name") == 0
+    assert _name(admin_engine, person.user_id) == stored
+    # A member school B removed who also works at another school: not editable either.
+    other = W.provision_school()
+    removed = W.add_member(admin_engine, b, ["teacher"], status="removed")
+    with admin_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO core.memberships (id, tenant_id, user_id, status) "
+                "VALUES (:m, :t, :u, 'active')"
+            ),
+            {"m": uuid.uuid4(), "t": other, "u": removed.user_id},
+        )
+    assert _rename_as_school(b, removed.user_id, "Synthetic Overwritten Name") == 0
+    # Still editable: active and suspended members, a brand-new invited or removed account.
+    for status in ("active", "suspended", "invited", "removed"):
+        member = W.add_member(admin_engine, b, ["teacher"], status=status)
+        assert _rename_as_school(b, member.user_id, f"Synthetic Renamed {status}") == 1, status
+        assert _name(admin_engine, member.user_id) == f"Synthetic Renamed {status}"
