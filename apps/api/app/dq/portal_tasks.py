@@ -41,12 +41,14 @@ from app.dq.calendar_service import (
     academic_year,
     active_member_ids,
     audit_calendar,
+    check_optional_version,
     confirmation_values,
     event_detail,
     events_in_force,
     find_event,
     readiness_counts,
     readiness_keys,
+    save_confirmation,
     today_ist,
 )
 from app.dq.schemas import CalendarEventOut, PortalTaskLinkIn
@@ -66,20 +68,30 @@ def _error(field: str, code: str) -> dict[str, str]:
 
 
 def link_task(
-    session: Session, ctx: UserContext, task_id: uuid.UUID, data: PortalTaskLinkIn
+    session: Session,
+    ctx: UserContext,
+    task_id: uuid.UUID,
+    data: PortalTaskLinkIn,
+    *,
+    expected_version: int | None = None,
 ) -> CalendarEventOut:
     """A person links a task confirmed from a circular to a calendar event (FR-RDY-010): the
     task's due date becomes the event's confirmed closing date, from that circular (``source_kind
     = circular``, the circular as the document), and the task's owner owns the work unless the
     event already has one. Needs ``readiness.calendar.manage`` and a school-wide
     ``task.manage``; a task not from a circular: 422 ``not_circular_task``. Audited
-    ``readiness.calendar.confirmed`` with the task id."""
+    ``readiness.calendar.confirmed`` with the task id.
+
+    ``expected_version`` is the optional ``If-Match`` (YS-03): when sent it must match the
+    event's confirmation (412 ``version_mismatch``, also when nothing is confirmed yet); a first
+    link racing another first confirmation answers 412 as :func:`confirm` does."""
     ref = circulars.task_for_portal_link(session, ctx, task_id)
     if ref.source != "circular":
         raise ValidationFailed([_error("task_id", "not_circular_task")])
     year = academic_year(session, data.academic_year_id)
     event = find_event(session, year, data.event_key)
     row = repo.calendar_row(session, year.id, data.event_key, lock=True)
+    check_optional_version(row, expected_version)
     opens_on = min(event.window.opens_on, ref.due_on)
     owner = row["owner_membership_id"] if row is not None else None
     active = active_member_ids(session)
@@ -93,15 +105,7 @@ def link_task(
         document_id=ref.document_id,
         owner_membership_id=owner,
     )
-    if row is None:
-        row = repo.insert_calendar_row(
-            session,
-            {"id": new_id(), "academic_year_id": year.id, "event_key": data.event_key, **values},
-        )
-        created = True
-    else:
-        row = repo.update_calendar_row(session, row["id"], values)
-        created = False
+    row, created = save_confirmation(session, row, year.id, data.event_key, values)
     audit_calendar(
         session,
         "readiness.calendar.confirmed",

@@ -428,6 +428,45 @@ def confirmation_values(ctx: UserContext, **values: Any) -> dict[str, Any]:
     }
 
 
+def save_confirmation(
+    session: Session,
+    row: RowMapping | None,
+    year_id: uuid.UUID,
+    event_key: str,
+    values: Mapping[str, Any],
+) -> tuple[RowMapping, bool]:
+    """Insert the first confirmation of an event or update the locked ``row``; (row, created).
+    Two first confirmations at once (nothing to lock yet): the second meets
+    ``portal_calendar_dates_once`` in a savepoint and answers 412 ``version_mismatch``."""
+    if row is not None:
+        return repo.update_calendar_row(session, row["id"], dict(values)), False
+    try:
+        with session.begin_nested():
+            inserted = repo.insert_calendar_row(
+                session,
+                {"id": new_id(), "academic_year_id": year_id, "event_key": event_key, **values},
+            )
+    except IntegrityError as exc:
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+        if constraint != "portal_calendar_dates_once":
+            raise
+        # Another first confirmation of this event committed meanwhile.
+        raise PreconditionFailed(
+            "Someone else changed this in the meantime. Reload it and try again.",
+            code="version_mismatch",
+        ) from None
+    return inserted, True
+
+
+def check_optional_version(row: RowMapping | None, expected: int | None) -> None:
+    """An ``If-Match`` that was sent must match (412 ``version_mismatch``); none: no check."""
+    if expected is not None and (row is None or row["version"] != expected):
+        raise PreconditionFailed(
+            "Someone else changed this in the meantime. Reload it and try again.",
+            code="version_mismatch",
+        )
+
+
 def event_detail(
     session: Session, ctx: UserContext, year: AcademicYearOut, key: str
 ) -> CalendarEventOut:
@@ -460,26 +499,7 @@ def confirm(
         document_id=data.document_id,
         owner_membership_id=data.owner_membership_id,
     )
-    if row is None:
-        try:
-            with session.begin_nested():
-                row = repo.insert_calendar_row(
-                    session,
-                    {"id": new_id(), "academic_year_id": year.id, "event_key": event_key, **values},
-                )
-        except IntegrityError as exc:
-            constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
-            if constraint != "portal_calendar_dates_once":
-                raise
-            # Another first confirmation of this event committed meanwhile.
-            raise PreconditionFailed(
-                "Someone else changed this in the meantime. Reload it and try again.",
-                code="version_mismatch",
-            ) from None
-        created = True
-    else:
-        row = repo.update_calendar_row(session, row["id"], values)
-        created = False
+    row, created = save_confirmation(session, row, year.id, event_key, values)
     audit_calendar(
         session,
         "readiness.calendar.confirmed",
@@ -581,6 +601,7 @@ __all__ = [
     "add_event",
     "assignees",
     "audit_calendar",
+    "check_optional_version",
     "confirm",
     "confirmation_values",
     "event_detail",
@@ -591,5 +612,6 @@ __all__ = [
     "readiness_counts",
     "readiness_keys",
     "remove",
+    "save_confirmation",
     "today_ist",
 ]
