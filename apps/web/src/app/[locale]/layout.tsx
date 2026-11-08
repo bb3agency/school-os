@@ -19,7 +19,9 @@ import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { SHELL_STATE_SCRIPT } from "@/components/shell/sidebar-script";
+import { CLIENT_NAMESPACES, pickMessages } from "@/i18n/client-messages";
 import { enabledLocales, isEnabledLocale, teluguEnabled } from "@/i18n/languages";
+import { loadMessages } from "@/i18n/messages";
 import { LanguagesProvider } from "@/i18n/LanguagesProvider";
 import { TELUGU_STYLESHEET_HREF } from "@/i18n/telugu-font";
 
@@ -63,6 +65,9 @@ export default async function LocaleLayout({ children, params }: LayoutProps) {
   await connection();
   // The per-request CSP nonce (src/proxy.ts) for the one inline script below.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  // WP-04: only the shared namespaces go to the browser here; each area (school console,
+  // operator console, marketing and dev pages) adds its own with <ClientMessages scope=…>.
+  const { messages } = await loadMessages(locale);
 
   return (
     // The inline script may add data-sidebar before React hydrates (a per-viewer preference
@@ -77,7 +82,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps) {
         {teluguEnabled() ? <link rel="stylesheet" href={TELUGU_STYLESHEET_HREF} /> : null}
       </head>
       <body>
-        <NextIntlClientProvider>
+        <NextIntlClientProvider messages={pickMessages(messages, CLIENT_NAMESPACES.root)}>
           <LanguagesProvider locales={enabledLocales()}>
             <QueryProvider>{children}</QueryProvider>
           </LanguagesProvider>

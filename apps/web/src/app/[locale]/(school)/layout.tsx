@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { StepUpHost } from "@/components/session/StepUpHost";
 import { SchoolShell } from "@/components/shell/SchoolShell";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
+import { ClientMessages } from "@/i18n/ClientMessages";
 import { PrivacyContactFooter } from "@/features/privacy/PrivacyContactFooter";
 import { AnnouncementBanner } from "@/features/school/AnnouncementBanner";
 import { SuspendedBanner, type SchoolStatus } from "@/features/school-status/SuspendedBanner";
@@ -105,31 +106,34 @@ export default async function SchoolLayout({ children }: { children: ReactNode }
   const schoolName =
     schools?.data?.data?.find((school) => school.tenant_id === activeTenantId)?.name ?? null;
 
+  // WP-04: the browser gets the school console's message namespaces only.
   return (
-    <SchoolShell
-      topbarActions={suspended ? null : <NotificationBell />}
-      account={{
-        kind: support ? "support" : "staff",
-        displayName: profile?.display_name ?? session.displayName,
-        roles: profile?.roles ?? null,
-      }}
-      schoolName={schoolName}
-      permissions={profile?.permissions ?? (suspended ? [] : null)}
-      canSwitchSchool={(profile?.tenant_ids.length ?? 0) > 1}
-      languages={settings?.languages ?? null}
-      features={{ tally, fees, messaging, disclosure }}
-      banner={
-        <>
-          {support ? <SupportAccessBanner /> : null}
-          <SuspendedBanner initialStatus={schoolStatus} />
-          <AnnouncementBanner />
-          <StepUpHost sessionKind={support ? "support" : "staff"} />
-        </>
-      }
-    >
-      {children}
-      {/* FR-DPDP-004: the school's privacy contact, small, at the foot of every page. */}
-      <PrivacyContactFooter contact={settings?.privacy_contact ?? null} />
-    </SchoolShell>
+    <ClientMessages scope="school">
+      <SchoolShell
+        topbarActions={suspended ? null : <NotificationBell />}
+        account={{
+          kind: support ? "support" : "staff",
+          displayName: profile?.display_name ?? session.displayName,
+          roles: profile?.roles ?? null,
+        }}
+        schoolName={schoolName}
+        permissions={profile?.permissions ?? (suspended ? [] : null)}
+        canSwitchSchool={(profile?.tenant_ids.length ?? 0) > 1}
+        languages={settings?.languages ?? null}
+        features={{ tally, fees, messaging, disclosure }}
+        banner={
+          <>
+            {support ? <SupportAccessBanner /> : null}
+            <SuspendedBanner initialStatus={schoolStatus} />
+            <AnnouncementBanner />
+            <StepUpHost sessionKind={support ? "support" : "staff"} />
+          </>
+        }
+      >
+        {children}
+        {/* FR-DPDP-004: the school's privacy contact, small, at the foot of every page. */}
+        <PrivacyContactFooter contact={settings?.privacy_contact ?? null} />
+      </SchoolShell>
+    </ClientMessages>
   );
 }

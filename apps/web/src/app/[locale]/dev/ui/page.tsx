@@ -4,6 +4,7 @@ import { isDevSignInEnabled } from "@/features/dev-sign-in/enabled";
 import { UiReference } from "@/features/dev-ui/UiReference";
 import { teluguEnabled } from "@/i18n/languages";
 import { pageMetadata } from "@/lib/metadata";
+import { ClientMessages } from "@/i18n/ClientMessages";
 
 const uiMetadata = pageMetadata((t) => t("devUi.title"));
 
@@ -21,5 +22,9 @@ export async function generateMetadata(props: {
  */
 export default function DevUiPage() {
   if (!isDevSignInEnabled()) notFound();
-  return <UiReference telugu={teluguEnabled()} />;
+  return (
+    <ClientMessages scope="dev">
+      <UiReference telugu={teluguEnabled()} />
+    </ClientMessages>
+  );
 }

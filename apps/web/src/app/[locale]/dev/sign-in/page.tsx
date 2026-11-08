@@ -4,6 +4,7 @@ import { DevSignInView } from "@/features/dev-sign-in/DevSignInView";
 import { isDevSignInEnabled } from "@/features/dev-sign-in/enabled";
 import { devSignInSchools } from "@/features/dev-sign-in/staff";
 import { pageMetadata } from "@/lib/metadata";
+import { ClientMessages } from "@/i18n/ClientMessages";
 
 const devMetadata = pageMetadata((t) => t("devSignIn.title"));
 
@@ -21,5 +22,9 @@ export async function generateMetadata(props: {
  */
 export default function DevSignInPage() {
   if (!isDevSignInEnabled()) notFound();
-  return <DevSignInView schools={devSignInSchools()} />;
+  return (
+    <ClientMessages scope="dev">
+      <DevSignInView schools={devSignInSchools()} />
+    </ClientMessages>
+  );
 }
