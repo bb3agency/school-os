@@ -7945,7 +7945,10 @@ export interface paths {
         /**
          * Update Request
          * @description Change the status, notes, verification or response, or withdraw a nomination
-         *     (permission ``privacy.request.manage``; ``If-Match``). Errors: ``request_closed`` (409),
+         *     (permission ``privacy.request.manage``; ``If-Match``). Withdrawing an access, erasure or
+         *     grievance request needs ``withdrawal_note`` (how the requester withdrew; 422 ``required``)
+         *     and a recent MFA sign-in (428 ``step_up_required``); a grievance is not withdrawn by the
+         *     person who logged it (403 ``self_approval_forbidden``). Errors: ``request_closed`` (409),
          *     ``request_decided`` (409, a decided request can only be closed),
          *     stale ``If-Match`` (412).
          */
@@ -20434,6 +20437,11 @@ export interface components {
             status?: ("in_progress" | "waiting_for_requester" | "withdrawn") | null;
             /** Verification Method */
             verification_method?: ("in_person_document" | "guardian_phone_on_record" | "staff_sign_in") | null;
+            /**
+             * Withdrawal Note
+             * @description How the requester withdrew (who, when, how it was confirmed). Required with status withdrawn for access, erasure and grievance requests (with a recent MFA sign-in; a grievance not by the person who logged it); stored as the request's response.
+             */
+            withdrawal_note?: string | null;
         };
         /** PrivacyRequestRowOut */
         PrivacyRequestRowOut: {

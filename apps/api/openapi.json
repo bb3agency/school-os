@@ -27957,6 +27957,20 @@
               }
             ],
             "title": "Verification Method"
+          },
+          "withdrawal_note": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the requester withdrew (who, when, how it was confirmed). Required with status withdrawn for access, erasure and grievance requests (with a recent MFA sign-in; a grievance not by the person who logged it); stored as the request's response.",
+            "title": "Withdrawal Note"
           }
         },
         "title": "PrivacyRequestPatch",
@@ -73444,7 +73458,7 @@
         ]
       },
       "patch": {
-        "description": "Change the status, notes, verification or response, or withdraw a nomination\n(permission ``privacy.request.manage``; ``If-Match``). Errors: ``request_closed`` (409),\n``request_decided`` (409, a decided request can only be closed),\nstale ``If-Match`` (412).",
+        "description": "Change the status, notes, verification or response, or withdraw a nomination\n(permission ``privacy.request.manage``; ``If-Match``). Withdrawing an access, erasure or\ngrievance request needs ``withdrawal_note`` (how the requester withdrew; 422 ``required``)\nand a recent MFA sign-in (428 ``step_up_required``); a grievance is not withdrawn by the\nperson who logged it (403 ``self_approval_forbidden``). Errors: ``request_closed`` (409),\n``request_decided`` (409, a decided request can only be closed),\nstale ``If-Match`` (412).",
         "operationId": "update_request_api_v1_privacy_requests__request_id__patch",
         "parameters": [
           {
