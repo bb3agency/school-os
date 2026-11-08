@@ -19461,8 +19461,9 @@ export interface components {
         };
         /**
          * PlanDifferencesOut
-         * @description Per account, instalment and head: what the previous version charged and what this one
-         *     plans (FR-FEE-004). Proposing them creates adjustment requests that need approval.
+         * @description Per account, instalment and head: what earlier versions charged (with the plan-change
+         *     adjustments of earlier versions that are pending or approved) and what this one plans
+         *     (FR-FEE-004). Proposing them creates adjustment requests that need approval.
          */
         PlanDifferencesOut: {
             /** Items */

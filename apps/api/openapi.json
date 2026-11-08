@@ -25242,7 +25242,7 @@
         "type": "object"
       },
       "PlanDifferencesOut": {
-        "description": "Per account, instalment and head: what the previous version charged and what this one\nplans (FR-FEE-004). Proposing them creates adjustment requests that need approval.",
+        "description": "Per account, instalment and head: what earlier versions charged (with the plan-change\nadjustments of earlier versions that are pending or approved) and what this one plans\n(FR-FEE-004). Proposing them creates adjustment requests that need approval.",
         "properties": {
           "items": {
             "items": {
