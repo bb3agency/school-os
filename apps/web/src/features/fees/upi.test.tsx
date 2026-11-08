@@ -2,7 +2,8 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installBffStub, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { setStoragePostForTesting } from "@/features/imports/upload";
+import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { me } from "@/test/school-fixtures";
 import { ReconcileScreen } from "./ReconcileScreen";
@@ -141,6 +142,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   uninstallBffStub();
+  setStoragePostForTesting(undefined);
   expect(intlErrors).toEqual([]);
 });
 
@@ -253,6 +255,51 @@ describe("reconcile UPI (US-2109 AC2-AC3, FR-FEE-016/017)", () => {
     stub.routes[`POST /bff/api/v1/fees/bank-statements/${STATEMENT}/confirm`] = () =>
       Response.json({ confirmed: 1, already_confirmed: 0, skipped: [] });
   }
+
+  it("a statement tried again after a lost answer reuses the upload keys (WD-07, FR-FEE-016)", async () => {
+    signedIn(["fee.reconcile"]);
+    routes();
+    stub.routes["POST /bff/api/v1/documents/uploads"] = () =>
+      Response.json(
+        {
+          upload_id: "0192f3a4-0000-7000-8000-00000000d0c9",
+          url: "https://files.invalid/u",
+          fields: {},
+        },
+        { status: 201 },
+      );
+    let registers = 0;
+    stub.routes["POST /bff/api/v1/documents"] = () =>
+      (registers += 1) === 1
+        ? problem(502, "bad_gateway")
+        : Response.json({ id: "0192f3a4-0000-7000-8000-00000000d0c8" }, { status: 202 });
+    stub.routes["GET /bff/api/v1/documents/0192f3a4-0000-7000-8000-00000000d0c8"] = () =>
+      Response.json({ current_version: { status: "ready" } });
+    stub.routes["POST /bff/api/v1/fees/bank-statements"] = () =>
+      Response.json(IMPORT, { status: 201 });
+    setStoragePostForTesting(async () => undefined);
+    const user = userEvent.setup();
+    renderWithIntl(<ReconcileScreen />);
+    const statement = new File(["date,amount\n"], "september.csv", {
+      type: "text/csv",
+      lastModified: 1,
+    });
+    const input = await screen.findByLabelText(en.reconcile.file);
+    await user.upload(input, statement);
+    await user.click(screen.getByRole("button", { name: en.reconcile.read }));
+    await screen.findByText(messages.en.errors.api.bad_gateway.title);
+    await user.upload(screen.getByLabelText(en.reconcile.file), statement);
+    await user.click(screen.getByRole("button", { name: en.reconcile.read }));
+    await waitFor(() =>
+      expect(stub.callsTo("POST /bff/api/v1/fees/bank-statements")).toHaveLength(1),
+    );
+    const key = (route: string, n: number) =>
+      stub.callsTo(route)[n]?.headers.get("idempotency-key");
+    expect(key("POST /bff/api/v1/documents/uploads", 1)).toBe(
+      key("POST /bff/api/v1/documents/uploads", 0),
+    );
+    expect(key("POST /bff/api/v1/documents", 1)).toBe(key("POST /bff/api/v1/documents", 0));
+  });
 
   it("is only for fee.reconcile holders (no API call otherwise)", async () => {
     signedIn(["fee.collect"]);

@@ -50,7 +50,7 @@ export function zodErrorKeys(error: z.ZodError): Record<string, string> {
 }
 
 /** A stable text form of the parsed values; files count by name, size and date. */
-function bodySignature(data: unknown): string {
+export function intentSignature(data: unknown): string {
   try {
     return JSON.stringify(data, (_key, value: unknown) =>
       typeof File !== "undefined" && value instanceof File
@@ -84,7 +84,7 @@ export function useIntentKey(): IntentKey {
   return useMemo(
     () => ({
       next: (body: unknown) => {
-        const signature = bodySignature(body);
+        const signature = intentSignature(body);
         if (!keyRef.current || (sentRef.current !== null && sentRef.current !== signature)) {
           keyRef.current = newIdempotencyKey();
         }
@@ -177,7 +177,7 @@ export function useApiForm<TSchema extends z.ZodType, TResult>(
     setError(undefined);
     setPending(true);
     busyRef.current = true;
-    const body = bodySignature(parsed.data);
+    const body = intentSignature(parsed.data);
     if (sentRef.current !== null && sentRef.current !== body) {
       keyRef.current = newIdempotencyKey();
     }

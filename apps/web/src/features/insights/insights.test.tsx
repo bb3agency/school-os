@@ -3,7 +3,9 @@ import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import type * as Upload from "@/features/imports/upload";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { uploadDocument } from "@/features/imports/upload";
 import { notificationHref } from "@/features/notifications/data";
+import { ApiError } from "@/lib/bff/query";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { SECTION, me, structureRoutes } from "@/test/school-fixtures";
@@ -615,6 +617,33 @@ describe("attendance (US-1701, US-1702; FR-ATT-001..004)", () => {
     });
     const preview = stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/attendance/sheet`)[0];
     expect(JSON.parse(preview?.body ?? "{}")).toEqual({ document_id: uploads.next });
+  });
+
+  it("a sheet read again after a lost answer reuses its upload keys (WD-07, FR-ATT-004)", async () => {
+    signedIn(["attendance.read", "attendance.record"]);
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/attendance`] = () => Response.json(day());
+    stub.routes[`POST /bff/api/v1/sections/${SECTION}/attendance/sheet`] = () =>
+      Response.json({ entries: [], dates: [], students: 0, issues: [], issue_count: 0 });
+    const upload = vi.mocked(uploadDocument);
+    upload.mockClear();
+    upload.mockRejectedValueOnce(new ApiError(502, "bad_gateway"));
+    renderWithIntl(<AttendanceScreen />);
+    const picker = await screen.findByLabelText(en.attendance.section);
+    await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(1));
+    await userEvent.selectOptions(picker, SECTION);
+    const file = new File(["Admission no.,01/09/2026\n"], "september.csv", {
+      type: "text/csv",
+      lastModified: 1,
+    });
+    await userEvent.upload(await screen.findByLabelText(en.insights.sheet.file), file);
+    await userEvent.click(screen.getByRole("button", { name: en.insights.sheet.read }));
+    await screen.findByText(en.errors.api.bad_gateway.title);
+    await userEvent.upload(screen.getByLabelText(en.insights.sheet.file), file);
+    await userEvent.click(screen.getByRole("button", { name: en.insights.sheet.read }));
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(2));
+    const keys = upload.mock.calls.map((call) => call[3]?.keys);
+    expect(keys[0]?.register).toBeTruthy();
+    expect(keys[1]).toEqual(keys[0]);
   });
 
   it("shows the month register with register codes, printable on A4 landscape", async () => {

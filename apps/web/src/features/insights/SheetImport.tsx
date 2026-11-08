@@ -12,6 +12,7 @@ import {
   UploadError,
   uploadDocument,
   extensionOf,
+  useUploadKeys,
   type UploadProgress,
 } from "@/features/imports/upload";
 import { useBffClient } from "@/lib/bff/query";
@@ -64,6 +65,7 @@ export function SheetImport<E, P extends SheetPreview<E>>({
   const [saved, setSaved] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const busy = progress !== null || saving;
+  const uploadKeys = useUploadKeys();
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,9 +81,13 @@ export function SheetImport<E, P extends SheetPreview<E>>({
       const documentId = await uploadDocument(api, file, "import_file", {
         onProgress: setProgress,
         acl: [{ principal_type: "section", principal_ref: section }],
+        // The same sheet tried again after a lost answer: one document (WD-07).
+        keys: uploadKeys.keys({ file, section }),
       });
       setSheet(await preview(documentId));
+      uploadKeys.succeeded();
     } catch (failure) {
+      uploadKeys.failed(failure);
       if (failure instanceof UploadError) setProblem(`upload.${failure.code}`);
       else setError(failure);
     } finally {

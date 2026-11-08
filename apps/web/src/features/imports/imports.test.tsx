@@ -129,6 +129,39 @@ describe("FR-IMP-001: which files can be imported", () => {
     });
   });
 
+  it("a retry after a lost answer reuses the upload and register keys, so one document is made (WD-07, FR-IMP-001)", async () => {
+    stub.routes["POST /bff/api/v1/documents/uploads"] = () =>
+      Response.json(
+        { upload_id: ID.upload, url: "https://files.schoolos.example/u", fields: {} },
+        { status: 201 },
+      );
+    let registers = 0;
+    stub.routes["POST /bff/api/v1/documents"] = () =>
+      (registers += 1) === 1
+        ? problem(502, "bad_gateway")
+        : Response.json({ id: ID.doc }, { status: 202 });
+    stub.routes[`GET /bff/api/v1/documents/${ID.doc}`] = () =>
+      Response.json({ id: ID.doc, current_version: { status: "ready" } });
+    stub.routes["POST /bff/api/v1/imports"] = () => Response.json(importBatch(), { status: 202 });
+    setStoragePostForTesting(async () => undefined);
+    const started = vi.fn();
+    const user = userEvent.setup();
+    renderWithIntl(<UploadSpreadsheet onStarted={started} />);
+    await user.upload(screen.getByLabelText(im.upload.file), file("class9.csv", 1024, "text/csv"));
+    await user.selectOptions(screen.getByLabelText(im.upload.source), "udise_plus");
+    await user.click(screen.getByRole("button", { name: im.upload.submit }));
+    await screen.findByText(messages.en.errors.api.bad_gateway.title);
+    await user.click(screen.getByRole("button", { name: im.upload.submit }));
+    await waitFor(() => expect(started).toHaveBeenCalled());
+    const key = (route: string, n: number) =>
+      stub.callsTo(route)[n]?.headers.get("idempotency-key");
+    expect(key("POST /bff/api/v1/documents/uploads", 0)).toBeTruthy();
+    expect(key("POST /bff/api/v1/documents/uploads", 1)).toBe(
+      key("POST /bff/api/v1/documents/uploads", 0),
+    );
+    expect(key("POST /bff/api/v1/documents", 1)).toBe(key("POST /bff/api/v1/documents", 0));
+  });
+
   it("explains a blocked file in plain language", async () => {
     stub.routes["POST /bff/api/v1/documents/uploads"] = () =>
       Response.json({ upload_id: ID.upload, url: "https://files.schoolos.example/u", fields: {} });

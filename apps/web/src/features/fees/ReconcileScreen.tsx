@@ -22,6 +22,7 @@ import {
   UploadError,
   uploadDocument,
   extensionOf,
+  useUploadKeys,
   type UploadProgress,
 } from "@/features/imports/upload";
 import { Link } from "@/i18n/navigation";
@@ -397,6 +398,7 @@ function StatementUpload({ onImported }: { onImported: (id: string) => void }) {
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(undefined);
+  const uploadKeys = useUploadKeys();
   const importStatement = useApiMutation(
     (documentId: string) =>
       unwrap(
@@ -420,11 +422,15 @@ function StatementUpload({ onImported }: { onImported: (id: string) => void }) {
         onProgress: setProgress,
         // Only the person who uploads a statement may read it (the API deletes it once read).
         acl: me ? [{ principal_type: "membership", principal_ref: me.membership_id }] : [],
+        // The same statement tried again after a lost answer: one document (WD-07).
+        keys: uploadKeys.keys({ file, preset }),
       });
       setProgress(null);
       const out = await importStatement.mutateAsync(documentId);
+      uploadKeys.succeeded();
       onImported(out.id);
     } catch (failure) {
+      uploadKeys.failed(failure);
       if (failure instanceof UploadError) setProblem(`upload.${failure.code}`);
       else setError(failure);
     } finally {
