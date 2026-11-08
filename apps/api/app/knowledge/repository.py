@@ -284,6 +284,14 @@ def delete_document_chunks(session: Session, document_id: uuid.UUID) -> int:
     return _rowcount(result)
 
 
+def indexed_document_ids(session: Session) -> list[uuid.UUID]:
+    """Every document of the current school that has chunks (RLS), in id order."""
+    rows = session.execute(
+        select(DocumentChunk.document_id).distinct().order_by(DocumentChunk.document_id)
+    ).scalars()
+    return list(rows)
+
+
 def flag_verified_answers_citing(session: Session, document_id: uuid.UUID) -> int:
     """Active verified answers citing any page of the document become ``needs_review``
     (docs/06 §4.8). Returns how many were flagged."""

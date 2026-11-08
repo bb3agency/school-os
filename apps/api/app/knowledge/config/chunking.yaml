@@ -38,6 +38,12 @@ extraction:
     # R2-1B: receipt PDFs are personal financial data (C2) read only through fee permissions;
     # Ask answers fee questions from the ledger tool, never from receipts (FR-FEE-024).
     - "fee_receipt"
+    # Audit 2026-11-09 YK-02: generated certificate PDFs (TC, bonafide, study, conduct) hold one
+    # student's record, and the TC prints the C3 religion and caste fields where the school turned
+    # them on, yet they are stored as C2 documents with a role ACL. They are read only through
+    # certificate permissions and the student's scope, never through Ask. `backfill --apply`
+    # deletes chunks indexed before this line.
+    - "certificate"
   # C3 stays out of the index (fail closed). Retrieval already returns C3 chunks only to holders
   # of student.read_sensitive (AclKeys.read_sensitive, docs/06 §6 as built); indexing C3 would
   # also store C3 text unencrypted in kb.document_chunks (C3 fields are encrypted, docs/05 §9),

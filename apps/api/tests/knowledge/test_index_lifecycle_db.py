@@ -250,3 +250,72 @@ def test_repository_latest_page_texts_reads_only_searchable_chunks(
         assert any("rehearsal" in t for t in repo.latest_page_texts(s, version, 1))
         repo.demote_document(s, doc)
         assert repo.latest_page_texts(s, version, 1) == []
+
+
+def _make_certificate(admin: Engine, doc: uuid.UUID) -> None:
+    """The generated-certificate purpose (app.certificates stores TC/bonafide PDFs this way)."""
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "UPDATE kb.documents SET purpose = 'certificate', doc_type = 'certificate' "
+                "WHERE id = :d"
+            ),
+            {"d": doc},
+        )
+
+
+def test_SEC_018_YK_02_certificate_pdfs_are_never_indexed(
+    world: Any, admin_engine: Engine, runtime: Any
+) -> None:
+    """A generated certificate PDF holds one student's record (and, where the school prints
+    them, the C3 religion and caste fields) but is stored as a C2 document with a role ACL: it
+    must stay out of the index, like fee receipts (invariant 8, docs/05 §6.1)."""
+    a = world.a
+    doc, version = K.text_document(admin_engine, a, BODY, acl=[("role", "owner")], ingest=False)
+    _make_certificate(admin_engine, doc)
+    assert K.pipeline().ingest(a.tenant_id, doc, version) == "excluded"
+    assert K.chunk_rows(admin_engine, doc) == []
+
+
+def test_SEC_018_YK_02_backfill_apply_prunes_chunks_of_documents_no_longer_indexed(
+    world: Any, admin_engine: Engine, runtime: Any
+) -> None:
+    """Chunks indexed before a purpose was excluded (certificate PDFs before YK-02) are deleted
+    by ``backfill --apply``; the dry run reports them and changes nothing."""
+    a = world.a
+    doc, _ = K.text_document(admin_engine, a, BODY, acl=[("role", "owner")])
+    kept, _ = K.text_document(admin_engine, a, BODY, acl=[("role", "owner")])
+    _make_certificate(admin_engine, doc)
+    dry = backfill.backfill_school(a.tenant_id, apply=False)
+    assert dry.pruned == 1
+    assert K.chunk_rows(admin_engine, doc)
+    result = backfill.backfill_school(a.tenant_id, apply=True)
+    assert result.pruned == 1
+    assert K.chunk_rows(admin_engine, doc) == []
+    assert K.chunk_rows(admin_engine, kept)
+
+
+def test_SEC_018_YK_01_acl_narrowing_rewrites_chunk_acl_in_the_same_transaction(
+    world: Any, api: Any, admin_engine: Engine, runtime: Any
+) -> None:
+    """An ACL change takes effect for retrieval when ``PUT /documents/{id}/acl`` commits, not
+    when the ``knowledge.refresh_acl`` worker gets to it (invariant 8: a member removed from
+    the ACL must not retrieve the passages, or have them sent to the model, meanwhile)."""
+    a = world.a
+    owner, teacher = a.people["owner"], a.people["teacher"]
+    doc, _ = K.text_document(admin_engine, a, BODY, acl=[("role", "owner"), ("role", "teacher")])
+    assert str(doc) in _search(api, teacher, "annual day rehearsal")
+
+    version = K.D.document_version(admin_engine, doc)
+    res = api.call(
+        owner,
+        "PUT",
+        f"/api/v1/documents/{doc}/acl",
+        json={"acl": [{"principal_type": "role", "principal_ref": "owner"}]},
+        headers={"If-Match": f'W/"{version}"'},
+    )
+    assert res.status_code == 200, res.text
+    # No worker ran: the chunks' ACL copies already follow the new ACL.
+    assert all(r["acl_roles"] == ["owner"] for r in K.chunk_rows(admin_engine, doc))
+    assert str(doc) not in _search(api, teacher, "annual day rehearsal")
+    assert str(doc) in _search(api, owner, "annual day rehearsal")
