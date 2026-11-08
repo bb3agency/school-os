@@ -171,6 +171,14 @@ describe("notice page (US-2401)", () => {
     expect(screen.getByRole("link", { name: "Try again" })).toHaveAttribute("href", "/p/document");
     expect(screen.queryByRole("link", { name: "Open the PDF" })).toBeNull();
   });
+
+  it("names the wait the API asked for after a failed render (WP-02, AZ-02, FR-PUB-009)", () => {
+    render(<LinkFrame envelope={notice} notice={{ kind: "pdfPreparing", minutes: 15 }} />);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "The PDF is being prepared. Try again in 15 minutes.",
+    );
+    expect(screen.getByRole("link", { name: "Try again" })).toHaveAttribute("href", "/p/document");
+  });
 });
 
 describe("receipt page (US-2402)", () => {

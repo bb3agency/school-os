@@ -38,6 +38,7 @@ import { MessageHistory } from "@/features/messaging/MessagesScreen";
 import { READ as MESSAGE_READ, type FeeReminderSelection } from "@/features/messaging/data";
 import {
   Amount,
+  DecisionNote,
   FeesGate,
   MoreActions,
   NoAccess,
@@ -488,6 +489,7 @@ function Requests({ account }: { account: Account }) {
                         </span>
                       </p>
                       <p className="text-sm text-ink-muted">{x.reason}</p>
+                      <DecisionNote request={x} />
                     </li>
                   ))}
                 </ul>
@@ -514,6 +516,7 @@ function Requests({ account }: { account: Account }) {
                         <Amount value={x.amount} className="num font-semibold whitespace-nowrap" />
                       </p>
                       <p className="text-sm text-ink-muted">{x.reason}</p>
+                      <DecisionNote request={x} />
                     </li>
                   ))}
                 </ul>

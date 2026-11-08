@@ -11,8 +11,34 @@ let idleTimeoutMs: number;
 let absoluteInMs: number;
 let logoutRedirect: string;
 let requests: Request[];
+/** The server's view (BFF session store): set on the first read, slid by activity. */
+let server: { idleAt: number; absoluteAt: number; ended: boolean } | null;
+
+function serverState() {
+  server ??= {
+    idleAt: Date.now() + expiresInMs,
+    absoluteAt: Date.now() + absoluteInMs,
+    ended: false,
+  };
+  return server;
+}
+
+/** A BFF call slid the server's idle timeout (this tab or another one). */
+function slideOnServer() {
+  const state = serverState();
+  state.idleAt = Math.min(Date.now() + idleTimeoutMs, state.absoluteAt);
+}
+
+/** This tab's BFF client reports a successful call: the server slid the timeout too. */
+function activity() {
+  slideOnServer();
+  window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { kind: "staff" } }));
+}
 
 function info() {
+  const state = serverState();
+  if (state.ended) return Response.json({ authenticated: false, kind: "staff" });
+  const left = Math.max(0, Math.min(state.idleAt, state.absoluteAt) - Date.now());
   return Response.json({
     authenticated: true,
     kind: "staff",
@@ -21,15 +47,16 @@ function info() {
     mfa: false,
     csrf_token: CSRF,
     idle_timeout_ms: idleTimeoutMs,
-    idle_expires_at: new Date(Date.now() + expiresInMs).toISOString(),
-    absolute_expires_at: new Date(Date.now() + absoluteInMs).toISOString(),
-    expires_in_ms: expiresInMs,
+    idle_expires_at: new Date(state.idleAt).toISOString(),
+    absolute_expires_at: new Date(state.absoluteAt).toISOString(),
+    expires_in_ms: left,
   });
 }
 
 beforeEach(() => {
   forgetSessionInfo();
   requests = [];
+  server = null;
   expiresInMs = 15 * MINUTE;
   idleTimeoutMs = 15 * MINUTE;
   absoluteInMs = 12 * 60 * MINUTE;
@@ -41,10 +68,13 @@ beforeEach(() => {
       requests.push(request);
       const path = new URL(request.url).pathname;
       if (path === "/bff/auth/session") {
-        if (request.method === "POST") expiresInMs = idleTimeoutMs;
+        if (request.method === "POST") slideOnServer();
         return info();
       }
-      if (path === "/bff/auth/logout") return Response.json({ redirect_to: logoutRedirect });
+      if (path === "/bff/auth/logout") {
+        serverState().ended = true;
+        return Response.json({ redirect_to: logoutRedirect });
+      }
       if (path === "/bff/auth/sessions" && request.method === "DELETE") {
         return Response.json({ redirect_to: logoutRedirect, revoked: 3 });
       }
@@ -173,7 +203,7 @@ describe("SessionControls (docs/07 §5.2 shared-PC mode)", () => {
       await vi.advanceTimersByTimeAsync(30_000);
     });
     act(() => {
-      window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { kind: "staff" } }));
+      activity();
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5 * MINUTE);
@@ -194,7 +224,7 @@ describe("SessionControls (docs/07 §5.2 shared-PC mode)", () => {
     });
     // Activity slides the deadline by the school's 5 minutes, not the 15 minute default.
     act(() => {
-      window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { kind: "staff" } }));
+      activity();
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5 * MINUTE - IDLE_WARNING_MS + 1_000);
@@ -213,7 +243,7 @@ describe("SessionControls (docs/07 §5.2 shared-PC mode)", () => {
     await flush();
     // The school lowered its timeout to 5 minutes; the server applied it (GET /me).
     idleTimeoutMs = 5 * MINUTE;
-    expiresInMs = 5 * MINUTE;
+    serverState().idleAt = Date.now() + 5 * MINUTE;
     await act(async () => {
       await refreshSessionInfo("staff");
     });
@@ -224,12 +254,65 @@ describe("SessionControls (docs/07 §5.2 shared-PC mode)", () => {
     expect(screen.getByRole("dialog")).toHaveAttribute("open");
     // Activity now slides by 5 minutes, not the 15 it started with.
     act(() => {
-      window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { kind: "staff" } }));
+      activity();
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5 * MINUTE);
     });
     expect(navigate).toHaveBeenCalledWith("/signed-out?reason=idle");
+  });
+
+  it("FR-IAM-003 WS-02: another tab kept the session alive: no warning, no sign-out", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    expiresInMs = 2 * MINUTE;
+    const navigate = vi.fn();
+    renderWithIntl(<SessionControls kind="staff" navigate={navigate} />);
+    await flush();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    // The person works in another tab: its BFF calls slide the shared server session.
+    slideOnServer();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * MINUTE);
+    });
+    expect(screen.getByRole("dialog", { hidden: true })).not.toHaveAttribute("open");
+    expect(navigate).not.toHaveBeenCalled();
+    expect(requests.some((r) => r.url.includes("/bff/auth/logout"))).toBe(false);
+  });
+
+  it("SEC-021 WS-02: a support session in use is not signed out (its BFF calls report as the school console)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    expiresInMs = 2 * MINUTE;
+    const navigate = vi.fn();
+    renderWithIntl(<SessionControls kind="support" navigate={navigate} />);
+    await flush();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    // The school console's BFF client reports activity as "staff" for a support session.
+    act(() => {
+      activity();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(MINUTE + 30_000);
+    });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(requests.some((r) => r.url.includes("/bff/auth/logout"))).toBe(false);
+  });
+
+  it("FR-IAM-003 WS-02: the session ended in another tab: this tab leaves the page", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    expiresInMs = 2 * MINUTE;
+    const navigate = vi.fn();
+    renderWithIntl(<SessionControls kind="staff" navigate={navigate} />);
+    await flush();
+    serverState().ended = true;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(MINUTE + 1_000);
+    });
+    expect(navigate).toHaveBeenCalledWith("/signed-out?reason=idle");
+    expect(screen.getByRole("dialog", { hidden: true })).not.toHaveAttribute("open");
   });
 
   it("never counts activity past the absolute session limit", async () => {
@@ -241,7 +324,7 @@ describe("SessionControls (docs/07 §5.2 shared-PC mode)", () => {
     renderWithIntl(<SessionControls kind="staff" navigate={navigate} />);
     await flush();
     act(() => {
-      window.dispatchEvent(new CustomEvent(ACTIVITY_EVENT, { detail: { kind: "staff" } }));
+      activity();
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10 * MINUTE);

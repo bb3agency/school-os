@@ -729,6 +729,44 @@ describe("staff sign-in: invitations and school choice (ADR-0019, FR-IAM-013)", 
     expect(await activeTenant()).toBeNull();
   });
 
+  it("FR-IAM-001 WS-01: someone else signing in at the step-up prompt is a new sign-in (invitations, school, login audited)", async () => {
+    await h.signIn("staff", clerk);
+    const before = h.apiCalls.length;
+    const stepUp = h.absorb(
+      await handleStepUp(h.request("/bff/auth/step-up?next=/settings/users"), h.runtime, "staff"),
+    );
+    const other = { sub: "staff-sub-2", name: "Another Clerk" };
+    const back = h.idp.staff.authorize(stepUp.headers.get("location") ?? "", other);
+    const done = h.absorb(await handleCallback(h.request(back.href), h.runtime, "staff"));
+    // Not the first person's return address.
+    expect(done.headers.get("location")).toBe("https://office.school.example/");
+    const after = h.apiCalls.slice(before).map((request) => new URL(request.url).pathname);
+    expect(after).toEqual([
+      "/api/v1/me/accept-invitations",
+      "/api/v1/me/schools",
+      "/api/v1/me/login-event",
+    ]);
+    const session = await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false });
+    expect(session?.subject).toBe(other.sub);
+    expect(session?.activeTenantId).toBe(TENANT);
+  });
+
+  it("FR-IAM-002 WS-01: someone else without MFA at the step-up prompt gets no session", async () => {
+    await h.signIn("staff", clerk);
+    h.setApi((request) =>
+      request.url.endsWith("/api/v1/me/accept-invitations")
+        ? json({ code: "mfa_required", status: 403 }, 403)
+        : defaultApi(request),
+    );
+    const stepUp = h.absorb(await handleStepUp(h.request("/bff/auth/step-up"), h.runtime, "staff"));
+    const other = { sub: "staff-sub-2", name: "Another Clerk" };
+    const back = h.idp.staff.authorize(stepUp.headers.get("location") ?? "", other);
+    const done = h.absorb(await handleCallback(h.request(back.href), h.runtime, "staff"));
+    expect(done.headers.get("location")).toContain("error=mfa_required");
+    const session = await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false });
+    expect(session).toBeNull();
+  });
+
   it("step-up does not repeat invitations or the login event", async () => {
     await h.signIn("staff", clerk);
     const before = h.apiCalls.length;

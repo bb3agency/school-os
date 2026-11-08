@@ -81,7 +81,11 @@ export async function disclosureDocumentRedirect(
   key: string,
   n: string,
 ): Promise<Response> {
-  const back = new URL(`/d/${DISCLOSURE_KEY.test(key) ? key : "unknown"}`, request.url);
+  // WP-03: back to the page with `?doc=0`, which says the document did not open (a silent
+  // reload of the same page looked like a dead link).
+  const back = DISCLOSURE_KEY.test(key)
+    ? new URL(`/d/${key}?doc=0`, request.url)
+    : new URL("/d/unknown", request.url);
   const see = (location: string | URL) =>
     new Response(null, {
       status: 303,

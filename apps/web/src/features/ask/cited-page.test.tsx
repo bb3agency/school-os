@@ -90,6 +90,42 @@ describe("cited page chip (D73)", () => {
     expect(opened).toEqual([]);
   });
 
+  it("WF-02 (D73): opens the tab during the click, so a slow link is not blocked", async () => {
+    setPageOpenerForTesting(undefined);
+    const tab = { opener: {} as unknown, location: { href: "" }, close: vi.fn() };
+    const open = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
+    let answer: (response: Response) => void = () => undefined;
+    stub.routes[PAGE_ROUTE] = () => new Promise<Response>((resolve) => (answer = resolve));
+    try {
+      await userEvent.setup().click(renderChip());
+      // Browsers allow a new tab only during the click (user activation lasts a few seconds),
+      // so the tab must exist before the API answers on a slow office link.
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(tab.opener).toBeNull();
+      answer(Response.json(link()));
+      await waitFor(() => expect(tab.location.href).toMatch(/X-Amz-Signature=abc#page=3$/));
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(nav.push).not.toHaveBeenCalled();
+    } finally {
+      open.mockRestore();
+    }
+  });
+
+  it("WF-02 (D73): closes the waiting tab and opens the document screen when the link fails", async () => {
+    setPageOpenerForTesting(undefined);
+    const tab = { opener: {} as unknown, location: { href: "" }, close: vi.fn() };
+    const open = vi.spyOn(window, "open").mockReturnValue(tab as unknown as Window);
+    stub.routes[PAGE_ROUTE] = () => problem(404, "not_found");
+    try {
+      await userEvent.setup().click(renderChip());
+      await waitFor(() => expect(nav.push).toHaveBeenCalled());
+      expect(tab.close).toHaveBeenCalled();
+      expect(tab.location.href).toBe("");
+    } finally {
+      open.mockRestore();
+    }
+  });
+
   it("adds #page only for PDFs and never keeps a hash from the API", () => {
     expect(citedPageUrl(link({ url: `${PRESIGNED}#evil` }), 3)).toBe(`${PRESIGNED}#page=3`);
     expect(citedPageUrl(link({ content_type: "image/png" }), 1)).not.toContain("#");

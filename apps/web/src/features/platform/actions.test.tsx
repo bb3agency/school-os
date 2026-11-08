@@ -1147,7 +1147,9 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
     });
   });
 
-  it("break-glass: the requester cannot give the second emergency confirmation (409)", async () => {
+  it("break-glass: a 409 same_operator on the second confirmation is explained", async () => {
+    // The first confirmer sees no button (WP-01, two-person.test.tsx); a list that is out of
+    // date (confirmed from another tab) can still meet the API's 409.
     stub.routes["GET /bff/api/v1/platform/break-glass-requests"] = () =>
       page([
         {
@@ -1159,7 +1161,7 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
           scope: {},
           duration_minutes: 60,
           emergency: true,
-          emergency_confirmed_by_1: OP,
+          emergency_confirmed_by_1: "0192f3a4-0000-7000-8000-0000000000f2",
           emergency_confirmed_by_2: null,
           status: "requested",
           created_at: "2026-09-26T04:30:00Z",
@@ -1171,7 +1173,7 @@ describe("fleet, flags, audit, operators, announcements, break-glass, support", 
     const user = userEvent.setup();
     renderWithIntl(<BreakGlassScreen />);
     expect(await screen.findByText("1 of 2 confirmations")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: pm.breakGlass.confirmEmergency }));
+    await user.click(await screen.findByRole("button", { name: pm.breakGlass.confirmEmergency }));
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: pm.breakGlass.confirmEmergency }));
     expect(

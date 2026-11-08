@@ -29,7 +29,7 @@ export function bellPollDelay(consecutiveFailures: number): number {
 }
 
 /** Screens that notifications may open. Other resource types are shown without a link. */
-const LINKS: Record<string, (id: string) => string> = {
+const LINKS: Record<string, (id: string, item: LinkSource) => string> = {
   change_request: (id) => `/change-requests/${id}`,
   // US-1102: TC approvals and decisions open the certificate.
   certificate: (id) => `/certificates/${id}`,
@@ -58,6 +58,18 @@ const LINKS: Record<string, (id: string) => string> = {
   fee_reconciliation_run: () => "/fees/reconcile/online",
   // R3-1B (ADR-0050): a breach duty is due or overdue, or SchoolOS reported a breach.
   breach_record: (id) => `/privacy/breaches/${id}`,
+  // R2-1B (FR-FEE-026): a waiting fee request opens the approvals inbox; a decided one opens the
+  // student's fee account, where the maker reads the decision and its reason (WF-01).
+  fee_request: (_id, item) => {
+    const account = item.params?.["account_id"];
+    return item.template_key === "fee.request_decided" &&
+      typeof account === "string" &&
+      UUID.test(account)
+      ? `/fees/accounts/${account}`
+      : "/fees/approvals";
+  },
+  // R3-1D (FR-RDY-006; ADR-0053): a portal window is closing (resource id: the academic year).
+  portal_calendar: () => "/findings/calendar",
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -71,11 +83,14 @@ const LIST_LINKS: Record<string, string> = {
   privacy_request_list: "/privacy/requests",
 };
 
-export function notificationHref(item: Pick<Notification, "resource_type" | "resource_id">) {
+type LinkSource = Pick<Notification, "resource_type" | "resource_id"> &
+  Partial<Pick<Notification, "template_key" | "params">>;
+
+export function notificationHref(item: LinkSource) {
   if (item.resource_type && item.resource_type in LIST_LINKS) {
     return LIST_LINKS[item.resource_type] ?? null;
   }
   if (!item.resource_type || !item.resource_id || !UUID.test(item.resource_id)) return null;
   const link = LINKS[item.resource_type];
-  return link ? link(item.resource_id) : null;
+  return link ? link(item.resource_id, item) : null;
 }

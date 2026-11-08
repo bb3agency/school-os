@@ -48,6 +48,12 @@ export const PAY_ERRORS: readonly PayError[] = [
   "expired",
 ];
 
+/** Whole minutes (1..60) from a Retry-After in seconds; 1 for anything else. */
+function retryMinutes(value: string | null | undefined): number {
+  if (!value || !/^\d{1,9}$/.test(value.trim())) return 1;
+  return Math.min(60, Math.max(1, Math.ceil(Number(value.trim()) / 60)));
+}
+
 function see(location: string): Response {
   return new Response(null, { status: 303, headers: { ...HEADERS, Location: location } });
 }
@@ -106,8 +112,11 @@ export async function documentRedirect(
   }
   if (upstream.status === 202) {
     // D71: the notice's PDF expired and the worker is making it again; the page says so.
+    // AZ-02 (WP-02): after a failed render the API asks for up to 15 minutes (Retry-After);
+    // the page names that wait so the parent does not tap again every minute.
+    const minutes = retryMinutes(upstream.headers.get("retry-after"));
     await upstream.body?.cancel();
-    return see(`${PUBLIC_VIEW_PATH}?pdf=preparing`);
+    return see(`${PUBLIC_VIEW_PATH}?pdf=preparing${minutes > 1 ? `&wait=${minutes}` : ""}`);
   }
   if (upstream.status !== 200) {
     await upstream.body?.cancel();

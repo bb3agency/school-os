@@ -8528,7 +8528,8 @@
       "notProvided": "Not provided",
       "notFoundTitle": "Page not found",
       "notFoundBody": "This disclosure link is not in use. Ask the school for its current link, or open the disclosure from the school's own website.",
-      "busyBody": "The page could not be loaded just now. Try again in a minute."
+      "busyBody": "The page could not be loaded just now. Try again in a minute.",
+      "documentFailed": "The document could not be opened just now. Try again in a few minutes."
     }
   },
   "messaging": {
@@ -9082,7 +9083,7 @@
     },
     "revokeLink": {
       "open": "Stop link",
-      "rowLabel": "Stop the link of the {purpose} sent {when}",
+      "rowLabel": "Stop link: {purpose} sent {when}",
       "title": "Stop this parent link?",
       "description": "{purpose} sent {when}.",
       "consequence": "The page this message opens stops working for the parent at once. This cannot be undone; send a new message if the parent needs the page again.",
@@ -9887,7 +9888,8 @@
         "minimum": "Enter an amount of 0 or more, with at most 2 decimals.",
         "gstNote": "Write the line, in at most 200 characters."
       }
-    }
+    },
+    "decisionNote": "Note from {name}:"
   },
   "payments": {
     "nav": {

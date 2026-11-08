@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { me, STUDENT } from "@/test/school-fixtures";
-import { adjustmentSchema, concessionSchema } from "./AccountScreen";
+import { AccountScreen, adjustmentSchema, concessionSchema } from "./AccountScreen";
 import { ApprovalsScreen } from "./ApprovalsScreen";
 import { CounterScreen } from "./CounterScreen";
 import {
@@ -18,6 +18,7 @@ import {
   type Account,
   type AccountSummary,
   type ApprovalItem,
+  type Concession,
   type DueLine,
   type FeeStatus,
   type Receipt,
@@ -747,4 +748,66 @@ describe("new fee plan: the late fee is checked before saving (WD-01, FR-FEE-009
       });
     },
   );
+});
+
+describe("decided requests show the checker's note (WF-03, FR-FEE-026)", () => {
+  const decided = {
+    requested_by: MEMBER,
+    requested_by_name: "Synthetic Clerk",
+    requested_at: "2026-10-16T05:00:00Z",
+    decided_by: "0192f3a4-0000-7000-8000-0000000000c1",
+    decided_by_name: "Synthetic Principal",
+    decided_at: "2026-10-17T05:00:00Z",
+    decision_note: "No sibling record in the admission register",
+    version: 2,
+  };
+  const noteFrom = en.decisionNote.replace("{name}", "Synthetic Principal");
+
+  it("the account's concession card shows why a concession was rejected", async () => {
+    signedIn([COLLECT, FINANCE_READ]);
+    stub.routes[`GET /bff/api/v1/fees/accounts/${ACCOUNT}`] = () => Response.json(account());
+    stub.routes[`GET /bff/api/v1/fees/accounts/${ACCOUNT}/concessions`] = () =>
+      Response.json([
+        {
+          id: "0192f3a4-0000-7000-8000-00000000f401",
+          account_id: ACCOUNT,
+          concession_type: "sibling",
+          basis: "percent",
+          value: "10",
+          targets: [],
+          reason: "Elder sister studies in Class X",
+          evidence_document_id: null,
+          status: "rejected",
+          total_amount: null,
+          ...decided,
+        } satisfies Concession,
+      ]);
+    stub.routes[`GET /bff/api/v1/fees/accounts/${ACCOUNT}/adjustments`] = () => Response.json([]);
+    renderWithIntl(<AccountScreen accountId={ACCOUNT} />);
+    expect(await screen.findByText(decided.decision_note)).toBeInTheDocument();
+    expect(screen.getByText(noteFrom)).toBeInTheDocument();
+  });
+
+  it("the receipt page shows why a cancellation was rejected", async () => {
+    signedIn([COLLECT]);
+    stub.routes[`GET /bff/api/v1/fees/receipts/${RECEIPT}`] = () =>
+      Response.json(
+        receipt({
+          cancellation: {
+            id: "0192f3a4-0000-7000-8000-00000000f501",
+            receipt_id: RECEIPT,
+            receipt_number: "RCT/2026-27/000123",
+            reason_code: "wrong_amount",
+            reason: "Typed the wrong amount",
+            status: "rejected",
+            cancelled_on: null,
+            ...decided,
+            decision_note: "The amount matches the counterfoil",
+          },
+        }),
+      );
+    renderWithIntl(<ReceiptDetailScreen receiptId={RECEIPT} />);
+    expect(await screen.findByText("The amount matches the counterfoil")).toBeInTheDocument();
+    expect(screen.getByText(noteFrom)).toBeInTheDocument();
+  });
 });

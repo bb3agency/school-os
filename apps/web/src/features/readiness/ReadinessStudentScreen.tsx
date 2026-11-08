@@ -102,7 +102,6 @@ function FieldCard({ field }: { field: ReadinessFieldDetail }) {
   return (
     <Card
       title={label}
-      headingLevel={3}
       actions={
         field.items.length === 0 ? (
           <Badge tone="success">{t("fieldMatches")}</Badge>

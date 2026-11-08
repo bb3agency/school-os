@@ -42,12 +42,26 @@ let openerOverride: Opener | undefined;
 export function setPageOpenerForTesting(opener: Opener | undefined): void {
   openerOverride = opener;
 }
-function openInNewTab(url: string): void {
+/**
+ * WF-02: browsers allow a new tab only while the click's user activation lasts (a few
+ * seconds), so the tab is opened during the click and pointed at the link once the API
+ * answers; on a slow office link a tab opened after the request would be blocked silently.
+ * The waiting tab is cut off from this page (`opener = null`) before it loads anything.
+ */
+function openWaitingTab(): { go: (url: string) => void; cancel: () => void } {
   if (openerOverride) {
-    openerOverride(url);
-    return;
+    const opener = openerOverride;
+    return { go: (url) => opener(url), cancel: () => undefined };
   }
-  window.open(url, "_blank", "noopener,noreferrer");
+  const tab = window.open("", "_blank");
+  if (tab) tab.opener = null;
+  return {
+    go: (url) => {
+      if (tab && !tab.closed) tab.location.href = url;
+      else window.open(url, "_blank", "noopener,noreferrer");
+    },
+    cancel: () => tab?.close(),
+  };
 }
 
 /**
@@ -74,6 +88,7 @@ export function CitedPageButton({
 
   const open = async () => {
     setOpening(true);
+    const tab = openWaitingTab();
     try {
       const link = pageLinkSchema.parse(
         await unwrap(
@@ -84,8 +99,9 @@ export function CitedPageButton({
       );
       const target = citedPageUrl(link, page);
       if (!target) throw new Error("unsafe page link");
-      openInNewTab(target);
+      tab.go(target);
     } catch {
+      tab.cancel();
       router.push(`/documents/${documentId}`);
     } finally {
       setOpening(false);

@@ -33,7 +33,7 @@ type T = ReturnType<typeof parentTranslator>;
 export type PageNotice =
   | { kind: "pay"; error: PayError }
   | { kind: "pdf" }
-  | { kind: "pdfPreparing" }
+  | { kind: "pdfPreparing"; minutes?: number }
   | { kind: "saved"; ok: boolean };
 
 /** The self-hosted Telugu font, only on Telugu pages (ADR-0044 decision 3). */
@@ -111,7 +111,11 @@ function NoticeSheet({ notice, t, flash }: { notice: Notice; t: T; flash: PageNo
         // D71: the worker is making the expired PDF again; a polite status, not an alert.
         <p className="public-banner public-banner-amber" role="status" aria-live="polite">
           <PublicIcon name="clock" />
-          <span>{t("common.pdfPreparing")}</span>
+          <span>
+            {flash.minutes && flash.minutes > 1
+              ? t("common.pdfPreparingMinutes", { minutes: flash.minutes })
+              : t("common.pdfPreparing")}
+          </span>
         </p>
       ) : null}
       {notice.has_pdf ? (
