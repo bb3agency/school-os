@@ -71,11 +71,11 @@ def test_YA_03_interval_beat_jobs_expire_instead_of_piling_up() -> None:
     """Audit 2026-11-09 YA-03: beat keeps publishing while workers are down; every missed run of
     an interval job (the outbox relay every 5 s, the 1-minute sweeps) then ran back to back
     ahead of real work on the same queue. A run older than its interval is now discarded."""
-    from celery.schedules import schedule as interval
+    from datetime import timedelta
 
     for name, entry in celery_app.conf.beat_schedule.items():
         every = entry["schedule"]
-        seconds = every.run_every.total_seconds() if isinstance(every, interval) else every
+        seconds = every.total_seconds() if isinstance(every, timedelta) else every
         if isinstance(seconds, int | float):
             expires = entry.get("options", {}).get("expires")
             assert expires is not None, name
