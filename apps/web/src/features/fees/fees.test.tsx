@@ -477,6 +477,7 @@ describe("fee problems the API returns have plain-language messages (FR-FEE-007.
     "waiver_reduces_late_fee",
     "zero",
     "above_due",
+    "concession_exceeds_due",
     "allocations_do_not_add_up",
     "invalid_utr",
     "invalid_cheque_number",
