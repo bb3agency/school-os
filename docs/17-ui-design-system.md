@@ -271,7 +271,7 @@ marked (client).
 | Component | Props | Notes |
 | --- | --- | --- |
 | `DataTableV2` (client) | `caption`, `columns` (`ColumnV2`: `Column` + `name`, `hideable`, `defaultHidden`), `state` (`Loadable`), `rowKey`, `id` (remembers hidden columns and density), `toolbar`, `chips`/`onRemoveChip`/`onClearFilters`, `emptyTitle`/`emptyBody`/`emptyAction`, `noResultsTitle`, `onRetry`, `selection` (`rowLabel`, `actions(selected, clear)`), `footer` (Pagination), `stacked`, `density` | The record list (§4.3 below). Use it for new and redesigned lists; `DataTable` stays for existing callers |
-| `CommandPalette` (client) | `open`, `onClose`, `items` (`{id, label, group, href? \| onRun?, hint, keywords, icon, shortcut}`), `groups` | Mounted by `AppShell` (§5.9); pages do not mount their own |
+| `CommandPalette` (client) | `open`, `onClose`, `items` (`{id, label, group, href? \| onRun?, hint, keywords, icon, shortcut}`), `groups`, `search?` (`{group, run(query, signal), messages}`, D72), `searchPlaceholder?` | Mounted by `AppShell` (§5.9); pages do not mount their own |
 
 ### 4.3 DataTable v2
 
@@ -1212,8 +1212,24 @@ Groups:
   as the menu. Operators: Set up a new school (`platform.tenants.provision`).
 - **Preferences**: Use compact / comfortable rows, Collapse or expand the menu (Ctrl+\\).
 
-Recents and student search are not built yet (student search needs a scoped server query;
-recents must store pages and actions only, never record names).
+- **Recent** (D72, empty box only, first): the last 5 pages and actions run from the palette,
+  as item ids of the static groups above, re-resolved against the items offered now (a page
+  the person lost access to drops out). Module memory for the tab, gone on reload; never
+  browser storage, and never a search row, so never a name or a student id
+  (`paletteRecents()`, `clearPaletteRecents()`).
+- **Students** (D72, school console, only with `student.read_basic`; unknown permissions do not
+  offer it): `SchoolShell` passes `studentSearch` (the session kind) to `AppShell`, which
+  builds the search with `components/shell/student-search.ts` over the scoped
+  `POST /students/search` (the name in the body, SEC-008; the caller's reach only, invariant 3).
+  It runs 250 ms after typing stops, from 2 characters, `limit` 8, and aborts the previous
+  request on new input; rows show the name ("Name not recorded" when absent), then class-section
+  · admission number, and open `/students/{id}`. The group comes after the static groups, so
+  the row under Enter does not jump when results arrive; arrows move across all groups. A
+  status line under the results and the polite announcement say "Searching students…", "No
+  students match…", "Could not search students…" or, with `navigator.onLine` false (no request
+  sent), "You are offline…"; pages and actions keep working. The box then reads "Type a page,
+  an action or a student's name…". Rows live only while the palette is open. Checks:
+  `components/console/palette-search.test.tsx`.
 
 **Shortcuts**: Ctrl/⌘+K palette, Ctrl+\\ compact sidebar (both `aria-keyshortcuts` on their
 buttons), plus the existing Ask (`/`, Alt+N) and fee counter keys. Never single-key shortcuts
@@ -1373,8 +1389,8 @@ and the switch have no text inside when empty, so they use `border-control` (3:1
   worthwhile (figures are simple, faces minimal).
 - v1.0 foundation (2026-10-18), for the page-redesign wave: screens still use their own layouts
   on the new tokens; each list screen moves to `DataTableV2` + `Pagination` + `FilterChips`,
-  each form to `ErrorSummary` + `SaveBar` (+ `Steps`), per §5. Not built yet: palette student
-  search and recents, sticky record page headers, marketing in Direction B, illustrations, a
+  each form to `ErrorSummary` + `SaveBar` (+ `Steps`), per §5. Not built yet: sticky record
+  page headers (palette student search and recents built in D72, §5.9), marketing in Direction B, illustrations, a
   `/dev/ui` section for the new components. Pages that pass a two-crumb `breadcrumb` no
   longer show it (the top bar does); pages with deeper trails still show theirs, so the
   record trail and the top bar overlap slightly until each page is redesigned.
