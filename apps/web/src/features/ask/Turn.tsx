@@ -230,9 +230,9 @@ function Sources({ state, prefix }: { state: AskState; prefix: string }) {
   return (
     <section aria-labelledby={headingId} className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 id={headingId} className="text-sm font-semibold text-ink">
+        <h2 id={headingId} className="text-sm font-semibold text-ink">
           {searchOnly ? t("searchOnly.passages") : t("answer.sources")}
-        </h3>
+        </h2>
         <Pill variant="tag" className="num">
           {t("answer.sourcesCount", { count: state.citations.length })}
         </Pill>

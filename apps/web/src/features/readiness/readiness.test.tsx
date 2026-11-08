@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { headingSkips } from "@/test/headings";
 import { intlErrors, renderWithIntl } from "@/test/render";
 import { me, SECTION, STUDENT, structureRoutes } from "@/test/school-fixtures";
 import { ReadinessScreen } from "./ReadinessScreen";
@@ -399,6 +400,8 @@ describe("student readiness (US-505)", () => {
       "/findings/0192f3a4-0000-7000-8000-00000000f001",
     );
     expect(screen.queryByText(/Aadhaar values are hidden/)).toBeNull();
+    // WA-02 (WCAG 1.3.1): each field card is an h2 under the student's h1.
+    expect(headingSkips()).toEqual([]);
   });
 
   it("keeps Aadhaar values masked without permission", async () => {

@@ -107,7 +107,6 @@ function VerifiedCard({
   return (
     <li>
       <Card
-        headingLevel={3}
         title={answer.question}
         actions={
           <Pill variant={PILL[answer.status]} size="md">
