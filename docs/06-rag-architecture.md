@@ -379,6 +379,7 @@ Free-form text-to-SQL is **not** used: it is hard to secure and hard to get righ
 | `search_documents` | Hybrid retrieval (§6) | `document.read` | Returns search results |
 | `search_my_conversations` (ADR-0034) | The caller's OWN earlier Ask conversations in this school | `kb.ask` | Newest 30 non-deleted conversations, at most 5 results; earlier answers only where their sources are still visible |
 | `get_fee_dues` (M6; behind flag; ADR Proposed) | Fee dues from Tally for one student, or the school totals | `finance.read` school-wide | Offered only while the school's `tally.connector.enabled` is on; linked ledgers only |
+| `list_due_tasks` (D74, amending ADR-0008) | Open and in-progress tasks (circular deadlines included) due in an IST date range | `task.read` (own tasks; every task with `task.read_all` school-wide) | Default today + 7 days, at most 31 days, 30 tasks; titles, due dates, status, "you" or a role; never details or an AI summary |
 
 Example tool definition (Messages API tool format):
 
@@ -437,6 +438,8 @@ The system instruction of a tool-use turn ends with `citations.marker_instructio
 
 **As built (ADR-0034; `knowledge/tools/conversations.py`).** `search_my_conversations` (`kb.ask`; description, `max_results` 5 and `max_conversations` 30 in `tools.yaml`) reads the caller's own conversations that are not deleted, newest activity first, in the school of the request (RLS plus `user_id`). Titles, questions and answers are decrypted in memory only and scored by shared words (casefold, Telugu script kept, a short stop list) plus character-trigram overlap; no plaintext index is stored. Superseded questions are skipped. An earlier answer is included (cut to 500 characters, markers removed) only when every source it cited is still visible to the caller now; otherwise only the question. Each result is a `search_result` block `sos://conversation/{conversation_id}#q{query_id}` titled `Your earlier question · <title> · DD/MM/YYYY` (text: the question and, where allowed, the answer given then), cited and validated like any other source; its `status` step is `searching_chats`.
 
+**As built (D74, 2026-11-08; `knowledge/tools/due.py`).** `list_due_tasks` ("What's due this week?") reads `circulars.service.due_tasks_for_ask` under the caller's `UserContext`: `task.read` is required; the caller's own open and in-progress tasks, or every task of the school only with `task.read_all` granted school-wide (a scoped grant fails closed, as on the Tasks screen). Arguments `from_date` / `to_date` are IST dates (`YYYY-MM-DD`, both optional and inclusive): `from_date` defaults to today, `to_date` to `from_date` + `default_days` (7); a range longer than `max_days` (31) is cut and the last passage says so; an end before the start is an error result. Description and caps (`max_results` 30) are in `tools.yaml` (invariant 13). One `search_result` block per task, soonest first, source `sos://task/{id}` (§8): title, due date and weekday, status (overdue once the date has passed), "you" or "a staff member with the role …" (never a name), and where it came from: the circular's title only while the caller may open that circular (ACL and scope; a C3 circular also needs `student.read_sensitive`), else "a circular you cannot open"; the portal calendar; or staff. Never the task's details and never a circular's AI summary (DL-08: a task confirmed from a suggestion never copies it); tasks hold no student data. Done and cancelled tasks are left out; more than 30 tasks are counted out with a pointer to the Tasks screen. No task in range gives no passage, so the answer is "not found in school records". Because `circulars.service` itself calls `knowledge.service`, the tools layer cannot import it: `circulars.service` registers its two public read functions (`due_tasks_for_ask`, `task_visible_for_ask`) in `knowledge.service.TASK_READERS` on import, like `INDEXED_HOOKS`; without a registered reader the tool is not offered and `task` sources are not visible (fail closed). A `task` source is visible again (§5, ADR-0034) only while `list_due_tasks` is still offered, the task is the caller's or they may see every task (`get_task` rule), and a task linked to a circular only while they can still open that circular; `GET /knowledge/resolve` answers `href` `/tasks`. Tests: `tests/knowledge/test_due_tool.py`, `tests/knowledge/test_due_tool_db.py`; evaluation §13.10.
+
 ## 8. Source URI scheme
 
 | Kind | URI | Opens in UI |
@@ -449,6 +452,7 @@ The system instruction of a tool-use turn ends with `citations.marker_instructio
 | Student count (M2 wave 5) | `sos://count/{id}#s{scope}` (id derived from school, breakdown and day; `scope` below) | No page: the chip shows the title and snippet |
 | Fee dues (M6; behind flag; ADR Proposed) | `sos://fee/{id}#s{scope}` (UUIDv5 of school, student or "school", and snapshot) | Fee dues screen (`/fees`); the chip says "From Tally" |
 | Earlier chat (ADR-0034) | `sos://conversation/{conversation_id}#q{query_id}` | That conversation in Ask, at that question |
+| Task (D74) | `sos://task/{task_id}` | Tasks screen (`/tasks`; the web opens it through `GET /knowledge/resolve`) |
 
 URIs never contain names or values.
 
@@ -814,6 +818,18 @@ Does the production vector path still find the nearest passages a caller MAY see
 
 `stub-perfect` returns the oracle (1.0); `stub-leaky` puts a forbidden chunk first (fails the critical gate). `app-fake` builds the CI corpus of §6 (`tests/knowledge/recall_support.py`) in its database and runs `vector_route` + `vector_statement` exactly as `HybridRetriever.search` does. Run of 2026-10-01 (app-fake, full): 48 probes, recall@10 1.00 overall and critical, leakage 0; at this corpus size (4 000 chunks, under the 5 000 threshold) every probe takes the exact route, so the HNSW route is measured by the pytest suite (threshold lowered to 100) and the sweep of §6, not by this pass.
 
+### 13.10 "What's due this week?" evaluation (D74; `sos_evals.due`; §7 `list_due_tasks`)
+
+`evals/datasets/due.jsonl` (generated from `sos_evals/due_cases.py`, checked by `generate --check`): **8 synthetic cases** in tiny made-up schools (7 English, 1 code-mixed Telugu), each with tasks assigned to the asker or to another member, due some days from today, open, in progress, done or cancelled. Traps: another person's task due this week for a permission-limited asker (teacher, office staff, class teacher, exam coordinator, accountant: `task.read` only), done and cancelled tasks, tasks due last week or next month, and an asker with nothing of their own due (no title at all). School-wide askers (owner, principal, office admin) must get every open task of the week. The harness reads task titles in the answer and judges them against the case's own table.
+
+| Metric | Definition | Gate |
+|---|---|---|
+| `due_leakage_count` | Answers naming a task the asker may not get (someone else's without `task.read_all` school-wide, done or cancelled, outside today + 7 days) | **= 0 (hard)** |
+| `due_citation_validity` | Task titles stated inside the cited text of a source provided in this request / titles stated | **= 1.0 (hard)** |
+| `due_task_recall` | Expected tasks stated / expected tasks | ≥ 0.95 (soft) |
+
+Adapters: `stub-perfect` answers from the key; `stub-leaky` lists every task (fails `due_leakage_count`); `app-fake` (`eval_bridge.AppFakeAdapter.ask_due`) builds each school, makes the tasks through `circulars.service`, and asks through `knowledge.service`; the stand-in calls `list_due_tasks` with its defaults for a question naming "task" and cites every passage whole. Run of 2026-11-08 (`app-fake`, through `tests/knowledge/test_eval_bridge.py::test_D74_*`): leakage **0**, citation validity **1.00**, task recall **1.00** over 8 cases. The `stub-perfect` baselines were rewritten for the new dataset; the `app-fake` baselines were not.
+
 ## 14. Observability for RAG
 
 Trace spans: `kb.ask` → `llm.call` (model, tokens, latency, stop reason) → `tool.<name>` (rows, latency) → `retrieval.hybrid` (candidates per list, fused count, ef_search) → `citations.validate` (valid/dropped). Metrics: answers/min, refusal rate, fallback rate, citation drop rate, token spend per tenant, p95 per step. Never log question or answer text in plaintext.
@@ -841,7 +857,7 @@ Trace spans: `kb.ask` → `llm.call` (model, tokens, latency, stop reason) → `
 ## 16. Extension points (later milestones)
 
 - **M3:** `get_certificate` / `list_certificates` tools; certificate PDFs indexed as documents.
-- **M4 (built, §4.10, §13.3):** circular reading → cited deadline suggestions → tasks confirmed by a person; parent notice drafts (English; bilingual with `SOS_TELUGU_ENABLED` on, ADR-0036) approved by a person. *Not built:* a "What's due this week?" tool for Ask (tasks are shown on the Tasks screen instead).
+- **M4 (built, §4.10, §13.3):** circular reading → cited deadline suggestions → tasks confirmed by a person; parent notice drafts (English; bilingual with `SOS_TELUGU_ENABLED` on, ADR-0036) approved by a person. *Built (D74, 2026-11-08):* the "What's due this week?" tool `list_due_tasks` (§7 as built, §13.10).
 - **M5:** `get_attendance_summary`, `get_marks_trend` tools with educational-purpose limits; flags visible only to assigned staff.
 - **M6 (built behind flag; ADR Proposed, §7, §13.4):** `get_fee_dues` over Tally-synced data, `finance.read` school-wide only, linked ledgers only. *Not built:* bill-wise (term-wise) dues with due dates (ADR-0032 PO question 8).
 - **Assistive drafting** (e.g., correction memo, notice text): model drafts, human edits and submits through normal endpoints; never auto-send.
