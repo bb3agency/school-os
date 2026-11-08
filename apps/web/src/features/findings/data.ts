@@ -16,7 +16,12 @@ export const DQ_KEYS = {
   profiles: ["staff", "dq", "profiles"],
   run: (id: string) => ["staff", "dq", "runs", id] as const,
   attributes: ["staff", "attributes"],
-  structure: ["staff", "structure", "dq"],
+  /**
+   * The section pickers' structure (attendance, marks, readiness, findings, documents...).
+   * Under the sections prefix (STRUCTURE_KEYS.sections), which every structure write and a
+   * promotion invalidate, so a new current year or section shows without a reload (XA-04).
+   */
+  structure: ["staff", "sections", "pickers"],
 } as const;
 
 const CATALOG_STALE_MS = 10 * 60_000;

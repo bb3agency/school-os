@@ -1,5 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { ALL_STRUCTURE_KEYS } from "@/features/academic-structure/data";
+import { AFTER_PROMOTION_KEYS } from "@/features/promotions/data";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import type * as Upload from "@/features/imports/upload";
@@ -695,6 +697,46 @@ describe("attendance (US-1701, US-1702; FR-ATT-001..004)", () => {
         ?.url.searchParams.get("month"),
     ).toBe(todayIst().slice(0, 7));
   });
+
+  it.each([
+    ["a structure write", ALL_STRUCTURE_KEYS],
+    ["a promotion", AFTER_PROMOTION_KEYS],
+  ])(
+    "the section picker shows a new year's sections after %s without a reload (XA-04, FR-TEN-010, FR-TEN-011)",
+    async (_, keys) => {
+      signedIn(["attendance.read", "attendance.record"]);
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      renderWithIntl(<AttendanceScreen />, "en", client);
+      const picker = await screen.findByLabelText(en.attendance.section);
+      await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(1));
+      const NEXT_YEAR = "0192f3a4-0000-7000-8000-0000000000y2";
+      const NEW_SECTION = "0192f3a4-0000-7000-8000-00000000e009";
+      // The office makes 2027-28 the current year (structure) or promotes into it.
+      stub.routes["GET /bff/api/v1/academic-years"] = () =>
+        Response.json({
+          data: [
+            { id: YEAR, is_current: false },
+            { id: NEXT_YEAR, is_current: true },
+          ],
+          next_cursor: null,
+        });
+      stub.routes["GET /bff/api/v1/sections"] = () =>
+        Response.json({
+          data: [
+            { id: SECTION, class_id: CLASS, academic_year_id: YEAR, name: "A" },
+            { id: NEW_SECTION, class_id: CLASS, academic_year_id: NEXT_YEAR, name: "B" },
+          ],
+          next_cursor: null,
+        });
+      await act(() =>
+        Promise.all(keys.map((queryKey) => client.invalidateQueries({ queryKey: [...queryKey] }))),
+      );
+      await waitFor(() =>
+        expect(within(picker).queryByRole("option", { name: /B$/ })).not.toBeNull(),
+      );
+      expect(within(picker).queryByRole("option", { name: /A$/ })).toBeNull();
+    },
+  );
 
   it("refuses a file that is not a sheet before uploading", async () => {
     signedIn(["attendance.read", "attendance.record"]);
