@@ -200,7 +200,7 @@ export function HistoryScreen() {
       {actions.dialogs}
       {list.isPending ? (
         <LoadingState label={tc("loading")} rows={5} />
-      ) : list.isError ? (
+      ) : list.isError && !list.nextPageFailed ? (
         <div className="space-y-3">
           <ApiErrorAlert error={list.error} namespace="ask" />
           <Button variant="secondary" size="sm" onClick={list.refetch}>
@@ -250,7 +250,8 @@ export function HistoryScreen() {
             </div>
           )}
           {list.hasMore ? (
-            <div ref={sentinel} className="flex justify-center">
+            <div ref={sentinel} className="flex flex-col items-center gap-2">
+              {list.nextPageFailed ? <ApiErrorAlert error={list.error} namespace="ask" /> : null}
               <Button variant="secondary" onClick={list.loadMore} disabled={list.loadingMore}>
                 {list.loadingMore ? t("loadingMore") : t("loadMore")}
               </Button>

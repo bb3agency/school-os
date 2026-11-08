@@ -336,6 +336,25 @@ describe("circulars inbox and detail (US-1601, US-1602)", () => {
     expect(JSON.parse(call?.body ?? "{}")).toEqual({ source: "circular", document_id: DOC });
     expect(call?.headers.get("Idempotency-Key")).toMatch(/^[0-9a-f-]{36}$/);
   });
+
+  it("a retry after a lost answer reuses the Idempotency-Key, so no second notice is drafted (XO-01, FR-NOTICE-003)", async () => {
+    signedIn(["document.read", "notice.draft"]);
+    stub.routes[`GET /bff/api/v1/circulars/${DOC}`] = () => Response.json(detail());
+    let answers = 0;
+    stub.routes["POST /bff/api/v1/notices"] = () =>
+      (answers += 1) === 1
+        ? problem(502, "bad_gateway")
+        : Response.json(notice(drafting()), { status: 202 });
+    renderWithIntl(<CircularDetailScreen documentId={DOC} />);
+    const button = await screen.findByRole("button", { name: en.circulars.draftNotice });
+    await userEvent.click(button);
+    await screen.findByText(messages.en.errors.api.bad_gateway.title);
+    await userEvent.click(button);
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/notices/${NOTICE}`));
+    const [first, second] = stub.callsTo("POST /bff/api/v1/notices");
+    expect(first?.headers.get("idempotency-key")).toBeTruthy();
+    expect(second?.headers.get("idempotency-key")).toBe(first?.headers.get("idempotency-key"));
+  });
 });
 
 describe("tasks (US-1603, US-1604)", () => {

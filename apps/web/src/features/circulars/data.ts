@@ -5,7 +5,14 @@ import type { components } from "@schoolos/api-client";
 import { useQuery, type Query } from "@tanstack/react-query";
 import * as z from "@/lib/zod";
 import { AuthRedirectError } from "@/lib/bff/fetch";
-import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
+import {
+  ApiError,
+  isTransientError,
+  NotAvailableError,
+  toLoadable,
+  unwrap,
+  useBffClient,
+} from "@/lib/bff/query";
 import { typedDateToIso } from "@/lib/date-format";
 import type { Loadable } from "@/lib/loadable";
 import { AADHAAR_GROUP_SEPARATOR } from "@/lib/aadhaar";
@@ -63,6 +70,11 @@ export const KEYS = {
   notice: (id: string) => ["staff", "notices", "detail", id] as const,
 } as const;
 
+/** A failed poll stops polling only when it is not transient (XO-07: the screen keeps its data). */
+function stopsPolling(state: { status: string; error: unknown }): boolean {
+  return state.status === "error" && !isTransientError(state.error);
+}
+
 /** `W/"3"` for If-Match (the API's ETag format). */
 export function ifMatch(version: number): string {
   return `W/"${version}"`;
@@ -117,7 +129,7 @@ export function useCirculars(
     enabled,
     retry,
     refetchInterval: (q: Query<Paged<Circular>, Error, Paged<Circular>, readonly unknown[]>) =>
-      q.state.status !== "error" && q.state.data?.data.some((c) => isReadingBusy(c.reading_status))
+      !stopsPolling(q.state) && q.state.data?.data.some((c) => isReadingBusy(c.reading_status))
         ? pollDelay(q.state.dataUpdateCount)
         : false,
     refetchIntervalInBackground: false,
@@ -140,7 +152,7 @@ export function useCircular(id: string, enabled: boolean): Loadable<CircularDeta
     enabled,
     retry,
     refetchInterval: (q: Query<CircularDetail, Error, CircularDetail, readonly unknown[]>) =>
-      q.state.status !== "error" && isReadingBusy(q.state.data?.reading_status)
+      !stopsPolling(q.state) && isReadingBusy(q.state.data?.reading_status)
         ? pollDelay(q.state.dataUpdateCount)
         : false,
     refetchIntervalInBackground: false,
@@ -211,7 +223,7 @@ export function useNotices(enabled: boolean, cursor?: string): Loadable<Paged<No
     enabled,
     retry,
     refetchInterval: (q: Query<Paged<Notice>, Error, Paged<Notice>, readonly unknown[]>) =>
-      q.state.status !== "error" && q.state.data?.data.some((n) => isNoticeDrafting(n.status))
+      !stopsPolling(q.state) && q.state.data?.data.some((n) => isNoticeDrafting(n.status))
         ? pollDelay(q.state.dataUpdateCount)
         : false,
     refetchIntervalInBackground: false,
@@ -234,7 +246,7 @@ export function useNotice(id: string, enabled: boolean): Loadable<Notice> {
     enabled,
     retry,
     refetchInterval: (q: Query<Notice, Error, Notice, readonly unknown[]>) =>
-      q.state.status !== "error" &&
+      !stopsPolling(q.state) &&
       (isNoticeDrafting(q.state.data?.status) || q.state.data?.render_status === "queued")
         ? pollDelay(q.state.dataUpdateCount)
         : false,

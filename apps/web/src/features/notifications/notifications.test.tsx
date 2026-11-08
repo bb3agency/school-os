@@ -290,6 +290,31 @@ describe("notifications page (FR-NOT-001)", () => {
   });
 });
 
+describe("notifications page, a failed next page (XO-05, FR-NOT-001)", () => {
+  it("keeps the notifications already shown and offers Show more again", async () => {
+    stub.routes["GET /bff/api/v1/notifications"] = (_request, url) =>
+      url.searchParams.get("cursor")
+        ? problem(502, "bad_gateway")
+        : Response.json({
+            data: [notification({ title: "First page item" })],
+            next_cursor: "c2",
+          });
+    renderWithIntl(<NotificationsScreen />);
+    await screen.findByText("First page item");
+    await userEvent.click(screen.getByRole("button", { name: "Show more" }));
+    await waitFor(() =>
+      expect(
+        stub
+          .callsTo("GET /bff/api/v1/notifications")
+          .some((call) => call.url.searchParams.get("cursor") === "c2"),
+      ).toBe(true),
+    );
+    await screen.findByRole("alert");
+    expect(screen.getByText("First page item")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show more" })).toBeEnabled();
+  });
+});
+
 describe("notifications grouped by day (FR-NOT-001)", () => {
   it("keeps the API's newest-first order and splits at IST midnight", () => {
     const groups = groupByDay([

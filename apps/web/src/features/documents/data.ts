@@ -6,6 +6,7 @@ import { runPollDelay } from "@/features/findings/RunChecks";
 import { AuthRedirectError } from "@/lib/bff/fetch";
 import {
   ApiError,
+  isTransientError,
   listAll,
   NotAvailableError,
   toLoadable,
@@ -62,7 +63,8 @@ function interval<T>(pick: (data: T) => readonly WithVersion[]) {
     return documentRefetchInterval(
       data === undefined ? undefined : pick(data),
       query.state.dataUpdateCount,
-      query.state.status === "error",
+      // A transient failure keeps polling: the screen still shows the old state (XO-07).
+      query.state.status === "error" && !isTransientError(query.state.error),
     );
   };
 }

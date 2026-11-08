@@ -100,7 +100,7 @@ export function NotificationsScreen() {
         <div className="p-4 sm:p-5">
           {list.isPending ? (
             <LoadingState label={tc("loading")} />
-          ) : list.isError ? (
+          ) : list.isError && !list.data ? (
             <div className="space-y-3">
               <ApiErrorAlert error={list.error} namespace="notifications" />
               <Button variant="secondary" size="sm" onClick={() => void list.refetch()}>
@@ -142,7 +142,11 @@ export function NotificationsScreen() {
           )}
         </div>
         {list.hasNextPage ? (
-          <div className="flex justify-center border-t border-border px-3 py-2.5 sm:px-4">
+          <div className="flex flex-col items-center gap-2 border-t border-border px-3 py-2.5 sm:px-4">
+            {/* A failed next page keeps what is shown; Show more tries it again (XO-05). */}
+            {list.isFetchNextPageError ? (
+              <ApiErrorAlert error={list.error} namespace="notifications" />
+            ) : null}
             <Button
               variant="secondary"
               onClick={() => void list.fetchNextPage()}

@@ -128,6 +128,23 @@ export function reasonOf(error: unknown): LoadErrorReason | undefined {
   return undefined;
 }
 
+/**
+ * A failure that says nothing about the data already shown (server trouble, timeout, rate
+ * limit, offline): the last good answer stays on screen. Sign-in, step-up, no access, a
+ * suspended school, a record that is gone and a route this deployment lacks are not.
+ * Pollers keep asking after a transient failure (the screen still shows the old state).
+ */
+export function isTransientError(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    return error.status >= 500 || error.status === 408 || error.status === 429;
+  }
+  return !(
+    error instanceof NotAvailableError ||
+    error instanceof AuthRedirectError ||
+    error instanceof StepUpCancelledError
+  );
+}
+
 export function toLoadable<T>(query: {
   isPending: boolean;
   isError: boolean;
@@ -136,6 +153,10 @@ export function toLoadable<T>(query: {
 }): Loadable<T> {
   if (query.isPending) return loading;
   if (query.isError) {
+    // A background refetch or poll failed: keep what is shown (XO-07).
+    if (query.data !== undefined && isTransientError(query.error)) {
+      return { status: "ready", data: query.data, refreshFailed: true };
+    }
     if (query.error instanceof NotAvailableError) return unavailable;
     // Navigating to sign-in or step-up: keep showing the loading state.
     if (query.error instanceof AuthRedirectError) return loading;

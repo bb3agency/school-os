@@ -70,6 +70,8 @@ export interface ConversationList {
   isPending: boolean;
   isError: boolean;
   error: unknown;
+  /** Only the next page failed: the chats already loaded stay shown (XO-05). */
+  nextPageFailed: boolean;
   hasMore: boolean;
   loadingMore: boolean;
   loadMore: () => void;
@@ -103,6 +105,7 @@ export function useConversationList(enabled = true): ConversationList {
     isPending: query.isPending && enabled,
     isError: query.isError,
     error: query.error,
+    nextPageFailed: query.isFetchNextPageError,
     hasMore: Boolean(hasNextPage),
     loadingMore: isFetchingNextPage,
     loadMore,

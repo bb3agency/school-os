@@ -12,7 +12,11 @@ export type Loadable<T> =
   | { status: "loading" }
   | { status: "error"; reason?: LoadErrorReason }
   | { status: "unavailable" }
-  | { status: "ready"; data: T };
+  /**
+   * `refreshFailed`: a later refetch or poll failed (5xx, offline); `data` is the last good
+   * answer, still shown (XO-07). Screens may say so; none has to.
+   */
+  | { status: "ready"; data: T; refreshFailed?: true };
 
 export const loading = { status: "loading" } as const;
 export const loadError = { status: "error" } as const;

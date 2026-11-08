@@ -5,7 +5,14 @@ import { useQuery, type Query } from "@tanstack/react-query";
 import { DQ_KEYS } from "@/features/findings/data";
 import { runPollDelay } from "@/features/findings/RunChecks";
 import { AuthRedirectError } from "@/lib/bff/fetch";
-import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
+import {
+  ApiError,
+  isTransientError,
+  NotAvailableError,
+  toLoadable,
+  unwrap,
+  useBffClient,
+} from "@/lib/bff/query";
 import { StepUpCancelledError } from "@/lib/bff/step-up";
 import type { Loadable } from "@/lib/loadable";
 import { isExportBusy, type Export, type ExportProfile, type RequestedBy } from "./types";
@@ -48,7 +55,8 @@ function interval<T>(pick: (data: T) => readonly Pick<Export, "status">[]) {
     return exportRefetchInterval(
       data === undefined ? undefined : pick(data),
       query.state.dataUpdateCount,
-      query.state.status === "error",
+      // A transient failure keeps polling: the screen still shows the old state (XO-07).
+      query.state.status === "error" && !isTransientError(query.state.error),
     );
   };
 }

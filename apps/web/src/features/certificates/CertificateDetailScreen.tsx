@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { useRef } from "react";
 import * as z from "@/lib/zod";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
@@ -13,6 +14,7 @@ import { Menu } from "@/components/ui/Menu";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Timeline, type TimelineItem } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
+import { runPollDelay } from "@/features/findings/RunChecks";
 import { Link, useRouter } from "@/i18n/navigation";
 import { unwrap, useApiMutation, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useStaffMe } from "@/lib/bff/staff-me";
@@ -35,6 +37,15 @@ import {
   type ContentLine,
 } from "./types";
 import { VerificationCard } from "./VerificationCard";
+
+/**
+ * Pause before reading an issued certificate again while its PDF is made (2 s, 3 s, 4.5 s … at
+ * most 15 s; XO-03). Tests shorten it.
+ */
+let pdfPollDelay: (attempt: number) => number = runPollDelay;
+export function setCertificatePollDelayForTesting(delay: ((attempt: number) => number) | null) {
+  pdfPollDelay = delay ?? runPollDelay;
+}
 
 const reasonText = z
   .string()
@@ -281,12 +292,27 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
   const types = useCertificateTypes();
   const inputLabel = useInputLabel();
   const title = useCertificateTitle();
-  const query = useApiQuery(CERT_KEYS.one(certificateId), () =>
-    unwrap(
-      api.GET("/api/v1/certificates/{certificate_id}", {
-        params: { path: { certificate_id: certificateId } },
-      }),
-    ),
+  // The PDF is made in the background after issue (or "Make the PDF again"): read the
+  // certificate again until it is ready or failed, so the download opens without a reload.
+  const pdfPolls = useRef(0);
+  const query = useApiQuery(
+    CERT_KEYS.one(certificateId),
+    () =>
+      unwrap(
+        api.GET("/api/v1/certificates/{certificate_id}", {
+          params: { path: { certificate_id: certificateId } },
+        }),
+      ),
+    {
+      refetchInterval: (current) => {
+        if (current?.pdf_status !== "queued") {
+          pdfPolls.current = 0;
+          return false;
+        }
+        pdfPolls.current += 1;
+        return pdfPollDelay(pdfPolls.current - 1);
+      },
+    },
   );
   const retry = useApiMutation(
     () =>

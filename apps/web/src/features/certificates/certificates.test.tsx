@@ -7,7 +7,10 @@ import { notificationHref } from "@/features/notifications/data";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { intlErrors, renderWithIntl } from "@/test/render";
 import { me, ME_MEMBERSHIP, OTHER_MEMBERSHIP, STUDENT } from "@/test/school-fixtures";
-import { CertificateDetailScreen } from "./CertificateDetailScreen";
+import {
+  CertificateDetailScreen,
+  setCertificatePollDelayForTesting,
+} from "./CertificateDetailScreen";
 import { CertificatesScreen } from "./CertificatesScreen";
 import { parseCertificateFilters, parseIssueType } from "./filters";
 import { buildInputSchema, IssueCertificateScreen } from "./IssueCertificateScreen";
@@ -326,6 +329,20 @@ describe("URL parameters and helpers", () => {
 });
 
 describe("certificate list (US-1101..US-1105)", () => {
+  it("a failed next page keeps the certificates shown and offers Show more again (XO-05)", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([READ]));
+    stub.routes["GET /bff/api/v1/certificates"] = (_request, url) =>
+      url.searchParams.get("cursor")
+        ? problem(502, "bad_gateway")
+        : Response.json({ data: [issued()], next_cursor: "c2" });
+    renderWithIntl(<CertificatesScreen filters={parseCertificateFilters({})} />);
+    expect(await screen.findByText("Bonafide certificate BC/2026-27/0007")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show more" }));
+    await screen.findByRole("alert");
+    expect(screen.getByText("Bonafide certificate BC/2026-27/0007")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show more" })).toBeEnabled();
+  });
+
   it("names certificates by type and serial and marks those waiting for this approver", async () => {
     stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([READ, APPROVE, "register.read"]));
     stub.routes["GET /bff/api/v1/certificates"] = () =>
@@ -414,6 +431,27 @@ describe("certificate detail (US-1102..US-1107)", () => {
     });
     expect(screen.getByText("Reason for leaving")).toBeInTheDocument();
     expect(screen.getByText("Parent transferred")).toBeInTheDocument();
+  });
+
+  it("an issued certificate whose PDF is being made asks again until it is ready (XO-03, FR-CERT-011)", async () => {
+    setCertificatePollDelayForTesting(() => 20);
+    try {
+      let reads = 0;
+      stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([READ]));
+      stub.routes[`GET /bff/api/v1/certificates/${CERT}`] = () =>
+        Response.json(issued({ pdf_status: (reads += 1) < 3 ? "queued" : "ready" }));
+      renderWithIntl(<CertificateDetailScreen certificateId={CERT} />);
+      expect(await screen.findByRole("button", { name: "Download PDF" })).toBeDisabled();
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Download PDF" })).toBeEnabled(),
+      );
+      const settled = stub.callsTo(`GET /bff/api/v1/certificates/${CERT}`).length;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Ready: no more polling.
+      expect(stub.callsTo(`GET /bff/api/v1/certificates/${CERT}`)).toHaveLength(settled);
+    } finally {
+      setCertificatePollDelayForTesting(null);
+    }
   });
 
   it("a draft changed since it was read says to reload and check it again (A-11)", async () => {
@@ -729,6 +767,18 @@ describe("registers (US-1106, FR-REG-004)", () => {
       await screen.findByRole("region", { name: "Admission and withdrawal register" }),
     ).toBeInTheDocument();
     expect(stub.callsTo("GET /bff/api/v1/registers/admission-withdrawal")).toHaveLength(0);
+  });
+});
+
+describe("registers without register.read (XO-04, FR-REG-004)", () => {
+  it("says so and offers nothing that would be refused", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([READ]));
+    stub.routes["GET /bff/api/v1/academic-years"] = () => page([]);
+    renderWithIntl(<RegistersScreen />);
+    expect(await screen.findByText(/not print the registers/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Prepare print view" })).toBeNull();
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(stub.callsTo("GET /bff/api/v1/academic-years")).toHaveLength(0);
   });
 });
 
