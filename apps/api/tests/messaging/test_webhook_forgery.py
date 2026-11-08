@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 import time
 import uuid
@@ -26,6 +27,7 @@ from sqlalchemy import Engine, text
 from app.core.config import Environment, Settings
 from app.core.db import tenant_session
 from app.messaging import service
+from app.messaging.config import load_config
 from app.messaging.providers.fake import STATE
 from app.messaging.webhook import signature
 from app.public import guards
@@ -277,3 +279,113 @@ def test_D35_a_suspended_school_records_stop_silently_and_drops_everything_else(
         g=guardian,
     )
     assert queued == [{"n": 0}]
+
+
+# --- audit 2026-11-09 (YM): replay window, late deliveries, STOP ordering ----------------------
+
+
+def _stops(admin: Engine, guardian: uuid.UUID) -> list[str]:
+    rows = M.rows(
+        admin,
+        "SELECT category FROM msg.optins WHERE guardian_id = :g AND method = 'whatsapp_stop'",
+        g=guardian,
+    )
+    return sorted(r["category"] for r in rows)
+
+
+def _current_notices(admin: Engine, guardian: uuid.UUID) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = M.rows(
+        admin,
+        "SELECT status, method FROM msg.optins WHERE guardian_id = :g AND category = 'notices' "
+        "ORDER BY seq DESC LIMIT 1",
+        g=guardian,
+    )
+    return rows
+
+
+def _with_timestamp(payload: dict[str, Any], ts: int) -> dict[str, Any]:
+    out: dict[str, Any] = json.loads(json.dumps(payload))
+    value = out["entry"][0]["changes"][0]["value"]
+    for item in value.get("messages", []) + value.get("statuses", []):
+        item["timestamp"] = str(ts)
+    return out
+
+
+def test_YM_01_FR_MSG_020_a_delivery_not_stored_is_not_a_replay_when_meta_retries(
+    world: Any, api: Any, admin_engine: Engine, fake_state: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A delivery the route could not store (a database error answers 5xx) must not stay
+    claimed by the replay check: Meta retries the same body, and that retry must be stored, or
+    a parent's STOP is lost (FR-MSG-010, FR-MSG-020)."""
+    _, waba = M.connect(world.a)
+    _, guardian, mobile = M.guardian(world.a)
+    assert mobile is not None
+    assert M.opt_in(api, world.person("office_staff"), guardian, "notices").status_code == 201
+    stop = M.inbound(waba, "91" + mobile, text_body="STOP")
+    real = service.store_events
+
+    def broken(*args: Any, **kwargs: Any) -> int:
+        raise RuntimeError("synthetic database outage")
+
+    monkeypatch.setattr(service, "store_events", broken)
+    with pytest.raises(RuntimeError):
+        M.post(api.client, stop)
+    monkeypatch.setattr(service, "store_events", real)
+    M.deliver_webhook(api, world.a, stop)  # Meta's retry: the same body
+    assert _stops(admin_engine, guardian) == ["attendance", "fees", "notices"]
+
+
+def test_YM_02_FR_MSG_010_a_join_sent_before_the_parents_stop_does_not_opt_back_in(
+    world: Any, api: Any, admin_engine: Engine, fake_state: Any
+) -> None:
+    """Meta does not deliver in order: a JOIN the parent sent before STOP, delivered (a Meta
+    retry) after the STOP was applied, must not opt the parent back in. The parent's latest
+    word (STOP) wins; a JOIN sent after the STOP still works with the same unused code."""
+    _, waba = M.connect(world.a)
+    student, guardian, mobile = M.guardian(world.a)
+    assert mobile is not None
+    slips = api.call(
+        world.person("office_admin"),
+        "POST",
+        "/api/v1/messaging/join-slips",
+        json={"student_ids": [str(student)], "categories": ["notices"]},
+    )
+    assert slips.status_code == 200, slips.text
+    code = re.findall(r"JOIN ([A-Z0-9]{8})", slips.text)[0]
+    now = int(time.time())
+    M.deliver_webhook(api, world.a, M.inbound(waba, "91" + mobile, text_body="STOP"))
+    late = _with_timestamp(M.inbound(waba, "91" + mobile, text_body=f"JOIN {code}"), now - 600)
+    M.deliver_webhook(api, world.a, late)
+    assert _current_notices(admin_engine, guardian) == [
+        {"status": "opted_out", "method": "whatsapp_stop"}
+    ]
+    later = _with_timestamp(M.inbound(waba, "91" + mobile, text_body=f"JOIN {code}"), now + 5)
+    M.deliver_webhook(api, world.a, later)
+    assert _current_notices(admin_engine, guardian) == [
+        {"status": "opted_in", "method": "whatsapp_join"}
+    ]
+
+
+def test_YM_03_FR_MSG_020_a_signed_delivery_older_than_metas_retry_period_is_dropped(
+    world: Any, api: Any, admin_engine: Engine, fake_state: Any
+) -> None:
+    """Meta retries a delivery for at most 7 days. A signed message or status older than
+    ``inbox.max_event_age_hours`` can only be a replay of a captured body after the guard's
+    replay window and the inbox's dedupe have both forgotten it: acknowledged, never stored
+    (a replayed STOP would undo a later signed-form opt-in; FR-MSG-010, SEC-034)."""
+    _, waba = M.connect(world.a)
+    _, guardian, mobile = M.guardian(world.a)
+    assert mobile is not None
+    assert M.opt_in(api, world.person("office_staff"), guardian, "notices").status_code == 201
+    max_age = load_config().inbox.max_event_age_hours
+    stale = int(time.time()) - max_age * 3600 - 60
+    old = _with_timestamp(M.inbound(waba, "91" + mobile, text_body="STOP"), stale)
+    assert M.post(api.client, old).status_code == 200
+    service.process_inbox(world.a.tenant_id)
+    assert _stops(admin_engine, guardian) == []
+    # A Meta retry inside the period is applied as usual.
+    recent = int(time.time()) - 6 * 24 * 3600
+    M.deliver_webhook(
+        api, world.a, _with_timestamp(M.inbound(waba, "91" + mobile, text_body="STOP"), recent)
+    )
+    assert _stops(admin_engine, guardian) == ["attendance", "fees", "notices"]

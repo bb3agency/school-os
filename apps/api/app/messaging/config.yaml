@@ -119,3 +119,8 @@ retention:
 inbox:
   max_attempts: 5
   batch_size: 200
+  # A message or status whose Meta timestamp is older than this is acknowledged and dropped
+  # (audit YM-03): Meta retries a delivery for at most 7 days, so an older one can only be a
+  # replay of a captured body. Must stay below retention.provider_events_days (the inbox dedupe
+  # covers everything younger).
+  max_event_age_hours: 192

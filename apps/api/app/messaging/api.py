@@ -47,6 +47,7 @@ from app.messaging.webhook import parse_entries
 from app.public import service as public
 from app.public.guards import (
     WebhookCaller,
+    forget_event,
     require_meta_verify_token,
     require_webhook_signature,
 )
@@ -335,11 +336,18 @@ def meta_webhook(delivery: MetaDelivery) -> Response:
     service.ensure_available()
     if delivery.duplicate:
         return Response(status_code=200)
-    for waba_id, events in parse_entries(delivery.body).items():
-        handle = public.resolve("meta_waba", waba_id)
-        if handle is None:
-            continue
-        service.store_events(handle.tenant_id, handle.handle_id, waba_id, events)
+    try:
+        for waba_id, events in parse_entries(delivery.body).items():
+            handle = public.resolve("meta_waba", waba_id)
+            if handle is None:
+                continue
+            service.store_events(handle.tenant_id, handle.handle_id, waba_id, events)
+    except Exception:
+        # YM-01: not stored, so Meta's retry of this body must pass the replay check again (a
+        # STOP would otherwise be lost). Schools already stored dedupe the retry by event key.
+        if delivery.event_id is not None:
+            forget_event("meta", delivery.event_id)
+        raise
     return Response(status_code=200)
 
 

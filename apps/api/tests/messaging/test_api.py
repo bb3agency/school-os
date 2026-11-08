@@ -398,6 +398,45 @@ def test_FR_MSG_010_stop_opts_out_everything_revokes_links_and_confirms(
     assert [k["kind"] for k in kinds] == ["stop", "stop"]
 
 
+def test_YM_04_FR_MSG_008_a_signed_form_dated_before_the_parents_stop_does_not_override_it(
+    world: Any, api: Any, admin_engine: Engine, fake_state: Any
+) -> None:
+    """After a parent's STOP only a NEW parent action opts back in (FR-MSG-008, FR-MSG-010). A
+    signed form dated before the STOP (paper collected earlier, back-dated up to
+    ``max_decision_age_days``) is not one: 409 ``opted_out_by_parent``. A form dated on or after
+    the STOP day still works."""
+    _, waba = M.connect(world.a)
+    staff = world.person("office_staff")
+    _, guardian, mobile = M.guardian(world.a)
+    assert M.opt_in(api, staff, guardian, "notices").status_code == 201
+    M.deliver_webhook(api, world.a, M.inbound(waba, "91" + mobile, text_body="STOP"))
+    doc = D.make_document(
+        admin_engine,
+        world.a.tenant_id,
+        staff.user_id,
+        purpose="evidence",
+        doc_type="form",
+        sensitivity="C3",
+    )
+    yesterday = (dt.date.fromisoformat(TODAY) - dt.timedelta(days=1)).isoformat()
+    stale = M.opt_in(
+        api,
+        staff,
+        guardian,
+        "notices",
+        method="signed_form",
+        evidence_document_id=str(doc),
+        decided_on=yesterday,
+    )
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["code"] == "opted_out_by_parent"
+    assert _states(api, staff, guardian)["notices"]["stopped_by_parent"] is True
+    fresh = M.opt_in(
+        api, staff, guardian, "notices", method="signed_form", evidence_document_id=str(doc)
+    )
+    assert fresh.status_code == 201, fresh.text
+
+
 def test_FR_MSG_009_join_slip_code_from_the_guardians_own_number(
     world: Any, api: Any, admin_engine: Engine, fake_state: Any
 ) -> None:
