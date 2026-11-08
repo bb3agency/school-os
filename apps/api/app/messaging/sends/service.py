@@ -1206,10 +1206,15 @@ def _notice_live(session: Session, notice_id: uuid.UUID) -> bool:
     return notice is not None and notice.approved
 
 
-def _claim(session: Session, message_id: uuid.UUID, now: dt.datetime) -> _Claim | str:  # noqa: PLR0911 - one return per outcome
+def _claim(  # noqa: PLR0911 - one return per outcome
+    session: Session, message_id: uuid.UUID, now: dt.datetime, started: dt.datetime
+) -> _Claim | str:
     """Check the rules for one queued message and claim it, or say why it waits / was
-    skipped (``deferred``, ``skipped``, ``busy``)."""
+    skipped (``deferred``, ``skipped``, ``busy``). ``now`` is the run's clock at ``started``
+    (database time when the run began); the rules apply at the moment of claiming, which a long
+    run reaches minutes later (BL-01: claim expiry; BL-03: quiet hours and the daily cap)."""
     cfg = load_config().sending
+    now = now + max(mrepo.now(session) - started, dt.timedelta(0))
     message = repo.get_message(session, message_id, lock=True)
     if message is None or message.status != "queued":
         return "busy"
@@ -1245,13 +1250,7 @@ def _claim(session: Session, message_id: uuid.UUID, now: dt.datetime) -> _Claim 
             session, message.id, {"next_attempt_at": rules.next_morning(now, quiet_end)}
         )
         return "deferred"
-    # BL-01: the claim runs from the moment of claiming, not from the run's start: a long run
-    # reaches its last messages minutes after ``now``, and a claim already over would let the
-    # next sweep send the same message again while this one is still with the provider.
-    claimed_at = max(now, mrepo.now(session))
-    values: dict[str, Any] = {
-        "next_attempt_at": claimed_at + dt.timedelta(seconds=cfg.claim_seconds)
-    }
+    values: dict[str, Any] = {"next_attempt_at": now + dt.timedelta(seconds=cfg.claim_seconds)}
     key: str | None = None
     handle_id: uuid.UUID | None = None
     kind = LINKS.get(message.purpose)
@@ -1272,9 +1271,11 @@ def _claim(session: Session, message_id: uuid.UUID, now: dt.datetime) -> _Claim 
     return _Claim(key=key, handle_id=handle_id)
 
 
-def _send_one(tenant_id: uuid.UUID, message_id: uuid.UUID, now: dt.datetime) -> str:
+def _send_one(
+    tenant_id: uuid.UUID, message_id: uuid.UUID, now: dt.datetime, started: dt.datetime
+) -> str:
     with tenant_session(tenant_id) as session:
-        claim = _claim(session, message_id, now)
+        claim = _claim(session, message_id, now, started)
     if not isinstance(claim, _Claim):
         return claim
     status = messaging.deliver(tenant_id, message_id, url_suffix=claim.key)
@@ -1311,11 +1312,12 @@ def send_due(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> dict[st
     with tenant_session(tenant_id) as session:
         if not _active(session):
             return {"held": 1}
-        moment = now or mrepo.now(session)
+        started = mrepo.now(session)
+        moment = now or started
         ids = repo.due_message_ids(session, moment, cfg.batch_per_run, SENDING_PURPOSES)
     totals: Counter[str] = Counter()
     for message_id in ids:
-        totals[_send_one(tenant_id, message_id, moment)] += 1
+        totals[_send_one(tenant_id, message_id, moment, started)] += 1
     with tenant_session(tenant_id) as session:
         _finish_broadcasts(session)
     if ids:
