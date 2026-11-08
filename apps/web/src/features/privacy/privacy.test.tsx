@@ -551,6 +551,46 @@ describe("D60 FR-DPDP-005 mark a request as withdrawn", () => {
   });
 });
 
+describe("YP-03 FR-DPDP-016 withdrawing an access, erasure or complaint request", () => {
+  const withdrawCall = `PATCH /bff/api/v1/privacy/requests/${REQUEST}`;
+  const NOTE = "The father phoned on 9 Nov and asked us to stop; confirmed by callback.";
+
+  it.each(["access", "erasure", "grievance"] as const)(
+    "%s: says a fresh sign-in is needed, requires the note and sends it",
+    async (kind) => {
+      staff(MANAGE);
+      stub.routes[`GET /bff/api/v1/privacy/requests/${REQUEST}`] = () =>
+        Response.json(detail({ kind, report: null }));
+      stub.routes[withdrawCall] = () =>
+        Response.json(detail({ kind, report: null, status: "withdrawn", version: 3 }));
+      const user = userEvent.setup();
+      renderWithIntl(<RequestDetailScreen requestId={REQUEST} />);
+      await user.click(await screen.findByRole("button", { name: pm.withdraw.action }));
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText(messages.en.common.stepUpNote)).toBeInTheDocument();
+      expect(within(dialog).getByText(pm.withdrawNote.body)).toBeInTheDocument();
+      await user.click(within(dialog).getByRole("button", { name: pm.withdraw.confirm }));
+      expect(stub.callsTo(withdrawCall)).toHaveLength(0);
+      await user.type(within(dialog).getByLabelText(pm.withdrawNote.label), NOTE);
+      await user.click(within(dialog).getByRole("button", { name: pm.withdraw.confirm }));
+      await waitFor(() => expect(stub.callsTo(withdrawCall)).toHaveLength(1));
+      expect(JSON.parse(stub.callsTo(withdrawCall)[0]?.body ?? "{}")).toEqual({
+        status: "withdrawn",
+        withdrawal_note: NOTE,
+      });
+    },
+  );
+
+  it("does not offer it to the person who logged a complaint", async () => {
+    staff(MANAGE);
+    stub.routes[`GET /bff/api/v1/privacy/requests/${REQUEST}`] = () =>
+      Response.json(detail({ kind: "grievance", report: null, logged_by_me: true }));
+    renderWithIntl(<RequestDetailScreen requestId={REQUEST} />);
+    expect(await screen.findByRole("button", { name: pm.withdraw.action })).toBeDisabled();
+    expect(screen.getByText(pm.withdrawNote.someoneElse)).toBeInTheDocument();
+  });
+});
+
 describe("D60 FR-DPDP-003 the notice-issue dialog's optional PDF", () => {
   const FILE = "0192f3a4-0000-7000-8000-00000000e201";
   const notice: PrivacyNotice = {
