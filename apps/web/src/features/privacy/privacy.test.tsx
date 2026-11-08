@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -667,5 +667,90 @@ describe("D60 FR-DPDP-003 the notice-issue dialog's optional PDF", () => {
     expect(
       within(dialog).getByRole("button", { name: new RegExp(pm.pdf.make) }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("the notes form saves once per submit (XP-02, FR-DPDP-006)", () => {
+  it("two synchronous submits send one PATCH", async () => {
+    staff(MANAGE);
+    stub.routes[`GET /bff/api/v1/privacy/requests/${REQUEST}`] = () => Response.json(detail());
+    stub.routes[`PATCH /bff/api/v1/privacy/requests/${REQUEST}`] = () =>
+      Response.json(detail({ notes: "Called the father.", version: 3 }));
+    const user = userEvent.setup();
+    renderWithIntl(<RequestDetailScreen requestId={REQUEST} />);
+    const notes = await screen.findByLabelText(pm.work.notes);
+    await user.type(notes, "Called the father.");
+    const form = notes.closest("form");
+    expect(form).not.toBeNull();
+    act(() => {
+      fireEvent.submit(form!);
+      fireEvent.submit(form!);
+    });
+    const key = `PATCH /bff/api/v1/privacy/requests/${REQUEST}`;
+    await waitFor(() => expect(stub.callsTo(key)).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stub.callsTo(key)).toHaveLength(1);
+  });
+});
+
+describe("after an erasure the requests list is read again (XP-04, FR-DPDP-012)", () => {
+  it("the list on the same page shows the decided status", async () => {
+    staff(DECIDE);
+    let decided = false;
+    stub.routes[`GET /bff/api/v1/privacy/requests/${REQUEST}`] = () =>
+      Response.json(
+        detail({ kind: "erasure", report: null, ...(decided ? { status: "decided" } : {}) }),
+      );
+    stub.routes[`GET /bff/api/v1/privacy/requests/${REQUEST}/erasure-plan`] = () =>
+      Response.json({ request_id: REQUEST, rows: plan() });
+    stub.routes["POST /bff/api/v1/privacy/requests/search"] = () =>
+      page([row({ kind: "erasure", ...(decided ? { status: "decided" } : {}) })]);
+    stub.routes[`POST /bff/api/v1/privacy/requests/${REQUEST}/erasure`] = () => {
+      decided = true;
+      return Response.json({
+        request_id: REQUEST,
+        erased: [{ class_key: "ask_history", count: 12 }],
+        manual_steps: [],
+      });
+    };
+    const user = userEvent.setup();
+    renderWithIntl(
+      <>
+        <RequestsScreen tab="open" />
+        <RequestDetailScreen requestId={REQUEST} />
+      </>,
+    );
+    const box = await screen.findByRole("checkbox", { name: "Erase Ask questions and answers" });
+    await waitFor(() =>
+      expect(stub.callsTo("POST /bff/api/v1/privacy/requests/search")).toHaveLength(1),
+    );
+    await user.click(box);
+    await user.click(screen.getByRole("button", { name: pm.erasure.erase }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: pm.erasure.erase }));
+    expect(await screen.findByText(pm.erasure.doneTitle)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(stub.callsTo("POST /bff/api/v1/privacy/requests/search").length).toBeGreaterThan(1),
+    );
+  });
+});
+
+describe("the access report is built once per click (XP-02, FR-DPDP-008)", () => {
+  it("two synchronous clicks send one POST", async () => {
+    staff(MANAGE);
+    stub.routes[`GET /bff/api/v1/privacy/requests/${REQUEST}`] = () =>
+      Response.json(detail({ report: null }));
+    stub.routes[`POST /bff/api/v1/privacy/requests/${REQUEST}/report`] = () =>
+      Response.json(detail(), { status: 202 });
+    renderWithIntl(<RequestDetailScreen requestId={REQUEST} />);
+    const build = await screen.findByRole("button", { name: pm.access.build });
+    act(() => {
+      fireEvent.click(build);
+      fireEvent.click(build);
+    });
+    const key = `POST /bff/api/v1/privacy/requests/${REQUEST}/report`;
+    await waitFor(() => expect(stub.callsTo(key)).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(stub.callsTo(key)).toHaveLength(1);
   });
 });

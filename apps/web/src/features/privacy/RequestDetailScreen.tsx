@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
@@ -292,6 +292,8 @@ function AccessPanel({ request }: { request: PrivacyRequest }) {
   const can = useStaffCan();
   const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
+  // Checked before the request starts: a second click in the same frame does not see `pending`.
+  const inFlight = useRef(false);
   const [error, setError] = useState<unknown>(undefined);
   const path = { request_id: request.id };
   const open = isOpen(request.status);
@@ -300,6 +302,8 @@ function AccessPanel({ request }: { request: PrivacyRequest }) {
   const released = request.report_released_at !== null;
 
   async function run(action: () => Promise<unknown>, refresh = true) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setPending(true);
     setError(undefined);
     try {
@@ -310,6 +314,7 @@ function AccessPanel({ request }: { request: PrivacyRequest }) {
     } catch (failure) {
       setError(failure);
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   }
@@ -632,7 +637,8 @@ function ErasurePanel({ request }: { request: PrivacyRequest }) {
               stepUp
               consequence={t("consequence", { count: total, kinds: chosen.length })}
               schema={emptySchema}
-              invalidate={[PRIVACY_KEYS.request(request.id), PRIVACY_KEYS.erasurePlan(request.id)]}
+              // The request is now decided: the lists read it again too (XP-04).
+              invalidate={[PRIVACY_KEYS.all]}
               errorNamespace="privacy"
               submit={() =>
                 unwrap(
@@ -774,6 +780,8 @@ function WorkForm({
   const base = useId();
   const { ref, dirty, onChange } = useFormDirty();
   const [pending, setPending] = useState(false);
+  // A second Enter in the same frame does not see `pending` yet (XP-02).
+  const busy = useRef(false);
   const [error, setError] = useState<unknown>(undefined);
   const stale = error instanceof ApiError && error.status === 412;
 
@@ -788,7 +796,8 @@ function WorkForm({
       verification_method: value("verification_method"),
       notes: value("notes"),
     });
-    if (Object.keys(patch).length === 0) return;
+    if (Object.keys(patch).length === 0 || busy.current) return;
+    busy.current = true;
     setPending(true);
     setError(undefined);
     try {
@@ -804,6 +813,7 @@ function WorkForm({
     } catch (failure) {
       setError(failure);
     } finally {
+      busy.current = false;
       setPending(false);
     }
   }
