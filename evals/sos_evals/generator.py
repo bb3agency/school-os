@@ -23,6 +23,8 @@ from sos_evals.contextual import CtxDocument, CtxQuestion
 from sos_evals.contextual_cases import CASES as CONTEXTUAL_CASES
 from sos_evals.conversation_cases import CASES as CONVERSATION_CASES
 from sos_evals.conversations import ConversationCase
+from sos_evals.due import DueCase
+from sos_evals.due_cases import CASES as DUE_CASES
 from sos_evals.fee_cases import CASES as FEE_CASES
 from sos_evals.fees import FeeCase
 from sos_evals.schema import CATEGORIES, Asker, Category, CorpusItem, EvalItem, Locale, Role
@@ -795,7 +797,8 @@ def _jsonl(
     | Sequence[CircularCase]
     | Sequence[FeeCase]
     | Sequence[CtxDocument | CtxQuestion]
-    | Sequence[ConversationCase],
+    | Sequence[ConversationCase]
+    | Sequence[DueCase],
 ) -> str:
     return "".join(
         json.dumps(row.model_dump(mode="json"), ensure_ascii=False, sort_keys=True) + "\n"
@@ -815,6 +818,7 @@ def render() -> dict[str, str]:
     rows += CONTEXTUAL_CASES.questions
     files["contextual.jsonl"] = _jsonl(rows)
     files["conversations.jsonl"] = _jsonl(CONVERSATION_CASES)
+    files["due.jsonl"] = _jsonl(DUE_CASES)
     return files
 
 

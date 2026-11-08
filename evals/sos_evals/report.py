@@ -27,6 +27,7 @@ LOWER_IS_BETTER = frozenset(
         "circular_hallucinated_deadlines",
         "fee_leakage_count",
         "fee_guessed_link_count",
+        "due_leakage_count",
         "ctx_leakage_count",
         "conversation_leakage_count",
         "english_first_telugu_outputs",
@@ -143,6 +144,7 @@ def to_markdown(report: Report) -> str:
             (
                 "circular_",
                 "fee_",
+                "due_",
                 "ctx_",
                 "conversation_",
                 "followup_",
@@ -180,6 +182,8 @@ def to_markdown(report: Report) -> str:
     lines += _circular_lines(report.run) or ["Not measured."]
     lines += ["", "## Fee dues from Tally (M6)", ""]
     lines += _fee_lines(report.run) or ["Not measured."]
+    lines += ["", "## What's due this week (D74)", ""]
+    lines += _due_lines(report.run) or ["Not measured."]
     lines += ["", "## Contextual retrieval and reranking (docs/06 §13.6)", ""]
     lines += _contextual_lines(report.run) or ["Not measured."]
     lines += ["", "## Ask conversations (ADR-0034)", ""]
@@ -273,6 +277,27 @@ def _fee_lines(run: RunResult) -> list[str]:
             problems.append("mapped an unlinked ledger by name")
         if o.valid_amounts < o.stated:
             problems.append(f"{o.stated - o.valid_amounts} uncited amount(s)")
+        if problems:
+            lines.append(f"- `{o.id}` ({o.locale}): " + "; ".join(problems))
+    return lines
+
+
+def _due_lines(run: RunResult) -> list[str]:
+    if not run.due_outcomes:
+        return []
+    m = run.metrics
+    lines = [
+        f"- Cases: {m.due_items} · leakage {fmt(m.due_leakage_count)} · citation validity "
+        f"{fmt(m.due_citation_validity)} · task recall {fmt(m.due_task_recall)}",
+    ]
+    for o in run.due_outcomes:
+        problems = []
+        if o.leaks:
+            problems.append("leak: " + ", ".join(o.leaks[:3]))
+        if o.found < o.expected:
+            problems.append(f"{o.expected - o.found} expected task(s) missing")
+        if o.valid < o.stated:
+            problems.append(f"{o.stated - o.valid} uncited task(s)")
         if problems:
             lines.append(f"- `{o.id}` ({o.locale}): " + "; ".join(problems))
     return lines

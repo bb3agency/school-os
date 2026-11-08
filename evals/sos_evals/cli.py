@@ -44,6 +44,8 @@ def build_report(
         circular_cases=data.circulars,
         fee=stub,
         fee_cases=data.fees,
+        due_adapter=stub,
+        due_cases=data.due,
         ctx=stub,
         ctx_set=data.contextual,
         ctx_fast=suite == "fast",

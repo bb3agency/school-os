@@ -43,6 +43,10 @@ PERFECT = Metrics(
     fee_guessed_link_count=0,
     fee_citation_validity=1.0,
     fee_refusal_correctness=1.0,
+    due_items=8,
+    due_leakage_count=0,
+    due_citation_validity=1.0,
+    due_task_recall=1.0,
     ctx_items=54,
     ctx_recall_at_5_plain=0.7,
     ctx_recall_at_5_contextual=1.0,
@@ -93,6 +97,10 @@ def test_FR_KB_010_SEC_018_SEC_019_hard_gates_are_exactly_the_documented_ones() 
         ("fee_guessed_link_count", "==", 0),
         ("fee_citation_validity", ">=", 1.0),
         ("fee_refusal_correctness", ">=", 0.95),
+        # "What's due this week?" (D74, list_due_tasks): no one else's task for a caller who
+        # may see only their own, and every task stated is cited from a passage given.
+        ("due_leakage_count", "==", 0),
+        ("due_citation_validity", ">=", 1.0),
         # Contextual retrieval and reranking (docs/06 §13.6): nothing restricted is retrieved
         # or sent to a reranker, in any variant.
         ("ctx_leakage_count", "==", 0),

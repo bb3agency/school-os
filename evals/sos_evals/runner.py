@@ -14,6 +14,7 @@ from sos_evals import (
     circulars,
     contextual,
     conversations,
+    due,
     english_first,
     fees,
     metrics,
@@ -98,6 +99,11 @@ class Metrics(_Model):
     fee_guessed_link_count: int | None = None
     fee_citation_validity: float | None = None
     fee_refusal_correctness: float | None = None
+    # "What's due this week?" (sos_evals.due; D74, list_due_tasks). None when not measured.
+    due_items: int = 0
+    due_leakage_count: int | None = None
+    due_citation_validity: float | None = None
+    due_task_recall: float | None = None
     # Contextual retrieval and reranking (sos_evals.contextual; docs/06 §13.6). None when not
     # measured (their gates fail).
     ctx_items: int = 0
@@ -295,6 +301,7 @@ class RunResult(_Model):
     outcomes: tuple[ItemOutcome, ...]
     circular_outcomes: tuple[circulars.CircularOutcome, ...] = ()
     fee_outcomes: tuple[fees.FeeOutcome, ...] = ()
+    due_outcomes: tuple[due.DueOutcome, ...] = ()
     contextual_outcomes: tuple[contextual.CtxOutcome, ...] = ()
     conversation_outcomes: tuple[conversations.StepOutcome, ...] = ()
     english_first_outcomes: tuple[english_first.EnglishFirstOutcome, ...] = ()
@@ -311,6 +318,8 @@ def run(
     circular_cases: Sequence[circulars.CircularCase] = (),
     fee: fees.FeeAdapter | None = None,
     fee_cases: Sequence[fees.FeeCase] = (),
+    due_adapter: due.DueAdapter | None = None,
+    due_cases: Sequence[due.DueCase] = (),
     ctx: contextual.ContextualAdapter | None = None,
     ctx_set: contextual.ContextualSet | None = None,
     ctx_fast: bool = False,
@@ -343,6 +352,10 @@ def run(
     if fee is not None and fee_cases:
         dues, fee_outcomes = fees.run(fee_cases, fee)
         overall = overall.model_copy(update=dues.model_dump())
+    due_outcomes: tuple[due.DueOutcome, ...] = ()
+    if due_adapter is not None and due_cases:
+        tasks, due_outcomes = due.run(due_cases, due_adapter)
+        overall = overall.model_copy(update=tasks.model_dump())
     ctx_outcomes: tuple[contextual.CtxOutcome, ...] = ()
     if ctx is not None and ctx_set is not None:
         ctx_metrics, ctx_outcomes = contextual.run(ctx_set, ctx_set.select(ctx_fast), ctx)
@@ -370,6 +383,7 @@ def run(
         outcomes=tuple(outcomes),
         circular_outcomes=circular_outcomes,
         fee_outcomes=fee_outcomes,
+        due_outcomes=due_outcomes,
         contextual_outcomes=ctx_outcomes,
         conversation_outcomes=conversation_outcomes,
         english_first_outcomes=english_outcomes,

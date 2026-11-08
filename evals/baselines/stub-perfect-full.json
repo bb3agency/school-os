@@ -1,6 +1,6 @@
 {
   "adapter": "stub-perfect",
-  "dataset_sha256": "81d2cbeef5053e3b5609a5de07be908f3613466e1d55f44aabe35570b5a6e09c",
+  "dataset_sha256": "acab44f5c4a49b7b78237319b77c24401fe49a013cd0a88a1580de7a11494ab3",
   "metrics": {
     "authorised_recall_at_10": 1.0,
     "authorised_recall_at_10_critical": 1.0,
@@ -32,6 +32,10 @@
     "ctx_recall_at_5_plain": 0.35185185185185186,
     "ctx_recall_at_5_rerank": 0.35185185185185186,
     "ctx_recall_gain_contextual": 0.6481481481481481,
+    "due_citation_validity": 1.0,
+    "due_items": 8,
+    "due_leakage_count": 0,
+    "due_task_recall": 1.0,
     "english_first_english_answer_rate": 1.0,
     "english_first_fields": 326,
     "english_first_items": 88,
