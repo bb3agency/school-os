@@ -5607,7 +5607,8 @@
       "resolveOpen": "దాని స్క్రీన్ తెరుస్తుంది",
       "resolveGone": "మీరు ఇక తెరవలేని మూలం",
       "resolveNoScreen": "ఈ మూలానికి తెరవడానికి స్క్రీన్ లేదు.",
-      "resolveFailed": "మూలాన్ని తెరవలేకపోయాము. మళ్లీ ప్రయత్నించండి."
+      "resolveFailed": "మూలాన్ని తెరవలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
+      "openPage": "page {page} (open {title} at this page in a new tab)"
     },
     "notFound": {
       "title": "మీరు చూడగల పాఠశాల రికార్డులలో ఇది కనబడలేదు",

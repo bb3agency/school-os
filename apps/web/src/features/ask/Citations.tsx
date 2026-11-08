@@ -18,7 +18,7 @@ import { DownloadButton } from "@/features/documents/parts";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { needsResolve, parseSource, sourceHref, type AskCitation } from "./answer";
-import { ResolveSourceLink } from "./ResolveSource";
+import { CitedPageButton, ResolveSourceLink } from "./ResolveSource";
 import { openLabel } from "./parts";
 
 // The popover's code loads with the first chip a reader points at (keeps the route lean).
@@ -214,7 +214,12 @@ export function SourceCard({ citation, id }: { citation: AskCitation; id: string
             <span className="font-semibold break-anywhere text-ink">{name}</span>
           )}
           {ref?.kind === "doc" && ref.page !== null ? (
-            <Pill variant="tag">{t("page", { page: ref.page })}</Pill>
+            <CitedPageButton
+              documentId={ref.id}
+              version={ref.version}
+              page={ref.page}
+              name={name}
+            />
           ) : null}
           {ref?.kind === "count" ? <Pill variant="tag">{t("countNote")}</Pill> : null}
           {ref?.kind === "fee" ? <Pill variant="tag">{tt("sourceNote")}</Pill> : null}

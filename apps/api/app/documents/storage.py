@@ -176,6 +176,17 @@ def attachment_disposition(filename: str) -> str:
     return f'attachment; filename="{safe or "download"}"'
 
 
+def inline_disposition(filename: str) -> str:
+    """``inline`` (shown in the browser tab, e.g. a PDF opened at a cited page; D73) with the
+    same ASCII-only generated filename. Only for types a browser renders without running the
+    file's own script in our origin (:data:`INLINE_CONTENT_TYPES`)."""
+    return "inline" + attachment_disposition(filename).removeprefix("attachment")
+
+
+# Types a presigned GET may serve ``inline``: PDF (the browser's viewer) and raster images.
+INLINE_CONTENT_TYPES: Final = frozenset({"application/pdf", "image/jpeg", "image/png"})
+
+
 class ObjectWriter(Protocol):
     """A streamed upload (:meth:`ObjectStore.open_writer`). ``write`` appends bytes; ``close``
     completes the object (nothing is visible before); ``abort`` discards everything written.
@@ -199,8 +210,11 @@ class ObjectStore(Protocol):
     ) -> PresignedPost: ...
 
     def presigned_get(
-        self, *, key: str, content_type: str, filename: str, expires_s: int
-    ) -> tuple[str, dt.datetime]: ...
+        self, *, key: str, content_type: str, filename: str, expires_s: int, inline: bool = False
+    ) -> tuple[str, dt.datetime]:
+        """A presigned GET; ``attachment`` unless ``inline`` (only for
+        :data:`INLINE_CONTENT_TYPES`, else ``ValueError``)."""
+        ...
 
     def head(self, key: str) -> ObjectHead | None: ...
 
@@ -316,16 +330,19 @@ class S3ObjectStore:
         )
 
     def presigned_get(
-        self, *, key: str, content_type: str, filename: str, expires_s: int
+        self, *, key: str, content_type: str, filename: str, expires_s: int, inline: bool = False
     ) -> tuple[str, dt.datetime]:
         if not 1 <= expires_s <= MAX_DOWNLOAD_URL_TTL_S:
             raise ValueError("download URL lifetime must be 1..300 seconds")
+        if inline and content_type not in INLINE_CONTENT_TYPES:
+            raise ValueError("only PDF and raster images may be served inline")
+        disposition = (inline_disposition if inline else attachment_disposition)(filename)
         url = self._presign.generate_presigned_url(
             "get_object",
             Params={
                 "Bucket": self._bucket,
                 "Key": key,
-                "ResponseContentDisposition": attachment_disposition(filename),
+                "ResponseContentDisposition": disposition,
                 "ResponseContentType": content_type,
                 "ResponseCacheControl": "private, no-store",
             },

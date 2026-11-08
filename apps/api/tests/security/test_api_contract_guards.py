@@ -310,6 +310,8 @@ NON_UUID_PATH_PARAMS = {
     ("GET", "/api/v1/public/disclosure/{key}", "key"),
     ("GET", "/api/v1/public/disclosure/{key}/documents/{n}", "key"),
     ("GET", "/api/v1/public/disclosure/{key}/documents/{n}", "n"),
+    # D73: a cited page number inside a document the caller reaches (bounded int).
+    ("GET", "/api/v1/documents/{document_id}/pages/{n}", "n"),
     # R3-1A: notice template keys and letter keys are closed Literal enums (ADR-0048).
     ("GET", "/api/v1/privacy/templates/{key}/preview", "key"),
     ("POST", "/api/v1/privacy/templates/{key}/pdf", "key"),

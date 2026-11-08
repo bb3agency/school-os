@@ -263,6 +263,17 @@ class DownloadUrlOut(_Out):
     filename: str
 
 
+class PageUrlOut(_Out):
+    """A cited page of a document (D73): a short-lived presigned URL of a ``ready`` version
+    served ``inline``; the browser opens it at ``page`` (``#page=n`` for a PDF)."""
+
+    url: str
+    page: int
+    expires_at: dt.datetime
+    content_type: str
+    version_no: int
+
+
 # --- sheets (FR-DOC-009..011) ----------------------------------------------------------------
 
 SheetFormat = Literal["csv", "xlsx"]

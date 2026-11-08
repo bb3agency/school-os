@@ -5607,7 +5607,8 @@
       "resolveOpen": "opens its screen",
       "resolveGone": "Source you can no longer open",
       "resolveNoScreen": "This source has no screen to open.",
-      "resolveFailed": "Could not open the source. Try again."
+      "resolveFailed": "Could not open the source. Try again.",
+      "openPage": "page {page} (open {title} at this page in a new tab)"
     },
     "notFound": {
       "title": "Not found in the school records you can access",

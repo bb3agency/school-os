@@ -182,10 +182,13 @@ class MemoryStore:
         return 204
 
     def presigned_get(
-        self, *, key: str, content_type: str, filename: str, expires_s: int
+        self, *, key: str, content_type: str, filename: str, expires_s: int, inline: bool = False
     ) -> tuple[str, dt.datetime]:
         assert 1 <= expires_s <= storage.MAX_DOWNLOAD_URL_TTL_S
-        disposition = storage.attachment_disposition(filename)
+        assert not inline or content_type in storage.INLINE_CONTENT_TYPES
+        disposition = (storage.inline_disposition if inline else storage.attachment_disposition)(
+            filename
+        )
         self.gets.append(
             {"key": key, "ttl": expires_s, "disposition": disposition, "type": content_type}
         )

@@ -861,6 +861,128 @@ def test_FR_DOC_004_download_url_is_short_lived_attachment(
     assert any(str(e["resource_id"]) == doc["id"] for e in events)
 
 
+# --- cited pages (D73; ADR-0005, invariant 8) -----------------------------------------------
+
+
+def _page(api: Any, who: Any, doc: uuid.UUID | str, n: int | str, **params: Any) -> Any:
+    return api.call(who, "GET", f"/api/v1/documents/{doc}/pages/{n}", params=params or None)
+
+
+def test_D73_cited_page_is_an_inline_short_lived_link_of_the_ready_version(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    owner = world.person("owner")
+    doc = S.make_document(admin_engine, world.a.tenant_id, owner.user_id)
+    who = world.person("office_staff")
+    res = _page(api, who, doc, 3)
+    assert res.status_code == 200, res.text
+    assert res.headers["Cache-Control"] == "no-store"
+    body = res.json()
+    assert set(body) == {"url", "page", "expires_at", "content_type", "version_no"}
+    assert (body["page"], body["content_type"], body["version_no"]) == (3, PDF_CT, 1)
+    query = urllib.parse.parse_qs(urllib.parse.urlparse(body["url"]).query)
+    assert int(query["X-Amz-Expires"][0]) <= 300
+    assert query["response-content-disposition"][0].startswith("inline;")
+    assert "Synthetic" not in body["url"], "titles never reach URLs"
+    got = S.memory_store().gets[-1]
+    assert got["key"].startswith(f"t/{world.a.tenant_id}/docs/{doc}/")
+    events = [
+        e
+        for e in W.audit_events(admin_engine, world.a.tenant_id, "document.download_url_issued")
+        if str(e["resource_id"]) == str(doc)
+    ]
+    assert events[-1]["summary"] == {"version_no": 1, "page": 3, "inline": True}
+    assert events[-1]["actor_id"] is not None
+    assert _page(api, who, doc, 1, version=1).status_code == 200
+    assert _page(api, who, doc, 1, version=2).status_code == 404
+
+
+def test_D73_cited_page_needs_document_read(world: Any, api: Any, admin_engine: Engine) -> None:
+    doc = S.make_document(admin_engine, world.a.tenant_id, world.person("owner").user_id)
+    # Every staff role holds document.read; a member without roles does not.
+    nobody = W.add_member(admin_engine, world.a.tenant_id, [])
+    res = _page(api, nobody, doc, 1)
+    assert res.status_code == 403, res.text
+
+
+def test_D73_cited_page_of_another_school_or_outside_the_acl_is_404(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    b_doc = S.make_document(admin_engine, world.b.tenant_id, world.b.people["owner"].user_id)
+    hidden = S.make_document(
+        admin_engine, world.a.tenant_id, world.person("owner").user_id, acl=[("role", "accountant")]
+    )
+    owner = world.person("owner")
+    answers = [_page(api, owner, b_doc, 1), _page(api, owner, uuid.uuid4(), 1)]
+    teacher = world.person("teacher")
+    answers += [_page(api, teacher, hidden, 1)]
+    assert [r.status_code for r in answers] == [404, 404, 404]
+    shapes = [{k: r.json().get(k) for k in ("status", "code", "title", "detail")} for r in answers]
+    assert shapes[0] == shapes[1] == shapes[2], "uniform 404"
+    assert _page(api, world.person("accountant"), hidden, 1).status_code == 200
+
+
+@pytest.mark.parametrize("status", ["quarantined", "queued", "scanning", "failed"])
+def test_D73_cited_page_refuses_versions_that_are_not_ready(
+    world: Any, api: Any, admin_engine: Engine, status: str
+) -> None:
+    doc = S.make_document(
+        admin_engine, world.a.tenant_id, world.person("owner").user_id, status=status
+    )
+    before = len(S.memory_store().gets)
+    for params in ({}, {"version": 1}):
+        res = _page(api, world.person("principal"), doc, 1, **params)
+        assert res.status_code == 409, res.text
+        assert res.json()["code"] == "document_not_ready"
+    assert len(S.memory_store().gets) == before, "no link for an unscanned or infected file"
+
+
+def test_D73_cited_page_of_a_restricted_file_needs_sensitive_read(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    doc = S.make_document(
+        admin_engine, world.a.tenant_id, world.person("owner").user_id, sensitivity="C3"
+    )
+    res = _page(api, world.person("accountant"), doc, 1)
+    assert res.status_code == 403
+    assert res.json()["code"] == "sensitive_document"
+    assert _page(api, world.person("principal"), doc, 1).status_code == 200
+
+
+def test_D73_cited_page_bounds(world: Any, api: Any, admin_engine: Engine) -> None:
+    doc = S.make_document(admin_engine, world.a.tenant_id, world.person("owner").user_id)
+    who = world.person("principal")
+    for n in (0, -1, 10_001, "x"):
+        assert _page(api, who, doc, n).status_code == 422, n
+    assert _page(api, who, doc, 10_000).status_code == 200, "page count unknown: up to 10000"
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE kb.document_versions SET page_count = 3 WHERE document_id = :d"),
+            {"d": doc},
+        )
+    assert _page(api, who, doc, 3).status_code == 200
+    res = _page(api, who, doc, 4)
+    assert res.status_code == 422
+    assert res.json()["errors"][0]["field"] == "n"
+    assert res.json()["errors"][0]["code"] == "page_out_of_range"
+
+
+def test_D73_cited_page_of_a_file_the_browser_cannot_show_is_415(
+    world: Any, api: Any, admin_engine: Engine
+) -> None:
+    doc = S.make_document(
+        admin_engine,
+        world.a.tenant_id,
+        world.person("owner").user_id,
+        data=b"PK\x03\x04synthetic",
+        mime_type=DOCX_CT,
+        ext="docx",
+    )
+    res = _page(api, world.person("principal"), doc, 1)
+    assert res.status_code == 415
+    assert res.json()["code"] == "page_not_viewable"
+
+
 def test_FR_DOC_004_restricted_c3_files_need_sensitive_read(world: Any, api: Any) -> None:
     maker = world.person("office_staff")
     up = upload(api, maker, S.pdf(), purpose="evidence", filename="tc.pdf")
