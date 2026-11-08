@@ -221,6 +221,36 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
       },
     );
 
+    it.each(["cross-site", "same-site"])(
+      "XB-03 (SEC-004): a GET from another site (Sec-Fetch-Site %s) never reaches the API as the user",
+      async (site) => {
+        // Top-level navigations carry the SameSite=Lax cookie; audited GETs (print views, the
+        // fee day report, download links) must not be triggered from another site.
+        await h.signIn("staff", clerk);
+        h.apiCalls.length = 0;
+        const response = await call("/bff/api/v1/fees/reports/daily/print?date=2026-11-08", {
+          headers: { "sec-fetch-site": site },
+        });
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ code: "csrf_failed" });
+        expect(h.apiCalls).toHaveLength(0);
+      },
+    );
+
+    it.each(["same-origin", "none"])(
+      "XB-03 (SEC-004): a GET with Sec-Fetch-Site %s (the app, a bookmark, a typed address) passes",
+      async (site) => {
+        await h.signIn("staff", clerk);
+        h.apiCalls.length = 0;
+        h.setApi(() => json({ ok: true }));
+        const response = await call("/bff/api/v1/fees/reports/daily/print?date=2026-11-08", {
+          headers: { "sec-fetch-site": site },
+        });
+        expect(response.status).toBe(200);
+        expect(h.apiCalls).toHaveLength(1);
+      },
+    );
+
     it("SEC-004: the app's own Origin with Sec-Fetch-Site same-origin and the token passes", async () => {
       await h.signIn("staff", clerk);
       const token = await h.csrf();

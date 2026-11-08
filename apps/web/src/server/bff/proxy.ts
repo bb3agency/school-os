@@ -238,6 +238,13 @@ export async function proxyToApi(request: Request, runtime: AuthRuntime): Promis
     return problem(requestId, 404, "not_found", "Not found");
   }
 
+  // XB-03: nothing from another site reaches the API as the user, safe methods included. A
+  // top-level navigation from another site carries the SameSite=Lax cookie, and some GETs have
+  // effects (audited print views and download links). The app's own calls are same-origin; a
+  // bookmark or a typed address is `none`; old browsers send no header at all.
+  const site = request.headers.get("sec-fetch-site");
+  if (site !== null && site !== "same-origin" && site !== "none") return csrfFailed(requestId);
+
   const passive = method === "GET" && request.headers.get(PASSIVE_HEADER) === "1";
   const resolved = await resolveSession(request, runtime, kind, requestId, !passive);
   if (resolved instanceof Response) return resolved;
