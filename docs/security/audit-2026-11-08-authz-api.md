@@ -8,9 +8,10 @@ tokens; break-glass; pagination. Extra attention on routes added since 2026-11-0
 reports (`audit-2026-10-*.md`) were read first; their findings are not repeated. Paths are
 relative to `apps/api/`. Synthetic data only.
 
-**Status: no confirmed defect of medium or higher severity. Three low findings are reported
-for a decision; none was fixed in code** (each needs either an API schema change or a change to
-an owner decision, D71). The automated guards that cover this area all pass on `987ded97`.
+**Status: complete. No defect of medium or higher severity was found. The three low findings
+are fixed, each with a test that failed first**, following the lead's decisions of 2026-11-08
+(AZ-02 amends D71). AZ-01 and AZ-03 change the API schema, so the lead regenerates OpenAPI and
+the TS client. The automated guards that cover this area all pass.
 
 ## Method
 
@@ -31,9 +32,9 @@ an owner decision, D71). The automated guards that cover this area all pass on `
 
 | ID | Severity | Area | File:line | Description | Status |
 |---|---|---|---|---|---|
-| AZ-01 | Low (lost update between two privacy managers; integrity of an internal register) | Concurrency (API6, ASVS V11.1.4) | `app/privacy/breach_api.py:105-109`, `app/privacy/breach_service.py:469-500` | `PUT /privacy/breaches/{id}/affected` replaces the whole affected list without `If-Match`, and does not bump the breach's `version`. Two managers editing the list at once: the later save silently drops the other's additions. The breach `PATCH` next to it uses `If-Match`. This is the same class as round-two A-17 / R-03 (`PUT /users/{id}/roles`). | Reported. Proposed fix (about 30 lines): take an optional `If-Match` (the breach `ETag`), lock the row as now, compare and bump `version`, answer the new `ETag`. **Changes the API schema** (optional header), so the lead regenerates OpenAPI. |
-| AZ-02 | Low (availability of the `pdf` queue; needs one valid parent notice link) | Public routes, rate limits (API4) | `app/circulars/service.py:1972-2025` (`parent_notice_pdf`), `app/public/api.py:146-172` | `GET /public/links/current/document` re-queues a Chromium render for a notice whose last render **failed**, on every request after the failure (D71: "expired, failed or never ran is queued again"). A notice that fails to render deterministically (for example a renderer time-out on that content) is therefore rendered again for every parent tap, and a link holder can repeat it as fast as the per-address public limit allows. Only one render per notice is in flight (row lock and `queued` state), so the cost is bounded to one worker slot per notice, and the web page does not poll by itself. | Reported. It needs a change to the D71 behaviour: re-queue a `failed` render from a parent link at most once per cooldown (for example `document_retry_after_s` × N, using the notice's `updated_at`), or only for `render_error` codes that are transient. Owner or lead decision. |
-| AZ-03 | Low (operator-only; memory and response size) | Pagination (API4) | `app/platform/api.py:473-478, 533-541` (`_range`, `GET /platform/usage`) | `GET /api/v1/platform/usage` without `tenant_id` returns every school's daily usage rows for up to 401 days in one unpaged list (`list[UsageDailyOut]`). With 500 schools that is about 200,000 rows in one response. Operator token with `platform.usage.read` needed. The other unpaged platform lists added in November (`/usage/ai-quota-alerts`, `/usage/limit-alerts`, `/incidents/clocks`) are bounded by one row per school (and metric) and are fine. | Reported. Proposed: when `tenant_id` is absent, cap the range (for example 93 days) or page with `limit`/`cursor` like R-14. **API schema change**, so not fixed here. |
+| AZ-01 | Low (lost update between two privacy managers; integrity of an internal register) | Concurrency (API6, ASVS V11.1.4) | `app/privacy/breach_api.py:105-109`, `app/privacy/breach_service.py:469-500` | `PUT /privacy/breaches/{id}/affected` replaces the whole affected list without `If-Match`, and does not bump the breach's `version`. Two managers editing the list at once: the later save silently drops the other's additions. The breach `PATCH` next to it uses `If-Match`. This is the same class as round-two A-17 / R-03 (`PUT /users/{id}/roles`). | Fixed in 16890529: `If-Match` is required, as on the breach `PATCH` (400 `if_match_required` when missing, 412 when stale, nothing changed). The breach `version` is bumped and the new `ETag` is answered. **API schema change** (new header parameter). The web does not call this route. Test: `tests/privacy/test_breach_api.py::test_FR_DPDP_033_AZ_01_affected_list_needs_if_match_and_bumps_the_version`. |
+| AZ-02 | Low (availability of the `pdf` queue; needs one valid parent notice link) | Public routes, rate limits (API4) | `app/circulars/service.py:1972-2025` (`parent_notice_pdf`), `app/public/api.py:146-172` | `GET /public/links/current/document` re-queues a Chromium render for a notice whose last render **failed**, on every request after the failure (D71: "expired, failed or never ran is queued again"). A notice that fails to render deterministically (for example a renderer time-out on that content) is therefore rendered again for every parent tap, and a link holder can repeat it as fast as the per-address public limit allows. Only one render per notice is in flight (row lock and `queued` state), so the cost is bounded to one worker slot per notice, and the web page does not poll by itself. | Fixed in b4ca607d and 86bc7321 (amends D71, lead decision). After a failed render, a parent request re-queues the render only when the failure is older than `notices.failed_render_cooldown_s` (`app/circulars/config.yaml`, 900 s, validated 60..86400). The failure time is `updated_at`, which the `parent_notices_set_updated_at` trigger stamps. Inside the cooldown the route answers 202 `preparing` with `Retry-After` set to the time left (at least 60 s) and queues nothing. No schema change. Test: `tests/public/test_pages.py::test_D71_AZ_02_a_failed_render_is_queued_again_only_after_the_cooldown`. |
+| AZ-03 | Low (operator-only; memory and response size) | Pagination (API4) | `app/platform/api.py:473-478, 533-541` (`_range`, `GET /platform/usage`) | `GET /api/v1/platform/usage` without `tenant_id` returns every school's daily usage rows for up to 401 days in one unpaged list (`list[UsageDailyOut]`). With 500 schools that is about 200,000 rows in one response. Operator token with `platform.usage.read` needed. The other unpaged platform lists added in November (`/usage/ai-quota-alerts`, `/usage/limit-alerts`, `/incidents/clocks`) are bounded by one row per school (and metric) and are fine. | Fixed in 509f7986: without `tenant_id` the range is at most 31 days. With no dates it defaults to the last 31 days; a longer range answers 422 `range_too_long` on `from`. With `tenant_id`, the 401-day limit stays. The operator usage screen no longer sends a longer all-schools query and shows a warning instead. **API behaviour change** (new 422; the docstring is now in OpenAPI). Tests: `tests/platform/test_flags_usage.py::test_FR_PLT_020_AZ_03_all_schools_usage_is_at_most_31_days`, `apps/web/src/features/platform/usage-range.test.ts`. |
 
 ## Verified clean
 
@@ -114,8 +115,31 @@ Cross-cutting:
 
 ## Checks run
 
+Fixes (after the lead's decisions):
+
+- pytest: `tests/privacy/test_breach_api.py`, `test_consents_api.py`, `test_cross_module.py`,
+  `test_breach_affected_count.py`; `tests/public` and `tests/circulars` (203 passed, 3
+  skipped); `tests/platform/test_flags_usage.py`; `tests/platform -k usage`;
+  `tests/security/test_api_contract_guards.py` and `test_route_enumeration.py`: all passed.
+- `tests/security/test_authz_matrix.py` and `test_bola.py` with `-k breach`: 100 passed, and 2
+  failed on `POST /api/v1/privacy/breaches`, the create route, which these fixes do not touch.
+  The error is `ValueError: SOS_LOCAL_DEV_MASTER_KEY is required for the local-dev key
+  wrapper`. It is a fixture or ordering artefact of the `-k` selection, not a result of these
+  changes. The PUT affected and the breach PATCH cases pass.
+- `ruff check` and `ruff format --check` on the touched files; `mypy apps/api apps/worker
+  evals`: no issues; `lint-imports`: 52 kept.
+- Web (packages from `D:\school-os\node_modules` through a scratch vitest config, because a
+  junction was refused):
+  - vitest on `src/features/platform` and `src/features/breaches`: 210 passed;
+  - `src/i18n/messages.test.ts`: passed (en and te keys match);
+  - eslint and prettier on the touched files: clean;
+  - `tsc --noEmit`: no errors in `src/`. The only errors are in `e2e/`,
+    `playwright.config.ts` and `vitest.config.ts`, which need web-local packages that are not
+    in the worktree.
+
+Audit:
+
 - `uv run pytest apps/api/tests/security/test_api_contract_guards.py
   apps/api/tests/security/test_route_enumeration.py
   apps/api/tests/security/test_rate_limit_routes.py
   apps/api/tests/security/test_no_pii_in_urls.py`: 34 passed.
-- No code changed, so ruff, mypy and lint-imports were not needed for this report.
