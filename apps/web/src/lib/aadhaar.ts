@@ -1,9 +1,10 @@
 /**
  * Client-side guard for invariant 4 (no Aadhaar numbers, ever): finds 12-digit sequences,
- * ungrouped or grouped 4-4-4 with 1-3 separator characters between groups (whitespace incl.
- * no-break spaces, dashes, dot, slash, underscore, invisible format characters, in any mix, or a
- * single comma; lead decision D52), that pass the Verhoeff check, as `core.redaction` does on
- * the server. Forms refuse such text before it is sent; the API
+ * ungrouped or grouped 4-4-4 (see `AADHAAR_GROUP_SEPARATOR`: whitespace gaps of any width,
+ * dashes and the table separators `|` `:` `*` with gaps around them, 1-3 of whitespace, dashes,
+ * dot, slash, underscore and invisible format characters in any mix, or a single comma; lead
+ * decision D52 as extended on 2026-11-08), that pass the Verhoeff check, as `core.redaction` does
+ * on the server. Forms refuse such text before it is sent; the API
  * refuses it again (`aadhaar_full_number_rejected`). Never logs or returns the number.
  */
 
@@ -45,11 +46,16 @@ export function verhoeffValid(digits: string): boolean {
 }
 
 /**
- * What may join two 4-digit groups (D52, same as `AADHAAR_GROUP_SEPARATOR` in core.redaction):
- * 1-3 of whitespace (all Zs), dashes (Pd, minus), dot, slash, underscore and format characters
- * (Cf) in any mix, or one comma. Bounded quantifiers only, so matching stays linear.
+ * What may join two 4-digit groups (the same rule as core.redaction):
+ * - a whitespace or format-character (Cf) gap of any width (audit 2026-11-08 DPA-01: the
+ *   server collapses whitespace, so every gap is a join);
+ * - one dash (Pd, minus) or table separator `|` `:` `*` with any gap around it (DPA-03, lead
+ *   decision 2026-11-08 extending D52);
+ * - 1-3 of whitespace, dashes, dot, slash, underscore and Cf in any mix, or one comma (D52).
+ * Gaps, separators and digits are disjoint and each try is anchored on 4 digits, so matching
+ * stays linear. `x` and parentheses are not separators.
  */
-export const AADHAAR_GROUP_SEPARATOR = String.raw`(?:[\s\p{Cf}\p{Pd}\u2212._/]{1,3}|,)`;
+export const AADHAAR_GROUP_SEPARATOR = String.raw`(?:[\s\p{Cf}]*[\p{Pd}\u2212|:*][\s\p{Cf}]*|[\s\p{Cf}]+|[\s\p{Cf}\p{Pd}\u2212._/]{1,3}|,)`;
 
 // 12 digits not touching other digits, ungrouped or grouped 4-4-4. Lookahead so that
 // overlapping candidates (a fourth group) are all checked.

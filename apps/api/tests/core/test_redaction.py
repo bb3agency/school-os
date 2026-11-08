@@ -744,3 +744,96 @@ def test_PRV_015_D52_adversarial_input_is_scanned_in_linear_time(name: str) -> N
     contains_full_aadhaar(adversarial)
     redact(adversarial)
     assert time.perf_counter() - started < 5.0
+
+
+# --- audit 2026-11-08 DPA-01: the maskers join every gap the input check collapses ------------
+
+
+@pytest.mark.parametrize(
+    "gap", ["    ", "\t\t\t\t", "\n\n\n\n\n", " -   ", "   -   ", "\u3000 \t \n ", " " * 40]
+)
+def test_PRV_015_DPA_01_masking_joins_any_whitespace_gap_the_input_check_refuses(gap: str) -> None:
+    """Invariant 4 / SEC-013 (audit 2026-11-08 DPA-01): ``contains_full_aadhaar`` refuses a
+    number however wide its whitespace gaps are (DL-01), but the maskers stopped at 3 gap
+    characters, so text that is masked rather than refused (an Ask question, every string the
+    AI gateway sends, model output, log lines) carried ``2345    6789    0124`` unmasked to the
+    LLM provider and the embedding search. Every gap that collapses into a space is a join."""
+    text = f"Is {gap.join([VALID[:4], VALID[4:8], VALID[8:]])} enrolled?"
+    assert contains_full_aadhaar(text)
+    for out in (mask_aadhaar(text), redact(text), redact_log(text)):
+        assert VALID[:4] not in out, repr(out)
+        assert masked(VALID) in out, repr(out)
+    assert [m.verhoeff for m in find_aadhaar(text)] == [True]
+
+
+ADVERSARIAL_WIDE = {
+    "wide gaps then a letter": ("1234" + " " * 50 + "x") * 2000,
+    "wide gaps around dashes": ("1234" + " " * 30 + "-" + " " * 30) * 2000,
+    "alternating gap and dash": "1234" + " -" * 50000 + "x",
+    "wide gaps around pipes": ("1234" + " " * 30 + "|" + " " * 30) * 2000,
+    "pipe table of short numbers": "| 12 | 34 | 56 |" * 10000 + "x",
+    "colons then a letter": ("1234" + " " * 40 + ":" + " " * 40 + "y") * 1500,
+}
+
+
+@pytest.mark.parametrize("name", sorted(ADVERSARIAL_WIDE))
+def test_PRV_015_DPA_01_unbounded_gaps_are_scanned_in_linear_time(name: str) -> None:
+    adversarial = ADVERSARIAL_WIDE[name]
+    started = time.perf_counter()
+    mask_aadhaar(adversarial)
+    contains_full_aadhaar(adversarial)
+    redact(adversarial)
+    redact_log(adversarial)
+    assert time.perf_counter() - started < 5.0
+
+
+# --- DPA-03 (lead decision 2026-11-08, extends D52): OCR table separators ----------------------
+
+TABLE_SEPARATORS = [
+    "{a} | {b} | {c}",  # OCR table row
+    "{a}|{b}|{c}",
+    "| {a} | {b} | {c} |",  # markdown table row
+    "{a}:{b}:{c}",
+    "{a} : {b} : {c}",
+    "{a}*{b}*{c}",
+    "{a}  *  {b}  *  {c}",
+    "{a}      |      {b}\t|\t{c}",  # wide gaps around the bar
+    "{a} | {b}-{c}",  # mixed with the D52 separators
+    "{a}:{b}.{c}",
+]
+
+
+@pytest.mark.parametrize("template", TABLE_SEPARATORS)
+def test_PRV_015_DPA_03_table_separators_join_4_4_4_groups(template: str) -> None:
+    """Invariant 4 (lead decision 2026-11-08 extending D52): a number grouped 4-4-4 with ``|``,
+    ``:`` or ``*`` between the groups (any whitespace around them), as OCR and PDF extraction
+    write table cells, is refused on input, masked by every masker and located for image
+    redaction."""
+    text = f"Row {d52(template, VALID)} end"
+    assert contains_full_aadhaar(text), text
+    assert contains_grouped_aadhaar(text), text
+    for out in (mask_aadhaar(text), redact(text), redact_log(text)):
+        assert VALID[:4] not in out, repr(out)
+        assert VALID[4:8] not in out, repr(out)
+        assert masked(VALID) in out, repr(out)
+    assert [m.verhoeff for m in find_aadhaar(text)] == [True]
+
+
+@pytest.mark.parametrize("template", ["{a} | {b} | {c}", "{a}:{b}:{c}", "{a}*{b}*{c}"])
+def test_PRV_015_DPA_03_table_separators_need_verhoeff(template: str) -> None:
+    text = f"Row {d52(template, INVALID)} end"
+    assert not contains_full_aadhaar(text)
+    assert mask_aadhaar(text) == text
+
+
+def test_PRV_015_DPA_03_x_and_parentheses_stay_unjoined_and_times_stay_intact() -> None:
+    """Only ``|``, ``:`` and ``*`` were added; ``x`` and parentheses are not separators, and a
+    colon joins only three 4-digit groups, so clock times and ratios are never masked."""
+    for text in (
+        d52("{a}x{b}x{c}", VALID),
+        d52("({a}) {b} {c}", VALID),
+        "Periods 09:30 10:15 11:00 11:45 12:30 13:15 14:00",
+        "Ratio 1:2:3, time 10:45:30",
+    ):
+        assert mask_aadhaar(text) == text, text
+        assert not contains_full_aadhaar(text), text

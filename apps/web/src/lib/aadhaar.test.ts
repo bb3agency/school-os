@@ -78,4 +78,47 @@ describe("invariant 4: full Aadhaar numbers are refused before sending", () => {
     containsAadhaarNumber("1".repeat(100000));
     expect(performance.now() - started).toBeLessThan(2000);
   });
+
+  it("joins wide whitespace gaps and table separators like core.redaction (DPA-01, DPA-03)", () => {
+    const [valid] = SERVER_VECTORS;
+    const [a, b, c] = [valid.slice(0, 4), valid.slice(4, 8), valid.slice(8)];
+    for (const text of [
+      `${a}    ${b}    ${c}`, // wide gap
+      `${a}\t\t\t\t${b}\t\t\t\t${c}`,
+      `${a}\n\n\n\n\n${b}\n\n\n\n\n${c}`,
+      `${a}${" ".repeat(40)}${b}${" ".repeat(40)}${c}`,
+      `${a}   -   ${b}   -   ${c}`,
+      `${a}　 \t \n ${b}　 \t \n ${c}`,
+      `${a} | ${b} | ${c}`, // OCR table row
+      `| ${a} | ${b} | ${c} |`,
+      `${a}|${b}|${c}`,
+      `${a}:${b}:${c}`,
+      `${a} : ${b} : ${c}`,
+      `${a}*${b}*${c}`,
+      `${a}      |      ${b}\t|\t${c}`,
+      `${a} | ${b}-${c}`,
+      `${a}:${b}.${c}`,
+    ]) {
+      expect(containsAadhaarNumber(`Row ${text} end`), JSON.stringify(text)).toBe(true);
+    }
+    const invalid = `${valid.slice(0, -1)}${(Number(valid.at(-1)) + 1) % 10}`;
+    expect(
+      containsAadhaarNumber(
+        `${invalid.slice(0, 4)} | ${invalid.slice(4, 8)} | ${invalid.slice(8)}`,
+      ),
+    ).toBe(false);
+    // Not separators: x and parentheses; clock times are never 4-4-4.
+    expect(containsAadhaarNumber(`${a}x${b}x${c}`)).toBe(false);
+    expect(containsAadhaarNumber(`(${a}) ${b} ${c}`)).toBe(false);
+    expect(containsAadhaarNumber("Periods 09:30 10:15 11:00 11:45 12:30 13:15")).toBe(false);
+  });
+
+  it("scans wide gaps and table separators in linear time", () => {
+    const started = performance.now();
+    containsAadhaarNumber(`1234${" ".repeat(50)}x`.repeat(2000));
+    containsAadhaarNumber(`1234${" ".repeat(30)}|${" ".repeat(30)}`.repeat(2000));
+    containsAadhaarNumber("| 12 | 34 | 56 |".repeat(10000));
+    containsAadhaarNumber(`1234${" -".repeat(50000)}x`);
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
 });
