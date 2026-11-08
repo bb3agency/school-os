@@ -742,6 +742,18 @@ describe("school picker (FR-IAM-013)", () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it("XB-05 (FR-IAM-004): a session that has ended goes to sign-in, not 'can't open this school'", async () => {
+    stub.routes["POST /bff/auth/active-tenant"] = () => problem(401, "unauthenticated");
+    const navigate = vi.fn();
+    const user = userEvent.setup();
+    renderWithIntl(<ChooseSchoolView schools={schools} next="/" navigate={navigate} />);
+    await user.click(within(screen.getByRole("list")).getAllByRole("button")[0] as HTMLElement);
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith(expect.stringMatching(/^\/bff\/auth\/login\?next=/)),
+    );
+    expect(screen.queryByText(messages.en.chooseSchool.errorNotAvailable)).not.toBeInTheDocument();
+  });
+
   it("'no access yet': accepts a re-sent invitation, then goes to the picker", async () => {
     stub.routes["POST /bff/api/v1/me/accept-invitations"] = () => Response.json({ accepted: [T] });
     stub.routes["GET /bff/api/v1/me/schools"] = () => Response.json({ data: [schools[0]] });

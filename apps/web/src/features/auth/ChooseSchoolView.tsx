@@ -11,7 +11,13 @@ import { cardClasses } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { known, schoolTone } from "@/features/status";
 import { cn } from "@/lib/cn";
-import { chooseSchool, defaultNavigate, type Navigate } from "@/lib/bff/session-client";
+import {
+  chooseSchool,
+  currentPath,
+  defaultNavigate,
+  loginUrl,
+  type Navigate,
+} from "@/lib/bff/session-client";
 
 /**
  * FR-IAM-013 school picker: one button per school the user belongs to. Only active schools
@@ -42,6 +48,11 @@ export function ChooseSchoolView({
       const code = await chooseSchool(school.tenant_id);
       if (code === null) {
         navigate(next);
+        return;
+      }
+      if (code === "unauthenticated") {
+        // XB-05: the session has ended; sign in again and come back here.
+        navigate(loginUrl("staff", currentPath()));
         return;
       }
       setFailed(code);

@@ -564,6 +564,37 @@ describe("POST /bff/auth/active-tenant", () => {
     await expect(mismatch.json()).resolves.toMatchObject({ idle_timeout_ms: 15 * 60_000 });
   });
 
+  it("XB-05 (FR-IAM-004): an API 401 ends the session and asks for sign-in, not 'can't open this school'", async () => {
+    await h.signIn("staff", clerk);
+    const before = await h.runtime.store.load(h.jar.get("__Host-sos_session"), { touch: false });
+    const response = await switchTo(OTHER_TENANT, () =>
+      Response.json({ status: 401, code: "unauthenticated" }, { status: 401 }),
+    );
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "unauthenticated",
+      login_url: "/bff/auth/login",
+    });
+    expect(response.headers.get("set-cookie")).toContain("__Host-sos_session=;");
+    expect(await h.runtime.store.get(before!.id)).toBeNull();
+  });
+
+  it("XB-05 (FR-IAM-004): token_expired is refreshed and retried once, then the school is set", async () => {
+    await h.signIn("staff", clerk);
+    let first = true;
+    const tokenCallsBefore = h.idp.staff.tokenRequests.length;
+    const response = await switchTo(OTHER_TENANT, () => {
+      if (first) {
+        first = false;
+        return Response.json({ status: 401, code: "token_expired" }, { status: 401 });
+      }
+      return new Response(null, { status: 204 });
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ active_tenant_id: OTHER_TENANT });
+    expect(h.idp.staff.tokenRequests.length - tokenCallsBefore).toBe(1);
+  });
+
   it("refuses a school the API says the user cannot open", async () => {
     await h.signIn("staff", clerk);
     h.setApi(() => new Response(null, { status: 403 }));
