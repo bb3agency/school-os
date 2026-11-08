@@ -1045,3 +1045,70 @@ def test_data_contract_account_summary_and_dues(school: Any) -> None:
     assert dues is not None
     assert dues.total_due == D("7000.00")
     assert summary.overdue == D("3500.00")
+
+
+def test_FR_FEE_008_YF_02_concession_evidence_must_be_visible_to_the_requester(
+    school: Any, admin_engine: Engine
+) -> None:
+    """YF-02 (BOLA on a body id): the evidence of a concession must be a usable document the
+    requester can open. Before, any document id of the school was accepted (only the foreign
+    key checked it), so a requester could attach, and learn the existence of, a document its
+    ACL hides (e.g. a principal-only file)."""
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    from app.documents import service as documents
+
+    name = "sos_test_documents_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "documents" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    docs = sys.modules[name]
+    setup = F.ensure_setup(school)
+    account_id = F.account(school)
+    hidden = docs.make_document(
+        admin_engine,
+        school.tenant_id,
+        school.people["principal"].user_id,
+        purpose="evidence",
+        doc_type="certificate",
+        sensitivity="C3",
+        acl=[("role", "principal")],
+    )
+    assert not F.call(school, "accountant", lambda s, c: documents.is_visible(s, c, hidden))
+
+    def ask(evidence: uuid.UUID) -> Any:
+        return F.call(
+            school,
+            "accountant",
+            fees.request_concession,
+            account_id,
+            ConcessionCreate(
+                concession_type="hardship",
+                basis="amount",
+                value=D("100"),
+                targets=[ConcessionTarget(instalment_no=1, head_id=setup.tui)],
+                reason="Family hardship this term, letter attached",
+                evidence_document_id=evidence,
+            ),
+        )
+
+    with pytest.raises(ValidationFailed) as err:
+        ask(hidden)
+    assert err.value.errors[0]["field"] == "evidence_document_id"
+    visible = docs.make_document(
+        admin_engine,
+        school.tenant_id,
+        school.people["accountant"].user_id,
+        purpose="evidence",
+        doc_type="certificate",
+        sensitivity="C3",
+        acl=[("role", "accountant"), ("role", "principal")],
+    )
+    assert ask(visible).evidence_document_id == visible

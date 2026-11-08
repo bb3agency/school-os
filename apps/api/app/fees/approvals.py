@@ -171,13 +171,22 @@ def request_concession(
     session: Session, ctx: UserContext, account_id: uuid.UUID, data: ConcessionCreate
 ) -> ConcessionOut:
     """Ask for a concession (``fee.concession.request``). Targets must be charged lines of the
-    account. Audit ``fee.concession.requested``; the approvers are notified."""
+    account. The optional evidence is a usable document the requester can open (422
+    ``invalid`` on ``evidence_document_id`` otherwise; YF-02). Audit
+    ``fee.concession.requested``; the approvers are notified."""
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.CONCESSION_REQUEST)
     reason = c.clean_reason("reason", data.reason)
     if data.basis == "percent" and data.value > HUNDRED:
         raise ValidationFailed([c.error("value", "above_100_percent")])
     account = _account_for(session, account_id)
+    if data.evidence_document_id is not None and not (
+        documents.is_visible(session, ctx, data.evidence_document_id)
+        and documents.evidence_exists(session, data.evidence_document_id)
+    ):
+        # YF-02: a document the requester cannot open (or a quarantined one) is not evidence;
+        # the same answer as an unknown id, so its existence is not revealed.
+        raise ValidationFailed([c.error("evidence_document_id", "invalid")])
     dues = ledger.dues_for(session, account, c.today(session))
     seen: set[tuple[int, uuid.UUID]] = set()
     for i, t in enumerate(data.targets):
