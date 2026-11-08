@@ -186,65 +186,81 @@ function DayForm({ day, canRecord }: { day: AttendanceDay; canRecord: boolean })
   );
 }
 
-/** The month register (students × school days), printable on A4 landscape (FR-ATT-003). */
+/**
+ * The month register (students × school days), printable on A4 landscape (FR-ATT-003). The
+ * card title names the section and the month in words (XA-02): the pickers do not print, so
+ * the paper register says which class it is.
+ */
 function MonthRegister({ section, month }: { section: string; month: string }) {
   const t = useTranslations("attendance");
+  const locale = useLocale();
   const data = useAttendanceMonth(section, month, true);
+  const monthName = monthLabel(month, locale);
   return (
-    <LoadGate data={data}>
-      {(register) =>
-        register.students.length === 0 ? (
-          <EmptyState icon="users" title={t("emptyTitle")} body={t("emptyBody")} />
-        ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-ink-muted">
-              {t("schoolDays", { count: register.school_days.length })}
-            </p>
-            <TableScroll label={t("monthTable", { section: register.section.label, month })}>
-              <Table density="compact">
-                <THead>
-                  <Tr>
-                    <Th>{t("columns.roll")}</Th>
-                    <Th>{t("columns.student")}</Th>
-                    {register.school_days.map((day) => (
-                      <Th key={day}>
-                        <span className="font-mono text-xs">{day.slice(8, 10)}</span>
-                      </Th>
-                    ))}
-                    <Th numeric>{t("columns.absent")}</Th>
-                  </Tr>
-                </THead>
-                <TBody>
-                  {register.students.map((row) => (
-                    <Tr key={row.student.student_id}>
-                      <Td>
-                        <span className="font-mono">{row.student.roll_no ?? "—"}</span>
-                      </Td>
-                      <Td>{row.student.full_name ?? t("unnamed")}</Td>
-                      {register.school_days.map((day) => {
-                        const status = row.days[day];
-                        return (
-                          <Td key={day}>
-                            <span className="font-mono text-xs">
-                              {status ? REGISTER_CODE[status] : ""}
-                            </span>
-                            {status ? (
-                              <span className="sr-only">{t(`status.${status}`)}</span>
-                            ) : null}
-                          </Td>
-                        );
-                      })}
-                      <Td numeric>{row.counts.absent ?? 0}</Td>
-                    </Tr>
-                  ))}
-                </TBody>
-              </Table>
-            </TableScroll>
-            <p className="text-xs text-ink-subtle">{t("legend")}</p>
-          </div>
-        )
+    <Card
+      title={
+        data.status === "ready"
+          ? t("monthTable", { section: data.data.section.label, month: monthName })
+          : t("monthTitle", { month: monthName })
       }
-    </LoadGate>
+    >
+      <LoadGate data={data}>
+        {(register) =>
+          register.students.length === 0 ? (
+            <EmptyState icon="users" title={t("emptyTitle")} body={t("emptyBody")} />
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-ink-muted">
+                {t("schoolDays", { count: register.school_days.length })}
+              </p>
+              <TableScroll
+                label={t("monthTable", { section: register.section.label, month: monthName })}
+              >
+                <Table density="compact">
+                  <THead>
+                    <Tr>
+                      <Th>{t("columns.roll")}</Th>
+                      <Th>{t("columns.student")}</Th>
+                      {register.school_days.map((day) => (
+                        <Th key={day}>
+                          <span className="font-mono text-xs">{day.slice(8, 10)}</span>
+                        </Th>
+                      ))}
+                      <Th numeric>{t("columns.absent")}</Th>
+                    </Tr>
+                  </THead>
+                  <TBody>
+                    {register.students.map((row) => (
+                      <Tr key={row.student.student_id}>
+                        <Td>
+                          <span className="font-mono">{row.student.roll_no ?? "—"}</span>
+                        </Td>
+                        <Td>{row.student.full_name ?? t("unnamed")}</Td>
+                        {register.school_days.map((day) => {
+                          const status = row.days[day];
+                          return (
+                            <Td key={day}>
+                              <span className="font-mono text-xs">
+                                {status ? REGISTER_CODE[status] : ""}
+                              </span>
+                              {status ? (
+                                <span className="sr-only">{t(`status.${status}`)}</span>
+                              ) : null}
+                            </Td>
+                          );
+                        })}
+                        <Td numeric>{row.counts.absent ?? 0}</Td>
+                      </Tr>
+                    ))}
+                  </TBody>
+                </Table>
+              </TableScroll>
+              <p className="text-xs text-ink-subtle">{t("legend")}</p>
+            </div>
+          )
+        }
+      </LoadGate>
+    </Card>
   );
 }
 
@@ -359,13 +375,13 @@ export function AttendanceScreen() {
               </LoadGate>
             </Card>
           ) : (
-            <Card title={t("monthTitle", { month })}>
-              <MonthRegister section={section} month={month} />
-            </Card>
+            <MonthRegister section={section} month={month} />
           )}
           {canRecord && section ? (
             <div data-print="hide">
               <SheetImport<AttendanceEntry, AttendanceSheet>
+                // XA-01: a sheet read for one section is never offered for another.
+                key={section}
                 section={section}
                 title={t("import.title")}
                 description={t("import.description")}

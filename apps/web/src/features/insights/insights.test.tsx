@@ -1,4 +1,5 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import type * as Upload from "@/features/imports/upload";
@@ -677,6 +678,17 @@ describe("attendance (US-1701, US-1702; FR-ATT-001..004)", () => {
     expect(within(table).getAllByText(en.attendance.status.absent)).toHaveLength(2);
     expect(container.querySelector('[data-print="landscape"]')).not.toBeNull();
     expect(screen.getByRole("button", { name: en.attendance.print })).toBeVisible();
+    // XA-02 (FR-ATT-003): the printed register names its section and month in words (the
+    // pickers do not print), not "2026-11".
+    const monthName = new Intl.DateTimeFormat("en", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(`${todayIst().slice(0, 7)}-01T00:00:00Z`));
+    expect(
+      screen.getByRole("heading", { name: `Register of IX-A for ${monthName}` }),
+    ).toBeVisible();
+    expect(screen.queryByText(todayIst().slice(0, 7), { exact: false })).toBeNull();
     expect(
       stub
         .callsTo(`GET /bff/api/v1/sections/${SECTION}/attendance/month`)[0]
@@ -879,6 +891,149 @@ describe("marks (US-1703; FR-MRK-001..003)", () => {
     } finally {
       window.matchMedia = original;
     }
+  });
+
+  describe("switching exam (XA-01, FR-MRK-002, FR-MRK-004)", () => {
+    const EXAM_A = "0192f3a4-0000-7000-8000-00000000ea01";
+    const EXAM_B = "0192f3a4-0000-7000-8000-00000000ea02";
+    const examOf = (id: string, name: string) => ({
+      id,
+      academic_year_id: YEAR,
+      name,
+      held_on: "2026-08-10",
+      version: 1,
+    });
+    const gridOf = (exam: ReturnType<typeof examOf>) => ({
+      section: section(),
+      exam,
+      subjects: [],
+      students: day().students.map((row) => ({ student: row.student, marks: [], percent: null })),
+    });
+
+    async function openExams() {
+      signedIn(["marks.read", "marks.record"]);
+      const a = examOf(EXAM_A, "Formative assessment 1");
+      const b = examOf(EXAM_B, "Formative assessment 2");
+      stub.routes["GET /bff/api/v1/exams"] = () => Response.json([a, b]);
+      stub.routes[`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM_A}/marks`] = () =>
+        Response.json(gridOf(a));
+      stub.routes[`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM_B}/marks`] = () =>
+        Response.json(gridOf(b));
+      // The app's cache keeps a grid no screen is watching (default gcTime), as in the browser.
+      renderWithIntl(
+        <MarksScreen />,
+        "en",
+        new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+      );
+      const picker = await screen.findByLabelText(en.marks.section);
+      await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(1));
+      await userEvent.selectOptions(picker, SECTION);
+      const exams = screen.getByLabelText(en.marks.exam);
+      await waitFor(() => expect(within(exams).getAllByRole("option").length).toBeGreaterThan(2));
+      // Exam B was looked at first, so its grid is cached when the teacher comes back to it.
+      await userEvent.selectOptions(exams, EXAM_B);
+      await screen.findByText("Marks for Formative assessment 2");
+      await userEvent.selectOptions(exams, EXAM_A);
+      await screen.findByText("Marks for Formative assessment 1");
+      return exams;
+    }
+
+    it("typed marks for one exam are not kept for another", async () => {
+      const exams = await openExams();
+      await userEvent.type(await screen.findByLabelText(en.marks.entry.subject), "Telugu");
+      await userEvent.type(screen.getByLabelText("Marks of Synthetica Ravi"), "42");
+      await userEvent.selectOptions(exams, EXAM_B);
+      await screen.findByText("Marks for Formative assessment 2");
+      expect(screen.getByLabelText(en.marks.entry.subject)).toHaveValue("");
+      expect(screen.getByLabelText("Marks of Synthetica Ravi")).toHaveValue("");
+      await userEvent.click(screen.getByRole("button", { name: en.marks.entry.save }));
+      expect(
+        (await screen.findAllByText(en.marks.entry.problem.subjectRequired)).length,
+      ).toBeGreaterThan(0);
+      expect(
+        stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/exams/${EXAM_B}/marks`),
+      ).toHaveLength(0);
+    });
+
+    it("a sheet read for one exam cannot be saved into another", async () => {
+      const exams = await openExams();
+      stub.routes[`POST /bff/api/v1/sections/${SECTION}/exams/${EXAM_A}/marks/sheet`] = () =>
+        Response.json({
+          entries: [
+            {
+              student_id: STUDENT_ID,
+              subject: "Telugu",
+              max_marks: "100",
+              marks: "72",
+              absent: false,
+            },
+          ],
+          subjects: ["Telugu"],
+          students: 1,
+          issues: [],
+          issue_count: 0,
+        });
+      const file = new File(["Admission no.,Telugu\nMaximum,100\nSYN-0001,72\n"], "fa1.csv", {
+        type: "text/csv",
+      });
+      await userEvent.upload(await screen.findByLabelText(en.insights.sheet.file), file);
+      await userEvent.click(screen.getByRole("button", { name: en.insights.sheet.read }));
+      expect(await screen.findByRole("button", { name: "Save 1 entry" })).toBeVisible();
+      await userEvent.selectOptions(exams, EXAM_B);
+      await screen.findByText("Marks for Formative assessment 2");
+      expect(screen.queryByRole("button", { name: "Save 1 entry" })).toBeNull();
+      expect(
+        stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/exams/${EXAM_B}/marks`),
+      ).toHaveLength(0);
+    });
+  });
+
+  it("refuses marks the API cannot read: exponents, hex, three decimals (XA-03, FR-MRK-002)", async () => {
+    const EXAM = "0192f3a4-0000-7000-8000-00000000ea01";
+    const exam = {
+      id: EXAM,
+      academic_year_id: YEAR,
+      name: "Formative assessment 1",
+      held_on: "2026-08-10",
+      version: 1,
+    };
+    signedIn(["marks.read", "marks.record"]);
+    stub.routes["GET /bff/api/v1/exams"] = () => Response.json([exam]);
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`] = () =>
+      Response.json({
+        section: section(),
+        exam,
+        subjects: [],
+        students: day().students.map((row) => ({ student: row.student, marks: [], percent: null })),
+      });
+    renderWithIntl(<MarksScreen />);
+    const picker = await screen.findByLabelText(en.marks.section);
+    await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(1));
+    await userEvent.selectOptions(picker, SECTION);
+    const exams = screen.getByLabelText(en.marks.exam);
+    await waitFor(() => expect(within(exams).getAllByRole("option").length).toBeGreaterThan(1));
+    await userEvent.selectOptions(exams, EXAM);
+    await userEvent.type(await screen.findByLabelText(en.marks.entry.subject), "Telugu");
+    await userEvent.type(screen.getByLabelText("Marks of Synthetica Ravi"), "4e1");
+    await userEvent.type(screen.getByLabelText("Marks of Synthetica Anjali"), "42.555");
+    await userEvent.click(screen.getByRole("button", { name: en.marks.entry.save }));
+    expect(await screen.findByText(en.marks.entry.problem.marksInvalid)).toBeVisible();
+    expect(screen.getByLabelText("Marks of Synthetica Ravi")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(screen.getByLabelText("Marks of Synthetica Anjali")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    // A maximum the API refuses (an exponent) is caught here too.
+    // A browser's number box keeps "1e2" as typed (jsdom drops it key by key).
+    fireEvent.change(screen.getByLabelText(en.marks.entry.max), { target: { value: "1e2" } });
+    await userEvent.click(screen.getByRole("button", { name: en.marks.entry.save }));
+    expect(await screen.findAllByText(en.marks.entry.problem.maxInvalid)).not.toHaveLength(0);
+    expect(stub.callsTo(`POST /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`)).toHaveLength(
+      0,
+    );
   });
 });
 
