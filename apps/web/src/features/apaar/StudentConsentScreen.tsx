@@ -299,6 +299,9 @@ function RecordDecision({
   const [step, setStep] = useState<Step>("idle");
   const [attempt, setAttempt] = useState(0);
   const [done, setDone] = useState(false);
+  // Checked before the request starts: a second Enter or click in the same frame does not see
+  // `pending` yet (XP-05).
+  const inFlight = useRef(false);
   const keys = useRef({
     upload: newIdempotencyKey(),
     register: newIdempotencyKey(),
@@ -321,6 +324,7 @@ function RecordDecision({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (inFlight.current) return;
     const form = event.currentTarget;
     const raw = formValues(form);
     const file =
@@ -348,6 +352,7 @@ function RecordDecision({
       return;
     }
     const data = parsed.data;
+    inFlight.current = true;
     try {
       let documentId: string | null = null;
       if (file) {
@@ -415,6 +420,7 @@ function RecordDecision({
       }
       if (unmapped) setError(failure);
     } finally {
+      inFlight.current = false;
       setStep("idle");
     }
   }

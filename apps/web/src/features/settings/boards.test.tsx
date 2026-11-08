@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installBffStub, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { expectOneCall, fireTwice } from "@/test/double-submit";
+import { ParentLanguageCard } from "./ParentLanguageCard";
 import { messages, renderWithIntl } from "@/test/render";
 import { BoardsCard, boardsPatch } from "./BoardsCard";
 
@@ -120,5 +122,25 @@ describe("FR-TEN-020..022: boards and operating mode", () => {
     expect(screen.queryByRole("button", { name: en.save })).toBeNull();
     expect(screen.getByText(`${en.names.CBSE}, ${en.names.BSEAP}`)).toBeInTheDocument();
     expect(screen.getByText(en.modes.alongside.label)).toBeInTheDocument();
+  });
+});
+
+describe("one PATCH per submit or click (XP-05, FR-TEN-020, FR-LANG-001)", () => {
+  it("the boards form sends one PATCH for two synchronous submits", async () => {
+    stub.routes["PATCH /bff/api/v1/tenant"] = () => Response.json({ ...TENANT, version: 8 });
+    const user = userEvent.setup();
+    renderWithIntl(<BoardsCard tenant={TENANT} manage tenantKey={KEY} />);
+    const bseap = screen.getByRole("checkbox", { name: en.names.BSEAP });
+    await user.click(bseap);
+    fireTwice(bseap.closest("form")!, "submit");
+    await expectOneCall(stub, "PATCH /bff/api/v1/tenant");
+  });
+
+  it("the parent language card sends one PATCH for two synchronous clicks", async () => {
+    stub.routes["PATCH /bff/api/v1/tenant"] = () => Response.json({ ...TENANT, version: 8 });
+    renderWithIntl(<ParentLanguageCard tenant={TENANT} manage tenantKey={KEY} />);
+    const [button] = screen.getAllByRole("button", { name: /Switch to/ });
+    fireTwice(button!, "click");
+    await expectOneCall(stub, "PATCH /bff/api/v1/tenant");
   });
 });

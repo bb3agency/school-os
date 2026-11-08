@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -131,9 +131,14 @@ export function NoticePdfButton({
   const api = useBffClient("staff");
   const [file, setFile] = useState<PrivacyFile | null>(initialFile);
   const [pending, setPending] = useState(false);
+  // Checked before the request starts: a second Enter or click in the same frame does not see
+  // `pending` yet (XP-05).
+  const inFlight = useRef(false);
   const [error, setError] = useState<unknown>(undefined);
 
   async function make() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setPending(true);
     setError(undefined);
     try {
@@ -146,6 +151,7 @@ export function NoticePdfButton({
     } catch (failure) {
       setError(failure);
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   }

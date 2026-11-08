@@ -2,7 +2,7 @@
 
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
@@ -395,6 +395,9 @@ function FormLanguageCard() {
   const can = useStaffCan();
   const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
+  // Checked before the request starts: a second Enter or click in the same frame does not see
+  // `pending` yet (XP-05).
+  const inFlight = useRef(false);
   const [error, setError] = useState<unknown>(undefined);
   const [saved, setSaved] = useState(false);
   const settings = useQuery({
@@ -408,7 +411,8 @@ function FormLanguageCard() {
   const current = settings.data?.effective_language ?? "en";
 
   async function save(language: FormLanguage | null) {
-    if (!settings.data) return;
+    if (!settings.data || inFlight.current) return;
+    inFlight.current = true;
     setPending(true);
     setError(undefined);
     setSaved(false);
@@ -424,6 +428,7 @@ function FormLanguageCard() {
     } catch (failure) {
       setError(failure);
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   }

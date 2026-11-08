@@ -3,7 +3,7 @@
 import type { TenantProfile } from "@schoolos/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
@@ -38,12 +38,17 @@ export function ParentLanguageCard({
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
+  // Checked before the request starts: a second Enter or click in the same frame does not see
+  // `pending` yet (XP-05).
+  const inFlight = useRef(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
   const current: ParentLanguage = tenant.settings.parent_language === "te" ? "te" : "en";
   const unreviewed = tenant.parent_language_unreviewed ?? [];
 
   async function save(language: ParentLanguage) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setPending(true);
     setSaved(false);
     setError(undefined);
@@ -59,6 +64,7 @@ export function ParentLanguageCard({
     } catch (failure) {
       setError(failure);
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   }

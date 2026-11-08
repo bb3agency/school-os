@@ -328,6 +328,12 @@ describe("retention settings (FR-ADM-002)", () => {
     await userEvent.clear(raw);
     await userEvent.type(raw, "30");
     await userEvent.click(screen.getByRole("button", { name: en.retention.save }));
+    // XP-03: a shorter period deletes data, so it is confirmed first.
+    const dialog = await screen.findByRole("dialog", { name: en.retention.shortenTitle });
+    expect(stub.callsTo("PUT /bff/api/v1/admin/retention")).toHaveLength(0);
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: en.retention.shortenConfirm }),
+    );
     await waitFor(() => expect(stub.callsTo("PUT /bff/api/v1/admin/retention")).toHaveLength(1));
     const call = stub.callsTo("PUT /bff/api/v1/admin/retention")[0];
     expect(call?.headers.get("If-Match")).toBe('W/"2"');
@@ -384,9 +390,10 @@ describe("retention settings (FR-ADM-002)", () => {
         ? problem(412, "precondition_failed")
         : Response.json(retention(version + 1));
     renderWithIntl(<RetentionScreen />);
-    const raw = await screen.findByLabelText(en.retention.categories.import_raw_files.name);
-    await userEvent.clear(raw);
-    await userEvent.type(raw, "45");
+    // A longer period (3 → 5 days) needs no confirm step.
+    const exportsField = await screen.findByLabelText(en.retention.categories.exports.name);
+    await userEvent.clear(exportsField);
+    await userEvent.type(exportsField, "5");
     await userEvent.click(screen.getByRole("button", { name: en.retention.save }));
     expect(await screen.findByText(en.errors.precondition_failed.title)).toBeInTheDocument();
     version = 5;
@@ -428,5 +435,75 @@ describe("retention settings (FR-ADM-002)", () => {
       schema.safeParse({ import_raw_files: "6", exports: "7", notifications_read: "90" }).success,
     ).toBe(false);
     expect("audit_events" in schema.shape).toBe(false);
+  });
+});
+
+describe("shortening a retention period is confirmed first (XP-03, FR-ADM-002)", () => {
+  it("names each shorter period and sends nothing until confirmed", async () => {
+    signedIn([MANAGE]);
+    stub.routes["GET /bff/api/v1/admin/retention"] = () => Response.json(retention());
+    stub.routes["PUT /bff/api/v1/admin/retention"] = () => Response.json(retention(3));
+    renderWithIntl(<RetentionScreen />);
+    const raw = await screen.findByLabelText(en.retention.categories.import_raw_files.name);
+    await userEvent.clear(raw);
+    await userEvent.type(raw, "30");
+    const read = screen.getByLabelText(en.retention.categories.notifications_read.name);
+    await userEvent.clear(read);
+    await userEvent.type(read, "60");
+    await userEvent.click(screen.getByRole("button", { name: en.retention.save }));
+    const dialog = await screen.findByRole("dialog", { name: en.retention.shortenTitle });
+    const rows = within(dialog).getAllByRole("listitem");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      `${en.retention.categories.import_raw_files.name}: 90 days → 30 days`,
+      `${en.retention.categories.notifications_read.name}: 90 days → 60 days`,
+    ]);
+    expect(within(dialog).getByText(en.retention.shortenConsequence)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: messages.en.common.cancel }));
+    expect(stub.callsTo("PUT /bff/api/v1/admin/retention")).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole("button", { name: en.retention.save }));
+    const again = await screen.findByRole("dialog", { name: en.retention.shortenTitle });
+    await userEvent.click(within(again).getByRole("button", { name: en.retention.shortenConfirm }));
+    await waitFor(() => expect(stub.callsTo("PUT /bff/api/v1/admin/retention")).toHaveLength(1));
+    const call = stub.callsTo("PUT /bff/api/v1/admin/retention")[0];
+    expect(call?.headers.get("If-Match")).toBe('W/"2"');
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({
+      rules: { import_raw_files: 30, exports: 3, notifications_read: 60 },
+    });
+    expect(await screen.findByText(en.retention.outcome.saved)).toBeInTheDocument();
+  });
+
+  it("a longer period only is saved at once", async () => {
+    signedIn([MANAGE]);
+    stub.routes["GET /bff/api/v1/admin/retention"] = () => Response.json(retention());
+    stub.routes["PUT /bff/api/v1/admin/retention"] = () => Response.json(retention(3));
+    renderWithIntl(<RetentionScreen />);
+    const exportsField = await screen.findByLabelText(en.retention.categories.exports.name);
+    await userEvent.clear(exportsField);
+    await userEvent.type(exportsField, "7");
+    await userEvent.click(screen.getByRole("button", { name: en.retention.save }));
+    await waitFor(() => expect(stub.callsTo("PUT /bff/api/v1/admin/retention")).toHaveLength(1));
+    expect(screen.queryByRole("dialog", { name: en.retention.shortenTitle })).toBeNull();
+    expect(await screen.findByText(en.retention.outcome.saved)).toBeInTheDocument();
+  });
+
+  it("a 412 in the confirm step offers the latest settings on the page", async () => {
+    signedIn([MANAGE]);
+    stub.routes["GET /bff/api/v1/admin/retention"] = () => Response.json(retention());
+    stub.routes["PUT /bff/api/v1/admin/retention"] = () => problem(412, "precondition_failed");
+    renderWithIntl(<RetentionScreen />);
+    const raw = await screen.findByLabelText(en.retention.categories.import_raw_files.name);
+    await userEvent.clear(raw);
+    await userEvent.type(raw, "30");
+    await userEvent.click(screen.getByRole("button", { name: en.retention.save }));
+    const dialog = await screen.findByRole("dialog", { name: en.retention.shortenTitle });
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: en.retention.shortenConfirm }),
+    );
+    expect(
+      await within(dialog).findByText(en.errors.precondition_failed.title),
+    ).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: messages.en.common.cancel }));
+    expect(await screen.findByRole("button", { name: en.retention.reload })).toBeInTheDocument();
   });
 });

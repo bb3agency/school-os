@@ -6803,7 +6803,12 @@
           "name": "Closed follow-up flags",
           "about": "Early-warning flags and what was done about them. Deleted a year after the flag is closed; open flags are kept."
         }
-      }
+      },
+      "shortenTitle": "Shorten the retention periods?",
+      "shortenBody": "These periods get shorter:",
+      "shortenRow": "{from} days → {to} days",
+      "shortenConsequence": "Data older than the new period is deleted at the next daily clean-up and cannot be recovered.",
+      "shortenConfirm": "Shorten and delete older data"
     },
     "errors": {
       "tenant_export_in_progress": {
@@ -10840,7 +10845,8 @@
       "checkbox": "These documents contain no student's personal data.",
       "checkboxRequired": "Tick the box to confirm before publishing.",
       "confirm": "Publish",
-      "consequence": "Anyone with the link can see this page. Changes to records will not show until you publish again."
+      "consequence": "Anyone with the link can see this page. Changes to records will not show until you publish again.",
+      "saveFirst": "Save your changes before publishing. Publishing uses the saved draft."
     },
     "published": {
       "title": "Public page",

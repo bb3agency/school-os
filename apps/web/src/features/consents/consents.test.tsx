@@ -4,6 +4,8 @@ import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerStepUpHandler } from "@/lib/bff/step-up";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { expectOneCall, fireTwice } from "@/test/double-submit";
+import { StudentConsentsPanel } from "./StudentConsentsPanel";
 import { ID, me } from "@/test/records-fixtures";
 import { messages, renderWithIntl } from "@/test/render";
 import { ConsentsScreen } from "./ConsentsScreen";
@@ -243,5 +245,53 @@ describe("US-2603 consent register summary", () => {
     renderWithIntl(<ConsentsScreen />);
     expect(await screen.findByText(cm.noPermissionTitle)).toBeInTheDocument();
     expect(stub.callsTo("GET /bff/api/v1/consents/summary")).toEqual([]);
+  });
+});
+
+describe("one request per click or submit (XP-05, FR-DPDP-020, FR-DPDP-021)", () => {
+  it("using a suggestion sends one POST for two synchronous clicks", async () => {
+    setMe(["tenant.settings.manage"]);
+    stub.routes["GET /bff/api/v1/consent-purposes"] = () => Response.json(list());
+    stub.routes["POST /bff/api/v1/consent-purposes"] = () =>
+      Response.json(purpose({ id: "0192f3a4-0000-7000-8000-00000000c0a2" }), { status: 201 });
+    renderWithIntl(<PurposesScreen />);
+    const enable = await screen.findByRole("button", {
+      name: `${cm.purposes.enable}: The class WhatsApp group`,
+    });
+    fireTwice(enable, "click");
+    await expectOneCall(stub, "POST /bff/api/v1/consent-purposes");
+  });
+
+  it("recording a family's decision sends one POST for two synchronous submits", async () => {
+    setMe(["consent.read", "consent.record", "student.read_basic"]);
+    stub.routes[`GET /bff/api/v1/students/${ID.student}/consent-view`] = () =>
+      problem(404, "not_found");
+    stub.routes[`GET /bff/api/v1/students/${ID.student}/consents`] = () =>
+      Response.json({
+        student_id: ID.student,
+        version: 0,
+        purposes: [
+          {
+            purpose_id: PURPOSE,
+            key: "website_photos",
+            label_en: "Photos on the school website",
+            active: true,
+            answer: "not_answered",
+            current: null,
+            form_version: 1,
+            history: [],
+          },
+        ],
+      });
+    stub.routes[`GET /bff/api/v1/students/${ID.student}/guardians`] = () => Response.json([]);
+    stub.routes[`POST /bff/api/v1/students/${ID.student}/consents`] = () =>
+      Response.json({}, { status: 201 });
+    const user = userEvent.setup();
+    renderWithIntl(<StudentConsentsPanel studentId={ID.student} />);
+    await user.click(await screen.findByRole("radio", { name: cm.record.decisions.refused }));
+    await user.selectOptions(screen.getByLabelText(cm.record.relationship), "father");
+    await user.type(screen.getByLabelText(cm.record.decidedOn), "15/07/2026");
+    fireTwice(screen.getByLabelText(cm.record.relationship).closest("form")!, "submit");
+    await expectOneCall(stub, `POST /bff/api/v1/students/${ID.student}/consents`);
   });
 });

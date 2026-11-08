@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { expectOneCall, fireTwice } from "@/test/double-submit";
 import { ID, NOW, me, student } from "@/test/records-fixtures";
 import { messages, renderWithIntl } from "@/test/render";
 import { ApaarScreen } from "./ApaarScreen";
@@ -251,5 +252,42 @@ describe("US-1901 recording a decision", () => {
     await user.type(screen.getByLabelText(am.record.decidedOn), "15/07/2026");
     await user.click(screen.getByRole("button", { name: am.record.submit }));
     expect(await screen.findByText(am.errors.consent_not_given.title)).toBeInTheDocument();
+  });
+});
+
+describe("one request per click or submit (XP-05, FR-APR-004)", () => {
+  it("the form language card sends one PUT for two synchronous clicks", async () => {
+    staffRoutes(["apaar.consent.read", "tenant.settings.manage"]);
+    stub.routes["GET /bff/api/v1/apaar/consents/summary"] = () =>
+      Response.json({
+        totals: { total: 0, given: 0, refused: 0, pending: 0, withdrawn: 0 },
+        sections: [],
+      });
+    stub.routes["GET /bff/api/v1/apaar/consents"] = () => page([]);
+    stub.routes["PUT /bff/api/v1/apaar/settings"] = () =>
+      Response.json({ form_language: null, version: 1 });
+    renderWithIntl(<ApaarScreen />);
+    const follow = await screen.findByRole("button", {
+      name: new RegExp(am.settings.followSchool),
+    });
+    fireTwice(follow, "click");
+    await expectOneCall(stub, "PUT /bff/api/v1/apaar/settings");
+  });
+
+  it("recording a decision sends one POST for two synchronous submits", async () => {
+    staffRoutes(["apaar.consent.read", "apaar.consent.record", "student.read_basic"]);
+    stub.routes[`GET /bff/api/v1/students/${ID.student}/apaar-consent`] = () =>
+      Response.json(consent());
+    stub.routes[`GET /bff/api/v1/students/${ID.student}`] = () => Response.json(student());
+    stub.routes[`GET /bff/api/v1/students/${ID.student}/guardians`] = () => Response.json([]);
+    stub.routes[`POST /bff/api/v1/students/${ID.student}/apaar-consent`] = () =>
+      Response.json(consent({ status: "refused", version: 1 }), { status: 201 });
+    const user = userEvent.setup();
+    renderWithIntl(<StudentConsentScreen studentId={ID.student} />);
+    await user.click(await screen.findByRole("radio", { name: am.record.decisions.refused }));
+    await user.selectOptions(screen.getByLabelText(am.record.relationship), "father");
+    await user.type(screen.getByLabelText(am.record.decidedOn), "15/07/2026");
+    fireTwice(screen.getByLabelText(am.record.relationship).closest("form")!, "submit");
+    await expectOneCall(stub, `POST /bff/api/v1/students/${ID.student}/apaar-consent`);
   });
 });

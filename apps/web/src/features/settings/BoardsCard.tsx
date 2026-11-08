@@ -2,7 +2,7 @@
 
 import type { TenantProfile } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
@@ -159,6 +159,9 @@ function BoardsForm({
   const [chosen, setChosen] = useState<Board[]>(known);
   const [mode, setMode] = useState<(typeof MODES)[number]>(settings.operating_mode ?? "full");
   const [pending, setPending] = useState(false);
+  // Checked before the request starts: a second Enter or click in the same frame does not see
+  // `pending` yet (XP-05).
+  const inFlight = useRef(false);
   const [error, setError] = useState<unknown>(undefined);
   const [nameError, setNameError] = useState<string | undefined>(undefined);
   const [attempt, setAttempt] = useState(0);
@@ -168,6 +171,7 @@ function BoardsForm({
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (inFlight.current) return;
     const form = event.currentTarget;
     const raw = formValues(form);
     const parsed = boardsSchema.safeParse({
@@ -201,6 +205,7 @@ function BoardsForm({
       setOutcome("unchanged");
       return;
     }
+    inFlight.current = true;
     setPending(true);
     unwrap(
       api.PATCH("/api/v1/tenant", {
@@ -214,7 +219,10 @@ function BoardsForm({
         await queryClient.invalidateQueries({ queryKey: tenantKey });
       })
       .catch((failure: unknown) => setError(failure))
-      .finally(() => setPending(false));
+      .finally(() => {
+        inFlight.current = false;
+        setPending(false);
+      });
   }
 
   const chip =
