@@ -72,6 +72,13 @@ describe("disclosure page (FR-DISC-009)", () => {
     expect(container.querySelector("script")).toBeNull();
   });
 
+  it("says when a document could not be opened (WP-03, FR-DISC-009)", () => {
+    render(<DisclosurePage disclosure={PAGE} docBase="/d/KEY" documentFailed />);
+    expect(screen.getByRole("alert").textContent).toBe(
+      "The document could not be opened just now. Try again in a few minutes.",
+    );
+  });
+
   it("has one not found and one busy page", () => {
     render(<DisclosureNotFound />);
     expect(screen.getByRole("heading", { name: "Page not found" })).toBeTruthy();

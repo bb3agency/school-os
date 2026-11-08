@@ -6,7 +6,8 @@
     "back": "Back to the page",
     "rupees": "₹{amount}",
     "pdfPreparing": "The PDF is being prepared. Try again in a minute.",
-    "tryAgain": "Try again"
+    "tryAgain": "Try again",
+    "pdfPreparingMinutes": "The PDF is being prepared. Try again in {minutes} minutes."
   },
   "notice": {
     "dated": "Dated {date}"

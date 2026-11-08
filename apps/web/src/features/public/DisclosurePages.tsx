@@ -94,9 +94,12 @@ function ItemValue({ item, docBase }: { item: Item; docBase: string }) {
 export function DisclosurePage({
   disclosure,
   docBase,
+  documentFailed = false,
 }: {
   disclosure: PublicDisclosure;
   docBase: string;
+  /** `?doc=0`: a document link came back without a file (WP-03). */
+  documentFailed?: boolean;
 }) {
   const tr = t();
   const d = disclosure;
@@ -108,6 +111,12 @@ export function DisclosurePage({
         <p className="public-muted">
           {tr("disclosure.published", { school: d.school_name, date })}
         </p>
+        {documentFailed ? (
+          <p className="public-banner public-banner-amber" role="alert">
+            <PublicIcon name="alert" />
+            <span>{tr("disclosure.documentFailed")}</span>
+          </p>
+        ) : null}
       </section>
       {d.sections.map((section) => (
         <section

@@ -117,13 +117,18 @@ describe("document redirect (FR-DISC-009)", () => {
     expect(res.headers.get("cache-control")).toContain("no-store");
   });
 
-  it("goes back to the page for anything else", async () => {
+  it("goes back to the page for anything else, saying the document did not open (WP-03)", async () => {
     answer = () => json({ code: "not_found" }, 404);
     const res = await disclosureDocumentRedirect(runtime(), request, KEY, "1");
-    expect(res.headers.get("location")).toBe(`https://${PARENT}/d/${KEY}`);
+    expect(res.headers.get("location")).toBe(`https://${PARENT}/d/${KEY}?doc=0`);
     answer = () => json({ url: "javascript:alert(1)" });
     const odd = await disclosureDocumentRedirect(runtime(), request, KEY, "1");
-    expect(odd.headers.get("location")).toBe(`https://${PARENT}/d/${KEY}`);
+    expect(odd.headers.get("location")).toBe(`https://${PARENT}/d/${KEY}?doc=0`);
+    answer = () => json({ code: "rate_limited" }, 429);
+    const busy = await disclosureDocumentRedirect(runtime(), request, KEY, "1");
+    expect(busy.headers.get("location")).toBe(`https://${PARENT}/d/${KEY}?doc=0`);
+    const unknown = await disclosureDocumentRedirect(runtime(), request, "x", "1");
+    expect(unknown.headers.get("location")).toBe(`https://${PARENT}/d/unknown`);
     calls = [];
     const bad = await disclosureDocumentRedirect(runtime(), request, KEY, "0");
     expect(bad.status).toBe(303);
@@ -134,7 +139,7 @@ describe("document redirect (FR-DISC-009)", () => {
     answer = () => json({ url: "http://localhost:8333/doc.pdf?sig=x", expires_at: "x" });
     vi.stubEnv("NODE_ENV", "production");
     const prod = await disclosureDocumentRedirect(runtime(), request, KEY, "1");
-    expect(prod.headers.get("location")).toBe(`https://${PARENT}/d/${KEY}`);
+    expect(prod.headers.get("location")).toBe(`https://${PARENT}/d/${KEY}?doc=0`);
     vi.stubEnv("NODE_ENV", "development");
     const dev = await disclosureDocumentRedirect(runtime(), request, KEY, "1");
     expect(dev.headers.get("location")).toBe("http://localhost:8333/doc.pdf?sig=x");
@@ -151,7 +156,7 @@ describe("document redirect (FR-DISC-009)", () => {
     expect(calls).toHaveLength(1);
     for (const outside of ["201", "999", "1000", "01"]) {
       const res = await disclosureDocumentRedirect(runtime(), request, KEY, outside);
-      expect(res.headers.get("location"), outside).toBe(`https://${PARENT}/d/${KEY}`);
+      expect(res.headers.get("location"), outside).toBe(`https://${PARENT}/d/${KEY}?doc=0`);
     }
     expect(calls).toHaveLength(1);
   });

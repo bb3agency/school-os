@@ -249,6 +249,20 @@ describe("GET /p/document and the payment status", () => {
     expect((await documentRedirect(rt, request)).headers.get("location")).toBe(
       "/p/view?pdf=preparing",
     );
+    // WP-02 (AZ-02): after a failed render the API asks for up to 15 minutes; the page says so.
+    for (const [retryAfter, location] of [
+      ["900", "/p/view?pdf=preparing&wait=15"],
+      ["61", "/p/view?pdf=preparing&wait=2"],
+      ["999999", "/p/view?pdf=preparing&wait=60"],
+      ["soon", "/p/view?pdf=preparing"],
+    ] as const) {
+      answer = () =>
+        new Response(JSON.stringify({ status: "preparing", retry_after_s: 1 }), {
+          status: 202,
+          headers: { "content-type": "application/json", "retry-after": retryAfter },
+        });
+      expect((await documentRedirect(rt, request)).headers.get("location")).toBe(location);
+    }
     answer = () => json({ url: "javascript:alert(1)", expires_at: "x" });
     expect((await documentRedirect(rt, request)).headers.get("location")).toBe("/p/view?pdf=0");
     const noCookie = new Request(`${PUBLIC}/p/document`);

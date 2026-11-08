@@ -19,7 +19,14 @@ function notice(query: Record<string, string | string[] | undefined>): PageNotic
     return { kind: "pay", error: pay as PayError };
   }
   if (query.pdf === "0") return { kind: "pdf" };
-  if (query.pdf === "preparing") return { kind: "pdfPreparing" };
+  if (query.pdf === "preparing") {
+    // AZ-02 (WP-02): the wait the API asked for, in whole minutes (2..60); else "a minute".
+    const wait =
+      typeof query.wait === "string" && /^\d{1,2}$/.test(query.wait) ? Number(query.wait) : 0;
+    return wait > 1 && wait <= 60
+      ? { kind: "pdfPreparing", minutes: wait }
+      : { kind: "pdfPreparing" };
+  }
   if (query.saved === "1") return { kind: "saved", ok: true };
   if (query.saved === "0") return { kind: "saved", ok: false };
   return null;

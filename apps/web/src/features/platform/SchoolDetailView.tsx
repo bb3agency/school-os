@@ -24,7 +24,7 @@ import { ready, type Loadable } from "@/lib/loadable";
 import { optionalInt, reason } from "@/lib/validation";
 import { billingAccountSchema } from "./billing-account";
 import { BillingAccountFields } from "./BillingAccountFields";
-import { PK, ifMatch, useCan, usePlanDirectory } from "./data";
+import { PK, ifMatch, useCan, useOperatorMe, usePlanDirectory } from "./data";
 import { DeploymentActions } from "./DeploymentActions";
 import { InvoiceTable } from "./InvoiceTable";
 import {
@@ -66,6 +66,8 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
   const te = useTranslations("errors");
   const api = useBffClient("operator");
   const can = useCan();
+  // SEC-029 (WP-01): the operator who asked for offboarding cannot approve it (409 same_operator).
+  const meId = useOperatorMe()?.operator_id;
   const path = { tenant_id: schoolId };
   const detail = useApiQuery(PK.tenant(schoolId), () =>
     unwrap(api.GET("/api/v1/platform/tenants/{tenant_id}", { params: { path } })),
@@ -226,7 +228,11 @@ export function SchoolDetailScreen({ schoolId, tab }: { schoolId: string; tab: S
             }
           />
         ) : null}
-        {can("platform.tenants.offboard") && offboardPending && !offboardExpired ? (
+        {can("platform.tenants.offboard") &&
+        offboardPending &&
+        !offboardExpired &&
+        meId !== undefined &&
+        data.offboard_requested_by !== meId ? (
           <ActionDialog
             triggerLabel={t("approveOffboard")}
             triggerVariant="danger"
