@@ -471,7 +471,23 @@ def accept_heartbeat(verified: VerifiedHeartbeat, *, at: dt.datetime | None = No
             "app_version": payload.app_version,
             "status": status,
         }
+        promoted = bool(verified.key_id) and verified.key_id == dep["heartbeat_next_key_id"]
+        if promoted:
+            # CP-02 (SEC-028): the host signs with the new key, so the old one ends now instead
+            # of at the end of the overlap (as the Tally agent does, ADR-0032). Under the
+            # deployment lock; R-15 stays safe because the host already uses the promoted key.
+            values |= _promoted(dep)
         repo.update_row(s, m.deployments, dep["id"], values, bump_version=False)
+        if promoted:
+            audit_platform(
+                s,
+                SYSTEM,
+                "deployment.heartbeat_key_promoted",
+                "deployment",
+                dep["id"],
+                {"heartbeat_key_id": verified.key_id},
+                tenant_id=dep["tenant_id"],
+            )
         if dep["last_heartbeat_at"] is None:
             audit_platform(
                 s,

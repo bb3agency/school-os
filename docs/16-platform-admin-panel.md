@@ -1107,7 +1107,7 @@ Suspension for non-payment must not cut off a school during board exams or regis
 | `X-SOS-Signature` | `v1=` + lowercase hex of `HMAC-SHA256(key, timestamp + "." + raw_body)` |
 
 The control plane (`require_fleet_signature()` in `app/platform/fleet.py`) checks, in this order, storing nothing on any failure:
-1. deployment and key ID known, and the key currently valid (current key, or the next key during a rotation; the old key stops working 7 days after rotation started) → else `401`, no detail;
+1. deployment and key ID known, and the key currently valid (current key, or the next key during a rotation; the old key stops working at the first accepted heartbeat signed with the next key, and at the latest 7 days after rotation started: audit 2026-11-09 CP-02) → else `401`, no detail;
 2. `|now − timestamp| ≤ 300 s` (**5-minute skew window**) → else `401`;
 3. body ≤ 16 KB → else `422`;
 4. HMAC over the exact bytes received, compared in constant time → else `401`;
@@ -1118,7 +1118,7 @@ The control plane (`require_fleet_signature()` in `app/platform/fleet.py`) check
 
 Rejections are logged as `fleet.heartbeat.rejected` with a reason code (not audited individually).
 
-Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored **wrapped** (KMS; the local-dev wrapper outside AWS) in `platform.deployments` — not hashed, because the control plane must recompute the HMAC — and on the host in AWS Secrets Manager (read at start-up by `deploy/dedicated/scripts/fetch-secrets.sh` into a 0600 env file). Rotation keeps the old and new keys valid together for 7 days (`fleet.key_rotation_overlap_days` in `billing.yaml`). A second rotation inside that overlap answers `409 rotation_pending`: it would otherwise promote the pending key and drop the one the host may still sign with (double click or retry; the new key is shown once, so the request cannot be replayed). After the overlap the pending key is promoted first and the rotation proceeds (audit 2026-10-06 R-15).
+Keys are 32 random bytes, one per deployment, generated at provisioning and on rotation, stored **wrapped** (KMS; the local-dev wrapper outside AWS) in `platform.deployments` — not hashed, because the control plane must recompute the HMAC — and on the host in AWS Secrets Manager (read at start-up by `deploy/dedicated/scripts/fetch-secrets.sh` into a 0600 env file). Rotation keeps the old and new keys valid together for 7 days (`fleet.key_rotation_overlap_days` in `billing.yaml`). A second rotation inside that overlap answers `409 rotation_pending`: it would otherwise promote the pending key and drop the one the host may still sign with (double click or retry; the new key is shown once, so the request cannot be replayed). After the overlap the pending key is promoted first and the rotation proceeds (audit 2026-10-06 R-15). The first accepted heartbeat signed with the next key promotes it at once and ends the old key (audit `deployment.heartbeat_key_promoted`; audit 2026-11-09 CP-02, as the Tally agent does, ADR-0032), so after a leak the operator rotates, installs the new key and the leaked key stops working at the host's next heartbeat; a new rotation is then accepted straight away.
 
 ### 12.3 Payload (schema version 1)
 
@@ -1258,7 +1258,7 @@ Written with `audit.service.record_platform(...)` in `platform.audit_events`, in
 | Billing | `billing_account.updated`, `invoice.created` (manual draft), `invoice.generated` (system), `invoice.updated`, `invoice.draft_discarded`, `invoice.issued`, `invoice.voided`, `payment.recorded`, `payment.reversed`, `invoice.paid` (system), `invoice.pdf_rendered` (system; number, template version, size), `invoice.pdf_downloaded` |
 | Usage | `usage.limit_threshold_crossed` (system), `usage.ai_quota_threshold_crossed` (system; `metric: ai_answers`, `threshold`, `month`; §5.10) |
 | Flags | `flag.updated`, `flag.override_set`, `flag.override_removed` (from the public override functions: actor `system`, with `source`; §5.11) |
-| Fleet | `deployment.created`, `deployment.updated`, `deployment.boards_synced` (system; `boards`, `previous`, codes only; ADR-0057), `deployment.first_heartbeat`, `deployment.status_changed` (system), `deployment.heartbeat_key_rotated`, `deployment.decommissioned` (rejected heartbeats are logged, not audited) |
+| Fleet | `deployment.created`, `deployment.updated`, `deployment.boards_synced` (system; `boards`, `previous`, codes only; ADR-0057), `deployment.first_heartbeat`, `deployment.status_changed` (system), `deployment.heartbeat_key_rotated`, `deployment.heartbeat_key_promoted` (system; the first heartbeat signed with the next key, CP-02), `deployment.decommissioned` (rejected heartbeats are logged, not audited) |
 | Announcements | `announcement.created`, `announcement.updated`, `announcement.approved` (critical, second operator), `announcement.cancelled` |
 | Support | `support.ticket_opened`, `support.ticket_updated`, `support.personal_data_flagged`, `support.tickets_purged` (system) |
 | School-chain copies | `tenant_audit.copies_purged` (system; `count`, `kept_unconfirmed`, `retention_days`; nightly retention, D51, D68) |
