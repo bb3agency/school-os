@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as z from "@/lib/zod";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { ActionDialog } from "@/components/ui/ActionDialog";
@@ -164,8 +164,13 @@ function SuggestionRow({ suggestion, manage }: { suggestion: Suggestion; manage:
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
   const [key] = useState(newIdempotencyKey);
+  // Checked before the request starts: a second Enter or click in the same frame does not see
+  // `pending` yet (XP-05).
+  const inFlight = useRef(false);
 
   async function enable() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setPending(true);
     setError(undefined);
     try {
@@ -179,6 +184,7 @@ function SuggestionRow({ suggestion, manage }: { suggestion: Suggestion; manage:
     } catch (failure) {
       setError(failure);
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   }

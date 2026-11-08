@@ -4,6 +4,8 @@ import type * as Navigation from "next/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { notificationHref } from "@/features/notifications/data";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { expectOneCall, fireTwice } from "@/test/double-submit";
+import { NoticePdfButton } from "./parts";
 import { ID, NOW, fakeAadhaar, me } from "@/test/records-fixtures";
 import { messages, renderWithIntl } from "@/test/render";
 import { NewRequestScreen, buildRequestSchema, toCreateBody } from "./NewRequestScreen";
@@ -752,5 +754,25 @@ describe("the access report is built once per click (XP-02, FR-DPDP-008)", () =>
     await waitFor(() => expect(stub.callsTo(key)).toHaveLength(1));
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(stub.callsTo(key)).toHaveLength(1);
+  });
+});
+
+describe("a notice PDF is asked for once per click (XP-05, FR-DPDP-003)", () => {
+  it("two synchronous clicks send one POST", async () => {
+    staff(MANAGE);
+    const queued: PrivacyFile = {
+      export_id: "0192f3a4-0000-7000-8000-00000000e202",
+      status: "queued",
+      error_code: null,
+      created_at: NOW,
+      finished_at: null,
+      expires_at: null,
+    };
+    stub.routes["POST /bff/api/v1/privacy/templates/notice_parents/pdf"] = () =>
+      Response.json(queued, { status: 202 });
+    stub.routes[`GET /bff/api/v1/privacy/files/${queued.export_id}`] = () => Response.json(queued);
+    renderWithIntl(<NoticePdfButton templateKey="notice_parents" label="Notice to parents" />);
+    fireTwice(screen.getByRole("button", { name: new RegExp(pm.pdf.make) }), "click");
+    await expectOneCall(stub, "POST /bff/api/v1/privacy/templates/notice_parents/pdf");
   });
 });

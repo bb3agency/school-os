@@ -7,6 +7,7 @@ import { uploadDocument } from "@/features/imports/upload";
 import { notificationHref } from "@/features/notifications/data";
 import { ApiError } from "@/lib/bff/query";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { expectOneCall, fireTwice } from "@/test/double-submit";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { SECTION, me, structureRoutes } from "@/test/school-fixtures";
 import { AttendanceScreen, recentMonths } from "./AttendanceScreen";
@@ -983,5 +984,22 @@ describe("helpers, messages and links", () => {
     expect(notificationHref({ resource_type: "insight_flag", resource_id: FLAG })).toBe(
       `/flags/${FLAG}`,
     );
+  });
+});
+
+describe("the rules form saves once per submit (XP-05, FR-EW-014)", () => {
+  it("two synchronous submits send one PUT", async () => {
+    signedIn(PRINCIPAL);
+    stub.routes["GET /bff/api/v1/insights/flags"] = () => page([]);
+    stub.routes["PUT /bff/api/v1/insights/settings"] = () =>
+      Response.json({ ...settings(), version: 1 });
+    renderWithIntl(<FlagsScreen />);
+    const input = await screen.findByLabelText(
+      `Threshold for ${en.insights.rules.names.attendance_rate} (60 to 90)`,
+    );
+    await userEvent.clear(input);
+    await userEvent.type(input, "80");
+    fireTwice(input.closest("form")!, "submit");
+    await expectOneCall(stub, "PUT /bff/api/v1/insights/settings");
   });
 });

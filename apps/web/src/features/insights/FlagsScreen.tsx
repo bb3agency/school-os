@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
@@ -77,10 +77,14 @@ function RulesCard({ settings, canManage }: { settings: Settings; canManage: boo
   const [error, setError] = useState<unknown>(undefined);
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
+  // Checked before the request starts: a second Enter or click in the same frame does not see
+  // `pending` yet (XP-05).
+  const inFlight = useRef(false);
   const ruleName = (key: string) => translateOr(t, `names.${key}`, "names.other");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (inFlight.current) return;
     const form = new FormData(event.currentTarget);
     const rules: Record<string, { threshold: number; enabled?: boolean }> = {};
     for (const rule of settings.rules) {
@@ -90,6 +94,7 @@ function RulesCard({ settings, canManage }: { settings: Settings; canManage: boo
         ...(rule.can_disable ? { enabled: form.get(`${rule.key}.enabled`) === "on" } : {}),
       };
     }
+    inFlight.current = true;
     setPending(true);
     setError(undefined);
     setSaved(false);
@@ -105,6 +110,7 @@ function RulesCard({ settings, canManage }: { settings: Settings; canManage: boo
     } catch (failure) {
       setError(failure);
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   }
