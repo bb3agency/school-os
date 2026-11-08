@@ -187,6 +187,22 @@ export function retentionRules(
   return rules;
 }
 
+/**
+ * The configurable categories whose period gets shorter (XP-03): saving them deletes the older
+ * data at the next daily clean-up, so the screen asks to confirm first.
+ */
+export function shortenedCategories(
+  categories: readonly RetentionCategory[],
+  values: Record<string, number>,
+): { category: RetentionCategory; from: number; to: number }[] {
+  return categories.flatMap((category) => {
+    const to = values[category.key];
+    return category.configurable && typeof to === "number" && to < category.days
+      ? [{ category, from: category.days, to }]
+      : [];
+  });
+}
+
 /** True when the form's values equal what is saved (nothing to send). */
 export function sameRetention(
   categories: readonly RetentionCategory[],

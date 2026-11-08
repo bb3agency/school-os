@@ -2,7 +2,8 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill } from "@/components/ui/Badge";
@@ -17,8 +18,9 @@ import { useFormDirty } from "@/features/settings/useFormDirty";
 import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
-import { useApiForm } from "@/lib/forms";
+import { formValues, useApiForm } from "@/lib/forms";
 import { translateOr } from "@/lib/i18n-dynamic";
+import * as z from "@/lib/zod";
 import {
   ADMIN_KEYS,
   SETTINGS_MANAGE,
@@ -27,6 +29,7 @@ import {
   retentionRules,
   retentionSchema,
   sameRetention,
+  shortenedCategories,
   useRetention,
   type RetentionCategory,
   type RetentionSettings,
@@ -90,6 +93,9 @@ function RetentionForm({
   const [reloading, setReloading] = useState(false);
   const [resetError, setResetError] = useState<unknown>(undefined);
   const [resetting, setResetting] = useState(false);
+  /** The values waiting for "Shorten and delete older data" (XP-03), or null. */
+  const [shortening, setShortening] = useState<Record<string, number> | null>(null);
+  const [confirmError, setConfirmError] = useState<unknown>(undefined);
   const categories = useMemo(() => orderedCategories(settings.categories), [settings.categories]);
   const editable = categories.filter((c) => c.configurable);
   const fixed = categories.filter((c) => !c.configurable);
@@ -133,9 +139,28 @@ function RetentionForm({
     }
   }
 
-  const stale =
-    (form.error instanceof ApiError && form.error.status === 412) ||
-    (resetError instanceof ApiError && resetError.status === 412);
+  /**
+   * A shorter period deletes data at the next daily clean-up, so it is confirmed in a dialog
+   * first (XP-03); a save that only keeps data longer goes straight through.
+   */
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    const parsed = schema.safeParse(formValues(event.currentTarget));
+    if (parsed.success && !form.pending) {
+      const values = parsed.data as Record<string, number>;
+      if (shortenedCategories(categories, values).length > 0) {
+        event.preventDefault();
+        setOutcome(null);
+        setConfirmError(undefined);
+        setShortening(values);
+        return;
+      }
+    }
+    form.onSubmit(event);
+  }
+
+  const stale = [form.error, resetError, confirmError].some(
+    (failure) => failure instanceof ApiError && failure.status === 412,
+  );
   const allDefault = categories.every((c) => c.is_default);
   const inputId = (key: string) => `${fieldId}-${key}`;
   const summary: SummaryError[] = editable.flatMap((category) => {
@@ -143,111 +168,156 @@ function RetentionForm({
     return message ? [{ fieldId: inputId(category.key), message }] : [];
   });
 
+  const shorter = shortening ? shortenedCategories(categories, shortening) : [];
+
   return (
-    <form
-      ref={formRef}
-      noValidate
-      onSubmit={form.onSubmit}
-      onChange={onFormChange}
-      className="space-y-5"
-    >
-      <ErrorSummary errors={summary} attempt={attempt} />
-      <Card title={t("editableTitle")} description={t("editableDescription")}>
-        <ul className="divide-y divide-border">
-          {editable.map((category) => (
-            <li key={category.key} className="space-y-2 py-4">
-              {/* The label is the category (unique per field); the hint says what and how long. */}
-              <TextField
-                id={inputId(category.key)}
-                name={category.key}
-                label={<CategoryName category={category} />}
-                hint={
-                  <>
-                    <CategoryAbout category={category} />{" "}
-                    {t("range", {
-                      min: category.min_days,
-                      max: category.max_days,
-                      default: category.default_days,
-                    })}
-                  </>
-                }
-                error={form.errors[category.key]}
-                defaultValue={String(category.days)}
-                inputMode="numeric"
-                maxLength={4}
-                className="max-w-xl"
-                required
-              />
-              {!category.is_default ? <Pill variant="tag">{t("changed")}</Pill> : null}
-            </li>
-          ))}
-        </ul>
-      </Card>
+    <>
+      <form
+        ref={formRef}
+        noValidate
+        onSubmit={onSubmit}
+        onChange={onFormChange}
+        className="space-y-5"
+      >
+        <ErrorSummary errors={summary} attempt={attempt} />
+        <Card title={t("editableTitle")} description={t("editableDescription")}>
+          <ul className="divide-y divide-border">
+            {editable.map((category) => (
+              <li key={category.key} className="space-y-2 py-4">
+                {/* The label is the category (unique per field); the hint says what and how long. */}
+                <TextField
+                  id={inputId(category.key)}
+                  name={category.key}
+                  label={<CategoryName category={category} />}
+                  hint={
+                    <>
+                      <CategoryAbout category={category} />{" "}
+                      {t("range", {
+                        min: category.min_days,
+                        max: category.max_days,
+                        default: category.default_days,
+                      })}
+                    </>
+                  }
+                  error={form.errors[category.key]}
+                  defaultValue={String(category.days)}
+                  inputMode="numeric"
+                  maxLength={4}
+                  className="max-w-xl"
+                  required
+                />
+                {!category.is_default ? <Pill variant="tag">{t("changed")}</Pill> : null}
+              </li>
+            ))}
+          </ul>
+        </Card>
 
-      <Card title={t("fixedTitle")} description={t("fixedDescription")}>
-        <ul className="divide-y divide-border">
-          {fixed.map((category) => (
-            <FixedRow key={category.key} category={category} />
-          ))}
-        </ul>
-        <p className="mt-2 text-sm text-ink-muted">{t("recordsNote")}</p>
-      </Card>
+        <Card title={t("fixedTitle")} description={t("fixedDescription")}>
+          <ul className="divide-y divide-border">
+            {fixed.map((category) => (
+              <FixedRow key={category.key} category={category} />
+            ))}
+          </ul>
+          <p className="mt-2 text-sm text-ink-muted">{t("recordsNote")}</p>
+        </Card>
 
-      <div className="space-y-3 print:hidden">
-        <div className="space-y-1 text-sm text-ink-muted">
-          <p>{t("saveBody")}</p>
-          <p>{tc("stepUpNote")}</p>
-          {settings.updated_at ? (
-            <p>
-              {t("lastChanged", {
-                when: formatDateTime(settings.updated_at) ?? "",
-                who: settings.updated_by?.display_name ?? t("formerStaff"),
-              })}
-            </p>
-          ) : null}
-        </div>
-        {stale || !allDefault ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {stale ? (
-              <Button
-                variant="secondary"
-                disabled={reloading}
-                onClick={() => {
-                  setReloading(true);
-                  void onReload().finally(() => setReloading(false));
-                }}
-              >
-                {t("reload")}
-              </Button>
-            ) : null}
-            {!allDefault ? (
-              <Button
-                variant="secondary"
-                disabled={resetting || form.pending}
-                aria-disabled={resetting || form.pending || undefined}
-                onClick={() => void restoreDefaults()}
-              >
-                {resetting ? tc("working") : t("restoreDefaults")}
-              </Button>
+        <div className="space-y-3 print:hidden">
+          <div className="space-y-1 text-sm text-ink-muted">
+            <p>{t("saveBody")}</p>
+            <p>{tc("stepUpNote")}</p>
+            {settings.updated_at ? (
+              <p>
+                {t("lastChanged", {
+                  when: formatDateTime(settings.updated_at) ?? "",
+                  who: settings.updated_by?.display_name ?? t("formerStaff"),
+                })}
+              </p>
             ) : null}
           </div>
-        ) : null}
-        <ApiErrorAlert error={form.error ?? resetError} namespace="admin" />
-        {outcome ? (
-          <Alert tone={outcome === "unchanged" ? "info" : "success"} live>
-            {t(`outcome.${outcome}`)}
-          </Alert>
-        ) : null}
-      </div>
-      <SaveBar dirty={dirty}>
-        <Button variant="secondary" disabled={!dirty || form.pending} onClick={onDiscard}>
-          {ts("discard")}
-        </Button>
-        <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>
-          {form.pending ? tc("working") : t("save")}
-        </Button>
-      </SaveBar>
-    </form>
+          {stale || !allDefault ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {stale ? (
+                <Button
+                  variant="secondary"
+                  disabled={reloading}
+                  onClick={() => {
+                    setReloading(true);
+                    void onReload().finally(() => setReloading(false));
+                  }}
+                >
+                  {t("reload")}
+                </Button>
+              ) : null}
+              {!allDefault ? (
+                <Button
+                  variant="secondary"
+                  disabled={resetting || form.pending}
+                  aria-disabled={resetting || form.pending || undefined}
+                  onClick={() => void restoreDefaults()}
+                >
+                  {resetting ? tc("working") : t("restoreDefaults")}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          <ApiErrorAlert error={form.error ?? resetError} namespace="admin" />
+          {outcome ? (
+            <Alert tone={outcome === "unchanged" ? "info" : "success"} live>
+              {t(`outcome.${outcome}`)}
+            </Alert>
+          ) : null}
+        </div>
+        <SaveBar dirty={dirty}>
+          <Button variant="secondary" disabled={!dirty || form.pending} onClick={onDiscard}>
+            {ts("discard")}
+          </Button>
+          <Button type="submit" disabled={form.pending} aria-disabled={form.pending || undefined}>
+            {form.pending ? tc("working") : t("save")}
+          </Button>
+        </SaveBar>
+      </form>
+      {/* Outside the form: the dialog has its own form, and forms must not nest. */}
+      <ActionDialog
+        open={shortening !== null}
+        onOpenChange={(open) => {
+          if (!open) setShortening(null);
+        }}
+        title={t("shortenTitle")}
+        description={t("shortenBody")}
+        confirmLabel={t("shortenConfirm")}
+        confirmVariant="danger"
+        stepUp
+        consequence={t("shortenConsequence")}
+        schema={z.object({})}
+        invalidate={[ADMIN_KEYS.retention]}
+        errorNamespace="admin"
+        submit={async () => {
+          setConfirmError(undefined);
+          try {
+            return await unwrap(
+              api.PUT("/api/v1/admin/retention", {
+                headers: { "If-Match": ifMatch(settings.version) },
+                body: { rules: retentionRules(categories, shortening ?? {}) },
+              }),
+            );
+          } catch (failure) {
+            setConfirmError(failure);
+            throw failure;
+          }
+        }}
+        onSuccess={() => setOutcome("saved")}
+      >
+        {() => (
+          <ul className="list-disc space-y-1 ps-5">
+            {shorter.map(({ category, from, to }) => (
+              <li key={category.key}>
+                <CategoryName category={category} />: {t("shortenRow", { from, to })}
+              </li>
+            ))}
+          </ul>
+        )}
+      </ActionDialog>
+    </>
   );
 }
 

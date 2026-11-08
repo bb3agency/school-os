@@ -6801,7 +6801,12 @@
           "name": "Closed follow-up flags",
           "about": "Early-warning flags and what was done about them. Deleted a year after the flag is closed; open flags are kept."
         }
-      }
+      },
+      "shortenTitle": "Shorten the retention periods?",
+      "shortenBody": "These periods get shorter:",
+      "shortenRow": "{from} days → {to} days",
+      "shortenConsequence": "Data older than the new period is deleted at the next daily clean-up and cannot be recovered.",
+      "shortenConfirm": "Shorten and delete older data"
     },
     "errors": {
       "tenant_export_in_progress": {

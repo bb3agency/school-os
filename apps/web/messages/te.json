@@ -6801,7 +6801,12 @@
           "name": "మూసివేసిన ఫాలో-అప్ ఫ్లాగ్‌లు",
           "about": "ముందస్తు హెచ్చరిక ఫ్లాగ్‌లు, వాటిపై చేసిన చర్యలు. ఫ్లాగ్ మూసివేసిన ఒక సంవత్సరం తర్వాత తొలగిస్తాం; తెరిచిన ఫ్లాగ్‌లు ఉంచుతాం."
         }
-      }
+      },
+      "shortenTitle": "Shorten the retention periods?",
+      "shortenBody": "These periods get shorter:",
+      "shortenRow": "{from} days → {to} days",
+      "shortenConsequence": "Data older than the new period is deleted at the next daily clean-up and cannot be recovered.",
+      "shortenConfirm": "Shorten and delete older data"
     },
     "errors": {
       "tenant_export_in_progress": {
