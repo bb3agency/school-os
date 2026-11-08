@@ -780,14 +780,63 @@ CLOSED_SCHOOL_STATUSES: Final = ("offboarding", "deleted")
 AI_QUOTA_METRIC: Final = "ai_answers"
 
 
-def in_protected_window(boards: Sequence[str], day: dt.date) -> str | None:
+@dataclass(frozen=True, slots=True)
+class ProtectedWindow:
+    """A board window in which a billing suspension needs a platform owner (docs/16 §9.3).
+
+    Seeded from the portal calendar (ADR-0057): ``verified`` is ``False`` while its dates are
+    the calendar's expectation, not an official one; the refusal and the audit say so."""
+
+    key: str
+    name: str
+    boards: tuple[str, ...]
+    start: dt.date
+    end: dt.date
+    verified: bool
+
+    def described(self) -> str:
+        """``name (expected dates, not verified)`` for an operator-facing refusal."""
+        if self.verified:
+            return self.name
+        dates = f"{self.start.isoformat()} to {self.end.isoformat()}"
+        return f"{self.name}, expected {dates}, not verified"
+
+
+def protected_windows() -> list[ProtectedWindow]:
+    """``billing.yaml`` ``protected_windows`` (a copy of the portal calendar's board windows,
+    kept equal by tests/platform/test_board_sync.py; ADR-0057)."""
+    out: list[ProtectedWindow] = []
     for window in billing_cfg().get("protected_windows") or []:
-        start = dt.date.fromisoformat(str(window["start"]))
-        end = dt.date.fromisoformat(str(window["end"]))
-        applies = not window.get("boards") or set(window["boards"]) & set(boards)
-        if start <= day <= end and applies:
-            return str(window["name"])
+        name = str(window["name"])
+        out.append(
+            ProtectedWindow(
+                key=str(window.get("key") or name),
+                name=name,
+                boards=tuple(str(b) for b in window.get("boards") or ()),
+                start=dt.date.fromisoformat(str(window["start"])),
+                end=dt.date.fromisoformat(str(window["end"])),
+                # A hand-entered window without the flag was checked by whoever entered it.
+                verified=bool(window.get("verified", True)),
+            )
+        )
+    return out
+
+
+def protected_window(boards: Sequence[str], day: dt.date) -> ProtectedWindow | None:
+    """The first window containing ``day`` that applies to a school with ``boards`` (a window
+    with no boards applies to every school). ``boards`` = ``platform.deployments.boards``,
+    kept current by the daily usage collector (ADR-0057)."""
+    own = set(boards)
+    for window in protected_windows():
+        applies = not window.boards or bool(own.intersection(window.boards))
+        if window.start <= day <= window.end and applies:
+            return window
     return None
+
+
+def in_protected_window(boards: Sequence[str], day: dt.date) -> str | None:
+    window = protected_window(boards, day)
+    return window.name if window is not None else None
 
 
 def suspend_subscription(
@@ -820,12 +869,13 @@ def suspend_subscription(
             raise Conflict("Only a past-due subscription can be suspended.", code="invalid_state")
         if sub["grace_ends_on"] is None or today < sub["grace_ends_on"]:
             raise Conflict("The 15-day grace period has not ended.", code="grace_not_over")
-        window = in_protected_window(dep["boards"], today)
+        window = protected_window(dep["boards"], today)
         override_by = None
         if window is not None:
             if not (exam_window_override and actor_is_owner):
                 raise Conflict(
-                    "Today is inside a protected exam window; a platform owner must approve.",
+                    f"Today is inside a protected exam window ({window.described()}); "
+                    "a platform owner must approve.",
                     code="exam_window",
                 )
             override_by = actor.operator_id
@@ -858,7 +908,14 @@ def suspend_subscription(
             "subscription.suspended",
             "subscription",
             sub_id,
-            {"exam_window_override": override_by is not None},
+            {
+                "exam_window_override": override_by is not None,
+                **(
+                    {"exam_window": window.key, "exam_window_verified": window.verified}
+                    if window is not None
+                    else {}
+                ),
+            },
             tenant_id=sub["tenant_id"],
         )
         out = SubscriptionOut.model_validate(dict(sub))

@@ -1029,6 +1029,21 @@ def school_boards(session: Session) -> tuple[list[str], dict[str, str]]:
     return list(tenant.boards), dict(_stored_settings(tenant).class_boards)
 
 
+def tenant_board_codes(tenant_id: uuid.UUID, *, engine: Engine | None = None) -> list[str]:
+    """The school's board codes (e.g. ``["CBSE"]``), for the control plane (ADR-0057).
+
+    Usage-style call (ADR-0020 as amended by ADR-0057): opens the school's own
+    ``tenant_session`` (sos_app, RLS ``own_tenant``) and returns the codes only, never names,
+    settings or the class -> board map. The daily usage collector keeps
+    ``platform.deployments.boards`` current with it for the protected exam windows.
+    """
+    with tenant_session(tenant_id, engine=engine) as session:
+        tenant = repo.get_own_tenant(session)
+        if tenant is None:
+            raise NotFound("Tenant not found")
+        return [str(b) for b in tenant.boards]
+
+
 def get_tenant(session: Session) -> TenantOut:
     """The caller's own school (RLS ``own_tenant``). Permission: any member."""
     tenant = repo.get_own_tenant(session)
