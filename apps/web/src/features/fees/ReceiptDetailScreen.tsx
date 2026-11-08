@@ -36,6 +36,7 @@ import {
   Amount,
   FeesGate,
   ModeText,
+  DecisionNote,
   MoreActions,
   NoAccess,
   ReceiptStatusPill,
@@ -464,6 +465,7 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
                             when: formatDateTime(r.cancellation.requested_at) ?? "",
                           })}
                         </p>
+                        <DecisionNote request={r.cancellation} />
                         {r.cancellation.status === "pending" ? (
                           <Link
                             href="/fees/approvals"
@@ -494,6 +496,7 @@ export function ReceiptDetailScreen({ receiptId }: { receiptId: string }) {
                               ) : null}
                             </p>
                             <p className="text-sm text-ink-muted">{x.reason}</p>
+                            <DecisionNote request={x} />
                             {x.status === "processed" ? (
                               <a
                                 href={printHref(`/api/v1/fees/refunds/${x.id}/print`)}

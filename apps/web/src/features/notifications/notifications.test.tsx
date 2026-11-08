@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as Navigation from "next/navigation";
@@ -73,6 +76,55 @@ describe("bell polling (FR-NOT-001)", () => {
     expect(notificationHref({ resource_type: null, resource_id: id })).toBeNull();
     expect(notificationHref({ resource_type: "change_request", resource_id: "../x" })).toBeNull();
     expect(notificationHref({ resource_type: "export", resource_id: "../x" })).toBeNull();
+  });
+
+  it("WF-01 (FR-NOT-001, FR-FEE-026, FR-RDY-006): links fee requests and portal reminders", () => {
+    const id = "0192f3a4-0000-7000-8000-00000000c001";
+    const account = "0192f3a4-0000-7000-8000-00000000a001";
+    // fee.approval_requested: the approver opens the approvals inbox.
+    expect(
+      notificationHref({
+        resource_type: "fee_request",
+        resource_id: id,
+        template_key: "fee.approval_requested",
+        params: { request_id: id, kind: "concession", account_id: account },
+      }),
+    ).toBe("/fees/approvals");
+    // fee.request_decided: the maker opens the account, where the decision and its reason show.
+    expect(
+      notificationHref({
+        resource_type: "fee_request",
+        resource_id: id,
+        template_key: "fee.request_decided",
+        params: { request_id: id, kind: "refund", account_id: account, decision: "rejected" },
+      }),
+    ).toBe(`/fees/accounts/${account}`);
+    expect(
+      notificationHref({
+        resource_type: "fee_request",
+        resource_id: id,
+        template_key: "fee.request_decided",
+        params: { account_id: "../x" },
+      }),
+    ).toBe("/fees/approvals");
+    // portal_calendar.reminder (resource id: the academic year) opens the portal calendar.
+    expect(notificationHref({ resource_type: "portal_calendar", resource_id: id })).toBe(
+      "/findings/calendar",
+    );
+  });
+
+  it("WF-01 (FR-NOT-001): every resource type in the API's templates has a screen", () => {
+    const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../..");
+    const yaml = readFileSync(resolve(repo, "apps/api/app/notifications/templates.yaml"), "utf8");
+    const types = new Set(
+      [...yaml.matchAll(/^ {4}resource_type: ([a-z_]+)\s*$/gm)].map((m) => m[1] ?? ""),
+    );
+    expect(types.size).toBeGreaterThan(10);
+    const id = "0192f3a4-0000-7000-8000-00000000c001";
+    const unlinked = [...types].filter(
+      (type) => notificationHref({ resource_type: type, resource_id: id }) === null,
+    );
+    expect(unlinked).toEqual([]);
   });
 });
 
