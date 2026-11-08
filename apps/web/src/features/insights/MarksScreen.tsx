@@ -158,6 +158,13 @@ function MarksTable({ grid }: { grid: MarksGrid }) {
   );
 }
 
+/**
+ * A number the API reads as marks (XA-03): up to four digits and two decimals, no sign,
+ * exponent or hex (`Number()` accepts "4e1" and "0x10", which the API refuses with a 422
+ * that names no cell).
+ */
+const MARKS_NUMBER = /^(?:\d{1,4}(?:\.\d{0,2})?|\.\d{1,2})$/;
+
 const SUBJECT_ID = "marks-subject";
 const MAX_ID = "marks-max";
 const cellId = (studentId: string) => `marks-${studentId}`;
@@ -197,7 +204,7 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
     if (!subject.trim()) {
       problems.push({ fieldId: SUBJECT_ID, message: t("problem.subjectRequired") });
     }
-    const maxValid = maximum > 0 && maximum <= 1000;
+    const maxValid = MARKS_NUMBER.test(max.trim()) && maximum > 0 && maximum <= 1000;
     if (!maxValid) problems.push({ fieldId: MAX_ID, message: t("problem.maxInvalid") });
     const entries: MarkIn[] = [];
     const invalid: string[] = [];
@@ -209,7 +216,7 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
         entries.push({
           student_id: id,
           subject: subject.trim(),
-          max_marks: max,
+          max_marks: max.trim(),
           marks: null,
           absent: true,
         });
@@ -217,14 +224,14 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
       }
       const value = Number(raw);
       if (!maxValid) continue;
-      if (!Number.isFinite(value) || value < 0 || value > maximum) {
+      if (!MARKS_NUMBER.test(raw) || value > maximum) {
         invalid.push(id);
         continue;
       }
       entries.push({
         student_id: id,
         subject: subject.trim(),
-        max_marks: max,
+        max_marks: max.trim(),
         marks: raw,
         absent: false,
       });
@@ -502,13 +509,23 @@ export function MarksScreen() {
                   <Card title={t("gridTitle", { exam: value.exam.name })}>
                     <MarksTable grid={value} />
                   </Card>
-                  {canRecord ? <SubjectEntry grid={value} onSaved={refresh} /> : null}
+                  {canRecord ? (
+                    // XA-01: keyed by section and exam, so marks typed for one exam are never
+                    // kept (and saved) when the teacher picks another whose grid is cached.
+                    <SubjectEntry
+                      key={`${value.section.id}:${value.exam.id}`}
+                      grid={value}
+                      onSaved={refresh}
+                    />
+                  ) : null}
                 </>
               )}
             </LoadGate>
           ) : null}
           {canRecord && section && exam ? (
             <SheetImport<MarkIn, MarksSheet>
+              // XA-01: a sheet read for one exam or section is never offered for another.
+              key={`${section}:${exam}`}
               section={section}
               title={t("import.title")}
               description={t("import.description")}
