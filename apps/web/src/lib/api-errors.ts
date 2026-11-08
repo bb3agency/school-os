@@ -1,6 +1,7 @@
 import { AuthRedirectError } from "@/lib/bff/fetch";
 import { ApiError, NotAvailableError } from "@/lib/bff/query";
 import { StepUpCancelledError } from "@/lib/bff/step-up";
+import { UnsafeFileUrlError } from "@/lib/open-file-url";
 
 /**
  * Turn an error from a BFF call into message keys the UI translates (en/te). Screens never
@@ -125,6 +126,10 @@ export function describeApiError(error: unknown): ApiErrorKind {
         ? { retryAfter: retry }
         : {}),
     };
+  }
+  // A link from the API that is not https (WS-03): refused, nothing was opened.
+  if (error instanceof UnsafeFileUrlError) {
+    return { kind: "api", key: "generic", status: 0, requestId: null };
   }
   // fetch() itself failed: offline or the server is down.
   return { kind: "api", key: "bad_gateway", status: 0, requestId: null };

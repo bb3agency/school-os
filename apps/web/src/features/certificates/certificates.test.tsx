@@ -454,6 +454,23 @@ describe("certificate detail (US-1102..US-1107)", () => {
     expect(stub.callsTo(`POST /bff/api/v1/certificates/${CERT}/reject`)).toHaveLength(0);
   });
 
+  it("SEC-010 WS-03: a PDF link that is not https is refused with an error, never opened", async () => {
+    detail([READ, ISSUE], issued());
+    stub.routes[`GET /bff/api/v1/certificates/${CERT}/download-url`] = () =>
+      Response.json({
+        url: "javascript:alert(document.cookie)",
+        expires_at: "2026-09-29T05:05:00Z",
+        filename: "bonafide-BC-2026-27-0007.pdf",
+      });
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    renderWithIntl(<CertificateDetailScreen certificateId={CERT} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Download PDF" }));
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it("an issued certificate shows its frozen values, downloads the PDF and can be duplicated", async () => {
     detail([READ, ISSUE], issued({ can_duplicate: true }));
     stub.routes[`GET /bff/api/v1/certificates/${CERT}/download-url`] = () =>

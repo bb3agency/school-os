@@ -271,6 +271,25 @@ describe("change request detail (US-601 AC1–AC4, FR-CR-002, FR-CR-004)", () =>
     expect(memo).toHaveAttribute("rel", "noopener noreferrer");
   });
 
+  it("SEC-010 WS-03: an evidence link that is not https is neither shown nor opened", async () => {
+    detail([APPROVE]);
+    stub.routes["GET /bff/api/v1/documents/0192f3a4-0000-7000-8000-00000000d0c1/download-url"] =
+      () =>
+        Response.json({
+          url: "data:image/svg+xml,<svg onload='alert(1)'/>",
+          expires_at: "2026-09-26T05:05:00Z",
+          version_no: 1,
+          mime_type: "image/png",
+          filename: "evidence.png",
+        });
+    renderWithIntl(<ChangeRequestDetailScreen changeRequestId={CR} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Show the evidence" }));
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: "Evidence document for this correction" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows an image evidence preview from a short-lived link", async () => {
     detail([APPROVE]);
     stub.routes["GET /bff/api/v1/documents/0192f3a4-0000-7000-8000-00000000d0c1/download-url"] =

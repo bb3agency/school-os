@@ -8,6 +8,7 @@ import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@
 import { useStaffCan } from "@/lib/bff/staff-me";
 import { StepUpCancelledError } from "@/lib/bff/step-up";
 import type { Loadable } from "@/lib/loadable";
+import { checkedFileUrl } from "@/lib/open-file-url";
 
 /**
  * School admin console data (US-1201): the school's full data export (FR-ADM-001:
@@ -203,5 +204,6 @@ export function setAdminDownloadOpenerForTesting(opener: ((url: string) => void)
   openDownload = opener ?? ((url) => window.location.assign(url));
 }
 export function startDownload(url: string): void {
-  openDownload(url);
+  // Only an https link (WS-03); anything else is the caller's usual error.
+  openDownload(checkedFileUrl(url));
 }

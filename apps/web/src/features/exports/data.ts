@@ -8,6 +8,7 @@ import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@
 import { StepUpCancelledError } from "@/lib/bff/step-up";
 import type { Loadable } from "@/lib/loadable";
 import { isExportBusy, type Export, type ExportProfile, type RequestedBy } from "./types";
+import { checkedFileUrl } from "@/lib/open-file-url";
 
 /** Query-key roots; creating an export invalidates `all`. */
 export const EXPORT_KEYS = {
@@ -150,5 +151,6 @@ export function setDownloadOpenerForTesting(opener: ((url: string) => void) | nu
   openDownload = opener ?? ((url) => window.location.assign(url));
 }
 export function startDownload(url: string): void {
-  openDownload(url);
+  // Only an https link (WS-03); anything else is the caller's usual error.
+  openDownload(checkedFileUrl(url));
 }

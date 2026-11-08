@@ -44,6 +44,7 @@ import {
   type DialogControl,
   type MoreItem,
 } from "./parts";
+import { openFileUrl } from "@/lib/open-file-url";
 
 const reason = z
   .string()
@@ -86,7 +87,7 @@ function useDownloadPdf(receipt: Receipt | null) {
           params: { path: { receipt_id: receipt.id } },
         }),
       );
-      window.location.assign(link.url);
+      openFileUrl(link.url);
     } catch (failure) {
       setError(failure);
     } finally {

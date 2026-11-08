@@ -8,6 +8,7 @@ import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@
 import { typedDateToIso } from "@/lib/date-format";
 import type { Loadable } from "@/lib/loadable";
 import { AADHAAR_GROUP_SEPARATOR } from "@/lib/aadhaar";
+import { checkedFileUrl } from "@/lib/open-file-url";
 
 /** Any 12 digits, ungrouped or 4-4-4 with the separators `lib/aadhaar` accepts (D52). */
 const TWELVE_DIGITS = new RegExp(
@@ -332,5 +333,6 @@ export function setNoticeDownloadOpenerForTesting(opener: ((url: string) => void
   openDownload = opener ?? ((url) => window.location.assign(url));
 }
 export function startDownload(url: string): void {
-  openDownload(url);
+  // Only an https link (WS-03); anything else is the caller's usual error.
+  openDownload(checkedFileUrl(url));
 }

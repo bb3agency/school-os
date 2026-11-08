@@ -488,6 +488,25 @@ describe("export detail and download (FR-EXP-003..004, SEC-005, ADR-0021)", () =
     expect(document.body.innerHTML).not.toContain("sig=synthetic");
   });
 
+  it("SEC-010 WS-03: a download link that is not https is refused with an error, never opened", async () => {
+    detail([BOARD, READ_BASIC, FINDINGS]);
+    const opened: string[] = [];
+    setDownloadOpenerForTesting((url) => opened.push(url));
+    stub.routes[`GET /bff/api/v1/exports/${EXPORT_ID}/download-url`] = () =>
+      Response.json({
+        url: "javascript:alert(document.cookie)",
+        expires_at: "2026-09-26T05:05:00Z",
+        format: "xlsx",
+        content_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename: "precheck.xlsx",
+      });
+    renderWithIntl(<ExportDetailScreen exportId={EXPORT_ID} />);
+    expect(await screen.findByText("You", { selector: "dd" })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /Download Excel \(XLSX\)/ }));
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+    expect(opened).toEqual([]);
+  });
+
   it("someone else's export without can_download: explains not_own_export, no download buttons", async () => {
     detail([READ_ALL], {
       own: false,

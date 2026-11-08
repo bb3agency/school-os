@@ -335,6 +335,25 @@ describe("document detail (US-701 AC3..AC4, FR-DOC-002, FR-DOC-004, FR-DOC-006)"
     expect(document.body.innerHTML).not.toContain("X-Amz-Signature");
   });
 
+  it("SEC-010 WS-03: a download link that is not https is refused with an error, never opened", async () => {
+    setMe([READ]);
+    stub.routes[`GET /bff/api/v1/documents/${DOC}`] = () => Response.json(detail());
+    stub.routes[`GET /bff/api/v1/documents/${DOC}/download-url`] = () =>
+      Response.json({
+        url: "data:text/html,<script>alert(1)</script>",
+        expires_at: "2026-09-27T05:35:00Z",
+        version_no: 1,
+        mime_type: "application/pdf",
+        filename: "circular-0192f3a4-v1.pdf",
+      });
+    const opened: string[] = [];
+    setDocumentDownloadOpenerForTesting((url) => opened.push(url));
+    renderWithIntl(<DocumentDetailScreen documentId={DOC} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Download version 1" }));
+    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+    expect(opened).toEqual([]);
+  });
+
   it("explains a virus-blocked and an Aadhaar-withheld version without showing any number", async () => {
     setMe([READ]);
     stub.routes[`GET /bff/api/v1/documents/${DOC}`] = () =>
