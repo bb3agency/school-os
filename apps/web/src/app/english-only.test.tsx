@@ -178,6 +178,16 @@ describe("English only while Telugu is switched off (ADR-0036)", () => {
       expect(container.querySelector("nav[aria-label='Language']"), path).toBeNull();
       // No message missing from the area's namespaces (WP-04), and no ICU errors.
       expect(intlErrors, path).toEqual([]);
+      // WA-04: a page whose queries all fail settles; it does not fetch in a loop (a failed
+      // /me refetched on every remount, hundreds of calls, and timed this scan out under load).
+      const settled = vi.mocked(fetch).mock.calls.length;
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      expect(vi.mocked(fetch).mock.calls.length - settled, `${path}: requests after settling`).toBe(
+        0,
+      );
+      expect(settled, `${path}: requests`).toBeLessThan(40);
       scanned.push(path);
     },
     60_000,

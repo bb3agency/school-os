@@ -61,6 +61,7 @@ const FAQ = ["price", "features", "ai", "switch", "data"] as const;
  */
 export function PricingView({ settings }: { settings: MarketingSettings }) {
   const t = useTranslations("marketing");
+  const tt = useTranslations("ui.table");
   const gst = `${GST_RATE_PERCENT}%`;
   const extra = rupees(EXTRA_ANSWER_INR);
   const basisValues = {
@@ -150,7 +151,8 @@ export function PricingView({ settings }: { settings: MarketingSettings }) {
             className="table-scroll rounded-2xl border border-border"
             tabIndex={0}
             role="region"
-            aria-labelledby="compare-title"
+            // WA-03: the section is "compare-title" already; the scroll box needs its own name.
+            aria-label={tt("scrollRegion", { label: t("pricing.compare.title") })}
           >
             <table className="w-full border-collapse text-sm sm:text-base text-start">
               <caption className="sr-only">{t("pricing.compare.caption")}</caption>

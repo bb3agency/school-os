@@ -63,7 +63,8 @@ export function AnnouncementBanner() {
     retry: false,
   });
 
-  if (!query.data) return null;
+  // A malformed answer (not a list) shows no banner rather than crashing the shell.
+  if (!Array.isArray(query.data)) return null;
   const visible = query.data.filter((item) => !dismissed.includes(item.id));
   if (visible.length === 0) return null;
 

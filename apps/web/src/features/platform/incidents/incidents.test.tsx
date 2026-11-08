@@ -14,6 +14,7 @@ import {
 } from "./data";
 import { IncidentDetailScreen } from "./IncidentDetailScreen";
 import { IncidentsScreen } from "./IncidentsScreen";
+import { duplicateLandmarks } from "@/test/landmarks";
 
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
@@ -430,5 +431,7 @@ describe("close gate and reopen propagation (D49)", () => {
     renderWithIntl(<IncidentDetailScreen incidentId={INC} />);
     expect(await screen.findByText(/Reopen received 21\/10\/2026/)).toBeInTheDocument();
     expect(screen.getByText(im.reopenNotPulled)).toBeInTheDocument();
+    // WA-03 (axe landmark-unique): no two landmarks share a role and a name.
+    expect(await duplicateLandmarks()).toEqual([]);
   });
 });

@@ -228,7 +228,9 @@ function Sources({ state, prefix }: { state: AskState; prefix: string }) {
   if (state.citations.length === 0) return null;
   const searchOnly = outcomeOf(state) === "search_only";
   return (
-    <section aria-labelledby={headingId} className="space-y-2">
+    // WA-03: a group, not a region: every answer in a chat has its own "Sources" (landmarks
+    // would repeat the name); the h2 still leads heading navigation to it.
+    <div role="group" aria-labelledby={headingId} className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <h2 id={headingId} className="text-sm font-semibold text-ink">
           {searchOnly ? t("searchOnly.passages") : t("answer.sources")}
@@ -242,7 +244,7 @@ function Sources({ state, prefix }: { state: AskState; prefix: string }) {
           <SourceCard key={c.index} citation={c} id={sourceCardId(prefix, c.index)} />
         ))}
       </ol>
-    </section>
+    </div>
   );
 }
 

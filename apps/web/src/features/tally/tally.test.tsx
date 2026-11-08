@@ -25,6 +25,7 @@ import {
 import { FeeDuesScreen } from "./FeeDuesScreen";
 import { TallyConnectorScreen } from "./TallyConnectorScreen";
 import { TallyLedgersScreen } from "./TallyLedgersScreen";
+import { duplicateLandmarks } from "@/test/landmarks";
 
 /**
  * Tally connector screens (M6; ADR-0032 Proposed; behind `tally.connector.enabled`):
@@ -369,6 +370,8 @@ describe("ledger links (US-1803, FR-TALLY-006)", () => {
       JSON.parse(stub.callsTo(`POST /bff/api/v1/tally/parties/${PARTY}/links`)[0]?.body ?? "{}"),
     ).toEqual({ student_id: STUDENT });
     expect(await within(panel).findByText(en.link.linkedTitle)).toBeInTheDocument();
+    // WA-03 (axe landmark-unique): no two landmarks share a role and a name.
+    expect(await duplicateLandmarks()).toEqual([]);
   });
 
   it("searches ledgers and students by name in a POST body, never in the URL (SEC-008)", async () => {

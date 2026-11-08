@@ -59,10 +59,11 @@ export default defineConfig([
     settings: { react: { version: "19.3" } },
     rules: {
       ...a11yRules,
-      // Scrollable table regions and tab panels must be focusable (WCAG 2.1.1).
+      // Scrollable table regions and tab panels must be focusable (WCAG 2.1.1). A scroll box that
+      // repeats in a list (a table in every Ask answer) is a named group, not a landmark (WA-03).
       "jsx-a11y/no-noninteractive-tabindex": [
         "error",
-        { tags: [], roles: ["tabpanel", "region"], allowExpressionValues: true },
+        { tags: [], roles: ["tabpanel", "region", "group"], allowExpressionValues: true },
       ],
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],

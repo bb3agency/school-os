@@ -7,6 +7,8 @@ import { EmptyState } from "./EmptyState";
 import { LoadFade } from "./LoadFade";
 import { LoadingState } from "./LoadingState";
 import { NarrowSwitch } from "./NarrowSwitch";
+// A client component (WA-03: its name depends on the section around it).
+import { TableScroll } from "./TableScroll";
 
 /**
  * `comfortable`: 44px rows. `compact`: 32px rows and 13px text (fine pointers only). Leave
@@ -68,33 +70,8 @@ export function Table({
   );
 }
 
-export interface TableScrollProps extends Omit<ComponentProps<"div">, "role" | "tabIndex"> {
-  /** Accessible name of the scroll region ("Students, table, scrolls sideways"). */
-  label: string;
-  /** Draw the white card frame (hairline border, radius, shadow) around the table. */
-  framed?: boolean;
-}
-
-/**
- * Horizontal scroll box for a wide table: the table never widens the card or the page, and
- * keyboard users can focus the region and scroll it with the arrow keys (WCAG 2.1.1).
- * `position: relative` (`.table-scroll`) keeps sr-only text inside the box.
- */
-export function TableScroll({ label, framed = false, className, ...props }: TableScrollProps) {
-  return (
-    <div
-      role="region"
-      aria-label={label}
-      tabIndex={0}
-      className={cn(
-        "table-scroll rounded-xl border border-border print:overflow-visible print:border-0",
-        framed && "bg-surface shadow-card print:shadow-none",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
+export { TableScroll };
+export type { TableScrollProps } from "./TableScroll";
 
 export function THead({ className, ...props }: ComponentProps<"thead">) {
   return (

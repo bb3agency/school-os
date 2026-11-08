@@ -9,6 +9,7 @@ import { messages, renderWithIntl } from "@/test/render";
 import { ConsentsScreen } from "./ConsentsScreen";
 import { PurposesScreen, versionWarning } from "./PurposesScreen";
 import { formsHref, nextDecisions, type Purpose, type PurposeList } from "./types";
+import { duplicateLandmarks } from "@/test/landmarks";
 
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof Navigation>();
@@ -144,6 +145,8 @@ describe("US-2601 consent purposes", () => {
     expect(await screen.findAllByText("Photos on the school website")).not.toHaveLength(0);
     expect(screen.queryByRole("button", { name: cm.purposes.add })).toBeNull();
     expect(screen.queryByRole("button", { name: cm.purposes.edit })).toBeNull();
+    // WA-03 (axe landmark-unique): no two landmarks share a role and a name.
+    expect(await duplicateLandmarks()).toEqual([]);
   });
 
   it("without a consent permission nothing is loaded", async () => {

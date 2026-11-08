@@ -43,7 +43,8 @@ describe("client message namespaces per area (WP-04)", () => {
     for (const big of ["platform", "fees", "school", "marketing", "messaging", "ask", "public"]) {
       expect(CLIENT_NAMESPACES.root).not.toContain(big);
     }
-    expect(CLIENT_NAMESPACES.marketing).toEqual(["common", "marketing"]);
+    // "ui": the pricing comparison table names its scroll region (WA-03).
+    expect(CLIENT_NAMESPACES.marketing).toEqual(["common", "marketing", "ui"]);
     expect(CLIENT_NAMESPACES.school).not.toContain("platform");
     expect(CLIENT_NAMESPACES.platform).not.toContain("fees");
     // The parent page texts are rendered on the server only, never sent.

@@ -26,6 +26,11 @@ export function useStaffMeQuery(): UseQueryResult<Me> {
     },
     staleTime: 60_000,
     retry: false,
+    // WA-04: a failed /me (403 tenant_suspended, offline) is not fetched again when another
+    // component mounts. A refetch with no data puts the query back to pending; screens that
+    // show a loading state then unmount and remount their children, which fetched again, in a
+    // loop of hundreds of calls a second. Focus and invalidation still refetch it.
+    retryOnMount: false,
   });
 }
 

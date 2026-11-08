@@ -94,7 +94,7 @@ export const CLIENT_NAMESPACES = {
     "validation",
   ],
   /** The public marketing pages (welcome, features, pricing, security, about). */
-  marketing: ["common", "marketing"],
+  marketing: ["common", "marketing", "ui"],
   /** Local development pages (dev sign-in, UI reference). */
   dev: [
     "ask",

@@ -122,7 +122,8 @@ function renderBlock(block: Block, key: number, ctx: RenderContext): ReactNode {
           key={key}
           className="table-scroll rounded-lg border border-border"
           tabIndex={0}
-          role="region"
+          // WA-03: a group, not a region: tables in every answer would repeat the landmark name.
+          role="group"
           aria-label={ctx.tableLabel}
         >
           <table className="w-full border-collapse text-sm">
