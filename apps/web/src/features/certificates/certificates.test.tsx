@@ -756,6 +756,18 @@ describe("registers (US-1106, FR-REG-004)", () => {
   });
 });
 
+describe("registers without register.read (XO-04, FR-REG-004)", () => {
+  it("says so and offers nothing that would be refused", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me([READ]));
+    stub.routes["GET /bff/api/v1/academic-years"] = () => page([]);
+    renderWithIntl(<RegistersScreen />);
+    expect(await screen.findByText(/not print the registers/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Prepare print view" })).toBeNull();
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(stub.callsTo("GET /bff/api/v1/academic-years")).toHaveLength(0);
+  });
+});
+
 describe("certificate letterhead (US-1108, FR-CERT-013)", () => {
   const tenant = {
     id: "0192f3a4-0000-7000-8000-000000000001",

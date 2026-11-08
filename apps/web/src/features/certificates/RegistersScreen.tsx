@@ -13,7 +13,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { unwrap, useBffClient } from "@/lib/bff/query";
-import { useStaffCan } from "@/lib/bff/staff-me";
+import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
 import {
   REGISTER_PATHS,
   REGISTER_READ,
@@ -215,6 +215,9 @@ export function RegistersScreen() {
   const tc = useTranslations("common");
   const api = useBffClient("staff");
   const can = useStaffCan();
+  const meQuery = useStaffMeQuery();
+  // Without register.read the API refuses every register (403): nothing to pick or prepare.
+  const allowed = can(REGISTER_READ);
   const [kind, setKind] = useState<RegisterKind>("transfer");
   const years = useQuery({
     queryKey: ["staff", "certificates", "register-years"],
@@ -224,6 +227,7 @@ export function RegistersScreen() {
           params: { query: { limit: 200, include_archived: true } },
         }),
       ),
+    enabled: allowed,
     retry: false,
   });
   return (
@@ -237,13 +241,16 @@ export function RegistersScreen() {
           { label: t("title") },
         ]}
       />
-      {!can(REGISTER_READ) ? <Alert tone="info">{t("noPermission")}</Alert> : null}
-      <Alert tone="info" title={t("stepUpTitle")}>
-        {t("stepUpBody")}
-      </Alert>
+      {meQuery.isPending ? <LoadingState label={tc("loading")} /> : null}
+      {!meQuery.isPending && !allowed ? <Alert tone="info">{t("noPermission")}</Alert> : null}
+      {allowed ? (
+        <Alert tone="info" title={t("stepUpTitle")}>
+          {t("stepUpBody")}
+        </Alert>
+      ) : null}
       {years.isError ? <ApiErrorAlert error={years.error} namespace="certificates" /> : null}
-      {years.isPending ? <LoadingState label={tc("loading")} /> : null}
-      {years.data ? (
+      {allowed && years.isPending ? <LoadingState label={tc("loading")} /> : null}
+      {allowed && years.data ? (
         // Print-first: the register picker on the left (on top on phones), the chosen
         // register's A4 sheet beside it.
         <div className="grid items-start gap-4 lg:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]">
