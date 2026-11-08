@@ -243,6 +243,79 @@ def test_FR_FEE_004_active_plan_is_frozen_new_version_proposes_adjustments(schoo
     assert [a.status for a in pending if a.source_plan_id == active.id] == ["pending"]
 
 
+def _tuition_version(school: Any, plan_id: uuid.UUID, amount: Decimal) -> Any:
+    setup = F.ensure_setup(school)
+    draft = F.call(school, "accountant", fees.new_version, plan_id)
+    draft = F.call(
+        school,
+        "accountant",
+        fees.update_plan,
+        draft.id,
+        FeePlanPatch(
+            lines=[PlanLineIn(head_id=setup.tui, annual_amount=amount)],
+            instalments=[
+                InstalmentIn(
+                    instalment_no=1,
+                    label="Term 1",
+                    due_on=setup.first_due,
+                    amounts={setup.tui: amount},
+                )
+            ],
+        ),
+        expected_version=draft.version,
+    )
+    return F.call(
+        school, "accountant", fees.activate_plan, draft.id, expected_version=draft.version
+    )
+
+
+def test_FR_FEE_004_YF_03_second_revision_counts_the_first_revisions_adjustment(
+    school: Any,
+) -> None:
+    """YF-03: the differences of a new plan version are measured against what the account
+    already owes for each line under the earlier versions: its charges AND the plan-change
+    adjustments of an earlier version. Before, only charges counted, so a second revision
+    (1000 -> 1100 -> 1300) proposed +300 on top of the approved +100 and the student owed 1400."""
+    plan_id, account_id = _late_plan(school, LateFeeRule(), "revised_twice")
+    v2 = _tuition_version(school, plan_id, D("1100.00"))
+    F.call(
+        school,
+        "accountant",
+        fees.propose_adjustments,
+        v2.id,
+        ProposeAdjustmentsIn(reason="Tuition increased by the management"),
+    )
+    first = next(
+        a
+        for a in F.call(school, "accountant", fees.list_adjustments, account_id)
+        if a.source_plan_id == v2.id
+    )
+    F.call(
+        school, "principal", fees.approve_adjustment, first.id, DecisionIn(), expected_version=None
+    )
+    v3 = _tuition_version(school, v2.id, D("1300.00"))
+    diffs = F.call(school, "accountant", fees.plan_differences, v3.id)
+    mine = [(d.instalment_no, d.difference) for d in diffs.items if d.account_id == account_id]
+    assert mine == [(1, D("200.00"))]
+    F.call(
+        school,
+        "accountant",
+        fees.propose_adjustments,
+        v3.id,
+        ProposeAdjustmentsIn(reason="Tuition increased again by the management"),
+    )
+    second = next(
+        a
+        for a in F.call(school, "accountant", fees.list_adjustments, account_id)
+        if a.source_plan_id == v3.id
+    )
+    F.call(
+        school, "principal", fees.approve_adjustment, second.id, DecisionIn(), expected_version=None
+    )
+    setup = F.ensure_setup(school)
+    assert _line(_account(school, account_id), 1, setup.tui).due == D("1300.00")
+
+
 def test_US_2101_AC2_AC3_apply_is_idempotent_and_skips_past_instalments(school: Any) -> None:
     setup = F.ensure_setup(school)
     sid = F.student(school, "section_9c")

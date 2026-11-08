@@ -290,8 +290,9 @@ class PlanDifference(_Out):
 
 
 class PlanDifferencesOut(_Out):
-    """Per account, instalment and head: what the previous version charged and what this one
-    plans (FR-FEE-004). Proposing them creates adjustment requests that need approval."""
+    """Per account, instalment and head: what earlier versions charged (with the plan-change
+    adjustments of earlier versions that are pending or approved) and what this one plans
+    (FR-FEE-004). Proposing them creates adjustment requests that need approval."""
 
     plan_id: uuid.UUID
     previous_plan_id: uuid.UUID | None

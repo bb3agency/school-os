@@ -551,6 +551,31 @@ def update_adjustment(session: Session, row_id: uuid.UUID, values: Mapping[str, 
     return row
 
 
+def plan_change_sums(
+    session: Session, account_ids: Collection[uuid.UUID], plan_ids: Collection[uuid.UUID]
+) -> dict[tuple[uuid.UUID, int, uuid.UUID], Decimal]:
+    """Plan-change adjustments proposed by ``plan_ids`` that stand (pending or approved), summed
+    per (account, instalment, head): what earlier versions already changed (FR-FEE-004)."""
+    if not account_ids or not plan_ids:
+        return {}
+    stmt = (
+        select(
+            Adjustment.account_id,
+            Adjustment.instalment_no,
+            Adjustment.head_id,
+            func.sum(Adjustment.amount),
+        )
+        .where(
+            Adjustment.account_id.in_(list(account_ids)),
+            Adjustment.source_plan_id.in_(list(plan_ids)),
+            Adjustment.status.in_(("pending", "approved")),
+            Adjustment.head_id.is_not(None),
+        )
+        .group_by(Adjustment.account_id, Adjustment.instalment_no, Adjustment.head_id)
+    )
+    return {(r[0], int(r[1]), r[2]): Decimal(r[3]) for r in session.execute(stmt)}
+
+
 def adjustments_of(session: Session, account_id: uuid.UUID) -> list[Adjustment]:
     stmt = (
         select(Adjustment)
