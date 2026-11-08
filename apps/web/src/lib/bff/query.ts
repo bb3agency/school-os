@@ -5,6 +5,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryFunctionContext,
   type QueryKey,
   type UseMutationResult,
 } from "@tanstack/react-query";
@@ -145,6 +146,20 @@ export function isTransientError(error: unknown): boolean {
   );
 }
 
+interface PollState {
+  status: string;
+  error: unknown;
+}
+
+/**
+ * A status poll stops on this failure (XO-08, as XO-07): a transient one keeps it going (the
+ * screen still shows the last answer and the job may still be running); any other (no access,
+ * gone, signed out, a route this deployment lacks) stops it. Pass the query's `state`.
+ */
+export function pollFailed(state: PollState): boolean {
+  return state.status === "error" && !isTransientError(state.error);
+}
+
 export function toLoadable<T>(query: {
   isPending: boolean;
   isError: boolean;
@@ -177,25 +192,31 @@ export interface ApiQueryOptions<T = unknown> {
   refetchInterval?: number | false | ((data: T | undefined) => number | false);
 }
 
-/** Query through the BFF, exposed as a Loadable for the view components. */
+/**
+ * Query through the BFF, exposed as a Loadable for the view components. `load` gets the query
+ * function's context: a polling caller passes it to pollHeaders (lib/bff/poll.ts), so the
+ * automatic re-reads are passive (XB-07).
+ */
 export function useApiQuery<T>(
   queryKey: QueryKey,
-  load: () => Promise<T>,
+  load: (context: QueryFunctionContext) => Promise<T>,
   options: ApiQueryOptions<T> = {},
 ): Loadable<T> {
   const interval = options.refetchInterval;
   const query = useQuery({
     queryKey,
-    queryFn: load,
+    queryFn: (context) => load(context),
     enabled: options.enabled ?? true,
     // Only callers that ask for polling set it (other observers of the same key keep theirs).
     ...(interval === undefined
       ? {}
       : {
-          refetchInterval:
-            typeof interval === "function"
-              ? (current: { state: { data: T | undefined } }) => interval(current.state.data)
-              : interval,
+          refetchInterval: (current: { state: PollState & { data: T | undefined } }) =>
+            pollFailed(current.state)
+              ? false
+              : typeof interval === "function"
+                ? interval(current.state.data)
+                : interval,
         }),
     retry: (count, error) =>
       count < 1 &&

@@ -12,6 +12,7 @@ import { Value } from "@/components/ui/Value";
 import { useSchoolStructure, useSectionOptions } from "@/features/students/StudentList";
 import type { Locale } from "@/i18n/routing";
 import { Link } from "@/i18n/navigation";
+import { pollHeaders } from "@/lib/bff/poll";
 import { newIdempotencyKey, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
 import { formatCount, formatDateTime, formatInr } from "@/lib/format";
@@ -75,9 +76,11 @@ function LiveBroadcast({ id }: { id: string }) {
   const api = useBffClient("staff");
   const report = useApiQuery(
     KEYS.broadcast(id),
-    () =>
+    (context) =>
       unwrap(
         api.GET("/api/v1/messaging/broadcasts/{broadcast_id}", {
+          // The live counts are polled passively (XB-07).
+          headers: pollHeaders(context),
           params: { path: { broadcast_id: id } },
         }),
       ),

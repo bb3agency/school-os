@@ -7,7 +7,8 @@ import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { exportRefetchInterval, startDownload } from "@/features/exports/data";
-import { unwrap, useBffClient } from "@/lib/bff/query";
+import { pollHeaders } from "@/lib/bff/poll";
+import { pollFailed, unwrap, useBffClient } from "@/lib/bff/query";
 import { formatDate } from "@/lib/format";
 import {
   PRIVACY_KEYS,
@@ -94,9 +95,11 @@ function usePrivacyFile(exportId: string) {
   const api = useBffClient("staff");
   return useQuery({
     queryKey: PRIVACY_KEYS.file(exportId),
-    queryFn: () =>
+    queryFn: (context) =>
       unwrap(
         api.GET("/api/v1/privacy/files/{export_id}", {
+          // The status polls are passive (XB-07).
+          headers: pollHeaders(context),
           params: { path: { export_id: exportId } },
         }),
       ),
@@ -104,7 +107,8 @@ function usePrivacyFile(exportId: string) {
       exportRefetchInterval(
         query.state.data ? [query.state.data] : undefined,
         query.state.dataUpdateCount,
-        query.state.status === "error",
+        // A transient failure keeps polling; any other stops it (XO-08).
+        pollFailed(query.state),
       ),
     refetchIntervalInBackground: false,
     retry: false,

@@ -31,6 +31,7 @@ import { ProblemAlert, problemCode } from "@/features/students/ProblemAlert";
 import { useSchoolStructure, useSectionOptions } from "@/features/students/StudentList";
 import { STUDENT_STATUSES, type Attribute } from "@/features/students/types";
 import { Link, useRouter } from "@/i18n/navigation";
+import { pollHeaders } from "@/lib/bff/poll";
 import { listAll, unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { cn } from "@/lib/cn";
 import { useDateInput } from "@/lib/date-format";
@@ -892,9 +893,12 @@ export function ItemReviewScreen({ itemId, after }: { itemId: string; after?: Af
   }, [broken, queryClient, itemId]);
   const item = usePolledQuery(
     itemKey(itemId),
-    () =>
+    (context) =>
       unwrap(
-        api.GET("/api/v1/extraction-items/{item_id}", { params: { path: { item_id: itemId } } }),
+        api.GET("/api/v1/extraction-items/{item_id}", {
+          headers: pollHeaders(context),
+          params: { path: { item_id: itemId } },
+        }),
       ),
     (data) => imageRefreshMs(data),
   );

@@ -5,7 +5,14 @@ import type { components } from "@schoolos/api-client";
 import { useQuery, type Query } from "@tanstack/react-query";
 import * as z from "@/lib/zod";
 import { AuthRedirectError } from "@/lib/bff/fetch";
-import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
+import {
+  ApiError,
+  NotAvailableError,
+  pollFailed,
+  toLoadable,
+  unwrap,
+  useBffClient,
+} from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
 import { StepUpCancelledError } from "@/lib/bff/step-up";
 import type { Loadable } from "@/lib/loadable";
@@ -117,7 +124,8 @@ export function useTenantExports(
       exportRefetchInterval(
         q.state.data?.data,
         q.state.dataUpdateCount,
-        q.state.status === "error",
+        // A transient failure keeps polling; any other stops it (XO-08).
+        pollFailed(q.state),
       ),
     refetchIntervalInBackground: false,
     retry,

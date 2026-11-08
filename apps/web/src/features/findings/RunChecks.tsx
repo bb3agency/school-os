@@ -12,7 +12,8 @@ import { SelectField } from "@/components/ui/Select";
 import { StatCard } from "@/components/ui/StatCard";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
-import { unwrap, useBffClient } from "@/lib/bff/query";
+import { pollHeaders } from "@/lib/bff/poll";
+import { pollFailed, unwrap, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDateTime } from "@/lib/format";
 import { formList } from "@/lib/forms";
 import { uuid } from "@/lib/validation";
@@ -54,13 +55,20 @@ export function RunProgress({
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: DQ_KEYS.run(runId),
-    queryFn: () =>
-      unwrap(api.GET("/api/v1/dq/runs/{run_id}", { params: { path: { run_id: runId } } })),
+    queryFn: (context) =>
+      unwrap(
+        api.GET("/api/v1/dq/runs/{run_id}", {
+          // The status polls are passive (XB-07).
+          headers: pollHeaders(context),
+          params: { path: { run_id: runId } },
+        }),
+      ),
     ...(initial ? { initialData: initial } : {}),
     refetchInterval: (current) => {
       const data = current.state.data;
       if (data && isRunFinished(data.status)) return false;
-      if (current.state.status === "error") return false;
+      // A transient failure keeps polling; any other stops it (XO-08).
+      if (pollFailed(current.state)) return false;
       return runPollDelay(current.state.dataUpdateCount);
     },
     retry: 1,

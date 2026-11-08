@@ -15,7 +15,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { describeApiError } from "@/lib/api-errors";
-import { unwrap, useBffClient } from "@/lib/bff/query";
+import { pollHeaders } from "@/lib/bff/poll";
+import { pollFailed, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { formatCount, formatDateTime } from "@/lib/format";
 import { translateOr } from "@/lib/i18n-dynamic";
@@ -47,11 +48,15 @@ export function AuditVerifyScreen() {
   const [requesting, setRequesting] = useState(false);
   const query = useQuery({
     queryKey: AUDIT_VERIFY_KEY,
-    queryFn: () => unwrap(api.GET("/api/v1/audit/verify")),
+    // The polls while a check is queued are passive (XB-07).
+    queryFn: (context) =>
+      unwrap(api.GET("/api/v1/audit/verify", { headers: pollHeaders(context) })),
     enabled: allowed,
     retry: false,
     refetchOnWindowFocus: false,
-    refetchInterval: (state) => (state.state.data?.pending ? PENDING_POLL_MS : false),
+    // A transient failure keeps polling; any other stops it (XO-08).
+    refetchInterval: (state) =>
+      !pollFailed(state.state) && state.state.data?.pending ? PENDING_POLL_MS : false,
   });
 
   const back = (

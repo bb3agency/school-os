@@ -8,7 +8,7 @@ import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { Link } from "@/i18n/navigation";
 import { PASSIVE_HEADER } from "@/lib/bff/fetch";
-import { ApiError, unwrap, useApiMutation, useBffClient } from "@/lib/bff/query";
+import { pollFailed, unwrap, useApiMutation, useBffClient } from "@/lib/bff/query";
 import { formatDateTime } from "@/lib/format";
 import { EASE_OUT, loadMotionFeatures, seconds } from "@/lib/motion";
 import { Presence } from "@/lib/presence";
@@ -127,11 +127,9 @@ export function NotificationBell() {
     refetchOnWindowFocus: true,
     refetchIntervalInBackground: false,
     refetchInterval: (query) => {
-      const error = query.state.error;
-      // Signed out or no access (e.g. the school is paused): stop polling.
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        return false;
-      }
+      // Signed out, no access (e.g. the school is paused), gone or not offered here: stop
+      // polling. A transient failure keeps it going, with the back-off (XO-08).
+      if (pollFailed(query.state)) return false;
       return bellPollDelay(failures.current);
     },
   });

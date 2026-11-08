@@ -28,6 +28,7 @@ import type { Attribute } from "@/features/students/types";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { apiFieldErrors } from "@/lib/api-errors";
+import { pollHeaders } from "@/lib/bff/poll";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formValues, useIntentKey } from "@/lib/forms";
 import { formatCount, formatDateTime } from "@/lib/format";
@@ -998,8 +999,13 @@ export function ImportDetailScreen({
   const permissions = useStaffPermissions();
   const batch = usePolledQuery(
     importKey(importId),
-    () =>
-      unwrap(api.GET("/api/v1/imports/{import_id}", { params: { path: { import_id: importId } } })),
+    (context) =>
+      unwrap(
+        api.GET("/api/v1/imports/{import_id}", {
+          headers: pollHeaders(context),
+          params: { path: { import_id: importId } },
+        }),
+      ),
     (data) => (data && IMPORT_BUSY.has(data.status) ? POLL_MS : false),
   );
   const attributes = useAttributes();

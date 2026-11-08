@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
 import { Pager, usePagedList } from "@/features/students/paging";
+import { pollHeaders } from "@/lib/bff/poll";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { DashboardView } from "./DashboardView";
 import { PK, useCan } from "./data";
@@ -23,7 +24,9 @@ export function DashboardScreen() {
   const hasClocks = kpis.status === "ready" && Array.isArray(kpis.data.incident_clocks);
   const clocks = useApiQuery(
     INCIDENT_KEYS.clocks,
-    () => unwrap(api.GET("/api/v1/platform/incidents/clocks")),
+    // Passive re-reads (XB-07): an open dashboard does not keep an operator signed in.
+    (context) =>
+      unwrap(api.GET("/api/v1/platform/incidents/clocks", { headers: pollHeaders(context) })),
     { enabled: hasClocks, refetchInterval: 60_000 },
   );
   const notice =

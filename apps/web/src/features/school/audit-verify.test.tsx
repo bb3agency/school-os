@@ -7,6 +7,7 @@ import type { Locale } from "@/i18n/routing";
 import { setSheetSaverForTesting } from "@/features/sheets/download";
 import { registerStepUpHandler } from "@/lib/bff/step-up";
 import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
+import { expectPollStops, expectPollsThroughTransient, failSecondRead } from "@/test/poll";
 import { me } from "@/test/records-fixtures";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { AuditVerifyScreen } from "./AuditVerifyScreen";
@@ -100,6 +101,27 @@ describe("audit chain check (US-1001 AC2, FR-AUD-003, FR-AUD-005)", () => {
     expect(await screen.findByText("Check queued")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Check again" })).toBeDisabled();
     done = true;
+  });
+
+  it.each([
+    ["keeps asking after a transient failure (503), passively", 503, false],
+    ["stops asking after a failure asking again does not fix (403)", 403, true],
+  ])("a queued check %s (XB-07, XO-08, FR-AUD-005)", async (_name, status, stops) => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      failSecondRead(
+        stub,
+        VERIFY,
+        () => Response.json(stored({ pending: true, requested_at: "2026-10-06T05:00:00Z" })),
+        status,
+        stops,
+      );
+      renderWithIntl(<AuditVerifyScreen />);
+      if (stops) await expectPollStops(stub, VERIFY, 5_000);
+      else await expectPollsThroughTransient(stub, VERIFY, 5_000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("explains the 10-minute cool-down when the school asked a moment ago (429)", async () => {

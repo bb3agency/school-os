@@ -16,6 +16,7 @@ import { Timeline, type TimelineItem } from "@/components/ui/Timeline";
 import { Value } from "@/components/ui/Value";
 import { runPollDelay } from "@/features/findings/RunChecks";
 import { Link, useRouter } from "@/i18n/navigation";
+import { pollHeaders } from "@/lib/bff/poll";
 import { unwrap, useApiMutation, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useStaffMe } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
@@ -297,9 +298,11 @@ export function CertificateDetailScreen({ certificateId }: { certificateId: stri
   const pdfPolls = useRef(0);
   const query = useApiQuery(
     CERT_KEYS.one(certificateId),
-    () =>
+    (context) =>
       unwrap(
         api.GET("/api/v1/certificates/{certificate_id}", {
+          // The PDF polls are passive (XB-07).
+          headers: pollHeaders(context),
           params: { path: { certificate_id: certificateId } },
         }),
       ),

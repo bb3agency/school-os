@@ -22,7 +22,8 @@ import { exportRefetchInterval, startDownload } from "@/features/exports/data";
 import { ifMatch } from "@/features/settings/data";
 import { useFormDirty } from "@/features/settings/useFormDirty";
 import { Link } from "@/i18n/navigation";
-import { ApiError, reasonOf, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
+import { pollHeaders } from "@/lib/bff/poll";
+import { ApiError, pollFailed, reasonOf, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
 import { formatCount, formatDate, formatDateTime } from "@/lib/format";
 import { translateOr } from "@/lib/i18n-dynamic";
@@ -69,19 +70,22 @@ export function RequestDetailScreen({ requestId }: { requestId: string }) {
   const api = useBffClient("staff");
   const query = useQuery({
     queryKey: PRIVACY_KEYS.request(requestId),
-    queryFn: () =>
+    queryFn: (context) =>
       unwrap(
         api.GET("/api/v1/privacy/requests/{request_id}", {
+          // The polls while the report is made are passive (XB-07).
+          headers: pollHeaders(context),
           params: { path: { request_id: requestId } },
         }),
       ),
-    // While the access report is being made, ask again now and then.
+    // While the access report is being made, ask again now and then. A transient failure
+    // keeps polling; any other stops it (XO-08).
     refetchInterval: (state) => {
       const report = state.state.data?.report;
       return exportRefetchInterval(
         report ? [report] : undefined,
         state.state.dataUpdateCount,
-        state.state.status === "error",
+        pollFailed(state.state),
       );
     },
     refetchIntervalInBackground: false,
