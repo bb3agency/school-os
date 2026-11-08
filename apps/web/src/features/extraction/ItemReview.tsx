@@ -292,7 +292,13 @@ function ConfirmForm({
 
   const form = useApiForm({
     schema,
-    invalidate: [itemKey(item.id), batchKey(item.batch_id), itemsKey(item.batch_id)],
+    // A confirmed row adds or updates a student: student lists and pages refresh (XS-02).
+    invalidate: [
+      itemKey(item.id),
+      batchKey(item.batch_id),
+      itemsKey(item.batch_id),
+      ["staff", "students"],
+    ],
     submit: (data, key) =>
       unwrap(
         api.POST("/api/v1/extraction-items/{item_id}/confirm", {

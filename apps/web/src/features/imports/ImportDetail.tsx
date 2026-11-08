@@ -753,8 +753,10 @@ function UndoCard({
   canCommit: boolean;
 }) {
   const t = useTranslations("imports.detail");
-  const open = batch.can_revert && Boolean(batch.revert_deadline);
-  const hours = useHoursLeft(open ? batch.revert_deadline : null);
+  const hours = useHoursLeft(batch.can_revert ? batch.revert_deadline : null);
+  // Past the deadline (a page left open) undo is closed even if the loaded batch still said
+  // can_revert: the API would refuse it (409 revert_window_closed) (XS-03).
+  const open = batch.can_revert && hours !== null;
   return (
     <Card
       eyebrow={t("undoEyebrow")}
@@ -775,7 +777,7 @@ function UndoCard({
           <p className="text-ink-muted">{t("revertClosed")}</p>
         )}
         <div className="flex flex-wrap items-center gap-3" data-print="hide">
-          {batch.can_revert && canCommit ? <RevertDialog batch={batch} /> : null}
+          {open && canCommit ? <RevertDialog batch={batch} /> : null}
           {canRun ? <SaveTemplateDialog batch={batch} /> : null}
         </div>
       </div>
@@ -792,12 +794,31 @@ export interface ImportDetailViewProps {
 }
 
 /** US-401 / FR-IMP-002..005: one import from mapping to check, add and (within 24 h) undo. */
+/**
+ * Adding and undoing run in a worker (202, then polled): once a batch seen busy settles as
+ * added or undone, student lists and pages refresh, so they do not show the cached (up to 30 s
+ * old) records from before (XS-02).
+ */
+function useRefreshStudentsWhenSettled(status: ImportBatch["status"] | null) {
+  const queryClient = useQueryClient();
+  const previous = useRef(status);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = status;
+    const settled =
+      (before === "committing" && status === "committed") ||
+      (before === "reverting" && status === "reverted");
+    if (settled) void queryClient.invalidateQueries({ queryKey: ["staff", "students"] });
+  }, [status, queryClient]);
+}
+
 export function ImportDetailView({
   batch,
   attributes,
   permissions,
   initialPreset,
 }: ImportDetailViewProps) {
+  useRefreshStudentsWhenSettled(batch.status === "ready" ? batch.data.status : null);
   const t = useTranslations("imports.detail");
   const tl = useTranslations("imports.list");
   const tn = useTranslations("school.nav");

@@ -78,6 +78,24 @@ describe("FR-STU-012 / BR-02: full Aadhaar numbers are recognised and refused", 
     expect(containsFullAadhaar("0123 4567 8901")).toBe(false);
   });
 
+  it("XS-01: refuses every grouping the API refuses (dots, wide gaps, slashes, a 0/1 lead)", () => {
+    const number = fakeAadhaar();
+    const [a, b, c] = [number.slice(0, 4), number.slice(4, 8), number.slice(8)];
+    for (const text of [
+      `${a}.${b}.${c}`,
+      `${a}  ${b}  ${c}`,
+      `${a}/${b}/${c}`,
+      `${a} | ${b} | ${c}`,
+      `${a} ${b} ${c}`,
+      `${a}​${b}​${c}`,
+    ]) {
+      expect(containsFullAadhaar(text), JSON.stringify(text)).toBe(true);
+    }
+    // core.redaction does not exempt a first digit 0 or 1, so the client does not either.
+    const lead = fakeAadhaar("01234567890");
+    expect(containsFullAadhaar(lead)).toBe(true);
+  });
+
   it("shows an Aadhaar reference only as XXXX XXXX 1234 and never widens a mask", () => {
     expect(aadhaarDisplay("1234")).toBe("XXXX XXXX 1234");
     expect(aadhaarDisplay("XXXX XXXX 1234")).toBe("XXXX XXXX 1234");
