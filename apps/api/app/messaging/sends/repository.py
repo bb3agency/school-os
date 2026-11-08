@@ -8,7 +8,7 @@ import uuid
 from collections.abc import Collection, Mapping
 from typing import Any
 
-from sqlalchemy import and_, delete, exists, func, or_, select, update
+from sqlalchemy import and_, delete, exists, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -191,6 +191,28 @@ def sent_since(session: Session, since: dt.datetime) -> int:
     window are free and do not count)."""
     stmt = select(func.count()).where(
         Message.kind == "template", Message.sent_at.is_not(None), Message.sent_at >= since
+    )
+    return int(session.execute(stmt).scalar_one())
+
+
+def lock_cap(session: Session) -> None:
+    """The school's daily-cap lock (BL-05): a transaction advisory lock on the stable key
+    ``hashtextextended('messaging.cap:' || <tenant id>, 0)``, held until the claiming
+    transaction ends, so cap checks and claims of one school never interleave."""
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended('messaging.cap:' || :t, 0))"),
+        {"t": str(current_tenant_id(session))},
+    )
+
+
+def claimed_count(session: Session, now: dt.datetime) -> int:
+    """Template messages claimed by a sender and not recorded yet (live ``claimed_until``):
+    counted in the daily cap with the sent ones (BL-05)."""
+    stmt = select(func.count()).where(
+        Message.kind == "template",
+        Message.status == "queued",
+        Message.claimed_until.is_not(None),
+        Message.claimed_until > now,
     )
     return int(session.execute(stmt).scalar_one())
 

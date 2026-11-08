@@ -1243,14 +1243,19 @@ def _claim(  # noqa: PLR0911 - one return per outcome
     if opens is not None:
         repo.set_message(session, message.id, {"next_attempt_at": opens})
         return "deferred"
+    # BL-05: the cap counts sent AND claimed messages, checked and claimed under the school's
+    # cap lock, so two runs at once cannot both pass it with a message in flight.
+    repo.lock_cap(session)
     if rules.cap_reached(
-        repo.sent_since(session, rules.ist_midnight(now)), _cap(session, settings)
+        repo.sent_since(session, rules.ist_midnight(now)) + repo.claimed_count(session, now),
+        _cap(session, settings),
     ):
         repo.set_message(
             session, message.id, {"next_attempt_at": rules.next_morning(now, quiet_end)}
         )
         return "deferred"
-    values: dict[str, Any] = {"next_attempt_at": now + dt.timedelta(seconds=cfg.claim_seconds)}
+    lease = now + dt.timedelta(seconds=cfg.claim_seconds)
+    values: dict[str, Any] = {"next_attempt_at": lease, "claimed_until": lease}
     key: str | None = None
     handle_id: uuid.UUID | None = None
     kind = LINKS.get(message.purpose)
@@ -1287,7 +1292,11 @@ def _send_one(
             return status
         if status == "queued":  # transient error: try again after the backoff
             backoff = load_config().sending.backoff(message.attempts)
-            repo.set_message(session, message_id, {"next_attempt_at": mrepo.now(session) + backoff})
+            repo.set_message(
+                session,
+                message_id,
+                {"next_attempt_at": mrepo.now(session) + backoff, "claimed_until": None},
+            )
             _revoke(session, claim.handle_id, "send_retry")
             return "retry"
         _revoke(session, claim.handle_id, "send_failed")

@@ -262,6 +262,56 @@ def test_FR_MSG_011_daily_cap_defers_to_the_next_morning(
     S.settings(school)
 
 
+def test_BL_05_FR_MSG_011_two_runs_at_once_cannot_both_pass_the_daily_cap(
+    send_school: Any, api: Any, admin_engine: Engine, fake_state: Any
+) -> None:
+    """BL-05 (lead decision 2026-11-08): the cap counts claimed as well as sent messages, and
+    the check and the claim run under the school's cap lock. Two runs claiming at once with one
+    message left under the cap: the second waits for the first and then defers its message."""
+    import threading
+
+    from app.messaging import repository as mrepo
+    from app.messaging.sends import repository as srepo
+
+    school = send_school
+    _reset(school)
+    when = S.at(13, days=1)
+    with tenant_session(school.tenant_id) as db:
+        already = srepo.sent_since(db, S.at(0, days=1)) + srepo.claimed_count(db, when)
+    S.settings(school, daily_cap=already + 1)
+    first, _ = _queue_notice(api, school)
+    second, _ = _queue_notice(api, school)
+    ids = [S.message_rows(admin_engine, guardian_id=g)[0]["id"] for g in (first, second)]
+    outcome: dict[str, Any] = {}
+
+    def claim_second() -> None:
+        with tenant_session(school.tenant_id) as db:
+            outcome["second"] = sends._claim(db, ids[1], when, mrepo.now(db))
+
+    try:
+        with tenant_session(school.tenant_id) as db:
+            outcome["first"] = sends._claim(db, ids[0], when, mrepo.now(db))
+            worker = threading.Thread(target=claim_second)
+            worker.start()
+            worker.join(timeout=3)  # the second run reaches its claim while the first holds it
+        worker.join(timeout=30)
+        assert isinstance(outcome["first"], sends._Claim)
+        assert outcome.get("second") == "deferred", outcome
+        assert S.message_rows(admin_engine, guardian_id=second)[0]["next_attempt_at"] == S.at(
+            7, days=2
+        )
+    finally:
+        S.settings(school)
+        with admin_engine.begin() as c:  # leave no live claim behind for later cap tests
+            c.execute(
+                text(
+                    "UPDATE msg.messages SET status = 'skipped', skip_reason = 'purpose_off' "
+                    "WHERE id = ANY(:ids) AND status = 'queued'"
+                ),
+                {"ids": ids},
+            )
+
+
 def test_FR_MSG_016_transient_error_retries_with_backoff_and_new_link(
     send_school: Any, api: Any, admin_engine: Engine, fake_state: Any
 ) -> None:
