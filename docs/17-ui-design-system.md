@@ -311,6 +311,21 @@ child; never autosave official records or maker-checker changes (drafts such as 
 autosave with a "Saved 10:42" line). Multi-step jobs show `Steps`. One primary button per
 view.
 
+Form dialogs follow the same rules (D75, 2026-11-08): `ActionDialog errorSummary` puts an
+`ErrorSummary` at the top of the dialog body after a failed submit (focus moves to it; each
+link finds its field by name, `fieldIdsByName` + `summaryFor`), and `ActionDialog
+unsavedStatus` gives an edit dialog the `SaveBar` status line ("Changes not saved" / "No
+changes") beside its Cancel and Save buttons; the dialog footer is its save bar, so no second
+bar is docked inside a dialog. `useApiForm({ focusInvalid: false })` leaves focus to the
+summary. Built on the operator console: the provision wizard (`Steps` + `ErrorSummary`), the
+new announcement form, the plan dialogs (new plan, new version, edit draft with the status
+line), the announcement edit dialog and the subscription dialogs (price override and AI bundle
+with the status line); If-Match and the 412 handling of the edit dialogs are unchanged. The
+operator lists with URL filters (schools, plans, subscriptions, invoices, support tickets,
+usage, fleet, audit) show the filters set as `FilterChips` under the filter form
+(`FilterCard path active`): removing a chip opens the same list without it, "Clear all" the
+unfiltered list. The incidents list has no filters.
+
 Shells (`@/components/shell`): `SchoolShell` (`permissions`, `features`, `schoolName`,
 `canSwitchSchool`, `account`, `topbarActions`, `languages`, `banner`) and `PlatformShell`
 (`permissions`, `account`) render `AppShell` (client): skip link, **one `Sidebar`** (beside the
@@ -1364,10 +1379,7 @@ and the switch have no text inside when empty, so they use `border-control` (3:1
 ## 8. Open points
 
 - v1.1 page wave (operator console, public, marketing, session pages), left open: the
-  operator forms (provision, plans, announcements, subscriptions) keep their inline errors and
-  existing buttons; they do not yet use `ErrorSummary` + `SaveBar` + `Steps` (the provision
-  stepper still shows its own progress); the operator lists keep their URL filter forms, so no
-  `FilterChips` there yet; the dev-mode render of `notFound()` under the `(public)` root layout
+  dev-mode render of `notFound()` under the `(public)` root layout
   is blank in `next dev` (production renders the uniform page; unchanged by this wave); the
   illustrations were drawn and reviewed by an agent, an owner or illustrator review is still
   worthwhile (figures are simple, faces minimal).
