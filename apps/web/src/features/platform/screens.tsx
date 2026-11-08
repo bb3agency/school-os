@@ -6,6 +6,7 @@ import { Pager, usePagedList } from "@/features/students/paging";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { DashboardView } from "./DashboardView";
 import { PK, useCan } from "./data";
+import { INCIDENT_KEYS } from "./incidents/data";
 import { SchoolsView, type SchoolFilters } from "./SchoolsView";
 
 /** Platform admin panel screens wired to /api/v1/platform/* through the BFF (C14). */
@@ -16,6 +17,15 @@ export function DashboardScreen() {
   const tc = useTranslations("common");
   const te = useTranslations("errors");
   const kpis = useApiQuery(PK.dashboard, () => unwrap(api.GET("/api/v1/platform/dashboard")));
+  // WP-05 (D49 part 2): the dashboard's incident clocks are a snapshot; while it stays open
+  // they come from the same list the incidents screen asks for every minute, so "due in 2 h"
+  // moves on. Only for operators whose dashboard has the clocks (`platform.incidents.read`).
+  const hasClocks = kpis.status === "ready" && Array.isArray(kpis.data.incident_clocks);
+  const clocks = useApiQuery(
+    INCIDENT_KEYS.clocks,
+    () => unwrap(api.GET("/api/v1/platform/incidents/clocks")),
+    { enabled: hasClocks, refetchInterval: 60_000 },
+  );
   const notice =
     kpis.status === "error" ? (
       <Alert tone="danger" title={tc("loadErrorTitle")}>
@@ -26,7 +36,13 @@ export function DashboardScreen() {
         {tc("notAvailableYetBody")}
       </Alert>
     ) : null;
-  return <DashboardView kpis={kpis.status === "ready" ? kpis.data : null} notice={notice} />;
+  return (
+    <DashboardView
+      kpis={kpis.status === "ready" ? kpis.data : null}
+      notice={notice}
+      {...(hasClocks && clocks.status === "ready" ? { liveClocks: clocks.data } : {})}
+    />
+  );
 }
 
 /** FR-PLT-001..005: GET /platform/tenants with the URL's filters. */

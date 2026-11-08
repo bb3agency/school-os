@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { PlatformShell } from "@/components/shell/PlatformShell";
+import { ClientMessages } from "@/i18n/ClientMessages";
 import { uiLocale } from "@/i18n/languages";
 import { apiGetAsSession, platformEnabled, requireOperator } from "@/server/session/rsc";
 
@@ -26,12 +27,15 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   if (!platformEnabled()) notFound();
   const session = await requireOperator();
   const me = await apiGetAsSession<OperatorMe>("operator", "/api/v1/platform/me");
+  // WP-04: the browser gets the operator console's message namespaces only.
   return (
-    <PlatformShell
-      account={{ displayName: session.displayName, roles: me?.data?.roles ?? null }}
-      permissions={me?.data?.permissions ?? null}
-    >
-      {children}
-    </PlatformShell>
+    <ClientMessages scope="platform">
+      <PlatformShell
+        account={{ displayName: session.displayName, roles: me?.data?.roles ?? null }}
+        permissions={me?.data?.permissions ?? null}
+      >
+        {children}
+      </PlatformShell>
+    </ClientMessages>
   );
 }

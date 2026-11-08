@@ -49,6 +49,7 @@ vi.mock("next/navigation", async (importOriginal) => {
   };
 });
 
+import { ClientMessages } from "@/i18n/ClientMessages";
 import ChooseSchoolPage from "./[locale]/choose-school/page";
 import PlatformLayout from "./[locale]/platform/layout";
 import SchoolLayout from "./[locale]/(school)/layout";
@@ -98,10 +99,30 @@ afterEach(() => {
 
 type ShellProps = { permissions: readonly string[] | null; canSwitchSchool: boolean };
 
+/** WP-04: the area layouts wrap their shell in `<ClientMessages scope=…>`; the shell is inside. */
+function shellOf(element: unknown): ReactElement {
+  const wrapper = element as ReactElement<{ scope: string; children: ReactElement }>;
+  expect(wrapper.type).toBe(ClientMessages);
+  return wrapper.props.children;
+}
+
+describe("area layouts send only their own message namespaces (WP-04)", () => {
+  it("school console and operator console", async () => {
+    await signInDirect("staff", HARNESS_TENANT);
+    const school = (await SchoolLayout({ children: "x" })) as ReactElement<{ scope: string }>;
+    expect(school.type).toBe(ClientMessages);
+    expect(school.props.scope).toBe("school");
+    await signInDirect("operator", null);
+    const platform = (await PlatformLayout({ children: "x" })) as ReactElement<{ scope: string }>;
+    expect(platform.type).toBe(ClientMessages);
+    expect(platform.props.scope).toBe("platform");
+  });
+});
+
 describe("school layout reads /me from the server (FR-IAM-013)", () => {
   it("passes effective permissions to the shell and sends the active school", async () => {
     await signInDirect("staff", HARNESS_TENANT);
-    const element = (await SchoolLayout({ children: "x" })) as ReactElement<ShellProps>;
+    const element = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<ShellProps>;
     expect(element.props.permissions).toEqual(HARNESS_ME.permissions);
     expect(element.props.canSwitchSchool).toBe(false);
     const call = h.apiCalls.find((r) => new URL(r.url).pathname === "/api/v1/me");
@@ -117,7 +138,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
       schoolName: string | null;
       account: { kind: string; displayName: string | null; roles: readonly string[] | null };
     };
-    const element = (await SchoolLayout({ children: "x" })) as ReactElement<Props>;
+    const element = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<Props>;
     expect(element.props.schoolName).toBe("Sample School");
     expect(element.props.account).toEqual({
       kind: "staff",
@@ -133,7 +154,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
         ? json({ status: 503, code: "unavailable" }, 503)
         : defaultApi(request),
     );
-    const without = (await SchoolLayout({ children: "x" })) as ReactElement<Props>;
+    const without = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<Props>;
     expect(without.props.schoolName).toBeNull();
     expect(without.props.permissions).toEqual(HARNESS_ME.permissions);
   });
@@ -145,7 +166,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
         ? json({ ...HARNESS_ME, tenant_ids: [HARNESS_TENANT, OTHER] })
         : defaultApi(request),
     );
-    const element = (await SchoolLayout({ children: "x" })) as ReactElement<ShellProps>;
+    const element = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<ShellProps>;
     expect(element.props.canSwitchSchool).toBe(true);
   });
 
@@ -166,7 +187,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
       return defaultApi(request);
     });
     type Features = ShellProps & { features: { tally?: boolean } };
-    const off = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
+    const off = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<Features>;
     expect(off.props.features).toEqual({
       tally: false,
       fees: false,
@@ -174,7 +195,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
       disclosure: false,
     });
     connector = 200;
-    const on = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
+    const on = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<Features>;
     expect(on.props.features).toEqual({
       tally: true,
       fees: false,
@@ -198,7 +219,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
       return defaultApi(request);
     });
     type Features = ShellProps & { features: { fees?: boolean } };
-    const off = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
+    const off = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<Features>;
     expect(off.props.features).toEqual({
       tally: false,
       fees: false,
@@ -206,7 +227,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
       disclosure: false,
     });
     fees = 200;
-    const on = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
+    const on = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<Features>;
     expect(on.props.features).toEqual({
       tally: false,
       fees: true,
@@ -231,7 +252,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
       return defaultApi(request);
     });
     type Features = ShellProps & { features: { messaging?: boolean } };
-    const off = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
+    const off = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<Features>;
     expect(off.props.features).toEqual({
       tally: false,
       fees: false,
@@ -239,7 +260,7 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
       disclosure: false,
     });
     settings = 200;
-    const on = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
+    const on = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<Features>;
     expect(on.props.features).toEqual({
       tally: false,
       fees: false,
@@ -263,16 +284,16 @@ describe("school layout reads /me from the server (FR-IAM-013)", () => {
       return defaultApi(request);
     });
     type Features = ShellProps & { features: { disclosure?: boolean } };
-    const off = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
+    const off = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<Features>;
     expect(off.props.features.disclosure).toBe(false);
     link = 200;
-    const on = (await SchoolLayout({ children: "x" })) as ReactElement<Features>;
+    const on = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<Features>;
     expect(on.props.features.disclosure).toBe(true);
   });
 
   it("does not ask for the Tally status for people without a Tally permission", async () => {
     await signInDirect("staff", HARNESS_TENANT);
-    const element = (await SchoolLayout({ children: "x" })) as ReactElement<
+    const element = shellOf(await SchoolLayout({ children: "x" })) as ReactElement<
       ShellProps & { features: { tally?: boolean } }
     >;
     expect(element.props.features).toEqual({
@@ -334,7 +355,7 @@ describe("platform layout reads /platform/me", () => {
           })
         : defaultApi(request),
     );
-    const element = (await PlatformLayout({ children: "x" })) as ReactElement<
+    const element = shellOf(await PlatformLayout({ children: "x" })) as ReactElement<
       ShellProps & { account: { displayName: string | null; roles: readonly string[] | null } }
     >;
     expect(element.props.permissions).toEqual(["platform.invoices.read"]);

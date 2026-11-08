@@ -4,7 +4,8 @@ import { isValidElement, type ReactElement } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformShell } from "@/components/shell/PlatformShell";
 import { SchoolShell } from "@/components/shell/SchoolShell";
-import { renderWithIntl, testQueryClient } from "@/test/render";
+import { ClientMessages } from "@/i18n/ClientMessages";
+import { intlErrors, renderWithIntl, testQueryClient } from "@/test/render";
 
 /**
  * ADR-0036 (English first, Telugu hidden): with SOS_TELUGU_ENABLED off (the default) no page
@@ -127,6 +128,8 @@ function localePrefixed(root: HTMLElement): string[] {
  * a file run in order, so run the whole file (a `-t` filter leaves the coverage test short).
  */
 const PATHS = Object.keys(modules).sort();
+/** Pages that render `<ClientMessages scope="marketing" | "dev">` themselves (WP-04). */
+const SELF_SCOPED = /^\.\/\[locale\]\/(welcome|features|pricing|security|about|dev)\//;
 const scanned: string[] = [];
 let links = 0;
 
@@ -140,12 +143,27 @@ describe("English only while Telugu is switched off (ADR-0036)", () => {
     async (path) => {
       const page = await element(path);
       if (!page) return;
+      // WP-04: each page renders with only the message namespaces its area sends to the
+      // browser (CLIENT_NAMESPACES), as under its layout; a missing one fails below.
       const shell = path.includes("/platform/") ? (
-        <PlatformShell permissions={null}>{page}</PlatformShell>
+        <ClientMessages scope="platform">
+          <PlatformShell permissions={null}>{page}</PlatformShell>
+        </ClientMessages>
+      ) : path.includes("/(school)/") ? (
+        <ClientMessages scope="school">
+          <SchoolShell permissions={null} languages={["te", "en"]}>
+            {page}
+          </SchoolShell>
+        </ClientMessages>
+      ) : SELF_SCOPED.test(path) ? (
+        // Marketing and dev pages wrap themselves in their scope. On the server that picks
+        // from the whole catalogue; in this client render it picks from the nearest provider,
+        // so the same scope goes outside (picking it again changes nothing).
+        <ClientMessages scope={path.includes("/dev/") ? "dev" : "marketing"}>{page}</ClientMessages>
       ) : (
-        <SchoolShell permissions={null} languages={["te", "en"]}>
-          {page}
-        </SchoolShell>
+        // The other pages outside an area (sign-in states, school picker) have the root
+        // layout's namespaces only.
+        <ClientMessages scope="root">{page}</ClientMessages>
       );
       const queryClient = testQueryClient();
       const { container } = renderWithIntl(shell, "en", queryClient);
@@ -158,6 +176,8 @@ describe("English only while Telugu is switched off (ADR-0036)", () => {
       expect([...offenders(container), ...localePrefixed(container)]).toEqual([]);
       links += container.querySelectorAll("a[href^='/']").length;
       expect(container.querySelector("nav[aria-label='Language']"), path).toBeNull();
+      // No message missing from the area's namespaces (WP-04), and no ICU errors.
+      expect(intlErrors, path).toEqual([]);
       scanned.push(path);
     },
     60_000,
