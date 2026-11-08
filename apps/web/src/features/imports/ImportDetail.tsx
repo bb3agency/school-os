@@ -753,8 +753,10 @@ function UndoCard({
   canCommit: boolean;
 }) {
   const t = useTranslations("imports.detail");
-  const open = batch.can_revert && Boolean(batch.revert_deadline);
-  const hours = useHoursLeft(open ? batch.revert_deadline : null);
+  const hours = useHoursLeft(batch.can_revert ? batch.revert_deadline : null);
+  // Past the deadline (a page left open) undo is closed even if the loaded batch still said
+  // can_revert: the API would refuse it (409 revert_window_closed) (XS-03).
+  const open = batch.can_revert && hours !== null;
   return (
     <Card
       eyebrow={t("undoEyebrow")}
@@ -775,7 +777,7 @@ function UndoCard({
           <p className="text-ink-muted">{t("revertClosed")}</p>
         )}
         <div className="flex flex-wrap items-center gap-3" data-print="hide">
-          {batch.can_revert && canCommit ? <RevertDialog batch={batch} /> : null}
+          {open && canCommit ? <RevertDialog batch={batch} /> : null}
           {canRun ? <SaveTemplateDialog batch={batch} /> : null}
         </div>
       </div>

@@ -489,7 +489,8 @@ describe("US-401 AC1..AC3: one import", () => {
     const batch = importBatch({
       status: "committed",
       committed_at: NOW,
-      revert_deadline: "2026-09-28T05:30:00Z",
+      // Ahead of the real clock: undo is offered only before the deadline (XS-03).
+      revert_deadline: "2099-09-28T05:30:00Z",
       can_revert: true,
       stats: { committed: 3, created: 3, updated: 0, skipped: 0 },
     });
@@ -501,7 +502,7 @@ describe("US-401 AC1..AC3: one import", () => {
       <ImportDetailView batch={ready(batch)} attributes={ready(ATTRIBUTES)} permissions={perms} />,
     );
     expect(
-      screen.getByText(im.detail.revertUntil.replace("{deadline}", "28/09/2026 11:00")),
+      screen.getByText(im.detail.revertUntil.replace("{deadline}", "28/09/2099 11:00")),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: im.revert.open }));
     const dialog = screen.getByRole("dialog");
@@ -543,6 +544,20 @@ describe("US-401 AC1..AC3: one import", () => {
     expect(spy).not.toHaveBeenCalledWith(students);
     await user.click(next);
     expect(spy).toHaveBeenCalledWith(students);
+  });
+
+  it("XS-03 (FR-IMP-005): a page left open past the deadline stops offering undo", () => {
+    stub.routes[`GET /bff/api/v1/imports/${ID.import}/rows`] = () => page([]);
+    const past = new Date(Date.now() - 60_000).toISOString();
+    renderWithIntl(
+      <ImportDetailView
+        batch={ready(importBatch({ status: "committed", revert_deadline: past, can_revert: true }))}
+        attributes={ready(ATTRIBUTES)}
+        permissions={perms}
+      />,
+    );
+    expect(screen.getByText(im.detail.revertClosed)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: im.revert.open })).toBeNull();
   });
 
   it("after 24 hours says undo is closed and hides the button", () => {
