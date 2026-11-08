@@ -43,6 +43,17 @@ const OWN_CSP_PATHS: readonly RegExp[] = [
   /^\/bff\/api\/v1\/registers\/(transfer-certificates|certificates|admission-withdrawal)$/i,
   // FR-DQ-045 (ADR-0040): parent verification slips of board and portal readiness.
   /^\/bff\/api\/v1\/dq\/readiness\/[a-z0-9][a-z0-9-]{0,63}\/slips$/i,
+  // XB-01: the other print pages the browser opens from the BFF (each API answer carries a
+  // policy of hashed style blocks only): fee receipts, refund vouchers and the day report
+  // (R2-1B), APAAR consent forms (ADR-0039), consent forms, WhatsApp join slips
+  // (FR-MSG-009), privacy notice previews and request letters (ADR-0048).
+  /^\/bff\/api\/v1\/fees\/(receipts|refunds)\/[0-9a-f-]{36}\/print$/i,
+  /^\/bff\/api\/v1\/fees\/reports\/daily\/print$/i,
+  /^\/bff\/api\/v1\/students\/[0-9a-f-]{36}\/apaar-consent\/form$/i,
+  /^\/bff\/api\/v1\/sections\/[0-9a-f-]{36}\/(apaar-consent-forms|join-slips)$/i,
+  /^\/bff\/api\/v1\/consents\/forms$/i,
+  /^\/bff\/api\/v1\/privacy\/templates\/[a-z_]{1,40}\/preview$/i,
+  /^\/bff\/api\/v1\/privacy\/requests\/[0-9a-f-]{36}\/letters\/[a-z_]{1,40}$/i,
 ];
 
 function isNonLocalised(pathname: string): boolean {

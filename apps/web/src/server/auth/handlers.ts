@@ -757,19 +757,52 @@ export async function handleActiveTenant(request: Request, runtime: AuthRuntime)
   let idleTimeoutMinutes: number | null = null;
   // Ask the API (it re-checks membership on every request anyway; never reveals tenants).
   try {
-    const fresh = await runtime.refresher.ensureFresh(session);
-    const stored = await runtime.store.tokens(fresh.id);
-    if (!stored) return unauthenticated(requestId);
-    const response = await callApi(runtime, {
-      session: { ...fresh, activeTenantId: tenantId.toLowerCase() },
-      accessToken: stored.tokens.accessToken,
-      method: "POST",
-      path: "/api/v1/me/active-tenant",
-      incomingHeaders: new Headers({ "content-type": "application/json" }),
-      body: new TextEncoder().encode(JSON.stringify({ tenant_id: tenantId.toLowerCase() })),
-      requestId,
-      headersTimeoutMs: 10_000,
-    });
+    // XB-05: one refresh and retry for token_expired, as the API proxy does.
+    let response: Response | null = null;
+    let staleAccessToken: string | undefined;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const fresh = await runtime.refresher.ensureFresh(
+        session,
+        attempt === 0 ? { force: false } : { force: true, staleAccessToken },
+      );
+      const stored = await runtime.store.tokens(fresh.id);
+      if (!stored) return unauthenticated(requestId);
+      response = await callApi(runtime, {
+        session: { ...fresh, activeTenantId: chosen },
+        accessToken: stored.tokens.accessToken,
+        method: "POST",
+        path: "/api/v1/me/active-tenant",
+        incomingHeaders: new Headers({ "content-type": "application/json" }),
+        body: new TextEncoder().encode(JSON.stringify({ tenant_id: chosen })),
+        requestId,
+        headersTimeoutMs: 10_000,
+      });
+      if (response.status !== 401 || attempt > 0) break;
+      const body: unknown = await response
+        .clone()
+        .json()
+        .catch(() => null);
+      if (problemCodeOf(body) !== "token_expired") break;
+      await response.body?.cancel();
+      staleAccessToken = stored.tokens.accessToken;
+    }
+    if (!response) return unauthenticated(requestId);
+    if (response.status === 401) {
+      // The API no longer accepts this sign-in: end the session (as the proxy does, XB-02) so
+      // the person signs in again instead of reading "You can't open this school".
+      await response.body?.cancel();
+      await runtime.store.revoke(session.id);
+      logEvent("session_ended_api_unauthenticated", { kind: "staff", request_id: requestId });
+      const secure = runtime.config.secureCookies;
+      return problem(
+        requestId,
+        401,
+        "unauthenticated",
+        "Sign in to continue",
+        { detail: "Your session has ended. Sign in again.", login_url: "/bff/auth/login" },
+        { "Set-Cookie": clearCookie(sessionCookieName("staff", secure), secure) },
+      );
+    }
     if (response.ok && (response.headers.get("content-type") ?? "").includes("json")) {
       const me: unknown = await response.json().catch(() => null);
       idleTimeoutMinutes = schoolIdleTimeoutFromMe(me, chosen);

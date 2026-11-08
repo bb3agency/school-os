@@ -221,6 +221,36 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
       },
     );
 
+    it.each(["cross-site", "same-site"])(
+      "XB-03 (SEC-004): a GET from another site (Sec-Fetch-Site %s) never reaches the API as the user",
+      async (site) => {
+        // Top-level navigations carry the SameSite=Lax cookie; audited GETs (print views, the
+        // fee day report, download links) must not be triggered from another site.
+        await h.signIn("staff", clerk);
+        h.apiCalls.length = 0;
+        const response = await call("/bff/api/v1/fees/reports/daily/print?date=2026-11-08", {
+          headers: { "sec-fetch-site": site },
+        });
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ code: "csrf_failed" });
+        expect(h.apiCalls).toHaveLength(0);
+      },
+    );
+
+    it.each(["same-origin", "none"])(
+      "XB-03 (SEC-004): a GET with Sec-Fetch-Site %s (the app, a bookmark, a typed address) passes",
+      async (site) => {
+        await h.signIn("staff", clerk);
+        h.apiCalls.length = 0;
+        h.setApi(() => json({ ok: true }));
+        const response = await call("/bff/api/v1/fees/reports/daily/print?date=2026-11-08", {
+          headers: { "sec-fetch-site": site },
+        });
+        expect(response.status).toBe(200);
+        expect(h.apiCalls).toHaveLength(1);
+      },
+    );
+
     it("SEC-004: the app's own Origin with Sec-Fetch-Site same-origin and the token passes", async () => {
       await h.signIn("staff", clerk);
       const token = await h.csrf();
@@ -427,6 +457,38 @@ describe("BFF proxy /bff/api/v1/* (SEC-004)", () => {
     const response = await call("/bff/api/v1/users");
     expect(response.status).toBe(401);
     expect(h.apiCalls).toHaveLength(2);
+  });
+
+  it("XB-02 (FR-IAM-004): a 401 the refresh does not cure ends the BFF session, so sign-in does not bounce back", async () => {
+    await h.signIn("staff", clerk);
+    const session = (await h.runtime.store.load(h.jar.get("__Host-sos_session"), {
+      touch: false,
+    }))!;
+    h.setApi(() => json({ status: 401, code: "token_expired" }, 401));
+    const response = await call("/bff/api/v1/users");
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "unauthenticated",
+      login_url: "/bff/auth/login",
+    });
+    expect(response.headers.get("set-cookie")).toContain("__Host-sos_session=;");
+    // Otherwise /bff/auth/login sees a live session and sends the browser straight back to the
+    // page, whose next call gets the same 401: an endless reload loop.
+    expect(await h.runtime.store.get(session.id)).toBeNull();
+  });
+
+  it("XB-02 (FR-IAM-004): any other 401 from the API ends the BFF session too", async () => {
+    await h.signIn("staff", clerk);
+    const session = (await h.runtime.store.load(h.jar.get("__Host-sos_session"), {
+      touch: false,
+    }))!;
+    h.apiCalls.length = 0;
+    h.setApi(() => json({ status: 401, code: "unauthenticated" }, 401));
+    const response = await call("/bff/api/v1/users");
+    expect(response.status).toBe(401);
+    expect(h.apiCalls).toHaveLength(1);
+    await expect(response.json()).resolves.toMatchObject({ login_url: "/bff/auth/login" });
+    expect(await h.runtime.store.get(session.id)).toBeNull();
   });
 
   it("returns 401 when the refresh token was reused and the family is revoked", async () => {

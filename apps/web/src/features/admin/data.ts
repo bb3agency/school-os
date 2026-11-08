@@ -1,5 +1,6 @@
 "use client";
 
+import { pollHeaders } from "@/lib/bff/poll";
 import type { components } from "@schoolos/api-client";
 import { useQuery, type Query } from "@tanstack/react-query";
 import * as z from "@/lib/zod";
@@ -104,9 +105,10 @@ export function useTenantExports(
   const api = useBffClient("staff");
   const query = useQuery({
     queryKey: ADMIN_KEYS.exportList(cursor),
-    queryFn: () =>
+    queryFn: (context) =>
       unwrap(
         api.GET("/api/v1/admin/tenant-export", {
+          headers: pollHeaders(context),
           params: { query: { limit: 20, ...(cursor ? { cursor } : {}) } },
         }),
       ),

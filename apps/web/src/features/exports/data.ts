@@ -1,5 +1,6 @@
 "use client";
 
+import { pollHeaders } from "@/lib/bff/poll";
 import { useQuery, type Query } from "@tanstack/react-query";
 import { DQ_KEYS } from "@/features/findings/data";
 import { runPollDelay } from "@/features/findings/RunChecks";
@@ -79,9 +80,10 @@ export function useExportList(
   const api = useBffClient("staff");
   const query = useQuery({
     queryKey: EXPORT_KEYS.list(view, cursor),
-    queryFn: () =>
+    queryFn: (context) =>
       unwrap(
         api.GET("/api/v1/exports", {
+          headers: pollHeaders(context),
           params: { query: { requested_by: view, limit: 25, ...(cursor ? { cursor } : {}) } },
         }),
       ),
@@ -98,8 +100,13 @@ export function useExport(exportId: string): Loadable<Export> {
   const api = useBffClient("staff");
   const query = useQuery({
     queryKey: EXPORT_KEYS.one(exportId),
-    queryFn: () =>
-      unwrap(api.GET("/api/v1/exports/{export_id}", { params: { path: { export_id: exportId } } })),
+    queryFn: (context) =>
+      unwrap(
+        api.GET("/api/v1/exports/{export_id}", {
+          headers: pollHeaders(context),
+          params: { path: { export_id: exportId } },
+        }),
+      ),
     refetchInterval: interval<Export>((one) => [one]),
     refetchIntervalInBackground: false,
     retry,

@@ -254,6 +254,68 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
     }
   });
 
+  it("XB-01 (SEC-010): every API print page opened in the browser keeps its own hashed-style CSP", () => {
+    const id = "0192f3a4-0000-7000-8000-0000000ab001";
+    // Each of these answers text/html with a `<style>` block pinned by hash in the API's own
+    // policy; under the page-wide `style-src 'self'` the A4 layout is lost in production.
+    for (const path of [
+      `/bff/api/v1/fees/receipts/${id}/print`,
+      `/bff/api/v1/fees/refunds/${id}/print`,
+      "/bff/api/v1/fees/reports/daily/print",
+      `/bff/api/v1/students/${id}/apaar-consent/form`,
+      `/bff/api/v1/sections/${id}/apaar-consent-forms`,
+      `/bff/api/v1/sections/${id}/join-slips`,
+      "/bff/api/v1/consents/forms",
+      "/bff/api/v1/privacy/templates/notice_parents/preview",
+      `/bff/api/v1/privacy/requests/${id}/letters/acknowledgement`,
+    ]) {
+      const response = proxy(request(path));
+      expect(response.headers.get("content-security-policy"), path).toBeNull();
+      expect(response.headers.get("x-content-type-options"), path).toBe("nosniff");
+    }
+    for (const path of [
+      `/bff/api/v1/fees/receipts/${id}`,
+      `/bff/api/v1/fees/receipts/${id}/print/x`,
+      "/bff/api/v1/fees/receipts/../print",
+      "/bff/api/v1/fees/reports/daily",
+      `/bff/api/v1/students/${id}/apaar-consent`,
+      `/bff/api/v1/sections/${id}/join-slips/x`,
+      "/bff/api/v1/consents/summary",
+      "/bff/api/v1/privacy/templates/notice_parents/pdf",
+      `/bff/api/v1/privacy/requests/${id}`,
+    ]) {
+      expect(proxy(request(path)).headers.get("content-security-policy"), path).toContain(
+        "default-src 'self'",
+      );
+    }
+  });
+
+  it("XB-01 (SEC-010): no HTML page of the API (apps/api/openapi.json) is left under the page-wide CSP", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const openapi = JSON.parse(
+      await readFile(new URL("../../api/openapi.json", import.meta.url), "utf8"),
+    ) as {
+      paths: Record<string, { get?: { responses?: Record<string, { content?: object }> } }>;
+    };
+    const sample: Record<string, string> = {
+      profile_key: "bseap-ssc-2027",
+      key: "notice_parents",
+      letter: "acknowledgement",
+    };
+    const htmlPages = Object.entries(openapi.paths)
+      .filter(([, item]) => "text/html" in (item.get?.responses?.["200"]?.content ?? {}))
+      .map(([path]) =>
+        path.replace(
+          /\{([a-z_]+)\}/g,
+          (_, name: string) => sample[name] ?? "0192f3a4-0000-7000-8000-0000000ab001",
+        ),
+      );
+    expect(htmlPages.length).toBeGreaterThan(10);
+    for (const path of htmlPages) {
+      expect(proxy(request(`/bff${path}`)).headers.get("content-security-policy"), path).toBeNull();
+    }
+  });
+
   it("leaves the readiness slips' CSP to the API, and only that path (FR-DQ-045)", () => {
     const slips = proxy(request("/bff/api/v1/dq/readiness/bseap-ssc-2027/slips"));
     expect(slips.headers.get("content-security-policy")).toBeNull();
