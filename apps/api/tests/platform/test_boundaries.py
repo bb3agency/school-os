@@ -1,7 +1,8 @@
 """Control-plane code boundaries (ADR-0020, CLAUDE.md §4, ADR-0017; decision 2026-09-27).
 
 ``platform`` may call ``tenancy.service`` only for tenant lifecycle (register, initialise keys,
-activate, suspend, reactivate, offboard, usage counts) and never reads tenant data. This test
+activate, suspend, reactivate, offboard, usage counts, and the school's board codes, ADR-0057)
+and never reads tenant data. This test
 parses every ``app/platform/**/*.py`` file and pins:
 
 1. every ``app.*`` import: ``core``, ``authz``, ``audit`` and ``platform`` itself are free; each
@@ -53,6 +54,10 @@ TENANCY_ALLOWED = frozenset(
         # school's AI budget is derived (owner decision 2026-10-03; ADR-0020 amendment B3). Opens
         # the school's own tenant_session inside tenancy; takes a count in, returns a flag.
         "set_ai_answer_allowance",
+        # board codes (ADR-0057, lead decision D78): the daily collector keeps
+        # platform.deployments.boards current for billing's protected exam windows. Opens the
+        # school's own tenant_session inside tenancy; returns board codes only.
+        "tenant_board_codes",
     }
 )
 
@@ -286,3 +291,15 @@ def test_ADR_0050_incident_records_never_reach_tenant_data() -> None:
     from app.platform import service
 
     assert {"incident_notices_for_school", "record_incident_notice_pulled"} <= set(service.__all__)
+
+
+def test_ADR_0057_board_codes_are_read_only_by_the_usage_collector() -> None:
+    """Lead decision D78: only ``usage.py`` reads a school's board codes, and the protected
+    windows are a copy in billing.yaml, so the control plane never imports ``app.dq``."""
+    readers = {
+        rel
+        for rel, source in _sources()
+        if "tenant_board_codes" in _scan([(rel, source)]).tenancy_attrs
+    }
+    assert readers == {"usage.py"}
+    assert not [m for m in FINDINGS.imports if m.startswith("app.dq")]

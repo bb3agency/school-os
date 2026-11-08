@@ -8,6 +8,10 @@ active students, active documents and stored bytes (audit 2026-10-17 L-09).
 Dedicated tier: the heartbeat carries the same counts. Limits never block school work in M0;
 crossing 80% / 100% is recorded once per metric per billing period and audited.
 
+Board codes (ADR-0057, lead decision D78): the same daily run copies each shared school's board
+codes (``tenancy.tenant_board_codes``, codes only) to ``platform.deployments.boards`` when they
+differ, so billing's protected exam windows match the school's current boards.
+
 AI answer quota alerts (ADR-0038 follow-up, docs/16 §19 Q16): after each collection (and each
 heartbeat) the month's billable answers are compared with the bundle's included answers; the
 first crossing of 80 % and of 100 % in a calendar month is recorded in ``usage_threshold_events``
@@ -163,6 +167,34 @@ def collect_tenant(tenant_id: uuid.UUID, day: dt.date) -> dict[str, Any]:
     return values
 
 
+def sync_boards(tenant_id: uuid.UUID) -> bool:
+    """Keep ``platform.deployments.boards`` equal to the school's boards (ADR-0057, lead
+    decision D78); ``True`` if it changed. Reads board codes only through
+    ``tenancy.tenant_board_codes`` (the school's own session; ADR-0020 as amended). Order is not
+    a change. Audit ``deployment.boards_synced`` (system; ``boards`` and ``previous``, codes
+    only) in the same transaction. Billing's protected exam windows match on these codes."""
+    codes = sorted(set(tenancy.tenant_board_codes(tenant_id)))
+    with platform_session() as s:
+        dep = repo.get_by(s, m.deployments, m.deployments.c.tenant_id == tenant_id, for_update=True)
+        if dep is None:
+            return False
+        previous = sorted(set(dep["boards"] or ()))
+        if previous == codes:
+            return False
+        repo.update_row(s, m.deployments, dep["id"], {"boards": codes})
+        audit_platform(
+            s,
+            SYSTEM,
+            "deployment.boards_synced",
+            "deployment",
+            dep["id"],
+            {"boards": codes, "previous": previous},
+            tenant_id=tenant_id,
+        )
+    log.info("platform.deployment.boards_synced", tenant_id=str(tenant_id), outcome="ok")
+    return True
+
+
 def collect_daily(day: dt.date | None = None) -> int:
     """Beat task body (01:30 IST): yesterday's counts for every active or suspended school."""
     day = day or (today_ist() - dt.timedelta(days=1))
@@ -175,6 +207,15 @@ def collect_daily(day: dt.date | None = None) -> int:
             done += 1
         except Exception:
             log.exception("platform.usage.collect_failed", tenant_id=str(tenant_id))
+        try:
+            # The school's boards for billing's protected exam windows (ADR-0057).
+            sync_boards(tenant_id)
+        except Exception as exc:
+            log.warning(
+                "platform.boards.sync_failed",
+                tenant_id=str(tenant_id),
+                error_type=type(exc).__name__,
+            )
         try:
             # Reconcile the AI answer allowance the school's budget is derived from (ADR-0020 B3).
             billing.sync_ai_allowance(tenant_id)
