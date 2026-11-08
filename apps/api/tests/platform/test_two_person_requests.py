@@ -383,6 +383,51 @@ def test_hardening_critical_announcement_needs_a_second_operator(
     assert cancelled.json()["status"] == "cancelled"
 
 
+def test_SEC_029_YI_02_approval_with_a_stale_etag_is_refused(
+    api: Api, make_operator: MakeOperator
+) -> None:
+    """Audit 2026-11-09 YI-02: the second operator approved whatever the critical banner said
+    at the moment of the click. The submitter could change the text after the approver opened
+    it (the change keeps it pending under the same submitter) and the approval then published
+    text the second person never saw. ``If-Match`` on approve is now checked (412 when the
+    banner changed since it was read; nothing approved)."""
+    agent, other = make_operator("support_agent"), make_operator("support_agent")
+    crit = api.call("POST", "/announcements", agent, json=_announcement("critical"))
+    assert crit.status_code == 201, crit.text
+    seen = crit.json()
+    aid = seen["id"]
+    edited = api.call(
+        "PATCH",
+        f"/announcements/{aid}",
+        agent,
+        json=_announcement("critical", title_en="Different text"),
+        headers={"If-Match": f'"{seen["version"]}"'},
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["status"] == "pending_approval"
+    stale = api.call(
+        "POST",
+        f"/announcements/{aid}/approve",
+        other,
+        headers={"If-Match": f'"{seen["version"]}"'},
+    )
+    assert stale.status_code == 412, stale.text
+    with platform_session() as s:
+        status: Any = s.execute(
+            text("SELECT status FROM platform.announcements WHERE id = :i"), {"i": uuid.UUID(aid)}
+        ).scalar_one()
+    assert status == "pending_approval"
+    ok = api.call(
+        "POST",
+        f"/announcements/{aid}/approve",
+        other,
+        headers={"If-Match": edited.headers["ETag"]},
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["status"] == "scheduled"
+    assert ok.headers["ETag"] == f'"{ok.json()["version"]}"'
+
+
 # --- hardening: invoices ----------------------------------------------------------------------
 
 

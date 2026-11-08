@@ -233,17 +233,23 @@ def update(
         return _out(row)
 
 
-def approve(actor: Actor, announcement_id: uuid.UUID) -> AnnouncementOut:
+def approve(
+    actor: Actor, announcement_id: uuid.UUID, *, expected_version: int | None = None
+) -> AnnouncementOut:
     """Second operator approves a critical announcement (``pending_approval`` -> ``scheduled``).
 
     409 ``invalid_state`` unless it is pending; ``same_operator`` for the operator who submitted
     it (DB CHECK too); ``request_expired``, ``requester_not_authorised`` and
     ``approver_not_eligible`` as for the other two-person flows (app.platform.two_person).
+    ``expected_version`` (``If-Match``): the version the approver read; 412 when the
+    announcement changed since (YI-02: the approval covers the text the approver saw).
     Withdrawing is cancelling (``POST .../cancel``). Audit ``announcement.approved``."""
     with platform_session() as s, db_errors():
         row = repo.get(s, m.announcements, announcement_id, for_update=True)
         if row is None:
             raise NotFound("Announcement not found")
+        if expected_version is not None and row["version"] != expected_version:
+            raise PreconditionFailed()
         if row["status"] != "pending_approval":
             raise Conflict(
                 "Only an announcement waiting for approval can be approved.", code="invalid_state"
