@@ -699,7 +699,11 @@
         "quotaUsedUp": "చేర్చిన సమాధానాలన్నీ వాడారు; ప్రతి అదనపు సమాధానానికి {amount}",
         "quotaUsedUpBody": "Ask సమాధానాలు ఇస్తూనే ఉంటుంది. ప్రతి అదనపు సమాధానానికి {amount} మరియు GST, వచ్చే నెల ఇన్‌వాయిస్‌లో వస్తుంది. బండిల్ మార్చడానికి SchoolOS సపోర్ట్‌ను సంప్రదించండి."
       },
-      "invoicesNote": "మీ చివరి 24 ఇన్‌వాయిస్‌లు, కొత్తవి ముందు. పాత ఇన్‌వాయిస్ కోసం SchoolOS సపోర్ట్‌ను సంప్రదించండి."
+      "invoicesNote": "మీ చివరి 24 ఇన్‌వాయిస్‌లు, కొత్తవి ముందు. పాత ఇన్‌వాయిస్ కోసం SchoolOS సపోర్ట్‌ను సంప్రదించండి.",
+      "nextInvoice": "Next invoice",
+      "nextInvoiceValue": "{amount} on {date}",
+      "nextInvoiceNote": "Estimate including GST. Extra students and AI answers above the bundle are added when the invoice is made.",
+      "summaryAsOf": "Plan details from SchoolOS, as of {date}. Invoices are sent to your billing email."
     },
     "audit": {
       "title": "ఆడిట్ లాగ్",

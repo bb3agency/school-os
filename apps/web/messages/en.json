@@ -699,7 +699,11 @@
         "quotaUsedUp": "All included answers used; extra answers are {amount} each",
         "quotaUsedUpBody": "Ask keeps answering. Each extra answer costs {amount} plus GST and is billed on next month's invoice. To change the bundle, contact SchoolOS support."
       },
-      "invoicesNote": "Your last 24 invoices, newest first. For an older invoice, contact SchoolOS support."
+      "invoicesNote": "Your last 24 invoices, newest first. For an older invoice, contact SchoolOS support.",
+      "nextInvoice": "Next invoice",
+      "nextInvoiceValue": "{amount} on {date}",
+      "nextInvoiceNote": "Estimate including GST. Extra students and AI answers above the bundle are added when the invoice is made.",
+      "summaryAsOf": "Plan details from SchoolOS, as of {date}. Invoices are sent to your billing email."
     },
     "audit": {
       "title": "Audit log",
