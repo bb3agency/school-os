@@ -16,6 +16,8 @@ export function useStaffMe(): StaffMe | undefined {
     queryFn: () => unwrap(api.GET("/api/v1/me")),
     staleTime: 60_000,
     retry: false,
+    // WA-04: never refetch a failed /me on mount (see lib/bff/staff-me.ts).
+    retryOnMount: false,
   });
   return query.data;
 }
