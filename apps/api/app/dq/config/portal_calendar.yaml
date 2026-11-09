@@ -14,7 +14,11 @@
 #
 # Per event:
 #   key           unique in the whole file, ^[a-z][a-z0-9_]{2,63}$ (stored on tasks and reminders)
-#   portal        udise_plus | bseap | cbse | cisce | apaar (the notification names the portal)
+#   portal        udise_plus | bseap | cbse | cisce | apaar | school_admin | rte (the
+#                 notification names the portal). school_admin: the school's own administrative
+#                 deadlines that concern no student record (recognition renewal, CBSE SARAS and
+#                 OASIS, the public disclosure, DPDP duties); rte: RTE 12(1)(c) lottery and
+#                 admission rounds (FR-RDY-011)
 #   label_en/te   what the school calls the window (te shown only with SOS_TELUGU_ENABLED)
 #   profile_keys  readiness or pre-check profiles it concerns (app/dq/config/profiles); the
 #                 reminder carries the readiness counts of those that have a readiness check
@@ -33,6 +37,8 @@ portals:
   cbse: {en: "CBSE", te: "CBSE"}
   cisce: {en: "CISCE", te: "CISCE"}
   apaar: {en: "APAAR", te: "APAAR"}
+  school_admin: {en: "School administration", te: "పాఠశాల పరిపాలన"}
+  rte: {en: "RTE admissions", te: "RTE ప్రవేశాలు"}
 
 years:
   # Academic year 2026-27 (the school's academic year starting in 2026).
@@ -135,14 +141,237 @@ years:
         - https://teachernews.in/submission-nominal-rolls-for-ssc-public/
       verified: false
 
-  # Academic year 2027-28. The board profiles for the 2028 examinations do not exist yet, so
-  # those events name no profile (no readiness counts) until a release adds them.
+    # --- FO-05 refresh (2026-11-09; FR-RDY-012..019). Every entry below is an expectation from
+    # earlier years' secondary sources; the 2027 notices were not found on 2026-11-09.
+
+    # BSEAP SSC exam fee, paid through the school login on bse.ap.gov.in. The March 2026 cycle
+    # took fees without late fee from 13 to 25 Nov 2025 ("due dates will not be extended"), then
+    # with late fees of Rs 50, Rs 100 and Rs 200. UDISE+ data must be verified before paying, so
+    # the event links the bseap-ssc-2027 readiness profile: the reminder carries its counts and
+    # the label tells the school to check readiness first (FR-RDY-013).
+    - key: bseap_ssc_2027_exam_fee
+      portal: bseap
+      label_en: AP SSC March 2027 exam fee, no late fee (check readiness before paying the fee)
+      label_te: AP SSC మార్చి 2027 పరీక్ష ఫీజు, ఆలస్య రుసుము లేకుండా (ఫీజు చెల్లించే ముందు సిద్ధతను చూడండి)
+      profile_keys: [bseap-ssc-2027]
+      boards: [BSEAP]
+      classes: [X]
+      opens_on: 2026-11-13
+      opens_approximate: true
+      closes_on: 2026-11-25
+      closes_approximate: true
+      lead_days: [14, 7, 3, 1]
+      source:
+        - https://www.collegedekho.com/news/ap-class-10-exams-2026-fee-payment-dates-released-check-schedule-fee-details-73878
+        - https://teachernews.in/submission-nominal-rolls-for-ssc-public/
+      verified: false
+
+    - key: bseap_ssc_2027_exam_fee_late
+      portal: bseap
+      label_en: AP SSC March 2027 exam fee with late fee (Rs 50, Rs 100, Rs 200 stages)
+      label_te: AP SSC మార్చి 2027 పరీక్ష ఫీజు ఆలస్య రుసుముతో (రూ.50, రూ.100, రూ.200 దశలు)
+      profile_keys: [bseap-ssc-2027]
+      boards: [BSEAP]
+      classes: [X]
+      opens_on: 2026-11-26
+      opens_approximate: true
+      closes_on: 2026-12-15
+      closes_approximate: true
+      lead_days: [7, 1]
+      source:
+        - https://www.collegedekho.com/news/ap-class-10-exams-2026-fee-payment-dates-released-check-schedule-fee-details-73878
+      verified: false
+
+    # CBSE Class X second board examination: the 2026 LOC ran 16-22 April by a circular of
+    # 15 April 2026. Subject choices are submitted again, so the LOC profile is linked.
+    - key: cbse_second_exam_loc_2027
+      portal: cbse
+      label_en: CBSE Class X second board exam 2027, list of candidates (LOC)
+      label_te: CBSE X తరగతి రెండో బోర్డు పరీక్ష 2027, అభ్యర్థుల జాబితా (LOC)
+      profile_keys: [cbse-loc-2027]
+      boards: [CBSE]
+      classes: [X]
+      opens_on: 2027-04-15
+      opens_approximate: true
+      closes_on: 2027-04-22
+      closes_approximate: true
+      lead_days: [14, 7, 3, 1]
+      source:
+        - https://www.freepressjournal.in/amp/education/cbse-releases-loc-schedule-for-class-10-second-board-exam-2026-submission-from-april-16-to-22
+      verified: false
+
+    # CBSE OASIS: school, staff and teacher data. A February 2026 circular made the Class XI-XII
+    # teacher data mandatory for on-screen marking; SARAS applicants must update OASIS first.
+    - key: cbse_oasis_update_2027
+      portal: school_admin
+      label_en: CBSE OASIS school and teacher data update (Class XI-XII teachers for on-screen marking)
+      label_te: CBSE OASIS పాఠశాల, ఉపాధ్యాయుల వివరాల నవీకరణ (ఆన్‌స్క్రీన్ మూల్యాంకనానికి XI-XII ఉపాధ్యాయులు)
+      profile_keys: []
+      boards: [CBSE]
+      classes: []
+      opens_on: 2027-01-15
+      opens_approximate: true
+      closes_on: 2027-02-28
+      closes_approximate: true
+      source:
+        - https://brainfeedmagazine.com/cbse-directs-schools-to-update-class-11-12-teachers-data-for-on-screen-marking-2026
+        - https://www.cbse.gov.in/cbsenew/cbse.html
+      verified: false
+
+    # CBSE mandatory public disclosure (Appendix IX): updated before a SARAS application and
+    # kept current on the school's website (SchoolOS: Disclosure, ADR-0051).
+    - key: cbse_disclosure_update_2027
+      portal: school_admin
+      label_en: CBSE mandatory public disclosure update (Appendix IX)
+      label_te: CBSE తప్పనిసరి బహిరంగ వెల్లడి నవీకరణ (అనుబంధం IX)
+      profile_keys: []
+      boards: [CBSE]
+      classes: []
+      opens_on: 2027-01-15
+      opens_approximate: true
+      closes_on: 2027-02-28
+      closes_approximate: true
+      source:
+        - https://news.careers360.com/cbse-extends-saras-7-0-application-deadline-for-2027-28-affiliation-session-till-september-30-inspections-compliance-submissions/amp
+        - https://www.cbse.gov.in/cbsenew/cbse.html
+      verified: false
+
+    # CBSE SARAS affiliation and renewal for the 2028-29 session. SARAS 7.0 (2027-28) opened
+    # 26 Feb 2026 and was extended to 30 Sep 2026; the closing date below is the earliest likely
+    # one, so reminders come early rather than late.
+    - key: cbse_saras_2028
+      portal: school_admin
+      label_en: CBSE affiliation and renewal on SARAS, 2028-29 session
+      label_te: SARAS లో CBSE అనుబంధం మరియు పునరుద్ధరణ, 2028-29 సెషన్
+      profile_keys: []
+      boards: [CBSE]
+      classes: []
+      opens_on: 2027-03-01
+      opens_approximate: true
+      closes_on: 2027-03-31
+      closes_approximate: true
+      source:
+        - https://news.careers360.com/cbse-extends-saras-7-0-application-deadline-for-2027-28-affiliation-session-till-september-30-inspections-compliance-submissions/amp
+      verified: false
+
+    # AP private school recognition renewal on the PSIS portal. No 2026 date was found; AP
+    # cancelled the recognition of 259 schools whose recognition had lapsed. The calendar has no
+    # state dimension yet (every school is in Andhra Pradesh), so it concerns every school.
+    - key: ap_psis_recognition_2027
+      portal: school_admin
+      label_en: AP private school recognition renewal (PSIS portal)
+      label_te: AP ప్రైవేటు పాఠశాల గుర్తింపు పునరుద్ధరణ (PSIS పోర్టల్)
+      profile_keys: []
+      boards: []
+      classes: []
+      opens_on: 2027-01-01
+      opens_approximate: true
+      closes_on: 2027-03-31
+      closes_approximate: true
+      source:
+        - https://cse.ap.gov.in/PSIS/
+        - https://www.deccanchronicle.com/nation/in-other-news/200321/recognition-of-259-private-schools-cancelled-in-ap.html
+      verified: false
+
+    # AP RTE 12(1)(c) admissions for 2027-28 (Class I entry seats). In 2026-27 the lottery ran
+    # in two rounds; round 2 allotted 10,453 seats. Schools admit the allotted children by the
+    # round's reporting date. School-side dates only: SchoolOS keeps no RTE register (D10).
+    - key: ap_rte_2027_round_1
+      portal: rte
+      label_en: AP RTE 12(1)(c) admissions 2027-28, round 1 lottery and admissions
+      label_te: AP RTE 12(1)(c) ప్రవేశాలు 2027-28, మొదటి విడత లాటరీ మరియు ప్రవేశాలు
+      profile_keys: []
+      boards: []
+      classes: [I]
+      opens_on: 2027-04-01
+      opens_approximate: true
+      closes_on: 2027-04-30
+      closes_approximate: true
+      source:
+        - https://deccanchronicle.com/southern-states/andhra-pradesh/rte-second-phase-lottery-allots-10453-ews-seats-in-private-schools-1954931
+      verified: false
+
+    - key: ap_rte_2027_round_2
+      portal: rte
+      label_en: AP RTE 12(1)(c) admissions 2027-28, round 2 lottery and admissions
+      label_te: AP RTE 12(1)(c) ప్రవేశాలు 2027-28, రెండో విడత లాటరీ మరియు ప్రవేశాలు
+      profile_keys: []
+      boards: []
+      classes: [I]
+      opens_on: 2027-05-15
+      opens_approximate: true
+      closes_on: 2027-06-15
+      closes_approximate: true
+      source:
+        - https://deccanchronicle.com/southern-states/andhra-pradesh/rte-second-phase-lottery-allots-10453-ews-seats-in-private-schools-1954931
+      verified: false
+
+    # UDISE+ dropbox: children who left without a TC must be moved to the dropbox (and transfers
+    # marked) before the 2026-27 freeze, or they stay "active" in two schools (FO-03).
+    - key: udise_plus_2026_dropbox
+      portal: udise_plus
+      label_en: UDISE+ 2026-27 dropbox and transfers cleared before the freeze
+      label_te: UDISE+ 2026-27 డ్రాప్‌బాక్స్, బదిలీలు ఫ్రీజ్‌కు ముందే పూర్తి
+      profile_keys: [udise-plus]
+      boards: []
+      classes: []
+      opens_on: 2026-09-01
+      opens_approximate: true
+      closes_on: 2026-11-30
+      closes_approximate: true
+      source:
+        - https://educationforallinindia.com/?p=25804
+        - https://schoolites.com/udise/student-transfer
+      verified: false
+
+    # UDISE+ progression of 2026-27 students to 2027-28, finished before the new year's entries
+    # (a Delhi circular of 24 Jul 2026 warns that pending progression blocks enrolment).
+    - key: udise_plus_2027_progression
+      portal: udise_plus
+      label_en: UDISE+ progression of students from 2026-27 to 2027-28
+      label_te: UDISE+ లో విద్యార్థుల ప్రోగ్రెషన్ 2026-27 నుండి 2027-28 కు
+      profile_keys: [udise-plus]
+      boards: []
+      classes: []
+      opens_on: 2027-04-15
+      opens_approximate: true
+      closes_on: 2027-07-31
+      closes_approximate: true
+      source:
+        - https://www.edudel.nic.in/upload/upload_2025_26/SamagraShiksha_CircularCompletionofPendingStudentProgressionActivityintheUDISEPortalfortheAcademicYear2025_26_dt_24072026_1202_1215.pdf
+        - https://educationforallinindia.com/?p=25804
+      verified: false
+
+    # DPDP Rules 2025 (notified 13/14 Nov 2025): notice, children's consent, rights and
+    # grievances apply from about 13 May 2027 (sources differ by a day; the gazette was not read
+    # directly). The school is the data fiduciary; SchoolOS: Privacy.
+    - key: dpdp_duties_2027
+      portal: school_admin
+      label_en: DPDP duties begin (13 May 2027) - privacy notice, consents, rights and grievances
+      label_te: DPDP బాధ్యతలు ప్రారంభం (13 మే 2027) - గోప్యతా నోటీసు, సమ్మతులు, హక్కులు, ఫిర్యాదులు
+      profile_keys: []
+      boards: []
+      classes: []
+      opens_on: 2026-11-14
+      opens_approximate: true
+      closes_on: 2027-05-13
+      closes_approximate: true
+      lead_days: [90, 30, 14, 7, 1]
+      source:
+        - https://www.mondaq.com/india/data-protection/1708164/digital-personal-data-protection-rules-2025-notified
+        - https://www.taxmann.com/post/blog/analysis-indias-dpdp-act-and-rules/
+        - https://static.pib.gov.in/WriteReadData/specificdocs/documents/2025/nov/doc20251117695301.pdf
+      verified: false
+
+  # Academic year 2027-28. The board profiles for the 2028 examinations do not exist yet; each
+  # board event links the latest profile of its board (the 2026-27 cycle's format) so the
+  # reminder carries readiness counts, until a release adds the 2028 profiles (FR-RDY-016).
   "2027-28":
     - key: udise_plus_2027_freeze
       portal: udise_plus
       label_en: UDISE+ 2027-28 student data closes (freeze)
       label_te: UDISE+ 2027-28 విద్యార్థి వివరాల గడువు (ఫ్రీజ్)
-      profile_keys: [apaar]
+      profile_keys: [udise-plus, apaar]
       boards: []
       classes: []
       opens_on: 2027-09-01
@@ -172,7 +401,7 @@ years:
       portal: cbse
       label_en: CBSE registration, Class IX and XI (2027-28)
       label_te: CBSE నమోదు, IX మరియు XI తరగతులు (2027-28)
-      profile_keys: []
+      profile_keys: [cbse-registration-2027]
       boards: [CBSE]
       classes: [IX, XI]
       opens_on: 2027-09-01
@@ -187,7 +416,7 @@ years:
       portal: cbse
       label_en: CBSE list of candidates (LOC), Class X and XII, 2028 exams
       label_te: CBSE అభ్యర్థుల జాబితా (LOC), X మరియు XII తరగతులు, 2028 పరీక్షలు
-      profile_keys: []
+      profile_keys: [cbse-loc-2027]
       boards: [CBSE]
       classes: [X, XII]
       opens_on: 2027-09-01
@@ -202,7 +431,7 @@ years:
       portal: cisce
       label_en: CISCE ICSE and ISC candidate registration 2027-28
       label_te: CISCE ICSE మరియు ISC అభ్యర్థుల నమోదు 2027-28
-      profile_keys: []
+      profile_keys: [cisce-registration-2027]
       boards: [CISCE]
       classes: [IX, X, XI, XII]
       opens_on: 2027-10-01
@@ -217,7 +446,7 @@ years:
       portal: bseap
       label_en: AP SSC March 2028 nominal roll corrections
       label_te: AP SSC మార్చి 2028 నామినల్ రోల్ సవరణలు
-      profile_keys: []
+      profile_keys: [bseap-ssc-2027]
       boards: [BSEAP]
       classes: [X]
       opens_on: 2028-02-01

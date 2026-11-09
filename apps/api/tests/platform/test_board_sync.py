@@ -32,7 +32,10 @@ from .conftest import Api, MakeOperator, Operator, provision_payload
 
 def _calendar_windows() -> list[dict[str, Any]]:
     """The windows ADR-0057 derives from app/dq/config/portal_calendar.yaml: every board
-    event (registration, list of candidates, nominal roll), not the all-school portals."""
+    portal event (registration, list of candidates, nominal roll, exam fee), not the
+    all-school portals and not the school's administrative deadlines (``school_admin``: SARAS,
+    OASIS, the public disclosure; FR-RDY-018), which run for weeks and concern no board portal
+    submission of student data."""
     return [
         {
             "key": e.key,
@@ -43,7 +46,7 @@ def _calendar_windows() -> list[dict[str, Any]]:
             "verified": e.verified,
         }
         for e in load_calendar().events
-        if e.boards
+        if e.boards and e.portal in ("bseap", "cbse", "cisce")
     ]
 
 

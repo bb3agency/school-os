@@ -155,6 +155,41 @@ describe("portal calendar (US-3101)", () => {
     expect(screen.queryByRole("button", { name: t.add.open })).toBeNull();
   });
 
+  it("names the school administration and RTE kinds (FR-RDY-011, FO-05)", async () => {
+    signedIn(READER);
+    // The generated client learns these kinds when the lead regenerates it.
+    const kind = (k: string) => k as unknown as CalendarEvent["portal"];
+    stub.routes["GET /bff/api/v1/dq/calendar"] = () =>
+      Response.json(
+        calendar([
+          event({
+            event_key: "ap_psis_recognition_2027",
+            portal: kind("school_admin"),
+            label_en: "AP private school recognition renewal (PSIS portal)",
+            profile_keys: [],
+            boards: [],
+            classes: [],
+            readiness: [],
+          }),
+          event({
+            event_key: "ap_rte_2027_round_1",
+            portal: kind("rte"),
+            label_en: "AP RTE 12(1)(c) admissions 2027-28, round 1 lottery and admissions",
+            profile_keys: [],
+            boards: [],
+            classes: ["I"],
+            readiness: [],
+          }),
+        ]),
+      );
+    renderWithIntl(<CalendarScreen />);
+    expect(
+      await screen.findByText("AP private school recognition renewal (PSIS portal)"),
+    ).toBeVisible();
+    expect(screen.getByText(t.portal.school_admin)).toBeVisible();
+    expect(screen.getByText(t.portal.rte)).toBeVisible();
+  });
+
   it("says so when no window concerns the school", async () => {
     signedIn(READER);
     stub.routes["GET /bff/api/v1/dq/calendar"] = () => Response.json(calendar([]));
