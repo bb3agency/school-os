@@ -1,0 +1,38 @@
+# Weekly management brief (FA-05; FR-BRF-001..FR-BRF-015). Versioned configuration shipped inside
+# the package (app/brief/config.py reads it; invariant 13).
+#
+# The brief is built only from counts that existing services return (readiness, findings,
+# corrections waiting, certificates issued, portal deadlines, fee totals, Ask answers). It never
+# carries a name, a student or any child-level value, and no early-warning (insights) data
+# (invariant 14). No AI writes any of it: the text is a fixed template (lead decision D85).
+version: 1
+
+schedule:
+  # The weekly job runs on Monday mornings (beat entry in app/brief/tasks.py, 07:45 IST) and
+  # builds the brief of the week that ended the day before (Monday to Sunday, IST).
+  week_starts_on: monday
+
+# Student counts between 1 and small_cell_min - 1 are shown as "fewer than N" (and when only one
+# count of a profile is hidden, the next smallest too, so the total cannot reveal it): the same
+# rule and minimum as the Ask count tools (app/knowledge/config/tools.yaml small_cell_min;
+# docs/06 §7). Work counts (findings, requests, certificates, deadlines) and money are not
+# counts of students and are shown as they are. Lead decision D85, PO to confirm.
+small_cell_min: 5
+
+# Portal windows closing within this many days are listed (research FA-05: "deadlines in the
+# next 14 days").
+deadline_days: 14
+# At most this many readiness profiles (the readiness page shows up to 5).
+max_profiles: 5
+# Stored weekly briefs older than this many weeks are deleted by the weekly job.
+keep_weeks: 104
+# The history list shows at most this many weeks.
+history_limit: 52
+
+delivery:
+  # In-app notice to holders of brief.read: on unless the member turns it off.
+  in_app_default: true
+  # E-mail (counts and a sign-in link only): off unless the member turns it on (opt-in; the
+  # research owner question "weekly by default, or opt-in?" is open; lead decision D85, PO to
+  # confirm).
+  email_default: false

@@ -46,6 +46,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -85,6 +86,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -124,6 +126,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -166,6 +169,7 @@ forbidden_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -237,6 +241,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.brief
     # Every privacy module except breach_sync (and breach_tasks, which runs it): R3-1B's sanctioned
     # bridge that pulls SchoolOS incident notices through app.platform.service (ADR-0050), like
     # app.breakglass.
@@ -293,6 +298,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -333,6 +339,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.changes
     app.extraction
     app.exports
@@ -372,6 +379,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.changes
     app.extraction
     app.exports
@@ -411,6 +419,7 @@ source_modules =
     app.imports
     app.notifications
     app.breakglass
+    app.brief
     app.changes
     app.extraction
     app.exports
@@ -449,6 +458,7 @@ source_modules =
     app.students
     app.documents
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -510,6 +520,58 @@ forbidden_modules =
     app.breakglass.models
 allow_indirect_imports = True
 
+[importlinter:contract:brief-internals]
+name = brief: repository/models are private (use app.brief.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+    app.knowledge
+    app.admin
+    app.circulars
+    app.certificates
+    app.apaar
+    app.academics
+    app.insights
+    app.tally
+    app.public
+    app.fees
+    app.messaging
+    app.disclosure
+    app.privacy
+forbidden_modules =
+    app.brief.repository
+    app.brief.models
+allow_indirect_imports = True
+
+# FA-05: the weekly brief reads counts only; it never touches early-warning data (invariant 14)
+# or the AI gateway (the brief's text is a fixed template, D85).
+[importlinter:contract:brief-without-insights-or-ai]
+name = brief: no insights and no knowledge gateway (counts only, no AI text)
+type = forbidden
+source_modules =
+    app.brief
+forbidden_modules =
+    app.insights
+    app.knowledge.gateway
+allow_indirect_imports = True
+
 # The name-matching library, rule types, explanation catalog, checks, masking and profiles stay
 # pure (no database, web or tenant modules), so the engine, imports and exports can reuse them
 # anywhere (FR-DQ-003). The engine, service, repository, tasks and routes use the database.
@@ -556,6 +618,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.changes
     app.extraction
     app.exports
@@ -620,6 +683,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.extraction
     app.exports
@@ -659,6 +723,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.exports
@@ -698,6 +763,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -757,6 +823,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -798,6 +865,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -860,6 +928,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -946,6 +1015,7 @@ forbidden_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1009,6 +1079,7 @@ forbidden_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1048,6 +1119,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1108,6 +1180,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1178,6 +1251,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1217,6 +1291,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1301,6 +1376,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1365,6 +1441,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1426,6 +1503,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1490,6 +1568,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1579,6 +1658,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1681,6 +1761,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction
@@ -1743,6 +1824,7 @@ source_modules =
     app.documents
     app.notifications
     app.breakglass
+    app.brief
     app.imports
     app.changes
     app.extraction

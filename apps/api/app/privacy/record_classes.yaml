@@ -528,3 +528,27 @@ classes:
     basis: Evidence that the family got the privacy notice when the student was admitted.
     erasure: refused_legal_obligation
     source: Recorded by the school office
+
+  # FA-05 (0088_weekly_brief): the stored weekly briefs (school-level counts) and each member's
+  # delivery choice.
+  weekly_briefs:
+    label: Weekly management briefs
+    owner: brief
+    tables: [ops.weekly_briefs]
+    classification: C1
+    docs_row: Weekly management briefs
+    retention: 104 weeks (2 years)
+    basis: School-level counts for the owner and principal; nothing about one student or one person.
+    erasure: no_personal_data
+    source: Made by SchoolOS from the school's own counts
+
+  brief_preferences:
+    label: Weekly brief delivery choices
+    owner: brief
+    tables: [ops.brief_preferences]
+    classification: C1
+    docs_row: Weekly brief delivery choices
+    retention: While the person works at the school
+    basis: Whether a staff member wants the weekly brief in-app and by e-mail.
+    erasure: allowed
+    source: Chosen by the staff member

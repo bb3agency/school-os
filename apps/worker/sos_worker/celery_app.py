@@ -17,6 +17,7 @@ from kombu import Queue
 
 from app.admin.tasks import beat_schedule as admin_beat_schedule
 from app.breakglass.tasks import beat_schedule as breakglass_beat_schedule
+from app.brief.tasks import beat_schedule as brief_beat_schedule
 from app.changes.tasks import beat_schedule as changes_beat_schedule
 from app.circulars.tasks import beat_schedule as circulars_beat_schedule
 from app.core.config import get_settings
@@ -52,6 +53,7 @@ import app.academics.service  # isort: skip
 import app.admin.service  # isort: skip
 import app.apaar.service  # isort: skip
 import app.breakglass.service  # isort: skip
+import app.brief.service  # isort: skip
 import app.changes.service  # isort: skip
 import app.circulars.service  # isort: skip
 import app.documents.service  # isort: skip
@@ -138,6 +140,8 @@ TASK_MODULES: list[str] = [
     "app.disclosure.tasks",
     # R3-1A privacy requests: the daily due-date reminder.
     "app.privacy.tasks",
+    # FA-05 weekly management brief (FR-BRF-010): Monday mornings, database work only.
+    "app.brief.tasks",
 ]
 
 
@@ -186,6 +190,8 @@ def create_celery() -> Celery:
             # FR-DQ-002: data-quality runs (outbox consumers and queued runs) on queue "dq".
             # R3-1D (FR-RDY-006): the daily portal calendar reminders are database work only.
             "dq.send_portal_reminders": {"queue": "maintenance"},
+            # FA-05 (FR-BRF-010): the weekly management brief.
+            "brief.build_weekly": {"queue": "maintenance"},
             "dq.*": {"queue": "dq"},
             # US-402: register-photo extraction runs on the ocr queue.
             "extraction.*": {"queue": "ocr"},
@@ -303,6 +309,8 @@ def create_celery() -> Celery:
             **tally_beat_schedule(),
             # FR-DPDP-006 (R3-1A): privacy requests due tomorrow or overdue, 07:00 IST.
             **privacy_beat_schedule(),
+            # FA-05 (FR-BRF-010): the weekly management brief, Mondays 07:45 IST.
+            **brief_beat_schedule(),
             # FR-PUB-006: expired parent link handles deleted 30 days after expiry (daily).
             **public_beat_schedule(),
             # FR-MSG-006, FR-MSG-020, FR-MSG-021, FR-MSG-023: webhook inbox sweep (1 min),

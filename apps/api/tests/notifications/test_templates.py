@@ -58,6 +58,9 @@ NUMERIC = {
     # R2-2E: UPI receipts not yet seen in the bank and credits needing a person.
     "unconfirmed",
     "credits",
+    # FA-05 weekly brief: corrections waiting and portal deadlines.
+    "waiting",
+    "deadlines",
 }
 
 

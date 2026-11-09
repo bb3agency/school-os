@@ -533,3 +533,17 @@ templates:
     te:
       title: "{metric, select, students {విద్యార్థులు} staff_users {సిబ్బంది వినియోగదారులు} documents {పత్రాలు} storage_gb {నిల్వ} ai_tokens_month {AI వినియోగం} ai_budget_inr {AI బడ్జెట్} other {వినియోగం}}: మీ ప్లాన్ పరిమితిలో {threshold}%"
       body: "మీ పాఠశాల ప్లాన్ పరిమితిలో {threshold}% చేరింది. {metric, select, ai_budget_inr {AI బడ్జెట్ పూర్తయితే, బడ్జెట్ మళ్లీ వచ్చే వరకు Ask రాసిన సమాధానం లేకుండా వెతుకులాట ఫలితాలు మాత్రమే చూపిస్తుంది; మిగతావన్నీ పని చేస్తాయి.} other {పరిమితులు పనిని ఎప్పుడూ ఆపవు: అందరూ యథావిధిగా పని చేయవచ్చు, ఏదీ ఆపివేయబడదు.}} మీ ప్లాన్ చూడటానికి సెట్టింగ్‌లు > ప్లాన్ మరియు బిల్లింగ్ తెరవండి, లేదా పెద్ద ప్లాన్ గురించి SchoolOS సపోర్ట్‌ను అడగండి."
+
+  # FA-05 weekly management brief (FR-BRF-010..FR-BRF-012; D85). Sent on Monday mornings to the
+  # holders of brief.read (owner, principal) who did not turn it off. Params are school-wide work
+  # counts only (open blocker findings, corrections waiting, portal windows closing within the
+  # brief's deadline_days); the link opens the stored week's brief.
+  brief.weekly_ready:
+    params: [blockers, waiting, deadlines]
+    resource_type: weekly_brief
+    en:
+      title: Your weekly school brief is ready
+      body: "Last week's summary is ready: {blockers, plural, =0 {no problems that block a submission} one {# problem that blocks a submission} other {# problems that block a submission}}, {waiting, plural, =0 {no corrections waiting} one {# correction waiting for approval} other {# corrections waiting for approval}} and {deadlines, plural, =0 {no portal deadlines} one {# portal deadline} other {# portal deadlines}} in the next two weeks. Open it to see readiness, certificates and fees."
+    te:
+      title: మీ వారపు పాఠశాల సారాంశం సిద్ధంగా ఉంది
+      body: "గత వారపు సారాంశం సిద్ధంగా ఉంది: సమర్పణను ఆపే సమస్యలు {blockers}, ఆమోదం కోసం వేచి ఉన్న సవరణలు {waiting}, రాబోయే రెండు వారాల్లో పోర్టల్ గడువులు {deadlines}. సంసిద్ధత, సర్టిఫికెట్లు, ఫీజుల కోసం దాన్ని తెరవండి."
