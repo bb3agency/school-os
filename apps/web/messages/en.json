@@ -9212,7 +9212,8 @@
       "setup": "Fee setup",
       "reconcile": "Reconcile UPI",
       "upiSettings": "UPI QR",
-      "feeSettings": "Fee settings"
+      "feeSettings": "Fee settings",
+      "taxCertificates": "Tax certificates"
     },
     "modes": {
       "cash": "Cash",
@@ -9989,7 +9990,123 @@
         "gstNote": "Write the line, in at most 200 characters."
       }
     },
-    "decisionNote": "Note from {name}:"
+    "decisionNote": "Note from {name}:",
+    "taxCertificate": {
+      "tab": "Tax certificate",
+      "title": "Tuition fee certificates",
+      "description": "Certificates of the tuition fees paid in a financial year, for the parent's income tax return.",
+      "listTitle": "Tuition fee certificates",
+      "panelTitle": "Tuition fee certificate",
+      "panelBody": "For the parent's income tax return. Adds up the tuition fee heads of receipts dated in the financial year, less refunds.",
+      "year": "Financial year",
+      "yearOption": "FY {year}",
+      "notAdviceTitle": "Not tax advice.",
+      "notAdvice": "The school certifies the tuition fees paid, not whether a deduction applies. That is for the parent and their tax adviser.",
+      "none": "No certificate issued for FY {year} yet.",
+      "issue": "Issue certificate",
+      "issueAgain": "Issue again",
+      "issueTitle": "Issue the tuition fee certificate",
+      "issueBody": "FY {year} for {name}. The amount comes from the tuition receipts of that year.",
+      "issueConsequence": "The certificate takes the next serial number and is kept; it is never deleted.",
+      "issueAgainConsequence": "If receipts or refunds changed, this certificate is marked superseded and a new one is issued. Otherwise nothing changes.",
+      "outcome": {
+        "issued": "Certificate {serial} issued.",
+        "reissued": "Certificate {serial} issued. The earlier one is marked superseded.",
+        "unchanged": "Nothing changed since certificate {serial} was issued, so it stays as it is."
+      },
+      "serial": "Serial number",
+      "amount": "Tuition fees",
+      "issuedOn": "Issued on",
+      "statusLabel": "Status",
+      "receipts": "{count, plural, one {# receipt} other {# receipts}}",
+      "status": {
+        "issued": "Issued",
+        "superseded": "Superseded"
+      },
+      "pdf": {
+        "preparing": "PDF being made",
+        "failed": "PDF not made",
+        "ready": "PDF ready"
+      },
+      "pdfPreparingBody": "It is ready in a few seconds. You can open the print view now.",
+      "pdfFailedBody": "Make the PDF again, or print from the print view.",
+      "retry": "Make PDF again",
+      "print": "Print view",
+      "download": "Download PDF",
+      "earlierTitle": "Earlier certificates for FY {year}",
+      "bulk": "Issue for a class",
+      "bulkTitle": "Issue certificates for a class or section",
+      "bulkBody": "Every student of the class or section this year who paid tuition in the financial year gets a certificate. Students who paid no tuition are skipped.",
+      "bulkTarget": "Class or section",
+      "bulkTargetPlaceholder": "Choose a class or section",
+      "noTargets": "No classes found for this year. Add them in academic structure first.",
+      "wholeClass": "{class} (whole class)",
+      "bulkConsequence": "Each new certificate takes the next serial number. Certificates whose amounts have not changed stay as they are.",
+      "bulkConfirm": "Issue certificates",
+      "result": {
+        "title": "Done for FY {year}",
+        "students": "{count, plural, one {# student was} other {# students were}} looked at.",
+        "issued": "Issued",
+        "reissued": "Issued again (earlier one superseded)",
+        "unchanged": "Already issued, unchanged",
+        "skipped": "Skipped: no tuition paid",
+        "skippedHint": "Skipped students paid no tuition in that year. Check the year, or which fee heads count as tuition in fee setup.",
+        "close": "Close"
+      },
+      "filterTarget": "Class or section",
+      "columns": {
+        "serial": "Serial number",
+        "student": "Student",
+        "year": "Financial year",
+        "status": "Status",
+        "receipts": "Receipts",
+        "amount": "Amount (₹)",
+        "actions": "Actions"
+      },
+      "emptyTitle": "No certificates yet",
+      "emptyBody": "Issue one from a student's fee account, or for a whole class with “Issue for a class”.",
+      "emptyBodyReader": "The office issues certificates from a student's fee account.",
+      "noResults": "No certificates match these filters.",
+      "headToggle": "Counts as tuition for tax",
+      "headToggleHint": "On for tuition heads. Only these heads are added up on the tuition fee certificate.",
+      "headColumn": "Tuition for tax",
+      "yes": "Yes",
+      "no": "No",
+      "editHead": "Change",
+      "editHeadTitle": "Counts as tuition for tax: {name}",
+      "editHeadConsequence": "Certificates already issued do not change. Issue them again to include this change.",
+      "save": "Save",
+      "errors": {
+        "no_tuition_paid": {
+          "title": "No tuition paid in this year",
+          "body": "There is nothing to certify. Check the financial year, or which fee heads count as tuition in fee setup."
+        },
+        "too_many_receipts": {
+          "title": "Too many receipts for one certificate",
+          "body": "This student has more tuition receipts in the year than one certificate lists. Ask SchoolOS support."
+        },
+        "too_many_students": {
+          "title": "Too many students at once",
+          "body": "Choose one section instead of the whole class, and issue section by section."
+        },
+        "pdf_not_ready": {
+          "title": "PDF not ready",
+          "body": "The PDF is still being made. Try again in a moment, or open the print view."
+        },
+        "financial_year_invalid": {
+          "title": "Financial year not recognised",
+          "body": "Choose a financial year from the list, for example FY 2026-27."
+        },
+        "financial_year_not_started": {
+          "title": "That year has not started",
+          "body": "A certificate is issued only for a year that has started. Choose the current or an earlier year."
+        },
+        "financial_year_too_old": {
+          "title": "That year is too far back",
+          "body": "Certificates are issued for the last 8 financial years only. Choose a later year."
+        }
+      }
+    }
   },
   "payments": {
     "nav": {
