@@ -412,6 +412,11 @@ permissions:
     description: See the school's legal holds, and place or lift one (two different people, one asks, another approves)
     sensitivity: critical
     step_up: true
+  # FA-05 weekly management brief (FR-BRF-001..015). Migration 0095_weekly_brief upserts it.
+  brief.read:
+    description: See the school's weekly management brief (counts only) and choose how to receive it
+    sensitivity: normal
+    step_up: false
 
 
   # --- R3-1C CBSE Appendix IX disclosure (ADR-0051; docs/07 §6.2; FR-DISC-*). Migration

@@ -1080,6 +1080,29 @@ Schools cannot correct a child's name or date of birth in UDISE+ themselves; the
 | FR-UDI-020 | Logs MUST carry ids and counts only; audit summaries MUST carry no names, dates of birth or PEN values. | T |
 
 *As built (wave F2, FO-02 and FO-04, 2026-11-09):* all built and tested (`apps/api/tests/dq/test_udise_corrections.py`, `apps/api/tests/imports/test_udise_match*.py`, `apps/api/tests/dq/udise_security_support.py`, `apps/web/src/features/udise/`). The change request number of a corrected register value is not printed yet (the letter names the register as the source).
+### 3.32 Weekly management brief (FR-BRF) (FA-05, wave F2)
+
+A weekly, counts-only brief for the school's owner and principal (docs/research/2026-11-features/ai-platform.md FA-05; module `app/brief`, config `app/brief/config.yaml`; migration `0095_weekly_brief`). No AI writes any of it.
+
+| ID | Requirement | Verify |
+|---|---|---|
+| FR-BRF-001 | The brief MUST hold only school-level counts, codes, board and portal labels, dates and rupee totals that existing services return: never a name, a student or guardian ID, a child-level value or any early-warning (insights) data (invariants 5 and 14). | T |
+| FR-BRF-002 | Reading the brief and setting one's own delivery choice MUST need `brief.read`, granted school-wide to the owner and the principal only; other roles get 403 and another school's stored week 404. *(Lead decision D85, PO to confirm.)* | T |
+| FR-BRF-003 | The brief MUST show, per readiness profile of the school (at most `max_profiles`), students, ready, waiting for parents, waiting for the school and blocked, with the change in ready students on the previous stored week, from the same service as `GET /dq/readiness/{profile_key}`. | T |
+| FR-BRF-004 | The brief MUST show the open blocker and warning findings (and students with blockers) of the whole school and the correction requests waiting for a decision (pending, not expired). | T |
+| FR-BRF-005 | The brief MUST show the certificates issued in the week (Monday-Sunday, IST). | T |
+| FR-BRF-006 | The brief MUST list the portal calendar windows that close within `deadline_days` (14) of the day the counts were taken, soonest first, with whether the school confirmed the dates. | T |
+| FR-BRF-007 | When fees are on, the brief MUST show the week's receipts and net collection (as the day books compute it) and the current year's balance, overdue amount and students with a balance. | T |
+| FR-BRF-008 | The brief MUST show the AI answers counted against the bundle this month and the bundle's included answers (the `GET /knowledge/usage` count). | T |
+| FR-BRF-009 | Student counts from 1 to `small_cell_min` - 1 (5, as the Ask count tools) MUST be shown as "fewer than N", with secondary suppression within a profile's breakdown; work counts and money are not suppressed. *(Lead decision D85, PO to confirm.)* | T |
+| FR-BRF-010 | A weekly job (Mondays 07:45 IST) MUST store the previous week's brief once per active school, notify in-app the holders of `brief.read` who did not turn it off (no counts in the notice or e-mail, which never say more than the reader's page; a link to the stored week), audit `brief.weekly_built` in the same transaction and delete stored weeks older than `keep_weeks` (104). | T |
+| FR-BRF-011 | Each holder MUST be able to turn their own in-app notice and e-mail on or off (`PUT /brief/preferences`, `If-Match` honoured, audited `brief.preferences_changed`); the in-app notice is on and the e-mail off by default. *(Lead decision D85, PO to confirm: e-mail opt-in.)* | T |
+| FR-BRF-012 | A holder who turned the e-mail on MUST get it through the notifications outbox with the week's notice (IDs only in the outbox; counts and a sign-in link in the body, never names), only while e-mail is set up. | T |
+| FR-BRF-013 | Before the first weekly job has stored a week, `GET /brief/weekly` MUST answer a live preview of the current week so far (`stored: false`) without storing it. | T |
+| FR-BRF-014 | Thresholds, windows and defaults (`small_cell_min`, `deadline_days`, `max_profiles`, `keep_weeks`, delivery defaults) MUST live in `app/brief/config.yaml` (invariant 13); text MUST be fixed templates, never an LLM, until a later decision adds an optional AI summary through `knowledge/gateway` with counts only. *(Lead decision D85, PO to confirm.)* | T |
+| FR-BRF-015 | A member's delivery choice MUST appear in their access report and be erasable (record class `brief_preferences`); stored briefs are record class `weekly_briefs` (no personal data); both tables are purged at offboarding. | T |
+
+*As built (wave F2, FA-05, 2026-11-09):* FR-BRF-001..015 built (`app/brief/`, tests `apps/api/tests/brief/`, web `/brief` with print CSS). Not built: the A4 monthly variant (the weekly page prints), WhatsApp to the owner (owner question open), the AI summary (FR-BRF-014).
 
 ---
 

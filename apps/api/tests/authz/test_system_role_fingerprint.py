@@ -24,7 +24,8 @@ from app.authz.catalog import system_roles
 # + FT-08 (year_result.read: principal, office admin, exam coordinator; year_result.confirm:
 #   principal; D85)
 # + FP-02 (message.closure.send for the principal; D85)
-PINNED = "a2fbbcbc782b0eab7e4cda0b760bc0ea7027111062961ae5b1ebb6acb31e9a78"
+# + FA-05 (brief.read: owner, principal; D85)
+PINNED = "1b5031b203e44fd02a35aabb3ae40bfced2f6ae6baf38ab8475215aab344c61d"
 
 
 def fingerprint() -> str:

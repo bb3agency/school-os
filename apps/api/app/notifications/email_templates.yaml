@@ -116,3 +116,34 @@ templates:
         మీరు SchoolOSలో పాఠశాల యజమాని లేదా ప్రిన్సిపాల్ కాబట్టి ఈ ఈమెయిల్ మీకు వచ్చింది.
 
         SchoolOS
+
+  # --- weekly management brief (FA-05; FR-BRF-012; D85) -------------------------------------
+  # Queued by app.brief with the week's in-app notice, only for members who turned the e-mail
+  # on (opt-in). The worker fills the counts from that notice, the school's name and the app's
+  # address. Counts and a sign-in link only: no names, no student data, no fee amounts.
+  brief.weekly:
+    params: [school, sign_in_url]
+    en:
+      subject: "{school}: your weekly school brief"
+      body: |
+        Hello,
+
+        Last week's brief for {school} is ready on SchoolOS.
+
+        To see readiness by board, certificates issued and fee totals, sign in at {sign_in_url} and open Weekly brief.
+
+        You get this email because you turned on the weekly brief e-mail. To stop it, open Weekly brief and turn the e-mail off.
+
+        SchoolOS
+    te:
+      subject: "{school}: మీ వారపు పాఠశాల సారాంశం"
+      body: |
+        నమస్కారం,
+
+        SchoolOSలో {school} గత వారపు సారాంశం సిద్ధంగా ఉంది.
+
+        వివరాల కోసం {sign_in_url} లో సైన్ ఇన్ చేసి వారపు సారాంశం తెరవండి.
+
+        మీరు వారపు సారాంశం ఈమెయిల్ ఆన్ చేసినందున ఇది మీకు వచ్చింది. ఆపడానికి వారపు సారాంశంలో ఈమెయిల్ ఆఫ్ చేయండి.
+
+        SchoolOS

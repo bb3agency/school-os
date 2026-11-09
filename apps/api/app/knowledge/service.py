@@ -2025,6 +2025,22 @@ def check_provider_agreements(settings: Settings) -> None:
     require_provider_agreements(settings, load_llm_config())
 
 
+def billable_answers_this_month(session: Session, now: dt.datetime) -> tuple[int, int | None]:
+    """(answers counted against the AI answer bundle this IST month, the bundle's included
+    answers or None): the same count as ``GET /knowledge/usage`` shows billing readers, for the
+    weekly management brief (FR-BRF-008). Counts only; no question, answer or person."""
+    _, start, end = ai_usage.month_bounds(now)
+    bundle = load_llm_config().budget.bundle
+    used = repo.count_answers(
+        session,
+        start=start,
+        end=end,
+        statuses=bundle.billable_statuses,
+        excluded_routes=bundle.excluded_routes,
+    )
+    return used, tenancy.ai_answer_allowance(session)
+
+
 __all__ = [
     "ASK",
     "CIRCULAR_NO_TEXT",
@@ -2071,6 +2087,7 @@ __all__ = [
     "TokenEvent",
     "admit_ai_request",
     "adopt_conversations",
+    "billable_answers_this_month",
     "check_provider_agreements",
     "circular_passages",
     "circulars_config",

@@ -80,7 +80,11 @@ export function SchoolShell({
   const groups: SchoolNavSection[] = [
     {
       id: "overview",
-      items: [{ href: "/", label: t("school.nav.home"), exact: true, icon: "home" }],
+      items: [
+        { href: "/", label: t("school.nav.home"), exact: true, icon: "home" },
+        // FA-05 (FR-BRF-001): the weekly management brief, owner and principal only.
+        { href: "/brief", label: t("brief.nav"), permission: "brief.read", icon: "chart" },
+      ],
     },
     {
       id: "records",

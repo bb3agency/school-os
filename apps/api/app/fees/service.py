@@ -601,6 +601,29 @@ unassign_addon = addons.unassign
 addon_students = addons.students_of
 
 
+def collected_between(session: Session, first: dt.date, last: dt.date) -> tuple[int, Decimal]:
+    """(receipts issued, net amount collected) over the receipt days ``first``..``last``: the
+    sum of the day books (receipts less the cancellations and refunds dated that day, as
+    ``GET /fees/reports/daily`` computes ``net_total``). Totals only, for the weekly management
+    brief (FR-BRF-007); the caller (``app.brief``) checks ``brief.read`` and that fees are on."""
+    count = 0
+    net = ZERO
+    day = first
+    while day <= last:
+        rows = repo.receipts_on(session, day)
+        cancelled = repo.receipts_by_id(
+            session, {x.receipt_id for x in repo.cancellations_on(session, day)}
+        )
+        count += len(rows)
+        net += (
+            sum((r.amount for r in rows), ZERO)
+            - sum((r.amount for r in cancelled.values()), ZERO)
+            - sum((x.amount for x in repo.refunds_on(session, day)), ZERO)
+        )
+        day += dt.timedelta(days=1)
+    return count, net
+
+
 __all__ = [
     "ADDON_READ",
     "COLLECT",
@@ -647,6 +670,7 @@ __all__ = [
     "ask_student_fees",
     "assign_addon",
     "balances_as_of",
+    "collected_between",
     "create_addon",
     "create_payment_intent",
     "dues_for_student",

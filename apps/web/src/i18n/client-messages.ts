@@ -35,6 +35,7 @@ export const CLIENT_NAMESPACES = {
     "auth",
     "breaches",
     "breakGlass",
+    "brief",
     "certificates",
     "changeRequests",
     "circulars",

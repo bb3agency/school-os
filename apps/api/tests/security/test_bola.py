@@ -1033,7 +1033,26 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "hold_id": lambda w: _consents().b_hold(_ADMIN[0], w),
     # FO-02: a UDISE+ correction request of school B.
     "correction_id": lambda w: _udise().b_request(_ADMIN[0], w),
+    # FA-05 (FR-BRF-002): a stored weekly brief of school B.
+    "brief_id": lambda w: _b_brief(_ADMIN[0], w),
 }
+
+
+def _b_brief(admin: Engine, w: Any) -> uuid.UUID:
+    """A stored weekly brief of school B (counts only)."""
+    if "bola_brief" not in w.b.ids:
+        brief_id = uuid.uuid4()
+        with admin.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO ops.weekly_briefs (id, tenant_id, week_start, counts) "
+                    "VALUES (:i, :t, '2026-10-05', CAST(:c AS jsonb))"
+                ),
+                {"i": brief_id, "t": w.b.tenant_id, "c": '{"v": 1}'},
+            )
+        w.b.ids["bola_brief"] = brief_id
+    value: uuid.UUID = w.b.ids["bola_brief"]
+    return value
 
 
 def _id_routes() -> list[tuple[str, str]]:

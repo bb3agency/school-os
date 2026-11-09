@@ -423,6 +423,9 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.dq.udise_schemas.UdiseRecipientOut.key": "recipient role code",
     "app.dq.udise_schemas.UdiseGroupOut.key": "field group code",
     "app.circulars.schemas.TaskOut.portal_event_key": "portal calendar event code",
+    # FA-05 weekly brief: readiness profile and portal calendar event codes, not secrets.
+    "app.brief.schemas.ReadinessLineOut.profile_key": "DQ profile code",
+    "app.brief.schemas.DeadlineOut.event_key": "portal calendar event code",
     "app.exports.schemas.ExportProfileOut.key": "export profile code",
     "app.exports.schemas.ExportOut.profile_key": "export profile code",
     "app.imports.schemas.Issue.message_key": "i18n message key",

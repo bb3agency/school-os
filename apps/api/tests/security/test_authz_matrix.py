@@ -3052,6 +3052,57 @@ def _udise_match(w: Any, r: str, a: Engine) -> Request:
 SPECS[("PUT", "/api/v1/imports/{import_id}/rows/{row_no}/match")] = _udise_match
 
 
+# FA-05 weekly management brief (FR-BRF-002): one stored week of school A (counts only).
+_BRIEF: dict[str, uuid.UUID] = {}
+
+
+def _brief_week(w: Any, a: Engine) -> uuid.UUID:
+    if not _BRIEF:
+        brief_id = uuid.uuid4()
+        counts = (
+            '{"v": 1, "as_of": "2026-10-19", "readiness": [], "findings": {"blockers": 0, '
+            '"warnings": 0, "students_with_blockers": 0}, "changes_waiting": 0, '
+            '"certificates_issued": 0, "deadlines": [], "fees": null, "ask": null}'
+        )
+        with a.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO ops.weekly_briefs (id, tenant_id, week_start, counts) "
+                    "VALUES (:i, :t, '2026-10-12', CAST(:c AS jsonb))"
+                ),
+                {"i": brief_id, "t": w.a.tenant_id, "c": counts},
+            )
+        _BRIEF["week"] = brief_id
+    return _BRIEF["week"]
+
+
+SPECS.update(
+    {
+        ("GET", "/api/v1/brief/weekly"): lambda w, r, a: ("/api/v1/brief/weekly", None, {}),
+        ("GET", "/api/v1/brief/weekly/history"): lambda w, r, a: (
+            "/api/v1/brief/weekly/history",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/brief/weekly/{brief_id}"): lambda w, r, a: (
+            f"/api/v1/brief/weekly/{_brief_week(w, a)}",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/brief/preferences"): lambda w, r, a: (
+            "/api/v1/brief/preferences",
+            None,
+            {},
+        ),
+        ("PUT", "/api/v1/brief/preferences"): lambda w, r, a: (
+            "/api/v1/brief/preferences",
+            {"in_app": True, "email": False},
+            {},
+        ),
+    }
+)
+
+
 def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one answer per route family
     creates = {
         "/api/v1/users",

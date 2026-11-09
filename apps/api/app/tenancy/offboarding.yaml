@@ -44,6 +44,9 @@ purge_order:
   - documents
   - exports
   - admin
+  # FA-05 (0095_weekly_brief): briefs and members' delivery choices reference only the
+  # school and its memberships, so the brief goes before identity.
+  - brief
   - notifications
   - breakglass
   - ops

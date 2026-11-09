@@ -1462,6 +1462,8 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | Disclosure snapshots (`ops.disclosure_snapshots`) | Life of the school | The record of what was published; view counts 90 days |
 | RTE admissions / claims (`sis.rte_*`; not scheduled) | Admissions: as the student record; claims and lines: 8 years after the financial year (D21) | |
 | Portal calendar dates and reminders (`ops.portal_*`) | 2 academic years | Configuration and idempotency, no personal data |
+| Weekly management briefs (`ops.weekly_briefs`; FA-05) | 104 weeks (2 years) | School-level counts only; older weeks are deleted by the Monday job (`keep_weeks` in `app/brief/config.yaml`) |
+| Weekly brief delivery choices (`ops.brief_preferences`; FA-05) | While the person works at the school | Deleted with the membership (`ON DELETE CASCADE`) or on an erasure request |
 | Platform incidents (`platform.incidents*`) | 3 years after closing | SchoolOS's own records, no personal data (ADR-0050) |
 
 
@@ -1717,6 +1719,16 @@ The dq module purges both tables and is purged **before** `circulars` (`offboard
 | `sis.udise_movement_marks` | C1 | The clerk's tick on a computed UDISE+ to-do item: `item_key` (`<kind>:<uuid>`, unique per school), `kind` CHECK (`transfer_out`,`left_without_tc`,`admission`,`progression`), `student_id` (composite FK; NULL exactly for `progression`), `state` CHECK (`done`,`not_needed`), `marked_by`, `marked_by_membership`, `marked_at`, `created_at`, `updated_at`, `version`. `sos_app` may update `state` and the marker columns and DELETE a row (undo) |
 
 Open follow-ups and to-do items are computed on every read (live readiness; TCs, leavers, admissions and promotions), so only the steps and ticks are stored. Both tables belong to the `data_quality` record class, are purged by the `dq` owner and are in the full data export (`dq_followups`, `udise_movement_marks`).
+
+
+### 16.9 Weekly management brief (`ops`; FA-05, FR-BRF-001..015; `0095_weekly_brief`)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `ops.weekly_briefs` | C1 | `week_start` (a Monday, CHECK `weekly_briefs_monday`; unique per school, `weekly_briefs_once`), `counts jsonb` (an object: school-level counts, codes, labels, dates, rupee totals; never a name or a student id; versioned `"v": 1`), `notified`, `built_at`. `sos_app` SELECT, INSERT, DELETE (weeks older than `keep_weeks`) and UPDATE of `notified` only. Record class `weekly_briefs` (`no_personal_data`); not in the full data export (derived counts) |
+| `ops.brief_preferences` | C1 | Primary key `(tenant_id, membership_id)`, composite FK to `core.memberships` `ON DELETE CASCADE`; `in_app` (default true), `email` (default false: opt-in), `updated_at`, `version`. `sos_app` may update the choice columns. Record class `brief_preferences` (`allowed`; module `brief` is a subject-report contributor and eraser for members) |
+
+Offboarding owner `brief` (before `notifications`, `offboarding.yaml`).
 
 ### 16.7 Classification, export and offboarding (as built)
 

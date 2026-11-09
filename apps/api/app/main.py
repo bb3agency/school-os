@@ -9,6 +9,7 @@ from app.admin.api import router as admin_router
 from app.apaar.api import router as apaar_router
 from app.audit.api import router as audit_router
 from app.breakglass.api import router as breakglass_router
+from app.brief.api import router as brief_router
 from app.certificates.api import public_router as certificates_public_router
 from app.certificates.api import router as certificates_router
 from app.changes.api import router as changes_router
@@ -124,6 +125,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(readiness_router)
     # FC-12 legal holds (ADR-0059).
     app.include_router(holds_router)
+    # FA-05 weekly management brief (FR-BRF-001..015).
+    app.include_router(brief_router)
     # R2-1B fees (ADR-0042): every route answers 404 module_hidden while fees are off.
     app.include_router(fees_router)
     # R2-2E UPI and bank statements (ADR-0042 decision 9).

@@ -186,3 +186,11 @@ def requests_about(
         stmt = stmt.where(ChangeRequest.attribute_key.in_(sorted(set(keys))))
     stmt = stmt.order_by(ChangeRequest.requested_at.desc(), ChangeRequest.id.desc())
     return session.scalars(stmt).all()
+
+
+def count_pending(session: Session, at: dt.datetime) -> int:
+    """Pending, unexpired requests of the current school (a count only; FR-BRF-004)."""
+    stmt = select(func.count()).where(
+        ChangeRequest.status == "pending", ChangeRequest.expires_at > at
+    )
+    return int(session.execute(stmt).scalar_one())

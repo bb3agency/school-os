@@ -883,6 +883,18 @@ Mounted from `app/disclosure/api.py` `public_router` and listed in `app/public/p
 
 **Rate-limit policies:** none new; R3 routes use the existing ones (`search`, `render`, `exports`, `readiness_reads`, `readiness_school` and the public policies), pinned in `app/core/rate_limits.yaml`. **New error codes:** `not_verified`, `class_not_erasable`, `nomination_adults_only`, `subject_required`, `request_closed`, `request_decided`, `response_required`, `changes_pending`, `report_not_ready`, `report_not_released`, `not_a_consent_withdrawal`, `purpose_inactive`, `purpose_exists`, `too_many_purposes`, `unknown_suggestion`, `no_forms`, `too_many_forms`, `no_purposes`, `section_only`, `breach_closed`, `duties_open`, `only_when_closing`, `pulled_automatically`, `incident_confirmed`, `no_schools`, `incident_closed`, `incident_not_closed`, `reopen_requested`, `no_reopen_request`, `incident_cert_in_unreported`, `incident_school_not_notified`, `confirmation_required`, `incomplete`, `snapshot_not_live`, `not_published`, `files_not_ready`, `files_failed`, `not_circular_task`; existing ones reused: `same_operator`, `request_expired`, `requester_not_authorised`, `approver_not_eligible`, `self_approval_forbidden`, `signed_form_required`, `consent_not_given`, `consent_already_decided`, `module_hidden`, `if_match_required`, `export_expired`.
 
+### Weekly brief (FA-05; FR-BRF-001..015)
+
+All routes need `brief.read` (school-wide: owner, principal). Counts only; a student count below `small_cell_min` is `null` ("fewer than N"); each section is `null` when the reader lacks the permission of the screen behind it.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/brief/weekly` | The newest stored week; before the first Monday job a live preview (`stored: false`) |
+| GET | `/brief/weekly/history` | Stored weeks, newest first (`limit` ≤ 52) |
+| GET | `/brief/weekly/{brief_id}` | One stored week, with the change on the week before; another school's: 404 |
+| GET | `/brief/preferences` | The caller's own choice (`in_app`, `email`, `email_available`, `version`; `ETag`) |
+| PUT | `/brief/preferences` | Change it (`If-Match` honoured, `W/"0"` before the first save; 412 `version_mismatch`); audited |
+
 ## 5. Examples
 
 ### 5.1 Search students

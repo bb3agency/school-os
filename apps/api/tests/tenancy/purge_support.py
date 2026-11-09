@@ -546,6 +546,7 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             s=ids["student"],
             u=u["user"],
             m=ids["m1"],
+        )
         # --- UDISE+ correction requests (0092_udise_corrections; FO-02) ----------------------
         udise_request = uuid.uuid4()
         _run(
@@ -956,6 +957,21 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
             y=ids["year1"],
             k=portal_task,
+        )
+        # --- weekly brief (FA-05, 0095_weekly_brief): a stored week and a member's choice ----
+        _run(
+            c,
+            "INSERT INTO ops.weekly_briefs (id, tenant_id, week_start, counts) "
+            "VALUES (:i, :t, '2026-11-02', CAST('{\"v\": 1}' AS jsonb))",
+            i=uuid.uuid4(),
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO ops.brief_preferences (tenant_id, membership_id, email) "
+            "VALUES (:t, :m, true)",
+            t=t,
+            m=ids["m1"],
         )
         parent_notice = uuid.uuid4()
         _run(

@@ -292,6 +292,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         "0092_udise_corrections",  # FO-02 UDISE+ correction requests, FO-04 UDISE+ row matches
         "0093_msg_reach_closure",  # FP-02 urgent closure messages (D85)
         "0094_tally_vouchers",  # FM-03 Tally voucher export (D85)
+        "0095_weekly_brief",  # FA-05 weekly management brief
     }
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
         command.downgrade(cfg, "0017_exports")

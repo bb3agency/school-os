@@ -259,6 +259,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | privacy.breach.read (R3-1B: the school's breach register, duties, clocks and drafts; ADR-0050) | ✓ | ✓ | — | — | — | — | — | — | ✓ |
 | privacy.breach.manage (R3-1B: record and update breaches, duties, affected people, the parent-notice draft) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | privacy.hold.manage (FC-12: see legal holds, place or lift one; two different people, one asks, another approves; ADR-0059, D84) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| brief.read (FA-05: the weekly management brief, counts only, and the member's own delivery choice; D85) | ✓ | ✓ | — | — | — | — | — | — | — |
 | disclosure.edit (R3-1C: edit the CBSE Appendix IX draft, see the published history, download the published files; CBSE schools only; ADR-0051) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | disclosure.publish (R3-1C: publish the disclosure, withdraw it, change its public link; ADR-0051) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | privacy.read (R3-1A: requests and grievances list and detail within the reader's student reach, notice records, record classes) | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |

@@ -113,6 +113,11 @@ contributors:
     subjects: [student, guardian, member]
     classes: [breach_records]
     eraser: false
+  # FA-05: a member's own weekly-brief delivery choice (the briefs hold counts only).
+  brief:
+    subjects: [member]
+    classes: [brief_preferences]
+    eraser: true
 no_personal_data:
   ops: Background job runs, the outbox and idempotency keys hold ids and counts only.
   admin: Whole-school archives asked for by the owner and the school's retention settings; nothing about one person.
