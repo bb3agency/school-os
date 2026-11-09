@@ -43,6 +43,7 @@ export type ErrorNamespace =
   | "portalCalendar"
   | "privacy"
   | "disclosure"
+  | "compliance"
   | "fees.taxCertificate";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };

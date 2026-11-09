@@ -39,6 +39,7 @@ export const CLIENT_NAMESPACES = {
     "changeRequests",
     "circulars",
     "common",
+    "compliance",
     "consents",
     "deploymentMode",
     "disclosure",

@@ -60,6 +60,8 @@ const LINKS: Record<string, (id: string, item: LinkSource) => string> = {
   breach_record: (id) => `/privacy/breaches/${id}`,
   // FC-12 (ADR-0059): a legal hold is due for review; the holds list shows it.
   legal_hold: () => "/privacy/holds",
+  // FC-01 (FR-COMP-011): a school certificate lapses soon or has lapsed.
+  compliance_certificate: () => "/compliance",
   // R2-1B (FR-FEE-026): a waiting fee request opens the approvals inbox; a decided one opens the
   // student's fee account, where the maker reads the decision and its reason (WF-01).
   fee_request: (_id, item) => {
