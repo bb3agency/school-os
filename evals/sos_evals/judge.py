@@ -216,7 +216,11 @@ def _cited_passages(
             ):
                 continue
             source = corpus[citation.source]
-            passages.append(f"{source.title}\n{source.content}")
+            # The source's metadata is part of what the answer may state (the application labels
+            # each passage with its type, title and issue date, as sentences.score allows).
+            issued = f" · issued {source.issued_on:%d/%m/%Y}" if source.issued_on else ""
+            label = source.doc_type.replace("_", " ")
+            passages.append(f"{label} · {source.title}{issued}\n{source.content}")
         out.append((segment.text, passages))
     return out
 

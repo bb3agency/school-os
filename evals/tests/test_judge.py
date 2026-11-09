@@ -116,6 +116,19 @@ def test_FR_KB_051_uncited_sentence_is_unfaithful_without_asking_the_judge() -> 
     assert (result.claims, result.supported) == (1, 0)
 
 
+def test_FR_KB_051_the_passage_label_with_type_title_and_issue_date_is_supported() -> None:
+    """The application prefixes each cited sentence with the source's label ("Circular · Title ·
+    15/09/2026 (p.1):"); that metadata belongs to the source, so it is not an unsupported claim."""
+    item = next(i for i in DATA.items if i.id == "documents-001")
+    source = DATA.corpus[item.expected_sources[0]]
+    assert source.issued_on is not None
+    lead = source.content.split("\n", 1)[0]
+    label = f"Circular · {source.title} · {source.issued_on:%d/%m/%Y} (p.1): {lead}"
+    _, answer = _item_and_answer(label, cite=True)
+    result = judge.judge_item(STUB, item, answer, DATA.corpus)
+    assert (result.claims, result.supported) == (1, 1)
+
+
 def test_FR_KB_052_a_refusal_of_an_answerable_question_is_incorrect() -> None:
     item, answer = _item_and_answer("Not found in school records.", cite=False, refused=True)
     result = judge.judge_item(STUB, item, answer, DATA.corpus)  # type: ignore[arg-type]
