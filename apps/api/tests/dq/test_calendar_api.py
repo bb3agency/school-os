@@ -33,7 +33,19 @@ FILE_EVENTS_2026 = {
     "cbse_loc_2027",
     "cisce_registration_2027",
     "bseap_ssc_2027_nominal_roll",
+    # FO-05 (FR-RDY-012): the RTE rounds concern Class I only, which this school does not have.
+    "bseap_ssc_2027_exam_fee",
+    "bseap_ssc_2027_exam_fee_late",
+    "cbse_second_exam_loc_2027",
+    "cbse_oasis_update_2027",
+    "cbse_disclosure_update_2027",
+    "cbse_saras_2028",
+    "ap_psis_recognition_2027",
+    "udise_plus_2026_dropbox",
+    "udise_plus_2027_progression",
+    "dpdp_duties_2027",
 }
+FEE_EVENT = "bseap_ssc_2027_exam_fee"
 ROLES = ("principal", "office_admin", "exam_coordinator", "class_teacher", "teacher", "accountant")
 
 
@@ -158,6 +170,11 @@ def test_US_3101_AC1_events_apply_by_board_and_class_with_expected_dates(
     assert SSC_EVENT in listed
     assert not {k for k in listed if k.startswith(("cbse", "cisce"))}
     assert {"udise_plus_2026_freeze", "apaar_2026_generation_drive"} <= set(listed)
+    assert {FEE_EVENT, "ap_psis_recognition_2027", "dpdp_duties_2027"} <= set(listed)
+    fee = listed[FEE_EVENT]
+    assert fee["portal"] == "bseap"
+    assert [r["profile_key"] for r in fee["readiness"]] == ["bseap-ssc-2027"]
+    assert listed["ap_psis_recognition_2027"]["portal"] == "school_admin"
 
     cbse = school(admin_engine, boards=("CBSE",))
     listed = events(api, cbse.people["office_admin"])
@@ -443,15 +460,22 @@ def test_US_3104_AC1_readiness_shows_the_next_window(admin_engine: Engine, api: 
     res = api.call(office, "GET", "/api/v1/dq/readiness/bseap-ssc-2027")
     assert res.status_code == 200, res.text
     window = res.json()["next_window"]
-    assert window["event_key"] == SSC_EVENT
+    # The exam fee window (FO-05, FR-RDY-013) closes before the nominal-roll corrections.
+    assert window["event_key"] == FEE_EVENT
     assert window["state"] == "expected"
     assert window["confirmed"] is False
-    assert window["days_left"] == (dt.date(2027, 2, 5) - TODAY).days
+    assert window["days_left"] == (dt.date(2026, 11, 25) - TODAY).days
+    for key in (FEE_EVENT, "bseap_ssc_2027_exam_fee_late"):
+        done = confirm(
+            api, s.people["principal"], s, key, opens_on="2026-10-01", closes_on="2026-10-20"
+        )
+        assert done.status_code == 200, done.text
     assert confirm(api, s.people["principal"], s, SSC_EVENT).status_code == 200
     overview = api.call(office, "GET", "/api/v1/dq/readiness", params={"profile_keys": ["apaar"]})
     apaar = overview.json()["summaries"][0]["next_window"]
     assert apaar["event_key"] == "udise_plus_2026_freeze"  # closes before the APAAR drive
     ssc = api.call(office, "GET", "/api/v1/dq/readiness/bseap-ssc-2027").json()["next_window"]
+    assert ssc["event_key"] == SSC_EVENT  # the fee windows closed (confirmed in the past)
     assert ssc["confirmed"] is True
     assert ssc["state"] == "confirmed"
     assert ssc["closes_on"] == "2027-02-04"

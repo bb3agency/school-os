@@ -101,8 +101,10 @@ office; the office or principal marks it done.
 ## 7. Ask the school
 
 1. Open **Ask the school** (or **Ask the school** on **Home**).
-2. Type a question, for example "Which students in Class VII-B were absent more than five days in
-   October?" and select **Ask**.
+2. Type a question, for example "How many students are in Class VII-B?" or "Which students in
+   Class VII-B have open record problems?", and select **Ask**. Ask the school answers from the
+   school's documents, student counts and record problems; it does not read attendance or
+   marks yet, so open **Attendance** or **Marks** for those.
 3. Check the **Sources** under the answer. You only get answers from your own sections and the
    documents you may see.
 4. "Not found in the school records you can access" means SchoolOS did not find it in what you may

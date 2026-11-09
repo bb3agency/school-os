@@ -291,7 +291,9 @@ class ReadinessSectionOut(ReadinessCounts):
 
 CalendarState = Literal["expected", "confirmed", "open", "closed"]
 CalendarSourceKind = Literal["circular", "portal", "phone", "other"]
-CalendarPortal = Literal["udise_plus", "bseap", "cbse", "cisce", "apaar", "school"]
+CalendarPortal = Literal[
+    "udise_plus", "bseap", "cbse", "cisce", "apaar", "school_admin", "rte", "school"
+]
 EVENT_KEY_PATTERN = r"^([a-z][a-z0-9_]{2,63}|school:[a-z0-9][a-z0-9-]{1,47})$"
 
 

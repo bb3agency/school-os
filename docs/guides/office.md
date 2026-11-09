@@ -82,10 +82,14 @@ if the same problem is found, it comes back.
 **Start the check** to refresh it. Open a section to see each student; **Print parent slip** or
 **Print slips for this section** gives slips for parents to correct their details.
 
-**Portal calendar** lists portal windows (UDISE+, board registration and similar). Dates marked
+**Portal calendar** lists portal windows (UDISE+, board registration, the AP SSC exam fee and
+similar) and the school's own deadlines (**School administration**: recognition renewal on PSIS,
+CBSE SARAS and OASIS, the DPDP duties; **RTE admissions**: the lottery rounds). Dates marked
 "Expected dates are not official" come from last year. When the circular arrives, select
 **Confirm the dates**, type the dates and choose **Who owns the work**. That person gets a task and
-reminders 30, 14, 7 and 1 days before the window closes. **Add our own event** adds a school date.
+reminders 30, 14, 7 and 1 days before the window closes (some windows remind on other days). **Add
+our own event** adds a school date. Before paying the AP SSC exam fee, open **Board readiness** and
+fix what is not ready: the board takes its data from UDISE+.
 
 ## 3. Correction requests (two people)
 

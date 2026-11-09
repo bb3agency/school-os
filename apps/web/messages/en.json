@@ -10651,8 +10651,8 @@
   "portalCalendar": {
     "nav": "Portal calendar",
     "title": "Portal calendar",
-    "description": "UDISE+, board registration and nominal-roll windows and APAAR drives for your school, with who owns the work and how many students are ready.",
-    "descriptionYear": "Academic year {year}: UDISE+, board registration and nominal-roll windows and APAAR drives for your school, with who owns the work and how many students are ready.",
+    "description": "UDISE+, board registration, exam fee and nominal-roll windows, APAAR drives, and the school's own deadlines such as recognition renewal and RTE admissions, with who owns the work and how many students are ready.",
+    "descriptionYear": "Academic year {year}: UDISE+, board registration, exam fee and nominal-roll windows, APAAR drives, and the school's own deadlines such as recognition renewal and RTE admissions, with who owns the work and how many students are ready.",
     "unverifiedTitle": "Expected dates are not official",
     "unverifiedBody": "Dates marked “Expected around” come from public notices and earlier years. Confirm each date when the circular or the portal shows it; confirmed dates are used for reminders.",
     "tableCaption": "Portal and board windows",
@@ -10684,6 +10684,8 @@
       "cbse": "CBSE",
       "cisce": "CISCE",
       "apaar": "APAAR",
+      "school_admin": "School administration",
+      "rte": "RTE admissions",
       "school": "Our own event"
     },
     "dialog": {

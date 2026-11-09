@@ -35,10 +35,22 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.dq.profiles import load_profiles
 
-Portal = Literal["udise_plus", "bseap", "cbse", "cisce", "apaar", "school"]
+# ``school_admin``: deadlines of the school itself, not of student data (recognition renewal,
+# CBSE SARAS and OASIS, the public disclosure, DPDP duties); ``rte``: RTE 12(1)(c) lottery and
+# admission rounds (FR-RDY-011). ``school`` is the school's own event, never in the file.
+FilePortal = Literal["udise_plus", "bseap", "cbse", "cisce", "apaar", "school_admin", "rte"]
+Portal = Literal["udise_plus", "bseap", "cbse", "cisce", "apaar", "school_admin", "rte", "school"]
 State = Literal["expected", "confirmed", "open", "closed"]
 
-PORTALS: Final[tuple[str, ...]] = ("udise_plus", "bseap", "cbse", "cisce", "apaar")
+PORTALS: Final[tuple[str, ...]] = (
+    "udise_plus",
+    "bseap",
+    "cbse",
+    "cisce",
+    "apaar",
+    "school_admin",
+    "rte",
+)
 # The boards a school can declare (app.tenancy.schemas.SUPPORTED_BOARDS; a test keeps them equal,
 # this module may not import tenancy).
 BOARDS: Final[tuple[str, ...]] = ("BSEAP", "CBSE", "CISCE")
@@ -77,7 +89,7 @@ class PortalEvent(_Model):
 
     key: str = Field(pattern=EVENT_KEY_PATTERN)
     year: str = Field(pattern=YEAR_PATTERN)
-    portal: Literal["udise_plus", "bseap", "cbse", "cisce", "apaar"]
+    portal: FilePortal
     label_en: str = Field(min_length=3, max_length=120)
     label_te: str = Field(min_length=3, max_length=160)
     profile_keys: tuple[str, ...] = Field(default=(), max_length=5)

@@ -479,10 +479,10 @@ templates:
     params: [portal, days, ready, students]
     resource_type: portal_calendar
     en:
-      title: "{portal, select, udise_plus {UDISE+} bseap {AP SSC board} cbse {CBSE} cisce {CISCE} apaar {APAAR} other {Portal}} window closes {days, plural, =0 {today} one {tomorrow} other {in # days}}"
+      title: "{portal, select, udise_plus {UDISE+} bseap {AP SSC board} cbse {CBSE} cisce {CISCE} apaar {APAAR} school_admin {School administration} rte {RTE admissions} other {Portal}} window closes {days, plural, =0 {today} one {tomorrow} other {in # days}}"
       body: "{students, plural, =0 {Check the dates and who owns the work on the portal calendar.} other {{ready} of # students are ready. Open the portal calendar to see the window and fix what is not ready.}}"
     te:
-      title: "{portal, select, udise_plus {UDISE+} bseap {AP SSC బోర్డు} cbse {CBSE} cisce {CISCE} apaar {APAAR} other {పోర్టల్}} గడువు {days, plural, =0 {ఈరోజే} one {రేపు} other {# రోజుల్లో}} ముగుస్తుంది"
+      title: "{portal, select, udise_plus {UDISE+} bseap {AP SSC బోర్డు} cbse {CBSE} cisce {CISCE} apaar {APAAR} school_admin {పాఠశాల పరిపాలన} rte {RTE ప్రవేశాలు} other {పోర్టల్}} గడువు {days, plural, =0 {ఈరోజే} one {రేపు} other {# రోజుల్లో}} ముగుస్తుంది"
       body: "{students, plural, =0 {పోర్టల్ క్యాలెండర్‌లో తేదీలు, పని ఎవరిదో చూడండి.} other {# మంది విద్యార్థుల్లో {ready} మంది సిద్ధంగా ఉన్నారు. గడువు చూడటానికి, సిద్ధంగా లేనివాటిని సరిచేయడానికి పోర్టల్ క్యాలెండర్ తెరవండి.}}"
   # --- R3-1A privacy requests (ADR-0048; FR-DPDP-006): the daily due-date reminder, counts only.
   privacy.requests_due:

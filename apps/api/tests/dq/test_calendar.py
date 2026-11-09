@@ -53,7 +53,8 @@ def test_FR_RDY_001_calendar_file_loads_with_both_years_and_every_portal() -> No
     assert years == {"2026-27", "2027-28"}
     for year in years:
         portals = {e.portal for e in calendar.for_year(year)}
-        assert portals == {"udise_plus", "bseap", "cbse", "cisce", "apaar"}, year
+        assert {"udise_plus", "bseap", "cbse", "cisce", "apaar"} <= portals, year
+    assert {e.portal for e in calendar.events} == set(cal.PORTALS)
     keys = {e.key for e in calendar.events}
     for expected in (
         "udise_plus_2026_freeze",
@@ -83,6 +84,115 @@ def test_FR_RDY_001_linked_profiles_exist_and_belong_to_the_event_board() -> Non
             profile = profiles[key]
             if profile.board is not None:
                 assert profile.board in event.boards, (event.key, key)
+
+
+# --- FO-05 refresh: new office deadlines and portal kinds (FR-RDY-011..017) ------------------
+
+FO05_EVENTS = {
+    "bseap_ssc_2027_exam_fee": "bseap",
+    "bseap_ssc_2027_exam_fee_late": "bseap",
+    "cbse_second_exam_loc_2027": "cbse",
+    "cbse_oasis_update_2027": "school_admin",
+    "cbse_disclosure_update_2027": "school_admin",
+    "cbse_saras_2028": "school_admin",
+    "ap_psis_recognition_2027": "school_admin",
+    "ap_rte_2027_round_1": "rte",
+    "ap_rte_2027_round_2": "rte",
+    "udise_plus_2026_dropbox": "udise_plus",
+    "udise_plus_2027_progression": "udise_plus",
+    "dpdp_duties_2027": "school_admin",
+}
+
+
+def test_FR_RDY_011_portal_kinds_include_school_admin_and_rte() -> None:
+    assert {"school_admin", "rte"} <= set(cal.PORTALS)
+    calendar = cal.load_calendar()
+    for portal in cal.PORTALS:
+        assert calendar.portal_label(portal) is not None, portal
+    # The school's own events keep their own kind; the file may not use it.
+    assert "school" not in cal.PORTALS
+    with pytest.raises(ValueError, match="portal"):
+        _event(portal="school")
+
+
+def test_FR_RDY_012_fo05_events_ship_unverified_with_sources_in_2026_27() -> None:
+    events = cal.load_calendar().by_key()
+    for key, portal in FO05_EVENTS.items():
+        event = events[key]
+        assert event.portal == portal, key
+        assert event.year == "2026-27", key
+        assert event.verified is False, key
+        assert event.source, key
+
+
+def test_FR_RDY_013_bseap_exam_fee_links_the_ssc_readiness_and_says_check_first() -> None:
+    profiles = load_profiles()
+    events = cal.load_calendar().by_key()
+    fee = events["bseap_ssc_2027_exam_fee"]
+    assert fee.profile_keys == ("bseap-ssc-2027",)
+    assert profiles["bseap-ssc-2027"].readiness is not None
+    assert "check readiness before paying the fee" in fee.label_en
+    assert fee.boards == ("BSEAP",)
+    assert fee.classes == ("X",)
+    late = events["bseap_ssc_2027_exam_fee_late"]
+    assert late.opens_on > fee.closes_on
+    assert late.profile_keys == ("bseap-ssc-2027",)
+
+
+def test_FR_RDY_014_school_admin_and_rte_events_apply_by_board_and_class() -> None:
+    events = cal.load_calendar().by_key()
+
+    def ap_school(key: str) -> bool:
+        return cal.applies(events[key], boards=("BSEAP",), class_boards={}, class_codes=("I", "X"))
+
+    def cbse_school(key: str) -> bool:
+        return cal.applies(
+            events[key], boards=("CBSE",), class_boards={}, class_codes=("IX", "XII")
+        )
+
+    assert ap_school("ap_psis_recognition_2027")
+    assert not ap_school("cbse_saras_2028")
+    assert cbse_school("cbse_saras_2028")
+    assert cbse_school("cbse_oasis_update_2027")
+    assert ap_school("ap_rte_2027_round_1")
+    # RTE entry seats are in Class I: a school without Class I is not reminded.
+    assert not cbse_school("ap_rte_2027_round_1")
+    assert cbse_school("dpdp_duties_2027")
+
+
+def test_FR_RDY_015_dpdp_event_closes_on_13_may_2027() -> None:
+    event = cal.load_calendar().by_key()["dpdp_duties_2027"]
+    assert event.closes_on == D(2027, 5, 13)
+    assert "13 May 2027" in event.label_en
+    assert event.lead_days[0] == 90
+
+
+def test_FR_RDY_016_2027_28_board_events_carry_a_profile_of_their_board() -> None:
+    profiles = load_profiles()
+    for event in cal.load_calendar().for_year("2027-28"):
+        if not event.boards:
+            continue
+        assert event.profile_keys, event.key
+        for key in event.profile_keys:
+            assert profiles[key].board in event.boards, (event.key, key)
+
+
+def test_FR_RDY_017_reminder_names_every_portal_kind() -> None:
+    from app.notifications import templates
+
+    for portal in cal.PORTALS:
+        message = templates.render(
+            "portal_calendar.reminder",
+            {"portal": portal, "days": 3, "ready": 1, "students": 2},
+            "en",
+        )
+        assert not message.title.startswith("Portal "), portal
+    admin = templates.render(
+        "portal_calendar.reminder",
+        {"portal": "school_admin", "days": 3, "ready": 0, "students": 0},
+        "en",
+    )
+    assert admin.title.startswith("School administration")
 
 
 def test_FR_RDY_002_calendar_boards_are_the_boards_a_school_can_declare() -> None:

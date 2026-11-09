@@ -27,7 +27,8 @@ billing:
   # Items: {key, name, boards: [BOARD, ...] ([] = every board), start: YYYY-MM-DD,
   #         end: YYYY-MM-DD, verified: bool (absent = true)}
   # ADR-0057 (lead decision D78): a COPY of the board windows of app/dq/config/portal_calendar.yaml
-  # (every event with boards: registration, list of candidates, nominal roll), with the
+  # (every board-portal event with boards: registration, list of candidates, nominal roll, the
+  # AP SSC exam fee; not the school_admin events such as CBSE SARAS or OASIS, FR-RDY-018), with the
   # calendar's key, English label, dates and `verified: false`. The control plane never imports
   # app.dq (ADR-0020), so the dates are copied; tests/platform/test_board_sync.py fails until this
   # list equals the calendar. Refresh both in the same PR. A window matches a school through
@@ -37,6 +38,9 @@ billing:
     - {key: cbse_loc_2027, name: "CBSE list of candidates (LOC), Class X and XII, 2027 exams", boards: [CBSE], start: "2026-09-01", end: "2026-10-31", verified: false}
     - {key: cisce_registration_2027, name: "CISCE ICSE and ISC candidate registration 2026-27", boards: [CISCE], start: "2026-10-01", end: "2026-11-30", verified: false}
     - {key: bseap_ssc_2027_nominal_roll, name: "AP SSC March 2027 nominal roll corrections", boards: [BSEAP], start: "2027-02-01", end: "2027-02-05", verified: false}
+    - {key: bseap_ssc_2027_exam_fee, name: "AP SSC March 2027 exam fee, no late fee (check readiness before paying the fee)", boards: [BSEAP], start: "2026-11-13", end: "2026-11-25", verified: false}
+    - {key: bseap_ssc_2027_exam_fee_late, name: "AP SSC March 2027 exam fee with late fee (Rs 50, Rs 100, Rs 200 stages)", boards: [BSEAP], start: "2026-11-26", end: "2026-12-15", verified: false}
+    - {key: cbse_second_exam_loc_2027, name: "CBSE Class X second board exam 2027, list of candidates (LOC)", boards: [CBSE], start: "2027-04-15", end: "2027-04-22", verified: false}
     - {key: cbse_registration_2028, name: "CBSE registration, Class IX and XI (2027-28)", boards: [CBSE], start: "2027-09-01", end: "2027-10-31", verified: false}
     - {key: cbse_loc_2028, name: "CBSE list of candidates (LOC), Class X and XII, 2028 exams", boards: [CBSE], start: "2027-09-01", end: "2027-10-31", verified: false}
     - {key: cisce_registration_2028, name: "CISCE ICSE and ISC candidate registration 2027-28", boards: [CISCE], start: "2027-10-01", end: "2027-11-30", verified: false}
