@@ -925,6 +925,277 @@
         "title": "AdjustmentOut",
         "type": "object"
       },
+      "AdmissionCountsOut": {
+        "properties": {
+          "added_since": {
+            "description": "Active students added on or after that date.",
+            "title": "Added Since",
+            "type": "integer"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Date of the latest parents' notice; null when none is recorded yet.",
+            "title": "Since"
+          },
+          "without_notice": {
+            "description": "Of those, students without a notice record.",
+            "title": "Without Notice",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "added_since",
+          "without_notice"
+        ],
+        "title": "AdmissionCountsOut",
+        "type": "object"
+      },
+      "AdmissionNoticeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "enum": [
+              "paper",
+              "in_person",
+              "school_whatsapp_group",
+              "sos_whatsapp",
+              "email",
+              "other"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "given_on": {
+            "format": "date",
+            "title": "Given On",
+            "type": "string"
+          },
+          "notice_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parents' notice issue the family got (default: the latest).",
+            "title": "Notice Id"
+          },
+          "student_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Student Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "student_ids",
+          "given_on",
+          "channel"
+        ],
+        "title": "AdmissionNoticeIn",
+        "type": "object"
+      },
+      "AdmissionNoticeOut": {
+        "properties": {
+          "channel": {
+            "enum": [
+              "paper",
+              "in_person",
+              "school_whatsapp_group",
+              "sos_whatsapp",
+              "email",
+              "other"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "given_on": {
+            "format": "date",
+            "title": "Given On",
+            "type": "string"
+          },
+          "notice_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice Id"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "recorded_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By Name"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "given_on",
+          "channel",
+          "notice_id",
+          "recorded_by_name",
+          "recorded_at"
+        ],
+        "title": "AdmissionNoticeOut",
+        "type": "object"
+      },
+      "AdmissionPendingOut": {
+        "properties": {
+          "hidden": {
+            "description": "Of those, students outside your reach (not listed).",
+            "title": "Hidden",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdmissionPendingRowOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "not_legal_advice": {
+            "const": true,
+            "default": true,
+            "title": "Not Legal Advice",
+            "type": "boolean"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "without_notice": {
+            "description": "Every such student of the school (a count).",
+            "title": "Without Notice",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "since",
+          "without_notice",
+          "hidden",
+          "items"
+        ],
+        "title": "AdmissionPendingOut",
+        "type": "object"
+      },
+      "AdmissionPendingRowOut": {
+        "properties": {
+          "added_on": {
+            "format": "date",
+            "title": "Added On",
+            "type": "string"
+          },
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "class_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Section"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "admission_no",
+          "class_section",
+          "added_on"
+        ],
+        "title": "AdmissionPendingRowOut",
+        "type": "object"
+      },
+      "AdmissionRecordedOut": {
+        "properties": {
+          "already_recorded": {
+            "title": "Already Recorded",
+            "type": "integer"
+          },
+          "recorded": {
+            "title": "Recorded",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "recorded",
+          "already_recorded"
+        ],
+        "title": "AdmissionRecordedOut",
+        "type": "object"
+      },
       "AffectedCountIn": {
         "additionalProperties": false,
         "description": "What to count for the affected-people picker (D59): whole classes or sections of the\ncurrent year, single students, all staff, staff by role or single staff members (ids and role\nkeys only). Nothing is stored; a person picked twice counts once. The school's 1,500 students\nfit through ``all_students`` or the class and section selectors; single picks are capped.",
@@ -15255,6 +15526,351 @@
         "title": "HeartbeatOut",
         "type": "object"
       },
+      "HoldCreate": {
+        "additionalProperties": false,
+        "description": "Ask to place a hold. Exactly one of ``student_id`` (scope ``student``) or\n``record_class`` (scope ``record_class``, a key of GET /privacy/record-classes).",
+        "properties": {
+          "reason_code": {
+            "maxLength": 63,
+            "pattern": "^[a-z][a-z0-9_]+$",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "record_class": {
+            "anyOf": [
+              {
+                "maxLength": 63,
+                "pattern": "^[a-z][a-z0-9_]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Class"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "review_on": {
+            "format": "date",
+            "title": "Review On",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "student",
+              "record_class"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          }
+        },
+        "required": [
+          "scope",
+          "reason_code",
+          "review_on"
+        ],
+        "title": "HoldCreate",
+        "type": "object"
+      },
+      "HoldListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HoldOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "max_review_on": {
+            "format": "date",
+            "title": "Max Review On",
+            "type": "string"
+          },
+          "reason_codes": {
+            "items": {
+              "$ref": "#/components/schemas/HoldOptionOut"
+            },
+            "title": "Reason Codes",
+            "type": "array"
+          },
+          "record_classes": {
+            "items": {
+              "$ref": "#/components/schemas/HoldOptionOut"
+            },
+            "title": "Record Classes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "reason_codes",
+          "record_classes",
+          "max_review_on"
+        ],
+        "title": "HoldListOut",
+        "type": "object"
+      },
+      "HoldOptionOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "HoldOptionOut",
+        "type": "object"
+      },
+      "HoldOut": {
+        "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "approved_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By Name"
+          },
+          "can_approve": {
+            "title": "Can Approve",
+            "type": "boolean"
+          },
+          "effective": {
+            "title": "Effective",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lift_requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lift Requested At"
+          },
+          "lift_requested_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lift Requested By Name"
+          },
+          "lifted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifted At"
+          },
+          "lifted_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifted By Name"
+          },
+          "placed_at": {
+            "format": "date-time",
+            "title": "Placed At",
+            "type": "string"
+          },
+          "placed_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placed By Name"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "reason_label": {
+            "title": "Reason Label",
+            "type": "string"
+          },
+          "record_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Class"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "rejected_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected At"
+          },
+          "review_on": {
+            "format": "date",
+            "title": "Review On",
+            "type": "string"
+          },
+          "review_overdue": {
+            "title": "Review Overdue",
+            "type": "boolean"
+          },
+          "scope": {
+            "enum": [
+              "student",
+              "record_class"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "active",
+              "lift_pending",
+              "lifted",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          },
+          "subject_label": {
+            "title": "Subject Label",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "student_id",
+          "subject_label",
+          "record_class",
+          "reason_code",
+          "reason_label",
+          "reference",
+          "review_on",
+          "review_overdue",
+          "status",
+          "effective",
+          "placed_by_name",
+          "placed_at",
+          "approved_by_name",
+          "approved_at",
+          "lift_requested_by_name",
+          "lift_requested_at",
+          "lifted_by_name",
+          "lifted_at",
+          "rejected_at",
+          "can_approve",
+          "version"
+        ],
+        "title": "HoldOut",
+        "type": "object"
+      },
       "IgnoreIn": {
         "additionalProperties": false,
         "properties": {
@@ -21561,6 +22177,56 @@
         "title": "NextDutyOut",
         "type": "object"
       },
+      "NotReachedRowOut": {
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "class_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Section"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "admission_no",
+          "class_section"
+        ],
+        "title": "NotReachedRowOut",
+        "type": "object"
+      },
       "NoteIn": {
         "additionalProperties": false,
         "properties": {
@@ -21707,6 +22373,66 @@
           "source"
         ],
         "title": "NoticeCreate",
+        "type": "object"
+      },
+      "NoticeDeliveryOut": {
+        "properties": {
+          "broadcast_id": {
+            "format": "uuid",
+            "title": "Broadcast Id",
+            "type": "string"
+          },
+          "guardians": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Guardians by the furthest status their message reached (read, delivered, sent, queued, failed, skipped) and ``left_out`` (no opt-in, no number...).",
+            "title": "Guardians",
+            "type": "object"
+          },
+          "hidden": {
+            "description": "Of those, students outside your reach (not listed).",
+            "title": "Hidden",
+            "type": "integer"
+          },
+          "not_legal_advice": {
+            "const": true,
+            "default": true,
+            "title": "Not Legal Advice",
+            "type": "boolean"
+          },
+          "not_reached": {
+            "description": "Students to give a paper copy to (only those you may see).",
+            "items": {
+              "$ref": "#/components/schemas/NotReachedRowOut"
+            },
+            "title": "Not Reached",
+            "type": "array"
+          },
+          "notice": {
+            "$ref": "#/components/schemas/PrivacyNoticeOut"
+          },
+          "students": {
+            "description": "Students of the broadcast's sections now.",
+            "title": "Students",
+            "type": "integer"
+          },
+          "students_not_reached": {
+            "description": "Students none of whose guardians got the message delivered or read.",
+            "title": "Students Not Reached",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "notice",
+          "broadcast_id",
+          "guardians",
+          "students",
+          "students_not_reached",
+          "hidden",
+          "not_reached"
+        ],
+        "title": "NoticeDeliveryOut",
         "type": "object"
       },
       "NoticeDownloadOut": {
@@ -27527,7 +28253,8 @@
               "erasable",
               "refused_legal_obligation",
               "refused_official_record",
-              "retention_running"
+              "retention_running",
+              "legal_hold"
             ],
             "title": "Outcome",
             "type": "string"
@@ -27925,13 +28652,27 @@
             "title": "Audience",
             "type": "string"
           },
+          "broadcast_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "FP-13: the WhatsApp broadcast; see /privacy/notices/{id}/delivery.",
+            "title": "Broadcast Id"
+          },
           "channel": {
             "enum": [
               "paper",
               "school_whatsapp_group",
               "sos_notice",
               "email",
-              "other"
+              "other",
+              "sos_whatsapp"
             ],
             "title": "Channel",
             "type": "string"
@@ -27965,6 +28706,19 @@
             ],
             "title": "Language",
             "type": "string"
+          },
+          "parent_notice_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "FP-13: the parent notice sent on WhatsApp (sos_whatsapp).",
+            "title": "Parent Notice Id"
           },
           "recorded_at": {
             "format": "date-time",
@@ -31017,7 +31771,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/ReadinessItemOut"
+              "$ref": "#/components/schemas/app__dq__schemas__ReadinessItemOut"
             },
             "title": "Items",
             "type": "array"
@@ -31050,41 +31804,10 @@
         "title": "ReadinessFieldOut",
         "type": "object"
       },
-      "ReadinessItemOut": {
+      "ReadinessMarkIn": {
+        "additionalProperties": false,
         "properties": {
-          "advisory": {
-            "title": "Advisory",
-            "type": "boolean"
-          },
-          "against": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Against"
-          },
-          "changes": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/Bilingual"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Changes"
-          },
-          "explanation": {
-            "$ref": "#/components/schemas/Bilingual"
-          },
-          "finding_id": {
+          "document_id": {
             "anyOf": [
               {
                 "format": "uuid",
@@ -31094,85 +31817,67 @@
                 "type": "null"
               }
             ],
-            "title": "Finding Id"
+            "description": "Evidence uploaded first as a document (signed DPA, DPIA...).",
+            "title": "Document Id"
           },
-          "finding_status": {
+          "done_on": {
+            "format": "date",
+            "title": "Done On",
+            "type": "string"
+          },
+          "item": {
+            "enum": [
+              "dpa_signed",
+              "dpia_done",
+              "breach_contact",
+              "retention_reviewed"
+            ],
+            "title": "Item",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item",
+          "done_on"
+        ],
+        "title": "ReadinessMarkIn",
+        "type": "object"
+      },
+      "ReadinessMarkOut": {
+        "properties": {
+          "document_id": {
             "anyOf": [
               {
-                "enum": [
-                  "open",
-                  "resolved",
-                  "waived",
-                  "reopened",
-                  "needs_confirmation"
-                ],
+                "format": "uuid",
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Finding Status"
+            "title": "Document Id"
           },
-          "kinds": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Kinds",
-            "type": "array"
-          },
-          "kinds_text": {
-            "$ref": "#/components/schemas/Bilingual"
-          },
-          "owner": {
-            "enum": [
-              "parent_aadhaar",
-              "school_udise",
-              "school_register",
-              "unknown"
-            ],
-            "title": "Owner",
+          "done_on": {
+            "format": "date",
+            "title": "Done On",
             "type": "string"
           },
-          "owner_label": {
-            "$ref": "#/components/schemas/Bilingual"
-          },
-          "reason": {
+          "item": {
             "enum": [
-              "mismatch",
-              "undecided",
-              "missing",
-              "needs_confirmation"
+              "dpa_signed",
+              "dpia_done",
+              "breach_contact",
+              "retention_reviewed"
             ],
-            "title": "Reason",
+            "title": "Item",
             "type": "string"
           },
-          "segments": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/DiffSegment"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Segments"
-          },
-          "severity": {
-            "enum": [
-              "blocker",
-              "high",
-              "medium",
-              "low",
-              "info"
-            ],
-            "title": "Severity",
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
             "type": "string"
           },
-          "source": {
+          "recorded_by_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -31181,50 +31886,53 @@
                 "type": "null"
               }
             ],
-            "title": "Source"
+            "title": "Recorded By Name"
+          }
+        },
+        "required": [
+          "item",
+          "done_on",
+          "document_id",
+          "recorded_by_name",
+          "recorded_at"
+        ],
+        "title": "ReadinessMarkOut",
+        "type": "object"
+      },
+      "ReadinessOut": {
+        "properties": {
+          "admission": {
+            "$ref": "#/components/schemas/AdmissionCountsOut"
           },
-          "sources": {
+          "applicable": {
+            "title": "Applicable",
+            "type": "integer"
+          },
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "items": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/app__privacy__readiness_schemas__ReadinessItemOut"
             },
-            "title": "Sources",
+            "title": "Items",
             "type": "array"
           },
-          "status": {
-            "enum": [
-              "ready",
-              "needs_parent",
-              "needs_school",
-              "blocked"
-            ],
-            "title": "Status",
-            "type": "string"
-          },
-          "waived": {
-            "title": "Waived",
+          "not_legal_advice": {
+            "const": true,
+            "default": true,
+            "title": "Not Legal Advice",
             "type": "boolean"
           }
         },
         "required": [
-          "reason",
-          "owner",
-          "status",
-          "source",
-          "against",
-          "sources",
-          "kinds",
-          "advisory",
-          "waived",
-          "severity",
-          "explanation",
-          "owner_label",
-          "kinds_text",
-          "segments",
-          "changes",
-          "finding_id",
-          "finding_status"
+          "done",
+          "applicable",
+          "items",
+          "admission"
         ],
-        "title": "ReadinessItemOut",
+        "title": "ReadinessOut",
         "type": "object"
       },
       "ReadinessOverviewOut": {
@@ -42326,6 +43034,116 @@
         "title": "WebhookSetupOut",
         "type": "object"
       },
+      "WhatsAppPreviewIn": {
+        "additionalProperties": false,
+        "properties": {
+          "parent_notice_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parent notice an earlier preview made (reused instead of a new one).",
+            "title": "Parent Notice Id"
+          },
+          "section_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 300,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sections of the current year; none = every section.",
+            "title": "Section Ids"
+          }
+        },
+        "title": "WhatsAppPreviewIn",
+        "type": "object"
+      },
+      "WhatsAppPreviewOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "not_legal_advice": {
+            "const": true,
+            "default": true,
+            "title": "Not Legal Advice",
+            "type": "boolean"
+          },
+          "parent_notice_id": {
+            "format": "uuid",
+            "title": "Parent Notice Id",
+            "type": "string"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/BroadcastPreviewOut"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "parent_notice_id",
+          "template_version",
+          "title",
+          "body",
+          "preview"
+        ],
+        "title": "WhatsAppPreviewOut",
+        "type": "object"
+      },
+      "WhatsAppSendIn": {
+        "additionalProperties": false,
+        "properties": {
+          "parent_notice_id": {
+            "format": "uuid",
+            "title": "Parent Notice Id",
+            "type": "string"
+          },
+          "preview_token": {
+            "maxLength": 80,
+            "minLength": 8,
+            "title": "Preview Token",
+            "type": "string"
+          },
+          "section_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 300,
+            "minItems": 1,
+            "title": "Section Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "parent_notice_id",
+          "preview_token",
+          "section_ids"
+        ],
+        "title": "WhatsAppSendIn",
+        "type": "object"
+      },
       "WhatsappStateOut": {
         "description": "The guardians' WhatsApp opt-ins (read-only here; recorded in the opt-in panel).",
         "properties": {
@@ -42648,6 +43466,183 @@
         "title": "DownloadUrlOut",
         "type": "object"
       },
+      "app__dq__schemas__ReadinessItemOut": {
+        "properties": {
+          "advisory": {
+            "title": "Advisory",
+            "type": "boolean"
+          },
+          "against": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Against"
+          },
+          "changes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Bilingual"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changes"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/Bilingual"
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id"
+          },
+          "finding_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "open",
+                  "resolved",
+                  "waived",
+                  "reopened",
+                  "needs_confirmation"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Status"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Kinds",
+            "type": "array"
+          },
+          "kinds_text": {
+            "$ref": "#/components/schemas/Bilingual"
+          },
+          "owner": {
+            "enum": [
+              "parent_aadhaar",
+              "school_udise",
+              "school_register",
+              "unknown"
+            ],
+            "title": "Owner",
+            "type": "string"
+          },
+          "owner_label": {
+            "$ref": "#/components/schemas/Bilingual"
+          },
+          "reason": {
+            "enum": [
+              "mismatch",
+              "undecided",
+              "missing",
+              "needs_confirmation"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "segments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DiffSegment"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segments"
+          },
+          "severity": {
+            "enum": [
+              "blocker",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "needs_parent",
+              "needs_school",
+              "blocked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "waived": {
+            "title": "Waived",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reason",
+          "owner",
+          "status",
+          "source",
+          "against",
+          "sources",
+          "kinds",
+          "advisory",
+          "waived",
+          "severity",
+          "explanation",
+          "owner_label",
+          "kinds_text",
+          "segments",
+          "changes",
+          "finding_id",
+          "finding_status"
+        ],
+        "title": "ReadinessItemOut",
+        "type": "object"
+      },
       "app__identity__schemas__MeOut": {
         "properties": {
           "display_name": {
@@ -42802,6 +43797,79 @@
           "data"
         ],
         "title": "Page[TicketOut]",
+        "type": "object"
+      },
+      "app__privacy__readiness_schemas__ReadinessItemOut": {
+        "properties": {
+          "detail": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "What the status is based on (dates, versions, counts; never names).",
+            "title": "Detail",
+            "type": "object"
+          },
+          "key": {
+            "enum": [
+              "privacy_contact",
+              "notices",
+              "dpa_signed",
+              "dpia_done",
+              "test_request",
+              "breach_contact",
+              "retention_reviewed",
+              "consent_forms"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "mark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReadinessMarkOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For the items the school records here: the latest record."
+          },
+          "source": {
+            "description": "Where the item comes from (docs/08).",
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "done",
+              "todo",
+              "not_applicable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "detail",
+          "mark",
+          "source"
+        ],
+        "title": "ReadinessItemOut",
         "type": "object"
       }
     }
@@ -74801,6 +75869,186 @@
         ]
       }
     },
+    "/api/v1/privacy/admission-notices": {
+      "post": {
+        "description": "Record that these students' families got the privacy notice: date, channel and notice\nissue (FR-DPDP-058, FR-DPDP-060; permission ``privacy.request.manage``;\n``Idempotency-Key``). A student with a record keeps it. Errors: 404 (a student outside your\nreach); 422 ``date_in_future``, ``no_parents_notice``, ``not_found``.",
+        "operationId": "record_admission_notices_api_v1_privacy_admission_notices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdmissionNoticeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdmissionRecordedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Record Admission Notices",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/admission-notices/pending": {
+      "get": {
+        "description": "Students added after the latest parents' notice without a notice record: the count for\nthe school, the list of those you may see (FR-DPDP-059; permission ``privacy.read``).",
+        "operationId": "admission_pending_api_v1_privacy_admission_notices_pending_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdmissionPendingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Admission Pending",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/admission-notices/{student_id}": {
+      "get": {
+        "description": "When and how one student's family got the privacy notice at admission (FR-DPDP-058;\npermission ``privacy.read``; 404 outside your reach or without a record).",
+        "operationId": "get_admission_notice_api_v1_privacy_admission_notices__student_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdmissionNoticeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Admission Notice",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
     "/api/v1/privacy/breaches": {
       "get": {
         "description": "The school's breach register: open breaches first by their next duty's clock (time left\nin hours), then closed ones (permission ``privacy.breach.read``).",
@@ -75564,6 +76812,524 @@
         ]
       }
     },
+    "/api/v1/privacy/holds": {
+      "get": {
+        "description": "The school's legal holds: open ones by review date, then recent lifted and rejected\nones, with the reason codes and record classes a hold may name (permission\n``privacy.hold.manage``).",
+        "operationId": "list_holds_api_v1_privacy_holds_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Holds",
+        "tags": [
+          "legal-holds"
+        ]
+      },
+      "post": {
+        "description": "Ask to place a hold on one student or on a record class (permission\n``privacy.hold.manage``, MFA within 5 minutes). It takes effect when another person with\nthe permission approves it. The reference is encrypted and never logged. Errors:\n``unknown_reason_code``, ``unknown_record_class``, ``student_required``,\n``record_class_required``, ``not_found``, ``date_in_past``, ``review_too_far``,\n``aadhaar_full_number_rejected`` (422). Accepts ``Idempotency-Key``.",
+        "operationId": "place_hold_api_v1_privacy_holds_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Place Hold",
+        "tags": [
+          "legal-holds"
+        ]
+      }
+    },
+    "/api/v1/privacy/holds/{hold_id}": {
+      "get": {
+        "description": "One hold (permission ``privacy.hold.manage``). ``ETag`` for ``If-Match``.",
+        "operationId": "get_hold_api_v1_privacy_holds__hold_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hold_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Hold Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Hold",
+        "tags": [
+          "legal-holds"
+        ]
+      }
+    },
+    "/api/v1/privacy/holds/{hold_id}:approve": {
+      "post": {
+        "description": "Approve a pending hold: it becomes active (another person than the one who asked;\nstep-up, ``If-Match``). Errors: ``self_approval_forbidden`` (403), ``hold_wrong_state``\n(409), stale ``If-Match`` (412).",
+        "operationId": "approve_hold_api_v1_privacy_holds__hold_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hold_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Hold Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Approve Hold",
+        "tags": [
+          "legal-holds"
+        ]
+      }
+    },
+    "/api/v1/privacy/holds/{hold_id}:approve-lift": {
+      "post": {
+        "description": "Approve a lift (another person than the one who asked; step-up, ``If-Match``):\nretention and erasure apply again from the next run. Errors: ``self_approval_forbidden``\n(403), ``hold_wrong_state`` (409), stale ``If-Match`` (412).",
+        "operationId": "approve_lift_api_v1_privacy_holds__hold_id__approve_lift_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hold_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Hold Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Approve Lift",
+        "tags": [
+          "legal-holds"
+        ]
+      }
+    },
+    "/api/v1/privacy/holds/{hold_id}:cancel-lift": {
+      "post": {
+        "description": "Cancel a lift request: the hold stays active (step-up, ``If-Match``). Errors:\n``hold_wrong_state`` (409), stale ``If-Match`` (412).",
+        "operationId": "cancel_lift_api_v1_privacy_holds__hold_id__cancel_lift_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hold_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Hold Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel Lift",
+        "tags": [
+          "legal-holds"
+        ]
+      }
+    },
+    "/api/v1/privacy/holds/{hold_id}:reject": {
+      "post": {
+        "description": "Reject a pending hold, or withdraw your own request (step-up, ``If-Match``). Errors:\n``hold_wrong_state`` (409), stale ``If-Match`` (412).",
+        "operationId": "reject_hold_api_v1_privacy_holds__hold_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hold_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Hold Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reject Hold",
+        "tags": [
+          "legal-holds"
+        ]
+      }
+    },
+    "/api/v1/privacy/holds/{hold_id}:request-lift": {
+      "post": {
+        "description": "Ask to lift an active hold; it keeps holding until another person approves (step-up,\n``If-Match``). Errors: ``hold_wrong_state`` (409), stale ``If-Match`` (412).",
+        "operationId": "request_lift_api_v1_privacy_holds__hold_id__request_lift_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hold_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Hold Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Request Lift",
+        "tags": [
+          "legal-holds"
+        ]
+      }
+    },
     "/api/v1/privacy/notices": {
       "get": {
         "description": "Every notice issue the school recorded, newest first (FR-DPDP-003; permission\n``privacy.read``).",
@@ -75673,6 +77439,327 @@
           }
         },
         "summary": "Record Notice",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/notices/whatsapp": {
+      "post": {
+        "description": "Send the previewed privacy notice on WhatsApp (utility template ``school_notice``) and\nrecord the notice issue with the broadcast (FR-DPDP-063, FR-DPDP-064; same permissions as\nthe preview; ``Idempotency-Key``). Errors: 409 ``notice_not_current``, ``preview_invalid``,\n``preview_expired``, ``preview_stale`` and the sending blocks.",
+        "operationId": "whatsapp_send_api_v1_privacy_notices_whatsapp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatsAppSendIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyNoticeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Whatsapp Send",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/notices/whatsapp/preview": {
+      "post": {
+        "description": "Make the parent notice from the parents' privacy notice and preview sending it on\nWhatsApp: recipients, guardians left out, estimated Meta cost (FR-DPDP-061, FR-DPDP-062;\npermission ``privacy.request.manage`` with ``notice.draft``, ``notice.approve`` and\n``message.send``). Nothing is sent. Errors: 403; 409 ``notice_not_current``; 422\n``section_ids``.",
+        "operationId": "whatsapp_preview_api_v1_privacy_notices_whatsapp_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatsAppPreviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatsAppPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Whatsapp Preview",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/notices/{notice_id}/delivery": {
+      "get": {
+        "description": "Who the privacy notice sent on WhatsApp reached: guardians by delivery status and the\nstudents to give a paper copy to (FR-DPDP-065, FR-DPDP-066; permission ``privacy.read``;\nnames only of students you may see). 404 for a notice not sent on WhatsApp.",
+        "operationId": "notice_delivery_api_v1_privacy_notices__notice_id__delivery_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeDeliveryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Notice Delivery",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/readiness": {
+      "get": {
+        "description": "The DPDP readiness checklist computed from the school's records: privacy contact,\nnotices with the current template version, DPA, DPIA, one request closed, breach contact,\nretention reviewed this academic year, consent forms; and how many students added after the\nparents' notice have no notice record (FR-DPDP-053, FR-DPDP-059; permission\n``privacy.read``). Not legal advice.",
+        "operationId": "readiness_api_v1_privacy_readiness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readiness",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/readiness/marks": {
+      "post": {
+        "description": "Record a readiness step SchoolOS cannot see elsewhere (DPA signed, DPIA done, breach\ncontact and phone tree, retention reviewed): the date and optionally the evidence document\n(FR-DPDP-054; permission ``privacy.request.manage``; ``Idempotency-Key``). Append-only.\nErrors (422): ``date_in_future``, ``not_found``.",
+        "operationId": "record_mark_api_v1_privacy_readiness_marks_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadinessMarkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessMarkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Record Mark",
         "tags": [
           "privacy"
         ]
