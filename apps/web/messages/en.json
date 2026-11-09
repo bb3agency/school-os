@@ -10930,6 +10930,61 @@
       "use": "Use these counts"
     }
   },
+  "brief": {
+    "nav": "Weekly brief",
+    "title": "Weekly brief",
+    "description": "What the office did last week and what is due next, as counts. No names and no student details.",
+    "print": "Print",
+    "week": "Week",
+    "weekOption": "{from} to {to}",
+    "period": "Week of {from} to {to}. Counts taken on {asOf}.",
+    "preview": "This week so far (counts taken on {asOf}). The first full weekly brief arrives on Monday morning.",
+    "fewerThan": "fewer than {n}",
+    "footnote": "Counts of students below {n} are shown as “fewer than {n}” so that no child can be singled out. Work counts and money are shown as they are.",
+    "noPermissionTitle": "Only the owner and the principal see the weekly brief",
+    "noPermissionBody": "Ask the school's owner if you need it.",
+    "kpi": {
+      "blockers": "Problems that block a submission",
+      "warnings": "{count, plural, =0 {No warnings} one {# warning} other {# warnings}}",
+      "waiting": "Corrections waiting for approval",
+      "certificates": "Certificates issued in the week",
+      "deadlines": "Portal deadlines in the next {days} days"
+    },
+    "readiness": {
+      "title": "Readiness by board and portal",
+      "none": "No board or portal readiness check applies to this school yet.",
+      "ready": "{ready} of {students} ready",
+      "change": "{change} on the week before",
+      "breakdown": "Waiting for parents: {parent} · Waiting for the school: {school} · Blocked: {blocked}"
+    },
+    "deadlines": {
+      "title": "Portal deadlines in the next {days} days",
+      "none": "No portal window closes in this period.",
+      "closes": "Closes {date} ({days, plural, =0 {today} one {in # day} other {in # days}})",
+      "confirmed": "Dates confirmed by the school",
+      "expected": "Expected dates, not yet confirmed"
+    },
+    "fees": {
+      "title": "Fees",
+      "collected": "{amount} collected in the week, {receipts, plural, one {# receipt} other {# receipts}}",
+      "due": "Still due this year: {balance} ({overdue} overdue); students with a balance: {students}"
+    },
+    "ask": {
+      "title": "AI answers this month",
+      "used": "{answers, plural, one {# answer} other {# answers}} used",
+      "usedOf": "{answers} of {included} answers in your bundle used"
+    },
+    "preferences": {
+      "title": "How you get the brief",
+      "description": "Each Monday morning SchoolOS prepares last week's brief. Choose how you hear about it.",
+      "loading": "Loading your choice…",
+      "inApp": "Notice in SchoolOS",
+      "inAppHint": "A notification in the bell on Monday morning. It stays on while the e-mail is on.",
+      "email": "E-mail",
+      "emailHint": "Counts and a sign-in link only, never names.",
+      "emailUnavailable": "E-mail is not set up for this school yet."
+    }
+  },
   "holds": {
     "nav": "Legal holds",
     "title": "Legal holds",
