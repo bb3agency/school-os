@@ -2186,7 +2186,14 @@
       "quiet_hours_empty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00.",
       "invalid_time": "Enter a time as HH:MM, for example 07:00.",
       "keys_rejected": "Razorpay did not accept this key id and secret. Copy both again from the Razorpay dashboard (Account & Settings > API keys).",
-      "write_off_reduces_due": "A write-off is a negative amount on a fee line, like -1500."
+      "write_off_reduces_due": "A write-off is a negative amount on a fee line, like -1500.",
+      "channel_required": "Choose how you reached the parent or the office.",
+      "channel_not_allowed": "This step does not take a channel. Leave it empty.",
+      "event_not_for_owner": "This step does not fit who must fix it. Choose another step.",
+      "before_step": "The promised date cannot be before the step. Choose a later date.",
+      "too_far": "The date is too far ahead. Choose an earlier date.",
+      "not_allowed": "This value is not allowed here. Leave it empty.",
+      "no_open_fix": "Nothing is waiting for this fix any more. Reload the list."
     },
     "api": {
       "generic": {
@@ -11164,6 +11171,120 @@
       "save": "Link and confirm the date",
       "consequence": "The window's closing date becomes the task's due date, confirmed from this circular."
     }
+  },
+  "udiseFollowup": {
+    "nav": "Follow-ups",
+    "title": "Follow-ups on fixes outside the school",
+    "description": "Who still has to fix a difference outside the school, and what the office did about it. A follow-up is overdue when nothing was recorded for {days} days or the promised date has passed. It closes by itself once the new value matches.",
+    "colOwner": "Who fixes it",
+    "colState": "State",
+    "colLast": "Last step",
+    "colPromised": "Promised by",
+    "nothingYet": "Nothing recorded yet",
+    "recordStep": "Record a step",
+    "recordAria": "Record a step for {student}",
+    "openList": "Open follow-ups",
+    "filter": "Show",
+    "filterAll": "All",
+    "filterOverdue": "Overdue",
+    "filterNotStarted": "Not contacted yet",
+    "emptyTitle": "Nothing is waiting outside the school",
+    "emptyBody": "No student waits for a parent's Aadhaar update or a UDISE+ correction for this check.",
+    "noneInFilter": "No follow-up matches this filter",
+    "waiting": {
+      "parent_aadhaar": "Waiting on parents",
+      "school_udise": "Waiting on the MEO (UDISE+)"
+    },
+    "waitingNote": "{overdue} overdue, {notStarted} not contacted yet",
+    "summary": {
+      "parent_aadhaar": "Waiting on parents: {open} ({overdue} overdue)",
+      "school_udise": "Waiting on the MEO: {open} ({overdue} overdue)"
+    },
+    "state": {
+      "not_started": "Not contacted yet",
+      "waiting": "Waiting",
+      "update_reported": "Update reported: record the new value",
+      "overdue": "Overdue",
+      "overdue_no_contact": "Overdue: no contact",
+      "overdue_promise_passed": "Overdue: promised date passed"
+    },
+    "event": {
+      "slip_given": "Verification slip given",
+      "parent_contacted": "Parent contacted",
+      "promised_by": "Parent promised an update by",
+      "update_reported": "Update reported done",
+      "request_sent": "Correction request sent",
+      "followed_up": "Followed up with the office"
+    },
+    "channel": {
+      "in_person": "In person",
+      "phone": "Phone call",
+      "whatsapp": "WhatsApp",
+      "letter": "Letter or diary note",
+      "email": "E-mail"
+    },
+    "record": {
+      "title": "Record a step",
+      "confirm": "Record step",
+      "note": "Only the step, how and when are kept. Do not write names or numbers anywhere.",
+      "event": "Step",
+      "channel": "How",
+      "channelHint": "How you reached the parent or the office.",
+      "choose": "Choose",
+      "occurredOn": "When it happened",
+      "promisedOn": "Promised date",
+      "promisedOnHint": "The day the parent said the Aadhaar update will be done."
+    },
+    "slips": {
+      "trigger": "Mark slips given",
+      "title": "Mark slips given",
+      "description": "Records that today the verification slip was given to the parents of {count} students who must update Aadhaar.",
+      "confirm": "Mark slips given"
+    },
+    "errors": {
+      "no_open_fix": {
+        "title": "Nothing is waiting any more",
+        "body": "The difference was fixed meanwhile, or the student is not on this list. Reload the list."
+      }
+    }
+  },
+  "udiseTodo": {
+    "nav": "UDISE+ to-do",
+    "title": "UDISE+ to-do",
+    "description": "What to repeat in the UDISE+ Student Module after something happened here: a transfer certificate issued, a child who left, an admission or a promotion. Do the step on the portal, then tick it here.",
+    "unverifiedTitle": "Check the steps with your MEO office",
+    "unverifiedBody": "These UDISE+ steps come from guides and circulars that are not confirmed for Andhra Pradesh yet. Follow your MEO office's instructions where they differ.",
+    "kpiOpen": "To do",
+    "kpiWaitingLong": "Waiting more than {days} days",
+    "kpiDone": "Done or not needed",
+    "view": "Show",
+    "viewOpen": "To do",
+    "viewClosed": "Done",
+    "colWhat": "What to do in UDISE+",
+    "colWhen": "Since",
+    "wholeSchool": "Whole school",
+    "tcSerial": "TC {serial}",
+    "progressionCounts": "{promoted} promoted, {heldBack} held back, {graduated} passed out",
+    "waitingLong": "Waiting long",
+    "markDone": "Done in UDISE+",
+    "doneAria": "Mark done in UDISE+: {what}",
+    "markNotNeeded": "Not needed",
+    "undo": "Undo",
+    "state": {
+      "open": "To do",
+      "done": "Done",
+      "not_needed": "Not needed"
+    },
+    "action": {
+      "transfer_out": "Transfer certificate issued: mark the child as transferred",
+      "left_without_tc": "Left without a transfer certificate: move the child to the dropbox",
+      "admission_without_pen": "New admission without a PEN: search by name and date of birth, create only if not found, then record the PEN here",
+      "admission_with_pen": "Admission with a PEN: import the child by PEN (do not create a new record)",
+      "progression": "Promotion done: finish the progression for the new year"
+    },
+    "emptyOpenTitle": "Nothing to repeat in UDISE+",
+    "emptyOpenBody": "New transfer certificates, leavers, admissions and promotions will appear here.",
+    "emptyClosedTitle": "Nothing ticked yet"
   },
   "disclosure": {
     "nav": "CBSE disclosure",

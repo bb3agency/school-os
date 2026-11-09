@@ -24,6 +24,7 @@ import { isRunFinished, RunProgress } from "@/features/findings/RunChecks";
 import type { DqRun } from "@/features/findings/types";
 import { PdfJobButton } from "@/features/exports/PdfJobButton";
 import { NextWindow } from "@/features/portal-calendar/NextWindow";
+import { FollowupSummaryLine, MarkSlipsGiven } from "@/features/udise-followup/ReadinessFollowups";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
@@ -422,6 +423,7 @@ export function ReadinessScreen({
               />
             </div>
           </div>
+          <FollowupSummaryLine profileKey={profileKey} />
           <p className="inline-flex flex-wrap items-center gap-2 text-sm text-ink-muted">
             <span>{t("lastRun")}:</span>
             <Pill variant="date">{lastRun ?? t("neverRun")}</Pill>
@@ -477,6 +479,14 @@ export function ReadinessScreen({
                 }}
               />
               <SensitiveSlipLink profileKey={profileKey} target={{ sectionId }} />
+              {can("dq.readiness.manage") ? (
+                <MarkSlipsGiven
+                  profileKey={profileKey}
+                  studentIds={(students.data ?? [])
+                    .filter((row) => row.owners.includes("parent_aadhaar"))
+                    .map((row) => row.student.id)}
+                />
+              ) : null}
             </span>
           }
         >

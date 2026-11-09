@@ -163,6 +163,14 @@ export function SchoolShell({
           icon: "checkCircle",
         },
         {
+          // FO-03 (FR-UDI-031..040): what to repeat in UDISE+ after a TC, a leaver, an
+          // admission or a promotion.
+          href: "/findings/udise-todo",
+          label: t("udiseTodo.nav"),
+          permission: "dq.readiness.read",
+          icon: "checkCircle",
+        },
+        {
           // R3-1D (US-3101, ADR-0053): portal and board windows with reminders to staff.
           href: "/findings/calendar",
           label: t("portalCalendar.nav"),
