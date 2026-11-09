@@ -32,6 +32,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
+from app.core import holds
 from app.core import purge as purging
 from app.core.db import context_free_session, tenant_session
 from app.core.errors import Conflict, ServiceUnavailable, ValidationFailed
@@ -393,6 +394,11 @@ def purge_expired_handles(tenant_id: uuid.UUID) -> int:
     total = 0
     while True:
         with tenant_session(tenant_id) as session:
+            # Legal holds (ADR-0059): a hold on parent links keeps every expired handle.
+            if holds.check(
+                session, job="public.purge_handles", record_class="public_links"
+            ).whole_class:
+                return total
             before = repo.now(session) - dt.timedelta(days=cfg.purge_after_days)
             keep = fees.public_handle_ids_in_use(session)
             deleted = repo.purge_expired(session, before, cfg.purge_batch_size, keep=keep)

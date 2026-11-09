@@ -10930,6 +10930,124 @@
       "use": "Use these counts"
     }
   },
+  "holds": {
+    "nav": "Legal holds",
+    "title": "Legal holds",
+    "description": "Keep a student's records, or a whole kind of record, past their deletion date while a legal matter is open.",
+    "noPermissionTitle": "Only the owner and the principal can see legal holds",
+    "noPermissionBody": "Ask the school's owner or principal if records must be kept for a legal reason.",
+    "aboutTitle": "Two people place or lift a hold",
+    "aboutBody": "One person asks and another approves. While a hold applies, SchoolOS does not delete or erase what it covers, and a family's access report only says the records are held. Review each hold by its review date.",
+    "emptyTitle": "No legal holds",
+    "emptyBody": "Place a hold when the police, a court or a regulator asks the school to keep records.",
+    "colSubject": "Held records",
+    "colReason": "Reason",
+    "colReview": "Review by",
+    "colStatus": "Status",
+    "colActions": "Actions",
+    "overdue": "Review overdue since {date}",
+    "askedBy": "Asked by {name}",
+    "liftAskedBy": "Lift asked by {name}",
+    "scopes": {
+      "student": "One student",
+      "record_class": "Whole school: one kind of record"
+    },
+    "status": {
+      "pending": "Waiting for approval",
+      "active": "Held",
+      "lift_pending": "Held, lift waiting",
+      "lifted": "Lifted",
+      "rejected": "Rejected"
+    },
+    "place": {
+      "trigger": "Place a hold",
+      "title": "Place a legal hold",
+      "description": "Choose what to keep, why, and when to review the hold.",
+      "confirm": "Ask for approval",
+      "makerChecker": "Another owner or principal must approve the hold before it applies.",
+      "consequence": "Nothing is kept yet: the hold applies when someone else approves it.",
+      "scopeLegend": "What to keep",
+      "scopes": {
+        "student": "One student",
+        "record_class": "One kind of record"
+      },
+      "changeStudent": "Change",
+      "recordClass": "Kind of record",
+      "recordClassHint": "Every school record of this kind is kept, for every student.",
+      "choose": "Choose",
+      "reason": "Reason",
+      "reference": "Reference (optional)",
+      "referenceHint": "A case, FIR or letter number. Only owners and principals see it; it never appears in reports to families.",
+      "reviewOn": "Review by",
+      "reviewOnHint": "At most 12 months ahead (latest {date})."
+    },
+    "actions": {
+      "approve": {
+        "label": "Approve",
+        "aria": "Approve the hold on {subject}",
+        "title": "Approve this hold?",
+        "consequence": "From now on SchoolOS keeps these records and does not erase them on request."
+      },
+      "reject": {
+        "label": "Reject",
+        "aria": "Reject the hold on {subject}",
+        "title": "Reject this hold?",
+        "consequence": "The hold is not placed. Nothing else changes."
+      },
+      "request-lift": {
+        "label": "Ask to lift",
+        "aria": "Ask to lift the hold on {subject}",
+        "title": "Ask to lift this hold?",
+        "consequence": "The hold still applies until another owner or principal approves the lift."
+      },
+      "approve-lift": {
+        "label": "Approve lift",
+        "aria": "Approve lifting the hold on {subject}",
+        "title": "Lift this hold?",
+        "consequence": "From the next nightly run, records past their retention date are deleted as usual."
+      },
+      "cancel-lift": {
+        "label": "Keep the hold",
+        "aria": "Cancel lifting the hold on {subject}",
+        "title": "Keep this hold?",
+        "consequence": "The lift request is cancelled and the hold stays in place."
+      }
+    },
+    "errors": {
+      "self_approval_forbidden": {
+        "title": "Someone else must approve",
+        "body": "You asked for this, so another owner or principal must approve it."
+      },
+      "hold_wrong_state": {
+        "title": "This hold changed",
+        "body": "Someone else already acted on this hold. Reload the page to see it."
+      },
+      "review_too_far": {
+        "title": "Review date too far ahead",
+        "body": "Choose a review date at most 12 months from today."
+      },
+      "date_in_past": {
+        "title": "Review date in the past",
+        "body": "Choose today or a later date."
+      },
+      "unknown_reason_code": {
+        "title": "Choose a reason",
+        "body": "Choose one of the listed reasons."
+      },
+      "unknown_record_class": {
+        "title": "Choose a kind of record",
+        "body": "Choose one of the listed kinds of record."
+      },
+      "student_required": {
+        "title": "Choose a student",
+        "body": "Search for the student whose records must be kept."
+      },
+      "record_class_required": {
+        "title": "Choose a kind of record",
+        "body": "Choose which kind of record the whole school must keep."
+      }
+    }
+  },
   "portalCalendar": {
     "nav": "Portal calendar",
     "title": "Portal calendar",
@@ -11475,7 +11593,8 @@
         "refused_official_record": "Kept: school record",
         "refused_legal_obligation": "Kept: required by law",
         "retention_running": "Kept for now",
-        "until": "Kept until {date}"
+        "until": "Kept until {date}",
+        "legal_hold": "Kept: held for legal reasons"
       }
     },
     "nomination": {

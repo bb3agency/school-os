@@ -60,6 +60,7 @@ from sqlalchemy.orm import Session
 from app.authz.context import Scopes, UserContext
 from app.authz.http import decode_cursor, encode_cursor
 from app.authz.kv import KVUnavailable, kv_store
+from app.core import holds
 from app.core.config import Environment
 from app.core.crypto import CryptoError, unwrap_bound, wrap_bound
 from app.core.db import context_free_session, tenant_session
@@ -2166,6 +2167,11 @@ def expire_intents(tenant_id: uuid.UUID) -> int:
 def purge_events(tenant_id: uuid.UUID) -> int:
     """Worker: processed inbox rows are deleted 90 days after processing (docs/05 §13)."""
     with tenant_session(tenant_id) as session:
+        # Legal holds (ADR-0059): a hold on the class keeps every inbox row.
+        if holds.check(
+            session, job="fees.purge_payment_events", record_class="provider_inboxes"
+        ).whole_class:
+            return 0
         before = orepo.now(session) - dt.timedelta(days=cfg().inbox.retention_days)
         return orepo.purge_events(session, before)
 

@@ -38,6 +38,7 @@ export type ErrorNamespace =
   | "platform.invoices.payments"
   | "consents"
   | "breaches"
+  | "holds"
   | "platform.incidents"
   | "portalCalendar"
   | "privacy"

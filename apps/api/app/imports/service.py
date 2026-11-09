@@ -43,8 +43,8 @@ from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import build_snapshot
+from app.core import holds, retention
 from app.core import purge as purging
-from app.core import retention
 from app.core.db import tenant_session
 from app.core.errors import Conflict, DomainError, NotFound, PreconditionFailed, ValidationFailed
 from app.core.ids import new_id
@@ -2068,6 +2068,9 @@ def purge_raw_files(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> 
     moment = now or dt.datetime.now(dt.UTC)
     deleted = 0
     with tenant_session(tenant_id) as s:
+        # Legal holds (ADR-0059): a hold on imports keeps every raw file.
+        if holds.check(s, job="imports.purge_raw_files", record_class="imports").whole_class:
+            return 0
         cutoff = moment - dt.timedelta(days=raw_file_retention_days(s))
         due = repo.batches_due_for_file_deletion(s, cutoff)
         by_document: dict[uuid.UUID, list[ImportBatch]] = {}

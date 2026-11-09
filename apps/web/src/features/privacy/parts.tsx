@@ -67,11 +67,13 @@ export function DueCell({
   );
 }
 
-const OUTCOME_VARIANTS: Record<ErasurePlanRow["outcome"], PillVariant> = {
+// "legal_hold" (FC-12, ADR-0059): listed before the client is regenerated with it.
+const OUTCOME_VARIANTS: Record<ErasurePlanRow["outcome"] | "legal_hold", PillVariant> = {
   erasable: "positive",
   refused_official_record: "tag",
   refused_legal_obligation: "tag",
   retention_running: "tag",
+  legal_hold: "negative",
 };
 
 /** "Can be erased" / "Kept: school record" / "Kept: required by law" / "Kept until 31/03/2035". */

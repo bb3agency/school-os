@@ -1427,6 +1427,7 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | Inbound message kinds (`msg.inbound_events`) | 90 days | Kind and time only; inbound text is never stored |
 | Public handles (`core.public_handles`) | Parent links: 30 days after expiry; certificate codes: life of the certificate; provider routes: until disconnected | Daily `public.purge_handles` |
 | Data-principal requests, grievances and their events (`ops.privacy_requests*`) | 3 years after closing (SchoolOS default, **to confirm**; docs/08 keeps logs and personal data at least 1 year) | Evidence that requests were answered; nominations end when withdrawn or the subject leaves |
+| Legal holds (`ops.legal_holds`; FC-12, ADR-0059) | Life of the school (a lifted hold stays as the record that it applied) | While a hold is active nothing it covers is deleted by retention or erasure (every job in `app/privacy/holds.yaml` asks `app.core.holds.check`); the reference is C3, encrypted |
 | Notice records (`ops.privacy_notices`) | Life of the school | Which notice version was issued when (PRV-001); with the DPDP readiness marks (`ops.privacy_readiness_marks`: DPA signed, DPIA done, breach contact, retention reviewed; dates and evidence documents only; FC-03) and, for a notice sent on WhatsApp, the parent notice and broadcast ids (FP-13) |
 | Notice given at admission (`ops.privacy_admission_notices`) | Kept with the student's record | One date and channel per student admitted after the school-wide notice (FC-03, FR-DPDP-058); erasure refused (evidence of the notice duty) |
 | Consents (`sis.consents`) and purposes | While the student is on roll, then as the student record | Evidence of consent (PRV-006); withdrawal is a new entry |
@@ -1672,6 +1673,14 @@ Offboarding: `disclosure` purges right after `certificates`, before `public` and
 | `ops.tasks` | — | `source` CHECK gains `portal_calendar`; new nullable `portal_event_key` (3-70 characters; set exactly when `source = portal_calendar`, CHECK `tasks_portal_event_key`); `tasks_circular_has_citation` now reads `source <> 'circular' OR citation IS NOT NULL` |
 
 The dq module purges both tables and is purged **before** `circulars` (`offboarding.yaml`), because reminders reference tasks; both are in the full data export (`portal_calendar_dates`, `portal_reminders`).
+
+### 16.8 Legal holds (`ops`; ADR-0059, FR-DPDP-039..052; `0087_legal_holds`)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `ops.legal_holds` | C2 (reference encrypted, C3) | `scope` (`student` with `student_id`, composite FK to `sis.students`; or `record_class` with a key of `app/privacy/record_classes.yaml`; CHECK `legal_holds_scope_check`), `reason_code` (from `app/privacy/holds.yaml`), `reference_ciphertext` (in `CIPHERTEXT_COLUMNS`; AAD `ops.legal_holds\|reference_ciphertext\|<id>`), `review_on` (required; service: today to 12 months ahead), `status` CHECK (`pending`,`active`,`lift_pending`,`lifted`,`rejected`), `placed_by`/`placed_at`, `approved_by`/`approved_at` (CHECK `approved_by <> placed_by`), `rejected_by`/`rejected_at`, `lift_requested_by`/`lift_requested_at`, `lifted_by`/`lifted_at` (CHECK `lifted_by <> lift_requested_by`), `last_reminded_on` (review reminders), `created_at`, `updated_at`, `version`. `sos_app` SELECT, INSERT and UPDATE of the workflow columns only; never DELETE. Offboarding owner `privacy`; record class `legal_holds` (`refused_legal_obligation`); exported without the reference |
+
+**Effect.** Holds that are `active` or `lift_pending` stop retention and erasure: `app.privacy.service.hold_scope` is registered with `app.core.holds`, and every job of `app/privacy/holds.yaml` `retention_jobs` asks `holds.check(...)` in the school's `tenant_session` before deleting (a whole-class hold stops the job; a student hold keeps that student's behaviour notes and early-warning flags). No provider means "everything held" (fail closed).
 
 ### 16.7 Classification, export and offboarding (as built)
 

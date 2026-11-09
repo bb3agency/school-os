@@ -41,8 +41,8 @@ from app.audit.schemas import ActorType, SummaryError, sanitize_summary
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.kv import KVUnavailable, kv_store
+from app.core import holds, retention
 from app.core import purge as purging
-from app.core import retention
 from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.errors import Conflict, NotFound, RateLimited, ValidationFailed
@@ -268,6 +268,11 @@ READ_RETENTION_CATEGORY: Final = "notifications_read"
 def purge_read(session: Session, *, now: dt.datetime | None = None) -> int:
     """Delete this school's notifications read more than the retention period ago (the
     school's setting, FR-ADM-002, else ``retention.read_days`` in templates.yaml: 90 days)."""
+    # Legal holds (ADR-0059): a hold on notifications keeps every read notification.
+    if holds.check(
+        session, job="notifications.purge_read", record_class="notifications"
+    ).whole_class:
+        return 0
     keep = retention.days(session, READ_RETENTION_CATEGORY, default=templates.read_retention_days())
     cutoff = (now or dt.datetime.now(dt.UTC)) - dt.timedelta(days=keep)
     return repo.purge_read_before(session, cutoff)

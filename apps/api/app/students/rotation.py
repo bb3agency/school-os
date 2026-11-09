@@ -121,6 +121,8 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
     # registers their re-encryption).
     ("ops.breach_records", "description_ciphertext"),
     ("ops.breach_records", "containment_ciphertext"),
+    # FC-12 (ADR-0059): the legal hold's case or letter reference.
+    ("ops.legal_holds", "reference_ciphertext"),
     # R3-1A (0066_privacy_requests): request texts, notes, responses and nominee details
     # (app.privacy registers their re-encryption).
     ("ops.privacy_requests", "requester_name_ciphertext"),

@@ -493,6 +493,18 @@ classes:
     erasure: refused_legal_obligation
     source: Logged by the school office
 
+  # FC-12 (ADR-0059): legal holds that stop retention and erasure while they apply.
+  legal_holds:
+    label: Legal holds
+    owner: privacy
+    tables: [ops.legal_holds]
+    classification: C2
+    docs_row: Legal holds (
+    retention: Life of the school (a lifted hold stays as the record that it applied)
+    basis: Evidence of why records were kept past their retention or not erased on request.
+    erasure: refused_legal_obligation
+    source: Placed by the school's owner or principal and approved by another of them
+
   privacy_notices:
     label: Privacy notices issued
     owner: privacy

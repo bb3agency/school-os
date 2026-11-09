@@ -81,9 +81,16 @@ def concern_dates(
     return out
 
 
-def purge_notes(session: Session, before: dt.date) -> int:
+def purge_notes(
+    session: Session, before: dt.date, *, keep_students: Collection[uuid.UUID] = ()
+) -> int:
+    """Delete notes dated before ``before``, except notes about ``keep_students`` (legal hold,
+    ADR-0059)."""
+    stmt = delete(BehaviourNote).where(BehaviourNote.noted_on < before)
+    if keep_students:
+        stmt = stmt.where(BehaviourNote.student_id.not_in(list(keep_students)))
     result = session.execute(
-        delete(BehaviourNote).where(BehaviourNote.noted_on < before),
+        stmt,
         execution_options={"synchronize_session": False},
     )
     return int(getattr(result, "rowcount", 0) or 0)
@@ -244,9 +251,16 @@ def overdue_flags(session: Session, today: dt.date) -> list[InsightFlag]:
     )
 
 
-def purge_closed(session: Session, before: dt.datetime) -> int:
+def purge_closed(
+    session: Session, before: dt.datetime, *, keep_students: Collection[uuid.UUID] = ()
+) -> int:
+    """Delete flags closed before ``before`` (actions cascade), except flags about
+    ``keep_students`` (legal hold, ADR-0059)."""
+    stmt = delete(InsightFlag).where(InsightFlag.status == "closed", InsightFlag.closed_at < before)
+    if keep_students:
+        stmt = stmt.where(InsightFlag.student_id.not_in(list(keep_students)))
     result = session.execute(
-        delete(InsightFlag).where(InsightFlag.status == "closed", InsightFlag.closed_at < before),
+        stmt,
         execution_options={"synchronize_session": False},
     )
     return int(getattr(result, "rowcount", 0) or 0)

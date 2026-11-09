@@ -35,7 +35,12 @@ NoticeChannelOut = Literal[
 NoticeLanguage = Literal["en", "te"]
 LinkKind = Literal["change_request"]
 ErasureOutcomeCode = Literal[
-    "erasable", "refused_legal_obligation", "refused_official_record", "retention_running"
+    "erasable",
+    "refused_legal_obligation",
+    "refused_official_record",
+    "retention_running",
+    # FC-12 (ADR-0059, FR-DPDP-045): an active legal hold covers the student or the class.
+    "legal_hold",
 ]
 
 

@@ -53,6 +53,7 @@ from sqlalchemy.orm import Session
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import decode_cursor, encode_cursor
+from app.core import holds
 from app.core import purge as purging
 from app.core.config import DeploymentMode, Settings
 from app.core.crypto import CryptoError, unwrap_bound, wrap_bound
@@ -2361,6 +2362,15 @@ def process_inbox(tenant_id: uuid.UUID) -> dict[str, int]:  # noqa: PLR0912 - on
 # --- retention (FR-MSG-023) -------------------------------------------------------------------
 
 
+# Retention step -> (hold-check job name, record class); join codes are setup, not about people.
+_HELD_BY: Final[dict[str, tuple[str, str]]] = {
+    "provider_events": ("messaging.purge_expired.inbound", "message_inbound"),
+    "inbound_events": ("messaging.purge_expired.inbound", "message_inbound"),
+    "message_vars": ("messaging.purge_expired", "messages"),
+    "messages": ("messaging.purge_expired", "messages"),
+}
+
+
 def purge_expired(tenant_id: uuid.UUID) -> dict[str, int]:
     """Daily: provider events 30 days after processing, inbound kinds after 90 days, message
     variables after 180 days, messages after 13 months, expired join codes (docs/05 §13)."""
@@ -2374,8 +2384,17 @@ def purge_expired(tenant_id: uuid.UUID) -> dict[str, int]:
         ("join_codes", repo.purge_join_codes, cfg.join_codes_after_expiry_days),
     ]
     for name, job, days in jobs:
+        held_class = _HELD_BY.get(name)
         while True:
             with tenant_session(tenant_id) as session:
+                # Legal holds (ADR-0059): a hold on the record class keeps all of its rows.
+                if (
+                    held_class is not None
+                    and holds.check(
+                        session, job=held_class[0], record_class=held_class[1]
+                    ).whole_class
+                ):
+                    break
                 before = repo.now(session) - dt.timedelta(days=days)
                 done = job(session, before, cfg.purge_batch_size)
             out[name] += done

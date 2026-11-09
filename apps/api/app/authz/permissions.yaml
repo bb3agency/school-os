@@ -386,6 +386,11 @@ permissions:
     description: Record and update breaches, their duties and affected people, and turn the family notice into a parent-notice draft
     sensitivity: critical
     step_up: true
+  # FC-12 legal holds (ADR-0059; lead decision D84). Migration 0087_legal_holds upserts it.
+  privacy.hold.manage:
+    description: See the school's legal holds, and place or lift one (two different people, one asks, another approves)
+    sensitivity: critical
+    step_up: true
 
 
   # --- R3-1C CBSE Appendix IX disclosure (ADR-0051; docs/07 §6.2; FR-DISC-*). Migration

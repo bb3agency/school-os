@@ -50,6 +50,7 @@ from app.platform.tenant_api import router as platform_tenant_router
 from app.privacy.api import router as privacy_router
 from app.privacy.breach_api import router as breach_router
 from app.privacy.consents_api import router as consents_router
+from app.privacy.holds_api import router as holds_router
 from app.privacy.readiness_api import router as readiness_router
 from app.public.api import router as public_router
 from app.public.config import rules as public_rules
@@ -114,6 +115,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(privacy_router)
     # FC-03 / FP-13 DPDP readiness checklist, notice at admission, notice on WhatsApp.
     app.include_router(readiness_router)
+    # FC-12 legal holds (ADR-0059).
+    app.include_router(holds_router)
     # R2-1B fees (ADR-0042): every route answers 404 module_hidden while fees are off.
     app.include_router(fees_router)
     # R2-2E UPI and bank statements (ADR-0042 decision 9).

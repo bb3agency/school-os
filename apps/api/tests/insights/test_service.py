@@ -667,6 +667,61 @@ def test_FR_EW_017_old_notes_and_long_closed_flags_are_purged(
     assert remaining == {kept_open.id}
 
 
+def test_FR_DPDP_043_a_held_students_old_notes_are_kept(school: Any, admin_engine: Engine) -> None:
+    """FC-12 (ADR-0059): the nightly purge keeps the notes of a student under an active legal
+    hold and still deletes everyone else's."""
+    principal = S.principal_ctx(school)
+    held = S.note(school, "a1", "Synthetic: note under hold.", who=principal)
+    free = S.note(school, "a2", "Synthetic: note without hold.", who=principal)
+    hold_id = uuid.uuid4()
+    with admin_engine.begin() as c:
+        c.execute(
+            text("UPDATE sis.behaviour_notes SET noted_on = noted_on - 400 WHERE id IN (:a, :b)"),
+            {"a": held.id, "b": free.id},
+        )
+        c.execute(
+            text(
+                "INSERT INTO ops.legal_holds (id, tenant_id, scope, student_id, reason_code, "
+                "review_on, status, placed_by, approved_by, approved_at) VALUES (:i, :t, "
+                "'student', :s, 'court_case', current_date + 30, 'active', :p, :a, now())"
+            ),
+            {
+                "i": hold_id,
+                "t": school.tenant_id,
+                "s": held.student_id,
+                "p": school.people["owner"].user_id,
+                "a": principal.user_id,
+            },
+        )
+    try:
+        with tenant_session(school.tenant_id) as db:
+            insights.purge_expired(db)
+        with admin_engine.connect() as c:
+            left: set[uuid.UUID] = set(
+                c.execute(
+                    text("SELECT id FROM sis.behaviour_notes WHERE id IN (:a, :b)"),
+                    {"a": held.id, "b": free.id},
+                ).scalars()
+            )
+        assert left == {held.id}
+    finally:
+        with admin_engine.begin() as c:
+            c.execute(
+                text(
+                    "UPDATE ops.legal_holds SET status = 'lift_pending', lift_requested_by = :p, "
+                    "lift_requested_at = now() WHERE id = :i"
+                ),
+                {"i": hold_id, "p": school.people["owner"].user_id},
+            )
+            c.execute(
+                text(
+                    "UPDATE ops.legal_holds SET status = 'lifted', lifted_by = :a, "
+                    "lifted_at = now() WHERE id = :i"
+                ),
+                {"i": hold_id, "a": principal.user_id},
+            )
+
+
 def test_FR_EW_017_retention_also_runs_for_a_suspended_school(
     school: Any, admin_engine: Engine
 ) -> None:
