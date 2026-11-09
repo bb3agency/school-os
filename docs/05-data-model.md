@@ -1683,6 +1683,12 @@ The dq module purges both tables and is purged **before** `circulars` (`offboard
 
 **Effect.** Holds that are `active` or `lift_pending` stop retention and erasure: `app.privacy.service.hold_scope` is registered with `app.core.holds`, and every job of `app/privacy/holds.yaml` `retention_jobs` asks `holds.check(...)` in the school's `tenant_session` before deleting (a whole-class hold stops the job; a student hold keeps that student's behaviour notes and early-warning flags). No provider means "everything held" (fail closed).
 
+### 16.9 School compliance certificates (`ops`; FC-01, FR-COMP-001..022; `0088_compliance_register`)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `ops.compliance_certificates` | C1 (no personal data) | `kind` (a key of `app/compliance/catalogue.yaml`; `other` carries `label` 3-120, CHECK `compliance_certificates_label`), `reference_no` (1-80), `issued_by` (1-200), `valid_from`, `valid_until` (NULL = no expiry; CHECK from <= until), `document_id` (composite FK to `kb.documents`, `ON DELETE SET NULL (document_id)`), `owner_membership_id` (composite FK to `core.memberships`), `notes` (1-500), `status` CHECK (`current`,`superseded`,`removed`) with `superseded_by` (composite FK to itself, DEFERRABLE INITIALLY DEFERRED)/`superseded_at` and `removed_by`/`removed_at` set exactly for their status, `last_reminded_lead` (-1 after the expiry notice, else the lead day)/`last_reminded_on`, `recorded_by`, `created_at`, `updated_at`, `version`. Partial unique index `compliance_certificates_one_current (tenant_id, kind) WHERE status = 'current' AND kind <> 'other'`. `sos_app` SELECT, INSERT and UPDATE of the editable and workflow columns; never DELETE. Offboarding owner `compliance` (before documents and identity); record class `compliance_certificates`; in the full export |
+
 ### 16.7 Classification, export and offboarding (as built)
 
 - Privacy requests, their events, consents and breach records are **C2**; request texts, nominee details, breach descriptions and containment steps are **C3 (encrypted)**; RTE admissions and claim lines (when built) are **C3** because they reveal a family's economic or social category (ADR-0052).
