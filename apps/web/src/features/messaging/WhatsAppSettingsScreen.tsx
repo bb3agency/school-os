@@ -24,7 +24,7 @@ import type { Locale } from "@/i18n/routing";
 import { unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { useApiForm } from "@/lib/forms";
-import { formatCount, formatDate, formatDateTime } from "@/lib/format";
+import { formatCount, formatDateTime } from "@/lib/format";
 import type { Loadable } from "@/lib/loadable";
 import {
   CONFIGURE,
@@ -45,6 +45,7 @@ import {
   type Template,
 } from "./data";
 import { runEmbeddedSignup } from "./embedded-signup";
+import { InrBanner, SpendCard } from "./SpendCard";
 
 /** Loading, "not offered here" (404 module_unavailable), an error, or the content. */
 export function MessagingGate<T>({
@@ -310,11 +311,7 @@ function AccountCard({ account, canConfigure }: { account: Account; canConfigure
           {t(`pause.${account.pause_reason ?? "other"}` as "pause.other")}
         </Alert>
       ) : null}
-      {account.currency_state === "not_inr" ? (
-        <Alert tone="warning" title={t("inrTitle")} className="mb-4">
-          {t("inrBody", { date: formatDate(account.inr_required_from) ?? "" })}
-        </Alert>
-      ) : null}
+      <InrBanner account={account} />
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Fact label={t("number")}>
           <span className="num whitespace-nowrap">{account.display_phone ?? none}</span>
@@ -736,6 +733,7 @@ export function WhatsAppSettingsScreen() {
                 <>
                   <AccountCard account={current} canConfigure={canConfigure} />
                   <TemplatesCard templates={current.templates ?? []} canConfigure={canConfigure} />
+                  <SpendCard enabled={can(READ)} />
                 </>
               ) : (
                 <ConnectCard account={current} canConfigure={canConfigure} />

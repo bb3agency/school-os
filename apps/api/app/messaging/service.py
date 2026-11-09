@@ -74,7 +74,7 @@ from app.identity import service as identity
 from app.messaging import catalogue as cat
 from app.messaging import eligibility as rules
 from app.messaging import repository as repo
-from app.messaging import slips
+from app.messaging import slips, spend
 from app.messaging.config import OPTIN_CATEGORIES, OptinCategory, load_config
 from app.messaging.models import (
     Account,
@@ -104,6 +104,7 @@ from app.messaging.schemas import (
     MessagingSearchIn,
     MessagingSettingsIn,
     MessagingSettingsOut,
+    MessagingSpendOut,
     MessagingTemplateOut,
     OptinEntryOut,
     OptinIn,
@@ -914,6 +915,39 @@ def get_messaging_settings(session: Session, ctx: UserContext) -> MessagingSetti
             version=0,
         )
     return _settings_out(session, row)
+
+
+def get_spend(session: Session, ctx: UserContext, months: int) -> MessagingSpendOut:
+    """Messages and estimated Meta cost per IST month for the last ``months`` months, by Meta
+    pricing category and purpose (FR-MSG-032; ``message.read``, school-wide). Counts and rupees
+    only, from the pricing Meta reported on status webhooks; rates from ``config.yaml`` (with the
+    date they were checked, FR-MSG-031). Not audited: no personal data."""
+    del ctx
+    ensure_available()
+    cfg = load_config()
+    today = repo.now(session).astimezone(IST).date()
+    first = spend.month_starts(today, months)[-1]
+    since = dt.datetime.combine(first, dt.time(0), tzinfo=IST)
+    rows = [
+        spend.SpendRow(
+            month=r.month,
+            kind=r.kind,
+            purpose=r.purpose,
+            pricing_category=r.pricing_category,
+            billable=r.billable,
+            failed=bool(r.failed),
+            count=int(r.n),
+        )
+        for r in repo.spend_groups(session, since)
+    ]
+    return spend.summarise(
+        today=today,
+        months=months,
+        rows=rows,
+        auto_replies=repo.auto_replies_by_month(session, since),
+        cfg=cfg.cost,
+        auto_reply_days=cfg.retention.inbound_events_days,
+    )
 
 
 def _office_phone(value: str | None) -> str | None:

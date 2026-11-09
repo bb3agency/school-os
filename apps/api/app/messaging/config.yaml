@@ -48,7 +48,9 @@ auto_reply_per_day: 1
 
 # Sending rules this wave owns (FR-MSG-011 partly; wave R2-3G adds quiet hours and caps).
 sending:
-  # Messages from Indian WABAs need INR billing from this date (FR-MSG-004).
+  # Messages from Indian WABAs need INR billing from this date (FR-MSG-004): Meta stops
+  # delivering for other currencies. Before it, the messaging screen of a school whose account is
+  # not in rupees shows the steps to move (FR-MSG-034); from it, sending is refused.
   inr_required_from: 2027-01-01
   # Owner decision D25: the school's daily cap defaults to Meta's messaging limit minus 10%.
   daily_cap_margin_percent: 10
@@ -99,12 +101,42 @@ messaging_limits:
   TIER_100K: 100000
   TIER_UNLIMITED: 1000000
 
-# Displayed estimate only (owner decision D27; the school pays Meta directly, D7): utility
-# template per delivered message in India, before GST (research notes §1; confirm against Meta's
-# INR rate card).
+# Displayed estimates only (owner decision D27; the school pays Meta directly, D7; FR-MSG-029,
+# FR-MSG-030; ADR-0043 amendment of 2026-11-09). Rupees per billable message before GST. Since
+# 1 Oct 2026 Meta charges utility templates sent inside an open customer-service window too, and
+# free-form (service) messages above the free tier per business number per month. Meta changes
+# rates only on 1 Jan, 1 Apr, 1 Jul and 1 Oct: recheck the rates against Meta's INR rate card on
+# each of those days, then update rates_checked_on (the worker logs messaging.rates_recheck_due
+# on those days and the spend card says when the rates may be out of date, FR-MSG-031).
 cost:
-  utility_rate_inr: "0.115"
   gst_percent: 18
+  rates_checked_on: 2026-11-09
+  # Months whose 1st day Meta may change its rates.
+  rate_change_months: [1, 4, 7, 10]
+  # Free-form replies free per business number per calendar month (Meta, from 1 Oct 2026).
+  service_free_per_month: 1000
+  # Template purposes sent only as the reply to the parent's own message (inside the window the
+  # parent opened); every other template is priced as sent outside a window (the estimate cannot
+  # see whether a parent happened to write in the last 24 hours).
+  in_window_purposes: [optin_confirm]
+  rates:
+    utility_out_of_window:
+      inr: "0.115"
+      verified: false
+      source: "Secondary sources (baat.ai, Monty Mobile, 2026); not checked against Meta's INR rate card."
+    utility_in_window:
+      inr: "0.115"
+      verified: false
+      source: "Charged from 1 Oct 2026 (Meta pricing docs, read 2026-11-09); rate assumed equal to the utility rate until checked against Meta's INR rate card."
+    service_above_free_tier:
+      inr: "0.115"
+      verified: false
+      source: "Charged above the free tier from 1 Oct 2026 (Meta pricing docs, read 2026-11-09); no INR service rate found in the sources read, placeholder equal to the utility rate."
+    marketing:
+      inr: "0.8631"
+      verified: false
+      used: false
+      source: "Secondary sources; SchoolOS never sends marketing templates (BR-18). Kept so a message Meta bills as marketing is still estimated."
 
 # Retention (docs/05 §13, FR-MSG-023). Days.
 retention:

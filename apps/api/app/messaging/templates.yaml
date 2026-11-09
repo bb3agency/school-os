@@ -19,7 +19,9 @@
 #   reviewed  false until a fluent reviewer signs the language off (ADR-0044 decision 6; owner
 #             decision D23). Meta's approval of a Telugu template does not count as review.
 # texts       Free-form replies sent only inside the 24-hour window the parent opened by writing
-#             (no template, no charge): the STOP confirmation and the one automatic reply a day.
+#             (no template): the STOP confirmation and the one automatic reply a day. Meta
+#             bills them as service messages: free up to config.yaml cost.service_free_per_month
+#             per number per month, charged above it since 1 Oct 2026 (FR-MSG-029).
 #             Named placeholders {school_name} / {office_phone}.
 # slip        The printed join slip (parent-facing, in the parent language; ADR-0044 decision 2).
 version: 1

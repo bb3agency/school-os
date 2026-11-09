@@ -15,7 +15,10 @@ Pure module (no database or web). Loads and validates the packaged catalogue onc
 :func:`provider_name` gives the deterministic name a template has in every school's WABA
 (``sos_<key>_v<version>_<lang>``) and :func:`build_components` the Meta component list used to
 create it. :func:`render_text` fills a free-form reply (texts are sent only inside the service
-window the parent opened).
+window the parent opened). Pricing (FR-MSG-029; ADR-0043 amendment 2026-11-09): since 1 Oct 2026
+Meta charges utility templates inside an open window as well as outside it, and free-form
+replies above its monthly free tier; nothing here is free by construction. The estimated rates
+live in ``config.yaml`` ``cost``.
 """
 
 from __future__ import annotations

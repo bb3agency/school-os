@@ -320,6 +320,66 @@ class MessagingMessagePage(_Out):
     next_cursor: str | None
 
 
+# --- spend (FR-MSG-032, FR-MSG-033) -------------------------------------------------------------
+
+
+class SpendLineOut(_Out):
+    """Messages of one month, Meta pricing category and purpose: counts and rupees only."""
+
+    pricing_category: str = Field(
+        description="Meta's pricing category (utility, service, marketing, authentication, ...); "
+        "for a message Meta has not priced yet, utility for a template and service for a text."
+    )
+    rate: str | None = Field(
+        description="The configured rate used (utility_out_of_window, utility_in_window, "
+        "service_above_free_tier, marketing); null when SchoolOS has no rate for the category."
+    )
+    purpose: str = Field(
+        description="optin_confirm, school_notice, absence_alert, fee_reminder, fee_receipt, "
+        "optin_stopped, or auto_reply (the daily automatic reply)."
+    )
+    sent: int = Field(description="Messages handed to Meta.")
+    billable: int = Field(description="Messages Meta reported as charged.")
+    free: int = Field(description="Messages Meta reported as free, or that failed.")
+    pending: int = Field(description="Messages Meta has not priced yet (counted as charged).")
+    estimated_cost_inr: str = Field(description="Rupees incl. GST (billable and pending).")
+
+
+class SpendMonthOut(_Out):
+    month: str = Field(pattern=r"^[0-9]{4}-[0-9]{2}$", description="IST calendar month.")
+    sent: int
+    billable: int
+    pending: int
+    estimated_cost_inr: str = Field(description="Rupees incl. GST, paid by the school to Meta.")
+    lines: list[SpendLineOut]
+
+
+class SpendRateOut(_Out):
+    rate: str = Field(description="utility_out_of_window, utility_in_window, ...")
+    inr: str = Field(description="Rupees per charged message before GST.")
+    verified: bool = Field(description="Checked against Meta's INR rate card.")
+    used: bool = Field(description="False for a category SchoolOS never sends (marketing).")
+
+
+class MessagingSpendOut(_Out):
+    """Messages and estimated Meta cost per month (FR-MSG-032). No recipient, phone or text."""
+
+    months: list[SpendMonthOut] = Field(description="Newest month first, empty months included.")
+    gst_percent: str
+    rates: list[SpendRateOut]
+    rates_checked_on: dt.date
+    next_rate_change: dt.date = Field(
+        description="The next 1 Jan, 1 Apr, 1 Jul or 1 Oct after the rates were checked."
+    )
+    rates_recheck_due: bool = Field(
+        description="Meta may have changed its rates since they were checked (FR-MSG-031)."
+    )
+    service_free_per_month: int
+    auto_reply_days: int = Field(
+        description="Automatic replies are counted only this many days back (their retention)."
+    )
+
+
 __all__ = [
     "CategoryCounts",
     "CategoryStateOut",
@@ -334,9 +394,13 @@ __all__ = [
     "MessagingSearchIn",
     "MessagingSettingsIn",
     "MessagingSettingsOut",
+    "MessagingSpendOut",
     "MessagingTemplateOut",
     "MessagingTemplatesOut",
     "OptinEntryOut",
     "OptinIn",
     "SectionOptinSummaryOut",
+    "SpendLineOut",
+    "SpendMonthOut",
+    "SpendRateOut",
 ]

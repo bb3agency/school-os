@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Collection, Mapping, Sequence
 from typing import Any, Final
 
-from sqlalchemy import and_, delete, func, or_, select, text, update
+from sqlalchemy import Date, and_, cast, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
@@ -673,6 +673,50 @@ def inbound_kind_counts(session: Session, phone_bidx: bytes) -> dict[str, int]:
     return {r.kind: int(r.n) for r in rows}
 
 
+# --- spend (FR-MSG-032) -------------------------------------------------------------------------
+
+
+def _ist_month(column: Any) -> Any:
+    return cast(func.date_trunc("month", func.timezone("Asia/Kolkata", column)), Date)
+
+
+def spend_groups(session: Session, since: dt.datetime) -> list[Any]:
+    """Messages handed to Meta since ``since``, counted by IST month, kind, purpose, Meta's
+    pricing category, billable flag and whether they failed (counts only, FR-MSG-032)."""
+    month = _ist_month(Message.sent_at).label("month")
+    failed = (Message.status == "failed").label("failed")
+    stmt = (
+        select(
+            month,
+            Message.kind,
+            Message.purpose,
+            Message.pricing_category,
+            Message.billable,
+            failed,
+            func.count().label("n"),
+        )
+        .where(Message.sent_at.is_not(None), Message.sent_at >= since)
+        .group_by(month, Message.kind, Message.purpose, Message.pricing_category)
+        .group_by(Message.billable, failed)
+    )
+    return list(session.execute(stmt))
+
+
+def auto_replies_by_month(session: Session, since: dt.datetime) -> dict[dt.date, int]:
+    """Automatic replies sent since ``since`` per IST month (FR-MSG-018: kind and time only)."""
+    month = _ist_month(InboundEvent.received_at).label("month")
+    rows = session.execute(
+        select(month, func.count().label("n"))
+        .where(
+            InboundEvent.replied.is_(True),
+            InboundEvent.outcome == "auto_reply",
+            InboundEvent.received_at >= since,
+        )
+        .group_by(month)
+    )
+    return {r.month: int(r.n) for r in rows}
+
+
 # --- full data export (FR-ADM-001) ------------------------------------------------------------
 
 
@@ -704,6 +748,7 @@ def export_tables(session: Session) -> list[RecordTable]:
 
 
 __all__ = [
+    "auto_replies_by_month",
     "count_vars_about",
     "current_optins",
     "current_tenant_id",
@@ -742,6 +787,7 @@ __all__ = [
     "search_messages",
     "set_account_secrets",
     "set_event_payload",
+    "spend_groups",
     "template_for",
     "templates_of",
     "translate_db_error",

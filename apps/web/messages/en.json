@@ -8684,8 +8684,16 @@
         "account_deleted": "Meta reports the account was deleted. Disconnect and connect again.",
         "other": "Sending was paused. Check the account in Meta Business Manager, then resume."
       },
-      "inrTitle": "Billing currency is not Indian rupees",
-      "inrBody": "From {date} Meta delivers messages only from accounts billed in Indian rupees. Change the currency in Meta Business Manager.",
+      "inrTitle": "Move WhatsApp billing to Indian rupees by {date}",
+      "inrBody": "From {date} Meta delivers messages only from accounts billed in Indian rupees. The school's account is billed in another currency. To move it:",
+      "inrStoppedTitle": "Sending has stopped: billing is not in Indian rupees",
+      "inrStoppedBody": "Since {date} Meta delivers messages only from accounts billed in Indian rupees, so SchoolOS sends nothing. To move the account:",
+      "inrSteps": {
+        "open": "Sign in to Meta Business Suite with the school's Meta business login and open WhatsApp Manager.",
+        "currency": "Open the account's payment settings and follow Meta's steps to change the currency to Indian rupees (INR). Meta may ask for a payment method in rupees.",
+        "settle": "Pay any amount still due in the old currency.",
+        "back": "Come back here. SchoolOS reads the new currency within an hour and this message goes away."
+      },
       "resume": "Resume sending",
       "resumeTitle": "Resume sending?",
       "resumeBody": "SchoolOS checks the number with Meta first. Messages start going out again.",
@@ -9013,7 +9021,7 @@
       "recipients": "Messages to send",
       "guardians": "Guardians in these sections",
       "cost": "Estimated Meta cost",
-      "costNote": "Includes GST. The school pays Meta directly; SchoolOS charges nothing for messages.",
+      "costNote": "Includes GST, at Meta's utility rate for every message (since 1 October 2026 Meta charges also when the parent wrote first). The school pays Meta directly; SchoolOS charges nothing for messages.",
       "languagesLine": "Languages: {languages}.",
       "fallbacks": "{count} will get English: the message in their language is not ready.",
       "skippedTitle": "Not sent to",
@@ -9151,6 +9159,37 @@
       "revoked": "The link no longer works.",
       "alreadyStopped": "The link had already stopped working. Nothing changed.",
       "done": "Done"
+    },
+    "spend": {
+      "title": "Messages and estimated Meta cost",
+      "description": "WhatsApp messages sent each month and what Meta is likely to charge, from what Meta reported for each message. The school pays Meta directly; Meta's invoice has the final amount.",
+      "monthsLabel": "Messages and estimated cost by month",
+      "monthPicker": "Show details for",
+      "breakdownLabel": "Messages in {month} by purpose",
+      "noneInMonth": "No messages were sent this month.",
+      "columns": {
+        "month": "Month",
+        "purpose": "Purpose",
+        "category": "Meta category",
+        "sent": "Sent",
+        "charged": "Charged",
+        "pending": "Not priced yet",
+        "cost": "Estimated cost"
+      },
+      "categories": {
+        "utility": "Utility",
+        "service": "Service (reply)",
+        "marketing": "Marketing",
+        "authentication": "Authentication"
+      },
+      "inWindow": "reply to the parent",
+      "autoReply": "Automatic reply",
+      "recheckTitle": "Meta may have changed its rates",
+      "recheckBody": "Meta can change rates on {date}. These estimates still use the rates checked on {checked}; SchoolOS will update them.",
+      "noteEstimate": "Estimates include {gst}% GST. Messages Meta has not priced yet are counted as charged.",
+      "noteRates": "Meta's rates were checked on {date}.",
+      "noteRatesUnverified": "Rates were last checked on {date} from published summaries, not yet against Meta's rupee rate card.",
+      "noteService": "Since 1 October 2026 Meta charges every utility message, also when the parent wrote first, and replies above {free} a month. Automatic replies are counted for the last {days} days only."
     }
   },
   "fees": {

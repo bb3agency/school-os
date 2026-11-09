@@ -37,12 +37,14 @@ from app.messaging.schemas import (
     MessagingSearchIn,
     MessagingSettingsIn,
     MessagingSettingsOut,
+    MessagingSpendOut,
     MessagingTemplatesOut,
     OptinIn,
     SectionOptinSummaryOut,
 )
 from app.messaging.sends import api as sends_api
 from app.messaging.slips import STYLE_CSP
+from app.messaging.spend import MAX_MONTHS
 from app.messaging.webhook import parse_entries
 from app.public import service as public
 from app.public.guards import (
@@ -63,6 +65,7 @@ SettingsReader = Annotated[UserContext, Depends(require_any(service.READ, servic
 OptinReader = Annotated[UserContext, Depends(require_any(service.READ, service.RECORD))]
 Recorder = Annotated[UserContext, Depends(require(service.RECORD))]
 Reader = Annotated[UserContext, Depends(require(service.READ))]
+SchoolReader = Annotated[UserContext, Depends(require(service.READ, scope="school"))]
 
 _UNAVAILABLE: dict[int | str, dict[str, Any]] = {
     404: {"description": "``module_unavailable`` on a dedicated host or with messaging off."}
@@ -171,6 +174,22 @@ def get_settings(ctx: SettingsReader, db: TenantDB, response: Response) -> Messa
     out = service.get_messaging_settings(db, ctx)
     response.headers["ETag"] = etag(out.version)
     return out
+
+
+@router.get("/messaging/spend", response_model=MessagingSpendOut, responses=_UNAVAILABLE)
+def get_spend(
+    ctx: SchoolReader,
+    db: TenantDB,
+    months: Annotated[int, Query(ge=1, le=MAX_MONTHS)] = 6,
+) -> MessagingSpendOut:
+    """Messages and estimated Meta cost per month ("Messages and estimated Meta cost";
+    FR-MSG-032, FR-MSG-033): for each of the last ``months`` IST months (default 6, at most 13,
+    the message retention), counts by Meta pricing category and purpose (sent, charged, free,
+    not priced yet) and the estimated rupees incl. GST, from the pricing Meta reported on status
+    webhooks and the configured rates with the date they were checked (FR-MSG-031). No
+    recipient, phone number or text. ``message.read`` school-wide (a class teacher's
+    section-scoped grant is refused). The school pays Meta directly (owner decision D7)."""
+    return service.get_spend(db, ctx, months)
 
 
 @router.put("/messaging/settings", response_model=MessagingSettingsOut, responses=_UNAVAILABLE)

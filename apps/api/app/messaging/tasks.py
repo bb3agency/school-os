@@ -11,13 +11,16 @@ The sending wave (R2-3G, ``app.messaging.sends.tasks``) adds ``messaging.send_du
 
 Beat: ``messaging.sweep_inbox`` every minute (events whose wake-up was lost),
 ``messaging.sync_accounts`` hourly (quality, limit, currency, template statuses; pauses on a red
-or flagged rating) and ``messaging.purge_expired`` daily (retention, docs/05 §13; suspended
-and offboarding schools included). Each school runs in its own ``tenant_session``; one failing
-school does not stop the others. Nothing runs while messaging is off (FR-MSG-024).
+or flagged rating), ``messaging.purge_expired`` daily (retention, docs/05 §13; suspended
+and offboarding schools included) and ``messaging.rates_recheck`` on 1 Jan, 1 Apr, 1 Jul and 1 Oct
+(FR-MSG-031: a warning for the SchoolOS team to recheck Meta's rates in ``config.yaml``).
+Each school runs in its own ``tenant_session``; one failing school does not stop the others.
+Nothing runs while messaging is off (FR-MSG-024).
 """
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from typing import Any
 
@@ -27,6 +30,7 @@ from celery.schedules import crontab
 from app.core.db import context_free_session
 from app.core.logging import get_logger
 from app.messaging import service
+from app.messaging.config import load_config
 from app.messaging.sends import service as sends
 from app.messaging.sends import tasks as sends_tasks
 from app.ops.service import TenantTask
@@ -125,8 +129,32 @@ def purge_expired() -> dict[str, int]:
     return _each_school("purge", _purge, _purge_tenant_ids)
 
 
+def rates_recheck_status(today: dt.date) -> dict[str, Any]:
+    """Whether Meta may have changed its rates since ``config.yaml`` ``cost.rates_checked_on``
+    (FR-MSG-031). Meta changes rates only on 1 Jan, 1 Apr, 1 Jul and 1 Oct."""
+    cost = load_config().cost
+    return {
+        "due": cost.rates_recheck_due(today),
+        "rates_checked_on": cost.rates_checked_on.isoformat(),
+        "next_rate_change": cost.next_rate_change(cost.rates_checked_on).isoformat(),
+        "unverified": sorted(k for k, r in cost.rates.items() if not r.verified),
+    }
+
+
+@shared_task(name="messaging.rates_recheck", acks_late=True, ignore_result=True)
+def rates_recheck() -> dict[str, Any]:
+    """The quarterly reminder (FR-MSG-031): a warning in the logs, which the SchoolOS team's
+    alerting picks up, until the rates are rechecked and ``rates_checked_on`` updated. Runs
+    whether or not messaging is on (the rates are SchoolOS-wide configuration)."""
+    status = rates_recheck_status(dt.datetime.now(service.IST).date())
+    if status["due"] or status["unverified"]:
+        log.warning("messaging.rates_recheck_due", **status)
+    return status
+
+
 def beat_schedule() -> dict[str, dict[str, Any]]:
-    """Inbox sweep every minute, account and template sync hourly, retention daily at 02:50 IST."""
+    """Inbox sweep every minute, account and template sync hourly, retention daily at 02:50 IST,
+    the rates reminder at 09:00 IST on 1 Jan, 1 Apr, 1 Jul and 1 Oct (FR-MSG-031)."""
     return {
         "messaging-sweep-inbox": {"task": "messaging.sweep_inbox", "schedule": 60.0},
         "messaging-sync-accounts": {
@@ -137,6 +165,10 @@ def beat_schedule() -> dict[str, dict[str, Any]]:
             "task": "messaging.purge_expired",
             "schedule": crontab(minute=20, hour=21),
         },
+        "messaging-rates-recheck": {
+            "task": "messaging.rates_recheck",
+            "schedule": crontab(minute=30, hour=3, day_of_month=1, month_of_year="1,4,7,10"),
+        },
         **sends_tasks.beat_schedule(),
     }
 
@@ -146,6 +178,8 @@ __all__ = [
     "process_inbox",
     "provision_templates",
     "purge_expired",
+    "rates_recheck",
+    "rates_recheck_status",
     "sweep_inbox",
     "sync_accounts",
 ]

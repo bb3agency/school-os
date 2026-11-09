@@ -78,6 +78,18 @@ Details of each step are in the [office guide, section 2](office.md#2-checks-rea
 **WhatsApp** (in **School admin**) holds the school's WhatsApp connection, quiet hours and automatic
 messages. Changing it asks you to confirm it's you.
 
+**Messages and estimated Meta cost** (on the same screen) shows how many WhatsApp messages went out
+each month and roughly what Meta will charge, including GST. The school pays Meta directly; Meta's
+invoice has the final amount. Since 1 October 2026 Meta charges every utility message, also when
+the parent wrote first, and replies above 1,000 a month. Choose a month under **Show details for**
+to see it by purpose (notices, absence alerts, fee messages). If the card says **Meta may have
+changed its rates**, the estimate uses older rates until SchoolOS updates them.
+
+If the screen says **Move WhatsApp billing to Indian rupees by 31/12/2026**, the school's Meta account
+is billed in another currency. Follow the steps shown (WhatsApp Manager → payment settings → change
+the currency to INR, then pay anything still due). From 1 January 2027 Meta stops delivering messages
+from accounts not billed in rupees.
+
 ## 6. Circulars and tasks
 
 Open **Circulars**, review the **Suggested deadlines** of each uploaded circular (**Confirm as task**
