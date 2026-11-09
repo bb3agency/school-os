@@ -8231,20 +8231,20 @@
         "dueInr": "బకాయి (₹)",
         "ledgers": "లెడ్జర్లు",
         "asOf": "తేదీ నాటికి",
-        "bills": "Bills"
+        "bills": "బిల్లులు"
       },
       "kpiLabel": "Tally బకాయిల సారాంశం",
       "sharedLedger": "{count, plural, one {ఒక తోబుట్టువుతో} other {# మంది తోబుట్టువులతో}} పంచుకున్న ఖాతా",
       "sharedTotalsNote": "తోబుట్టువులు పంచుకునే కుటుంబ ఖాతా ప్రతి పిల్లల మొత్తంలో ఉంటుంది, కానీ మొత్తం బకాయిలో ఒక్కసారే లెక్కించబడుతుంది.",
-      "billsNone": "No bill-wise details in Tally: the amount is the ledger balance",
-      "billsSummary": "{count, plural, one {# pending bill} other {# pending bills}}",
-      "billsLabel": "Pending bills from Tally",
-      "overdueCount": "{count} overdue: {amount}",
-      "overdue": "Overdue",
-      "billDue": "Due {date}",
-      "billNoDueDate": "No due date in Tally",
-      "billShared": "Shared ledger",
-      "billLedger": "Ledger: {ledger}"
+      "billsNone": "Tally లో బిల్లుల వారీ వివరాలు లేవు: మొత్తం లెడ్జర్ బ్యాలెన్స్",
+      "billsSummary": "{count, plural, one {# బాకీ బిల్లు} other {# బాకీ బిల్లులు}}",
+      "billsLabel": "Tally నుండి బాకీ బిల్లులు",
+      "overdueCount": "{count} గడువు దాటినవి: {amount}",
+      "overdue": "గడువు దాటింది",
+      "billDue": "గడువు {date}",
+      "billNoDueDate": "Tally లో గడువు తేదీ లేదు",
+      "billShared": "ఉమ్మడి లెడ్జర్",
+      "billLedger": "లెడ్జర్: {ledger}"
     },
     "connector": {
       "title": "Tally కనెక్టర్",
@@ -9681,7 +9681,7 @@
         "allocation": "ప్రతి మొత్తాన్ని రూపాయలలో ఇవ్వండి, లేదా ఖాళీగా ఉంచండి.",
         "allocationSum": "మొత్తాలు రసీదు మొత్తానికి సమానం కావాలి.",
         "utrInUse": "ఈ UTR ఇప్పటికే మరో రసీదులో ఉంది. ఆ రసీదు తెరవండి.",
-        "allocationAboveDue": "A line takes no more than what is due on it. Lower that amount."
+        "allocationAboveDue": "ఒక లైన్‌కు దానిపై బాకీ ఉన్నదాని కంటే ఎక్కువ జమ కాదు. ఆ మొత్తాన్ని తగ్గించండి."
       },
       "upi": {
         "showQr": "పాఠశాల UPI QR చూపించండి",
@@ -10358,7 +10358,7 @@
         "gstNote": "వాక్యాన్ని గరిష్ఠంగా 200 అక్షరాలలో రాయండి."
       }
     },
-    "decisionNote": "Note from {name}:",
+    "decisionNote": "{name} నుండి గమనిక:",
     "taxCertificate": {
       "tab": "పన్ను సర్టిఫికెట్",
       "title": "ట్యూషన్ ఫీజు సర్టిఫికెట్లు",
@@ -10419,8 +10419,8 @@
         "unchanged": "ఇప్పటికే జారీ, మార్పు లేదు",
         "skipped": "వదిలివేసినవి: ట్యూషన్ చెల్లింపు లేదు",
         "skippedHint": "వదిలివేసిన విద్యార్థులు ఆ సంవత్సరంలో ట్యూషన్ చెల్లించలేదు. సంవత్సరాన్ని, లేదా ఫీజు సెటప్‌లో ఏ ఫీజు హెడ్‌లు ట్యూషన్‌గా లెక్కించబడతాయో చూడండి.",
-        "skippedTooMany": "Skipped: too many receipts",
-        "skippedTooManyHint": "These students paid in more receipts than one certificate lists. Issue their certificates one at a time from the fee account.",
+        "skippedTooMany": "వదిలేశాం: రసీదులు చాలా ఎక్కువ",
+        "skippedTooManyHint": "ఈ విద్యార్థులు ఒక సర్టిఫికెట్‌లో పట్టే వాటి కంటే ఎక్కువ రసీదులతో చెల్లించారు. వారి సర్టిఫికెట్లను ఫీజు ఖాతా నుండి ఒక్కొక్కటిగా ఇవ్వండి.",
         "close": "మూసివేయండి"
       },
       "filterTarget": "తరగతి లేదా సెక్షన్",
@@ -12816,244 +12816,244 @@
     }
   },
   "udise": {
-    "nav": "UDISE+ corrections",
-    "title": "UDISE+ corrections to the MEO",
-    "description": "Names, dates of birth and gender that are wrong in UDISE+. Prepare a request, print the letter for the MEO office and follow it up.",
-    "readinessCrumb": "Board and portal readiness",
-    "aboutTitle": "A request, not a change",
-    "aboutBody": "SchoolOS lists the differences between UDISE+ and the school's admission register. The MEO or MIS coordinator corrects UDISE+; nothing in the school's records changes here. Import the UDISE+ list again afterwards to see which corrections were made.",
-    "noPermissionTitle": "You cannot prepare UDISE+ requests",
-    "noPermissionBody": "Ask the office admin or the principal: this needs permission to run readiness checks.",
-    "profile": "Check",
+    "nav": "UDISE+ సవరణలు",
+    "title": "MEO కు UDISE+ సవరణలు",
+    "description": "UDISE+ లో తప్పుగా ఉన్న పేర్లు, పుట్టిన తేదీలు, లింగం. అభ్యర్థన సిద్ధం చేసి, MEO ఆఫీసు కోసం లేఖ ప్రింట్ చేసి, దాన్ని ఫాలో అప్ చేయండి.",
+    "readinessCrumb": "బోర్డు మరియు పోర్టల్ సన్నద్ధత",
+    "aboutTitle": "ఇది అభ్యర్థన మాత్రమే, మార్పు కాదు",
+    "aboutBody": "UDISE+ కు, పాఠశాల అడ్మిషన్ రిజిస్టర్‌కు మధ్య ఉన్న తేడాలను SchoolOS చూపిస్తుంది. UDISE+ ను MEO లేదా MIS కోఆర్డినేటర్ సరిచేస్తారు; ఇక్కడ పాఠశాల రికార్డుల్లో ఏదీ మారదు. ఏ సవరణలు జరిగాయో చూడటానికి తర్వాత UDISE+ జాబితాను మళ్లీ ఇంపోర్ట్ చేయండి.",
+    "noPermissionTitle": "మీరు UDISE+ అభ్యర్థనలు సిద్ధం చేయలేరు",
+    "noPermissionBody": "ఆఫీస్ అడ్మిన్‌ను లేదా ప్రిన్సిపాల్‌ను అడగండి: దీనికి సన్నద్ధత తనిఖీలు చేసే అనుమతి కావాలి.",
+    "profile": "తనిఖీ",
     "profiles": {
-      "bseap-ssc-2027": "AP SSC March 2027",
-      "apaar": "APAAR ID"
+      "bseap-ssc-2027": "AP SSC మార్చి 2027",
+      "apaar": "APAAR ఐడీ"
     },
-    "unverifiedTitle": "Format not yet confirmed",
-    "unverifiedBody": "This request follows the public guidance we could find. Show it to your MEO office once and tell us if they want another format.",
-    "noneTitle": "Nothing to ask for",
-    "noneBody": "UDISE+ agrees with the school's records for every student this check covers.",
-    "summary": "{lines, plural, one {# correction} other {# corrections}} for {students, plural, one {# student} other {# students}}; {requested, plural, =0 {none requested yet} one {# already requested} other {# already requested}}.",
-    "emptyTitle": "No corrections",
-    "emptyBody": "Nothing to correct in this group.",
-    "notShown": "Student outside your classes",
-    "colStudent": "Student",
+    "unverifiedTitle": "ఫార్మాట్ ఇంకా నిర్ధారణ కాలేదు",
+    "unverifiedBody": "ఈ అభ్యర్థన మాకు దొరికిన పబ్లిక్ మార్గదర్శకాన్ని అనుసరిస్తుంది. ఒకసారి మీ MEO ఆఫీసుకు చూపించి, వారు వేరే ఫార్మాట్ కోరితే మాకు చెప్పండి.",
+    "noneTitle": "అడగాల్సింది ఏమీ లేదు",
+    "noneBody": "ఈ తనిఖీ పరిధిలోని ప్రతి విద్యార్థికి UDISE+ పాఠశాల రికార్డులతో సరిపోతుంది.",
+    "summary": "{students, plural, one {# విద్యార్థికి} other {# మంది విద్యార్థులకు}} {lines, plural, one {# సవరణ} other {# సవరణలు}}; {requested, plural, =0 {ఇంకా ఏదీ అడగలేదు} one {# ఇప్పటికే అడిగారు} other {# ఇప్పటికే అడిగారు}}.",
+    "emptyTitle": "సవరణలు లేవు",
+    "emptyBody": "ఈ గుంపులో సరిచేయాల్సింది ఏమీ లేదు.",
+    "notShown": "మీ తరగతుల బయటి విద్యార్థి",
+    "colStudent": "విద్యార్థి",
     "colPen": "PEN",
-    "colField": "Field",
-    "colValues": "UDISE+ and correct value",
-    "colEvidence": "Source and evidence",
-    "colState": "Now",
-    "colRequested": "Request",
-    "inUdise": "In UDISE+:",
-    "correct": "Correct:",
-    "blank": "(blank)",
+    "colField": "వివరం",
+    "colValues": "UDISE+ విలువ మరియు సరైన విలువ",
+    "colEvidence": "మూలం మరియు ఆధారం",
+    "colState": "ఇప్పుడు",
+    "colRequested": "అభ్యర్థన",
+    "inUdise": "UDISE+ లో:",
+    "correct": "సరైనది:",
+    "blank": "(ఖాళీ)",
     "aadhaar": {
-      "yes": "Matches Aadhaar: yes",
-      "no": "Matches Aadhaar: no",
-      "not_recorded": "Aadhaar details not recorded"
+      "yes": "ఆధార్‌తో సరిపోతుంది: అవును",
+      "no": "ఆధార్‌తో సరిపోతుంది: లేదు",
+      "not_recorded": "ఆధార్ వివరాలు నమోదు కాలేదు"
     },
-    "alreadyRequested": "Already requested",
-    "notRequested": "Not requested yet",
+    "alreadyRequested": "ఇప్పటికే అడిగారు",
+    "notRequested": "ఇంకా అడగలేదు",
     "lineState": {
-      "open": "Still wrong",
-      "fixed": "Corrected",
-      "unavailable": "Not in your classes"
+      "open": "ఇంకా తప్పుగానే ఉంది",
+      "fixed": "సరిచేశారు",
+      "unavailable": "మీ తరగతుల్లో లేదు"
     },
     "status": {
-      "prepared": "Prepared",
-      "sent": "Sent",
-      "done": "Done",
-      "rejected": "Rejected"
+      "prepared": "సిద్ధం చేశారు",
+      "sent": "పంపారు",
+      "done": "పూర్తయింది",
+      "rejected": "తిరస్కరించారు"
     },
-    "requestsTitle": "Requests",
-    "noRequestsTitle": "No requests yet",
-    "noRequestsBody": "Prepared requests appear here with their state.",
-    "colPrepared": "Prepared on",
-    "colLines": "Corrections",
-    "colSent": "Sent",
-    "colStatus": "State",
-    "linesFor": "{lines, plural, one {# correction} other {# corrections}} for {students, plural, one {# student} other {# students}}",
-    "sentTo": "Sent on {date} to {to}",
-    "notSent": "Not sent yet",
+    "requestsTitle": "అభ్యర్థనలు",
+    "noRequestsTitle": "ఇంకా అభ్యర్థనలు లేవు",
+    "noRequestsBody": "సిద్ధం చేసిన అభ్యర్థనలు వాటి స్థితితో ఇక్కడ కనిపిస్తాయి.",
+    "colPrepared": "సిద్ధం చేసిన తేదీ",
+    "colLines": "సవరణలు",
+    "colSent": "పంపిన తేదీ",
+    "colStatus": "స్థితి",
+    "linesFor": "{students, plural, one {# విద్యార్థికి} other {# మంది విద్యార్థులకు}} {lines, plural, one {# సవరణ} other {# సవరణలు}}",
+    "sentTo": "{date} న {to} కు పంపారు",
+    "notSent": "ఇంకా పంపలేదు",
     "prepare": {
-      "trigger": "{count, plural, =0 {Nothing to request} one {Prepare request (# correction)} other {Prepare request (# corrections)}}",
-      "title": "Prepare a UDISE+ correction request",
-      "description": "{count, plural, one {# correction} other {# corrections}} not yet requested will go into one request.",
-      "confirm": "Prepare request",
-      "consequence": "Nothing changes in the school's records. The principal then prints the letter for the MEO office."
+      "trigger": "{count, plural, =0 {అడగాల్సింది ఏమీ లేదు} one {అభ్యర్థన సిద్ధం చేయండి (# సవరణ)} other {అభ్యర్థన సిద్ధం చేయండి (# సవరణలు)}}",
+      "title": "UDISE+ సవరణ అభ్యర్థన సిద్ధం చేయండి",
+      "description": "ఇంకా అడగని {count, plural, one {# సవరణ} other {# సవరణలు}} ఒకే అభ్యర్థనలో చేరతాయి.",
+      "confirm": "అభ్యర్థన సిద్ధం చేయండి",
+      "consequence": "పాఠశాల రికార్డుల్లో ఏదీ మారదు. తర్వాత ప్రిన్సిపాల్ MEO ఆఫీసు కోసం లేఖను ప్రింట్ చేస్తారు."
     },
     "detail": {
-      "title": "UDISE+ correction request",
-      "progress": "{fixed, plural, =0 {None corrected yet} one {# corrected} other {# corrected}}; {open, plural, =0 {nothing left to correct} one {# still wrong} other {# still wrong}}."
+      "title": "UDISE+ సవరణ అభ్యర్థన",
+      "progress": "{fixed, plural, =0 {ఇంకా ఏదీ సరిచేయలేదు} one {# సరిచేశారు} other {# సరిచేశారు}}; {open, plural, =0 {సరిచేయాల్సింది ఏమీ మిగలలేదు} one {# ఇంకా తప్పుగా ఉంది} other {# ఇంకా తప్పుగా ఉన్నాయి}}."
     },
     "letter": {
-      "prepare": "Print letter for the MEO",
-      "checking": "Checking…",
-      "open": "Open letter to print",
-      "newTab": "opens in a new tab",
-      "askPrincipal": "The principal or the office admin prints the letter (it needs permission for portal exports)."
+      "prepare": "MEO కోసం లేఖ ప్రింట్ చేయండి",
+      "checking": "తనిఖీ చేస్తున్నాం…",
+      "open": "ప్రింట్ చేయడానికి లేఖ తెరవండి",
+      "newTab": "కొత్త ట్యాబ్‌లో తెరుచుకుంటుంది",
+      "askPrincipal": "లేఖను ప్రిన్సిపాల్ లేదా ఆఫీస్ అడ్మిన్ ప్రింట్ చేస్తారు (దీనికి పోర్టల్ ఎక్స్‌పోర్ట్‌ల అనుమతి కావాలి)."
     },
     "sent": {
-      "trigger": "Record as sent",
-      "title": "Record that the request was sent",
-      "description": "Say when and to which office. Use the role, not a person's name.",
-      "confirm": "Record as sent",
-      "date": "Sent on",
-      "to": "Sent to",
-      "toHint": "The office that will correct UDISE+.",
-      "choose": "Choose an office"
+      "trigger": "పంపినట్లు నమోదు చేయండి",
+      "title": "అభ్యర్థన పంపినట్లు నమోదు చేయండి",
+      "description": "ఎప్పుడు, ఏ ఆఫీసుకు పంపారో చెప్పండి. వ్యక్తి పేరు కాదు, హోదా రాయండి.",
+      "confirm": "పంపినట్లు నమోదు చేయండి",
+      "date": "పంపిన తేదీ",
+      "to": "ఎవరికి పంపారు",
+      "toHint": "UDISE+ ను సరిచేసే ఆఫీసు.",
+      "choose": "ఆఫీసును ఎంచుకోండి"
     },
     "close": {
-      "description": "{fixed, plural, =0 {No correction is confirmed yet} one {# correction is confirmed} other {# corrections are confirmed}} by the last UDISE+ import; {open, plural, =0 {none is still wrong} one {# is still wrong} other {# are still wrong}}.",
+      "description": "చివరి UDISE+ ఇంపోర్ట్ ప్రకారం {fixed, plural, =0 {ఇంకా ఏ సవరణా నిర్ధారణ కాలేదు} one {# సవరణ నిర్ధారణ అయింది} other {# సవరణలు నిర్ధారణ అయ్యాయి}}; {open, plural, =0 {ఏదీ తప్పుగా మిగలలేదు} one {# ఇంకా తప్పుగా ఉంది} other {# ఇంకా తప్పుగా ఉన్నాయి}}.",
       "done": {
-        "trigger": "Mark done",
-        "title": "Mark the request done"
+        "trigger": "పూర్తయినట్లు గుర్తించండి",
+        "title": "అభ్యర్థన పూర్తయినట్లు గుర్తించండి"
       },
       "rejected": {
-        "trigger": "Mark rejected",
-        "title": "Mark the request rejected"
+        "trigger": "తిరస్కరించినట్లు గుర్తించండి",
+        "title": "అభ్యర్థన తిరస్కరించినట్లు గుర్తించండి"
       }
     },
     "match": {
-      "colMatch": "Matched by",
-      "rowLabel": "Row {row}",
-      "toReview": "Choose the student",
+      "colMatch": "దేని ద్వారా సరిపోలింది",
+      "rowLabel": "వరుస {row}",
+      "toReview": "విద్యార్థిని ఎంచుకోండి",
       "basis": {
-        "admission_no": "Admission number",
-        "picked": "Chosen by you",
-        "pen_verified": "PEN (verified)",
+        "admission_no": "అడ్మిషన్ నంబర్",
+        "picked": "మీరు ఎంచుకున్నారు",
+        "pen_verified": "PEN (ధృవీకరించినది)",
         "pen": "PEN",
-        "name_dob_class": "Name, date of birth and class",
-        "skipped": "Skipped"
+        "name_dob_class": "పేరు, పుట్టిన తేదీ మరియు తరగతి",
+        "skipped": "వదిలేశారు"
       },
       "pick": {
-        "trigger": "Choose student",
-        "title": "Which student is this row?",
-        "description": "{name}: no student has this PEN, or no single student has this name, date of birth and class.",
-        "confirm": "Use this student",
-        "change": "Change",
-        "consequence": "The UDISE+ values of this row are added to this student when the import is added. The admission register is not changed."
+        "trigger": "విద్యార్థిని ఎంచుకోండి",
+        "title": "ఈ వరుస ఏ విద్యార్థిది?",
+        "description": "{name}: ఈ PEN ఉన్న విద్యార్థి ఎవరూ లేరు, లేదా ఈ పేరు, పుట్టిన తేదీ, తరగతి ఉన్న విద్యార్థి ఒక్కరే లేరు.",
+        "confirm": "ఈ విద్యార్థిని వాడండి",
+        "change": "మార్చండి",
+        "consequence": "ఇంపోర్ట్ జోడించినప్పుడు ఈ వరుసలోని UDISE+ విలువలు ఈ విద్యార్థికి జోడించబడతాయి. అడ్మిషన్ రిజిస్టర్ మారదు."
       },
-      "skip": "Skip row",
-      "skipAria": "Skip the row of {name}",
-      "undo": "Undo choice",
-      "undoAria": "Undo the choice for {name}"
+      "skip": "వరుసను వదిలేయండి",
+      "skipAria": "{name} వరుసను వదిలేయండి",
+      "undo": "ఎంపికను రద్దు చేయండి",
+      "undoAria": "{name} కోసం చేసిన ఎంపికను రద్దు చేయండి"
     },
     "errors": {
       "nothing_to_request": {
-        "title": "Nothing to request",
-        "body": "Every difference is already in an open request, or none is left."
+        "title": "అడగాల్సింది ఏమీ లేదు",
+        "body": "ప్రతి తేడా ఇప్పటికే తెరిచి ఉన్న అభ్యర్థనలో ఉంది, లేదా ఏదీ మిగలలేదు."
       },
       "line_not_open": {
-        "title": "Some corrections changed",
-        "body": "Some differences were corrected or requested meanwhile. Reload the page."
+        "title": "కొన్ని సవరణలు మారాయి",
+        "body": "ఈలోగా కొన్ని తేడాలు సరిచేయబడ్డాయి లేదా అడగబడ్డాయి. పేజీని రీలోడ్ చేయండి."
       },
       "udise_request_state": {
-        "title": "This request changed",
-        "body": "Someone else already updated this request. Reload the page to see it."
+        "title": "ఈ అభ్యర్థన మారింది",
+        "body": "వేరొకరు ఇప్పటికే ఈ అభ్యర్థనను అప్‌డేట్ చేశారు. చూడటానికి పేజీని రీలోడ్ చేయండి."
       },
       "nothing_to_print": {
-        "title": "Nothing left to print",
-        "body": "Every correction in this request is made, or the students are outside your classes."
+        "title": "ప్రింట్ చేయాల్సింది ఏమీ మిగలలేదు",
+        "body": "ఈ అభ్యర్థనలోని ప్రతి సవరణ జరిగిపోయింది, లేదా విద్యార్థులు మీ తరగతుల బయట ఉన్నారు."
       },
       "import_not_matchable": {
-        "title": "Not a UDISE+ list",
-        "body": "Only a UDISE+ student list matches rows by PEN."
+        "title": "ఇది UDISE+ జాబితా కాదు",
+        "body": "UDISE+ విద్యార్థుల జాబితా మాత్రమే వరుసలను PEN ద్వారా సరిపోలుస్తుంది."
       },
       "row_has_admission_no": {
-        "title": "This row has an admission number",
-        "body": "It is matched by that number. Correct the number in the sheet instead."
+        "title": "ఈ వరుసలో అడ్మిషన్ నంబర్ ఉంది",
+        "body": "అది ఆ నంబర్ ద్వారా సరిపోలుతుంది. బదులుగా షీట్‌లో నంబర్‌ను సరిచేయండి."
       }
     }
   },
   "compliance": {
-    "nav": "Compliance certificates",
-    "title": "Compliance certificates",
-    "description": "The school's own certificates (fire NOC, building safety, recognition, affiliation, water and sanitation): when each one lapses and who renews it.",
-    "recordButton": "Record a certificate",
-    "noPermissionTitle": "You can't see the compliance certificates",
-    "noPermissionBody": "Ask the principal or the office admin if you need to check a certificate.",
-    "unverifiedTitle": "Typical validity is only a guide",
-    "unverifiedBody": "The list of certificates and their usual validity come from public sources that SchoolOS has not checked against the rules. Always type the dates printed on your certificate.",
-    "emptyTitle": "No certificates yet",
-    "emptyBody": "Record the school's fire NOC, recognition and other certificates so SchoolOS can remind you before they lapse.",
-    "colCertificate": "Certificate",
-    "colValidity": "Valid until",
-    "colOwner": "Renewed by",
-    "colCopy": "Copy",
-    "colActions": "Actions",
-    "reference": "No. {number}",
-    "daysLeft": "{days, plural, =0 {lapses today} one {# day left} other {# days left}}",
-    "daysAgo": "{days, plural, one {expired # day ago} other {expired # days ago}}",
-    "noOwner": "No one chosen",
-    "ownerLeft": "A former member",
-    "ownerInactive": "No longer active: choose someone else",
-    "copyHidden": "A document you can't open",
-    "noCopy": "No copy attached",
+    "nav": "నిబంధనల సర్టిఫికెట్లు",
+    "title": "నిబంధనల సర్టిఫికెట్లు",
+    "description": "పాఠశాల స్వంత సర్టిఫికెట్లు (ఫైర్ NOC, భవన భద్రత, గుర్తింపు, అనుబంధం, నీరు మరియు పారిశుధ్యం): ఒక్కొక్కటి ఎప్పుడు ముగుస్తుంది, ఎవరు పునరుద్ధరిస్తారు.",
+    "recordButton": "సర్టిఫికెట్ నమోదు చేయండి",
+    "noPermissionTitle": "మీరు నిబంధనల సర్టిఫికెట్లను చూడలేరు",
+    "noPermissionBody": "ఏదైనా సర్టిఫికెట్ చూడాల్సి వస్తే ప్రిన్సిపాల్‌ను లేదా ఆఫీస్ అడ్మిన్‌ను అడగండి.",
+    "unverifiedTitle": "సాధారణ చెల్లుబాటు కాలం ఒక సూచన మాత్రమే",
+    "unverifiedBody": "సర్టిఫికెట్ల జాబితా, వాటి సాధారణ చెల్లుబాటు కాలం పబ్లిక్ మూలాల నుండి వచ్చాయి; SchoolOS వాటిని నిబంధనలతో సరిచూడలేదు. ఎప్పుడూ మీ సర్టిఫికెట్‌పై ముద్రించిన తేదీలనే టైప్ చేయండి.",
+    "emptyTitle": "ఇంకా సర్టిఫికెట్లు లేవు",
+    "emptyBody": "పాఠశాల ఫైర్ NOC, గుర్తింపు మరియు ఇతర సర్టిఫికెట్లను నమోదు చేయండి, అవి ముగిసే ముందు SchoolOS మీకు గుర్తుచేస్తుంది.",
+    "colCertificate": "సర్టిఫికెట్",
+    "colValidity": "చెల్లుబాటు చివరి తేదీ",
+    "colOwner": "పునరుద్ధరించేవారు",
+    "colCopy": "కాపీ",
+    "colActions": "చర్యలు",
+    "reference": "నం. {number}",
+    "daysLeft": "{days, plural, =0 {ఈ రోజు ముగుస్తుంది} one {# రోజు మిగిలి ఉంది} other {# రోజులు మిగిలి ఉన్నాయి}}",
+    "daysAgo": "{days, plural, one {# రోజు క్రితం ముగిసింది} other {# రోజుల క్రితం ముగిసింది}}",
+    "noOwner": "ఎవరినీ ఎంచుకోలేదు",
+    "ownerLeft": "మాజీ సభ్యులు",
+    "ownerInactive": "ఇప్పుడు యాక్టివ్‌గా లేరు: వేరొకరిని ఎంచుకోండి",
+    "copyHidden": "మీరు తెరవలేని డాక్యుమెంట్",
+    "noCopy": "కాపీ జతచేయలేదు",
     "state": {
-      "valid": "Valid",
-      "expiring": "Expires soon",
-      "expired": "Expired",
-      "no_expiry": "No expiry",
-      "missing": "Not recorded"
+      "valid": "చెల్లుబాటులో ఉంది",
+      "expiring": "త్వరలో ముగుస్తుంది",
+      "expired": "ముగిసింది",
+      "no_expiry": "ముగింపు తేదీ లేదు",
+      "missing": "నమోదు కాలేదు"
     },
     "counts": {
-      "expired": "Expired",
-      "expiring": "Expiring within {days} days",
-      "missing": "Not recorded",
-      "valid": "Valid"
+      "expired": "ముగిసినవి",
+      "expiring": "{days} రోజుల్లో ముగిసేవి",
+      "missing": "నమోదు కానివి",
+      "valid": "చెల్లుబాటులో ఉన్నవి"
     },
     "actions": {
-      "record": "Record",
-      "recordAria": "Record the {name}",
-      "renew": "Renew",
-      "renewAria": "Record the renewed {name}",
-      "edit": "Correct",
-      "editAria": "Correct the {name}",
-      "remove": "Remove",
-      "removeAria": "Remove the {name}"
+      "record": "నమోదు చేయండి",
+      "recordAria": "{name} నమోదు చేయండి",
+      "renew": "పునరుద్ధరించండి",
+      "renewAria": "పునరుద్ధరించిన {name} నమోదు చేయండి",
+      "edit": "సరిచేయండి",
+      "editAria": "{name} సరిచేయండి",
+      "remove": "తీసివేయండి",
+      "removeAria": "{name} తీసివేయండి"
     },
     "form": {
-      "recordTitle": "Record a certificate",
-      "renewTitle": "Record the renewed {name}",
-      "editTitle": "Correct the {name}",
-      "description": "Type the details as printed on the certificate.",
-      "renewDescription": "The current certificate is kept in the history. Type the details of the new one as printed.",
-      "kind": "Certificate",
-      "choose": "Choose a certificate",
-      "issuedByHint": "Usually issued by: {authority}.",
-      "typicalValidity": "Often valid for {months, plural, one {# month} other {# months}}.",
-      "typicalNoExpiry": "Usually does not expire.",
-      "label": "Name of the certificate",
-      "referenceNo": "Certificate number",
-      "issuedBy": "Issued by",
-      "validFrom": "Valid from",
-      "validUntil": "Valid until",
-      "validUntilHint": "The last day it is valid. Leave empty if it does not expire.",
-      "document": "Copy in Documents",
-      "documentHint": "Upload the scan in Documents first. To also show it on the CBSE disclosure page, upload a PDF as an 'other' document.",
-      "noDocument": "No copy",
-      "loading": "Loading documents…",
-      "owner": "Who renews it",
-      "noOwner": "No one chosen",
-      "ownerHint": "Reminders go to this person and to everyone who manages compliance certificates.",
-      "notes": "Notes",
-      "record": "Record certificate",
-      "save": "Save changes"
+      "recordTitle": "సర్టిఫికెట్ నమోదు చేయండి",
+      "renewTitle": "పునరుద్ధరించిన {name} నమోదు చేయండి",
+      "editTitle": "{name} సరిచేయండి",
+      "description": "సర్టిఫికెట్‌పై ముద్రించినట్లే వివరాలు టైప్ చేయండి.",
+      "renewDescription": "ప్రస్తుత సర్టిఫికెట్ చరిత్రలో ఉంటుంది. కొత్తదాని వివరాలను ముద్రించినట్లే టైప్ చేయండి.",
+      "kind": "సర్టిఫికెట్",
+      "choose": "సర్టిఫికెట్‌ను ఎంచుకోండి",
+      "issuedByHint": "సాధారణంగా జారీ చేసేవారు: {authority}.",
+      "typicalValidity": "తరచుగా {months, plural, one {# నెల} other {# నెలలు}} చెల్లుతుంది.",
+      "typicalNoExpiry": "సాధారణంగా ముగియదు.",
+      "label": "సర్టిఫికెట్ పేరు",
+      "referenceNo": "సర్టిఫికెట్ నంబర్",
+      "issuedBy": "జారీ చేసినవారు",
+      "validFrom": "చెల్లుబాటు మొదలు",
+      "validUntil": "చెల్లుబాటు చివరి తేదీ",
+      "validUntilHint": "అది చెల్లే చివరి రోజు. ముగియకపోతే ఖాళీగా వదిలేయండి.",
+      "document": "డాక్యుమెంట్లలో కాపీ",
+      "documentHint": "ముందుగా స్కాన్‌ను డాక్యుమెంట్లలో అప్‌లోడ్ చేయండి. దాన్ని CBSE వెల్లడి పేజీలో కూడా చూపించాలంటే, PDF ను \"ఇతర\" డాక్యుమెంట్‌గా అప్‌లోడ్ చేయండి.",
+      "noDocument": "కాపీ లేదు",
+      "loading": "డాక్యుమెంట్లు లోడ్ అవుతున్నాయి…",
+      "owner": "ఎవరు పునరుద్ధరిస్తారు",
+      "noOwner": "ఎవరినీ ఎంచుకోలేదు",
+      "ownerHint": "గుర్తుచేతలు ఈ వ్యక్తికి, నిబంధనల సర్టిఫికెట్లను నిర్వహించే అందరికీ వెళ్తాయి.",
+      "notes": "గమనికలు",
+      "record": "సర్టిఫికెట్ నమోదు చేయండి",
+      "save": "మార్పులు సేవ్ చేయండి"
     },
     "removeDialog": {
-      "title": "Remove this certificate?",
-      "confirm": "Remove",
-      "consequence": "Use this only for a certificate recorded by mistake. It stays in the history as removed; if it was a renewal, the earlier certificate becomes current again."
+      "title": "ఈ సర్టిఫికెట్‌ను తీసివేయాలా?",
+      "confirm": "తీసివేయండి",
+      "consequence": "పొరపాటున నమోదు చేసిన సర్టిఫికెట్‌కు మాత్రమే దీన్ని వాడండి. ఇది తీసివేసినదిగా చరిత్రలో ఉంటుంది; ఇది పునరుద్ధరణ అయితే, ముందటి సర్టిఫికెట్ మళ్లీ ప్రస్తుతమైనది అవుతుంది."
     },
     "errors": {
       "certificate_not_current": {
-        "title": "This certificate was replaced",
-        "body": "Only the current certificate can be changed. Reload the page to see the latest one."
+        "title": "ఈ సర్టిఫికెట్ స్థానంలో వేరొకటి వచ్చింది",
+        "body": "ప్రస్తుత సర్టిఫికెట్‌ను మాత్రమే మార్చవచ్చు. తాజాది చూడటానికి పేజీని రీలోడ్ చేయండి."
       },
       "conflict": {
-        "title": "Someone recorded this at the same time",
-        "body": "Reload the page and check the certificate before trying again."
+        "title": "ఇదే సమయంలో వేరొకరు దీన్ని నమోదు చేశారు",
+        "body": "మళ్లీ ప్రయత్నించే ముందు పేజీని రీలోడ్ చేసి సర్టిఫికెట్‌ను తనిఖీ చేయండి."
       }
     }
   }
