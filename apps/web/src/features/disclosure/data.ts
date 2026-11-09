@@ -15,10 +15,34 @@ import { checkedFileUrl } from "@/lib/open-file-url";
 export const EDIT = "disclosure.edit";
 export const PUBLISH = "disclosure.publish";
 
-export type DisclosureFormat = components["schemas"]["DisclosureFormatOut"];
-export type FormatItem = components["schemas"]["FormatItemOut"];
-export type FormatSection = components["schemas"]["FormatSectionOut"];
-export type DisclosureDraft = components["schemas"]["DisclosureDraftOut"];
+/** A row or column of a `count_table` item (format version 2; FR-DISC-016). */
+export interface FormatChoice {
+  key: string;
+  label: string;
+}
+type GeneratedItem = components["schemas"]["FormatItemOut"];
+/**
+ * Format version 2 (FC-02) adds the `count_table` type with its rows and columns, and the draft's
+ * carry-over fields. Written by hand until the generated client is regenerated; the generated
+ * types stay assignable to these.
+ */
+export type FormatItem = Omit<GeneratedItem, "type"> & {
+  type: GeneratedItem["type"] | "count_table";
+  rows?: FormatChoice[] | null;
+  columns?: FormatChoice[] | null;
+};
+export type FormatSection = Omit<components["schemas"]["FormatSectionOut"], "items"> & {
+  items: FormatItem[];
+};
+export type DisclosureFormat = Omit<components["schemas"]["DisclosureFormatOut"], "sections"> & {
+  sections: FormatSection[];
+};
+export type DisclosureDraft = components["schemas"]["DisclosureDraftOut"] & {
+  /** The older format version whose items were carried over (FR-DISC-014); null otherwise. */
+  carried_over_from?: number | null;
+  /** Item keys of the older version that were not carried over. */
+  dropped?: string[];
+};
 export type DerivedValue = components["schemas"]["DerivedValueOut"];
 export type DraftDocument = components["schemas"]["DraftDocumentOut"];
 export type Snapshot = components["schemas"]["SnapshotOut"];
@@ -45,10 +69,14 @@ export interface ResultRow {
   passed: string;
 }
 
-/** The editor's state: text for every typed item, result rows, chosen document ids. */
+/** Count-table cells as the form keeps them: row key → column key → text. */
+export type CountCells = Record<string, Record<string, string>>;
+
+/** The editor's state: text for every typed item, result rows, counts, chosen document ids. */
 export interface DraftState {
   values: Record<string, string>;
   results: Record<string, ResultRow[]>;
+  counts: Record<string, CountCells>;
   documents: Record<string, string[]>;
 }
 
@@ -109,13 +137,32 @@ function asRows(value: unknown): ResultRow[] {
   });
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function asCells(item: FormatItem, value: unknown): CountCells {
+  const saved = asRecord(value);
+  const cells: CountCells = {};
+  for (const row of item.rows ?? []) {
+    const counts = asRecord(saved[row.key]);
+    const out: Record<string, string> = {};
+    for (const column of item.columns ?? []) out[column.key] = asText(counts[column.key]);
+    cells[row.key] = out;
+  }
+  return cells;
+}
+
 /** The editor's starting state from the saved draft. */
 export function draftState(format: DisclosureFormat, draft: DisclosureDraft): DraftState {
-  const state: DraftState = { values: {}, results: {}, documents: {} };
+  const state: DraftState = { values: {}, results: {}, counts: {}, documents: {} };
   for (const section of format.sections) {
     for (const item of section.items) {
       const saved = draft.inputs[item.key];
       if (item.type === "results") state.results[item.key] = asRows(saved);
+      else if (item.type === "count_table") state.counts[item.key] = asCells(item, saved);
       else if (item.fill === "input" || item.fill === "link") {
         state.values[item.key] = asText(saved);
       }
@@ -130,6 +177,23 @@ export function draftState(format: DisclosureFormat, draft: DisclosureDraft): Dr
 function wholeNumber(text: string): number | string {
   const trimmed = text.trim();
   return /^\d{1,9}$/.test(trimmed) ? Number(trimmed) : trimmed;
+}
+
+/** Filled count-table cells as `{row: {column: n}}`; empty cells left out. */
+function countsBody(
+  item: FormatItem,
+  cells: CountCells | undefined,
+): Record<string, Record<string, number | string>> {
+  const out: Record<string, Record<string, number | string>> = {};
+  for (const row of item.rows ?? []) {
+    const filled: Record<string, number | string> = {};
+    for (const column of item.columns ?? []) {
+      const text = (cells?.[row.key]?.[column.key] ?? "").trim();
+      if (text) filled[column.key] = wholeNumber(text);
+    }
+    if (Object.keys(filled).length) out[row.key] = filled;
+  }
+  return out;
 }
 
 /**
@@ -157,6 +221,9 @@ export function draftBody(
             passed: wholeNumber(r.passed),
           }));
         }
+      } else if (item.type === "count_table") {
+        const counts = countsBody(item, state.counts[item.key]);
+        if (Object.keys(counts).length) inputs[item.key] = counts;
       } else if (item.fill === "input" || item.fill === "link") {
         const text = (state.values[item.key] ?? "").trim();
         if (!text) continue;

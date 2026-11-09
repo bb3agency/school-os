@@ -10823,6 +10823,16 @@
       "add": "Add a year",
       "remove": "Remove"
     },
+    "counts": {
+      "hint": "Numbers only, no names. Count each person once, under their highest qualification. Leave a box empty for none.",
+      "category": "Category",
+      "cell": "{row}, {column}"
+    },
+    "carried": {
+      "title": "Moved from format version {from}",
+      "body": "CBSE revised Appendix IX, so the draft now uses format version {version}. Items that are the same in both versions were kept. Check the new items, then save the draft.",
+      "dropped": "{count, plural, one {# item from the old version is no longer in the format and is removed when you save.} other {# items from the old version are no longer in the format and are removed when you save.}}"
+    },
     "documents": {
       "none": "No document chosen.",
       "chosen": "Chosen document",

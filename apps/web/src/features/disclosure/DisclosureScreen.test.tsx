@@ -117,3 +117,54 @@ describe("the draft editor saves once per submit (XP-02, FR-DISC-004)", () => {
     expect(stub.callsTo("PUT /bff/api/v1/disclosure/draft")).toHaveLength(1);
   });
 });
+
+describe("format version 2 in the editor (FR-DISC-014, FR-DISC-016)", () => {
+  const V2: DisclosureFormat = {
+    ...FORMAT,
+    version: 2,
+    sections: [
+      ...FORMAT.sections,
+      {
+        key: "staff",
+        title: "Staff",
+        items: [
+          {
+            key: "staff_qualifications",
+            label: "Staff by category and highest qualification",
+            fill: "input",
+            type: "count_table",
+            required: false,
+            contact: false,
+            takes_documents: false,
+            max_length: null,
+            max_value: 1000,
+            max_rows: null,
+            rows: [{ key: "pgt", label: "PGT" }],
+            columns: [{ key: "doctorate", label: "Doctorate" }],
+          },
+        ],
+      },
+    ],
+  };
+
+  it("says the draft moved from version 1 and edits counts per category", async () => {
+    stub.routes["GET /bff/api/v1/disclosure/format"] = () => Response.json(V2);
+    stub.routes["GET /bff/api/v1/disclosure/draft"] = () =>
+      Response.json({ ...DRAFT, format_version: 2, carried_over_from: 1, dropped: ["old_item"] });
+    stub.routes["PUT /bff/api/v1/disclosure/draft"] = () =>
+      Response.json({ ...DRAFT, format_version: 2, version: 4 });
+    const user = userEvent.setup();
+    renderWithIntl(<DisclosureScreen />);
+    expect(await screen.findByText("Moved from format version 1")).toBeInTheDocument();
+    expect(screen.getByText(/1 item from the old version/)).toBeInTheDocument();
+    const cell = screen.getByRole("textbox", { name: "PGT, Doctorate" });
+    await user.type(cell, "2");
+    await user.click(screen.getByRole("button", { name: dm.save }));
+    await waitFor(() => expect(stub.callsTo("PUT /bff/api/v1/disclosure/draft")).toHaveLength(1));
+    const [call] = stub.callsTo("PUT /bff/api/v1/disclosure/draft");
+    expect(JSON.parse(call!.body).inputs).toEqual({
+      affiliation_no: "1130001",
+      staff_qualifications: { pgt: { doctorate: 2 } },
+    });
+  });
+});

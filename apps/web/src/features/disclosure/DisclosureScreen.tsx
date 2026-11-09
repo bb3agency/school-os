@@ -39,6 +39,7 @@ import {
   type DerivedValue,
   type DisclosureDraft,
   type DisclosureFormat,
+  type CountCells,
   type DisclosureLink,
   type DraftState,
   type FormatItem,
@@ -198,6 +199,68 @@ function ResultsEditor({
           {t("add")}
         </Button>
       ) : null}
+    </fieldset>
+  );
+}
+
+/**
+ * Counts by category and qualification (format version 2; FR-DISC-016): numbers only, never
+ * names (lead decision D84). One whole-number box per row and column; empty boxes are left out.
+ */
+function CountTableEditor({
+  item,
+  cells,
+  onChange,
+  error,
+}: {
+  item: FormatItem;
+  cells: CountCells;
+  onChange: (cells: CountCells) => void;
+  error: string | undefined;
+}) {
+  const t = useTranslations("disclosure.counts");
+  const id = useId();
+  const set = (row: string, column: string, text: string) =>
+    onChange({ ...cells, [row]: { ...cells[row], [column]: text } });
+  return (
+    <fieldset className="space-y-2" aria-describedby={`${id}-hint`}>
+      <legend className="font-semibold text-ink">{item.label}</legend>
+      <p id={`${id}-hint`} className="text-sm text-ink-muted">
+        {t("hint")}
+      </p>
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      <TableScroll label={item.label}>
+        <Table density="compact">
+          <THead>
+            <Tr>
+              <Th>{t("category")}</Th>
+              {(item.columns ?? []).map((column) => (
+                <Th key={column.key}>{column.label}</Th>
+              ))}
+            </Tr>
+          </THead>
+          <TBody>
+            {(item.rows ?? []).map((row) => (
+              <Tr key={row.key}>
+                <Th scope="row">{row.label}</Th>
+                {(item.columns ?? []).map((column) => (
+                  <Td key={column.key}>
+                    <Input
+                      aria-label={t("cell", { row: row.label, column: column.label })}
+                      name={`${item.key}.${row.key}.${column.key}`}
+                      value={cells[row.key]?.[column.key] ?? ""}
+                      inputMode="numeric"
+                      maxLength={6}
+                      className="w-20"
+                      onChange={(e) => set(row.key, column.key, e.target.value)}
+                    />
+                  </Td>
+                ))}
+              </Tr>
+            ))}
+          </TBody>
+        </Table>
+      </TableScroll>
     </fieldset>
   );
 }
@@ -755,6 +818,16 @@ function DraftEditor({
         />
       );
     }
+    if (item.type === "count_table") {
+      return (
+        <CountTableEditor
+          item={item}
+          cells={state.counts[item.key] ?? {}}
+          error={byItem[item.key]}
+          onChange={(cells) => update({ ...state, counts: { ...state.counts, [item.key]: cells } })}
+        />
+      );
+    }
     if (item.type === "results") {
       return (
         <ResultsEditor
@@ -783,6 +856,14 @@ function DraftEditor({
         </p>
         {canPublish ? <PublishDialog draft={draft} live={live} unsaved={dirty} /> : null}
       </div>
+      {draft.carried_over_from ? (
+        <Alert tone="info" title={t("carried.title", { from: draft.carried_over_from })}>
+          <p>{t("carried.body", { version: draft.format_version })}</p>
+          {draft.dropped?.length ? (
+            <p className="mt-1">{t("carried.dropped", { count: draft.dropped.length })}</p>
+          ) : null}
+        </Alert>
+      ) : null}
       <form noValidate onSubmit={(e) => void onSubmit(e)} className="space-y-5">
         <ErrorSummary errors={summary} attempt={attempt} />
         {format.sections.map((section) => (
