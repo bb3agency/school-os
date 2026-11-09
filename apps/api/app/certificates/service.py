@@ -2681,6 +2681,13 @@ tenancy.register_data_owner(
 )
 
 
+def issued_count(session: Session, start: dt.datetime, end: dt.datetime) -> int:
+    """Certificates of the whole school issued in ``[start, end)`` (later cancellations
+    included): a count only, for the weekly management brief (FR-BRF-005). No permission check:
+    the caller (``app.brief``) checks ``brief.read``."""
+    return repo.count_issued_between(session, start, end)
+
+
 __all__ = [
     "APPROVE",
     "ISSUE",
@@ -2708,6 +2715,7 @@ __all__ = [
     "formats_catalog",
     "get_certificate",
     "get_verification",
+    "issued_count",
     "list_certificates",
     "mark_pdf_failed",
     "preview",

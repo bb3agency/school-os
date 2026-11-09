@@ -1019,6 +1019,7 @@ __all__ = [
     "get_request",
     "list_requests",
     "memo",
+    "pending_count",
     "purge_tenant_data",
     "reject",
     "request_student",
@@ -1047,6 +1048,13 @@ def purge_tenant_data(session: Session) -> dict[str, int]:
     """Delete the current school's rows of this module (offboarding only: the database allows it
     only as ``sos_purger`` for a school in ``offboarding``)."""
     return _PURGE.delete(session)
+
+
+def pending_count(session: Session) -> int:
+    """How many correction requests of the whole school wait for a decision now (pending and
+    not expired): a count only, for the weekly management brief (FR-BRF-004). No permission
+    check: the caller (``app.brief``) checks ``brief.read`` and shows the count alone."""
+    return repo.count_pending(session, _now(session))
 
 
 tenancy.register_data_owner(
