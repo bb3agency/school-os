@@ -1447,6 +1447,8 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | Disclosure snapshots (`ops.disclosure_snapshots`) | Life of the school | The record of what was published; view counts 90 days |
 | RTE admissions / claims (`sis.rte_*`; not scheduled) | Admissions: as the student record; claims and lines: 8 years after the financial year (D21) | |
 | Portal calendar dates and reminders (`ops.portal_*`) | 2 academic years | Configuration and idempotency, no personal data |
+| Weekly management briefs (`ops.weekly_briefs`; FA-05) | 104 weeks (2 years) | School-level counts only; older weeks are deleted by the Monday job (`keep_weeks` in `app/brief/config.yaml`) |
+| Weekly brief delivery choices (`ops.brief_preferences`; FA-05) | While the person works at the school | Deleted with the membership (`ON DELETE CASCADE`) or on an erasure request |
 | Platform incidents (`platform.incidents*`) | 3 years after closing | SchoolOS's own records, no personal data (ADR-0050) |
 
 
@@ -1681,6 +1683,15 @@ The dq module purges both tables and is purged **before** `circulars` (`offboard
 | `ops.legal_holds` | C2 (reference encrypted, C3) | `scope` (`student` with `student_id`, composite FK to `sis.students`; or `record_class` with a key of `app/privacy/record_classes.yaml`; CHECK `legal_holds_scope_check`), `reason_code` (from `app/privacy/holds.yaml`), `reference_ciphertext` (in `CIPHERTEXT_COLUMNS`; AAD `ops.legal_holds\|reference_ciphertext\|<id>`), `review_on` (required; service: today to 12 months ahead), `status` CHECK (`pending`,`active`,`lift_pending`,`lifted`,`rejected`), `placed_by`/`placed_at`, `approved_by`/`approved_at` (CHECK `approved_by <> placed_by`), `rejected_by`/`rejected_at`, `lift_requested_by`/`lift_requested_at`, `lifted_by`/`lifted_at` (CHECK `lifted_by <> lift_requested_by`), `last_reminded_on` (review reminders), `created_at`, `updated_at`, `version`. `sos_app` SELECT, INSERT and UPDATE of the workflow columns only; never DELETE. Offboarding owner `privacy`; record class `legal_holds` (`refused_legal_obligation`); exported without the reference |
 
 **Effect.** Holds that are `active` or `lift_pending` stop retention and erasure: `app.privacy.service.hold_scope` is registered with `app.core.holds`, and every job of `app/privacy/holds.yaml` `retention_jobs` asks `holds.check(...)` in the school's `tenant_session` before deleting (a whole-class hold stops the job; a student hold keeps that student's behaviour notes and early-warning flags). No provider means "everything held" (fail closed).
+
+### 16.9 Weekly management brief (`ops`; FA-05, FR-BRF-001..015; `0088_weekly_brief`)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `ops.weekly_briefs` | C1 | `week_start` (a Monday, CHECK `weekly_briefs_monday`; unique per school, `weekly_briefs_once`), `counts jsonb` (an object: school-level counts, codes, labels, dates, rupee totals; never a name or a student id; versioned `"v": 1`), `notified`, `built_at`. `sos_app` SELECT, INSERT, DELETE (weeks older than `keep_weeks`) and UPDATE of `notified` only. Record class `weekly_briefs` (`no_personal_data`); not in the full data export (derived counts) |
+| `ops.brief_preferences` | C1 | Primary key `(tenant_id, membership_id)`, composite FK to `core.memberships` `ON DELETE CASCADE`; `in_app` (default true), `email` (default false: opt-in), `updated_at`, `version`. `sos_app` may update the choice columns. Record class `brief_preferences` (`allowed`; module `brief` is a subject-report contributor and eraser for members) |
+
+Offboarding owner `brief` (before `notifications`, `offboarding.yaml`).
 
 ### 16.7 Classification, export and offboarding (as built)
 
