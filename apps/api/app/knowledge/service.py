@@ -45,7 +45,7 @@ from typing import TYPE_CHECKING, Any, Final
 from sqlalchemy.exc import IntegrityError
 
 from app.audit import service as audit
-from app.core import languages, ratelimit, retention
+from app.core import holds, languages, ratelimit, retention
 from app.core import purge as purging
 from app.core.db import tenant_session
 from app.core.errors import (
@@ -2122,6 +2122,9 @@ def purge_old_queries(session: Session, *, now: dt.datetime | None = None) -> in
     Conversations follow their questions (ADR-0034): a rolling summary that covers a deleted
     question is forgotten (rebuilt from the questions kept), and a conversation with no question
     left (deleted from the history or not) is deleted."""
+    # Legal holds (ADR-0059): a hold on the Ask history keeps every question and answer.
+    if holds.check(session, job="knowledge.purge_queries", record_class="ask_history").whole_class:
+        return 0
     keep = retention.days(
         session, QUERY_RETENTION_CATEGORY, default=load_llm_config().query_log.retention_days
     )
@@ -2147,6 +2150,9 @@ def purge_memories(session: Session, *, now: dt.datetime | None = None) -> int:
     """Memory retention (ADR-0034), in the school's ``tenant_session``: suggestions nobody
     confirmed within ``memory.pending_ttl_hours`` are deleted, and so is every item and setting
     of a person who is no longer an active member of the school. Returns items deleted."""
+    # Legal holds (ADR-0059): a hold on Ask memory keeps every item and suggestion.
+    if holds.check(session, job="knowledge.purge_memories", record_class="ask_memory").whole_class:
+        return 0
     at = now or dt.datetime.now(dt.UTC)
     deleted = repo.delete_expired_memories(session, at)
     owners = repo.memory_user_ids(session)

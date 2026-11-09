@@ -35,6 +35,7 @@ from typing import Final
 from sqlalchemy.orm import Session
 
 from app.authz.context import UserContext
+from app.core import holds
 from app.core.db import tenant_session
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.ids import new_id
@@ -738,6 +739,11 @@ def exceptions(session: Session, ctx: UserContext) -> UpiExceptionsOut:
 def erase_old_narrations(session: Session, *, batch: int = 1000) -> int:
     """Erase narrations older than ``narration_keep_days`` (docs/05 §13; PRV-024). Returns how
     many were erased (one batch; the daily job repeats until none is left)."""
+    # Legal holds (ADR-0059): a hold on bank statements keeps every narration.
+    if holds.check(
+        session, job="fees.erase_upi_narrations", record_class="bank_statements"
+    ).whole_class:
+        return 0
     keep = _cfg().statements.narration_keep_days
     before = c.now(session) - dt.timedelta(days=keep)
     ids = repo.stale_narrations(session, before, batch)

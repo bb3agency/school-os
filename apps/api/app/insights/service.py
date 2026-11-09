@@ -43,6 +43,7 @@ from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.certificates import service as certificates
+from app.core import holds
 from app.core import purge as purging
 from app.core.errors import (
     Conflict,
@@ -1303,11 +1304,25 @@ def purge_expired(session: Session, *, today: dt.date | None = None) -> dict[str
     theirs are deleted (with their actions). Audit ``insights.retention_purged`` (counts)."""
     cfg = load_config().retention
     day = today or today_ist()
-    notes = repo.purge_notes(session, day - dt.timedelta(days=cfg.notes_days))
+    # Legal holds (ADR-0059, FR-DPDP-043): a held class keeps everything, a held student keeps
+    # their own notes and flags.
+    notes = 0
+    held_notes = holds.check(
+        session, job="insights.purge_expired.notes", record_class="behaviour_notes"
+    )
+    if not held_notes.whole_class:
+        notes = repo.purge_notes(
+            session, day - dt.timedelta(days=cfg.notes_days), keep_students=held_notes.student_ids
+        )
     cutoff = dt.datetime.combine(day, dt.time(), tzinfo=IST) - dt.timedelta(
         days=cfg.closed_flags_days
     )
-    flags = repo.purge_closed(session, cutoff)
+    flags = 0
+    held_flags = holds.check(
+        session, job="insights.purge_expired.flags", record_class="early_warning"
+    )
+    if not held_flags.whole_class:
+        flags = repo.purge_closed(session, cutoff, keep_students=held_flags.student_ids)
     if notes or flags:
         _audit(
             session,

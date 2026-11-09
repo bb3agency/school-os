@@ -1,0 +1,62 @@
+# Legal holds (FC-12; ADR-0059; FR-DPDP-039..FR-DPDP-052). Versioned configuration read by
+# app/privacy/holds_config.py. Lead decision D84 (2026-11-09), PO to confirm.
+#
+# reason_codes   why the school keeps the records; the free-text reference (case or letter
+#                number) is C3, encrypted, never shown in access reports, letters or logs.
+#                verified: false: the list is a SchoolOS proposal, not legal advice.
+# review         every hold carries a review date at most `max_months` ahead; reminders go to
+#                the holders of privacy.hold.manage `remind_days_before` days before, and again
+#                every `overdue_every_days` days while it is overdue. A hold is never lifted
+#                automatically.
+# retention_jobs every job that deletes school data by retention, with the record class it
+#                deletes. Each one asks app.core.holds.check(job=..., record_class=...) before it
+#                deletes (tests/privacy/test_holds_jobs.py). `student` means rows about one
+#                student are kept when that student is held; `class` jobs keep everything only
+#                when the record class is held as a whole.
+# exempt_jobs    deletion jobs that are not retention of records about people, with the reason.
+version: 1
+verified: false
+source: SchoolOS proposal (docs/research/2026-11-features/compliance-safety.md FC-12); not legal advice
+
+reason_codes:
+  police_inquiry: Police inquiry or FIR
+  court_case: Court case or tribunal
+  pocso_matter: Child protection (POCSO) matter
+  regulator_inquiry: Inquiry by a board, department or regulator
+  parent_dispute: Dispute with a family
+  insurance_claim: Insurance claim
+  other_legal: Other legal reason
+
+review:
+  max_months: 12
+  remind_days_before: 14
+  overdue_every_days: 7
+
+retention_jobs:
+  imports.purge_raw_files: {record_class: imports, scope: class}
+  exports.purge_expired: {record_class: exports, scope: class}
+  notifications.purge_read: {record_class: notifications, scope: class}
+  knowledge.purge_queries: {record_class: ask_history, scope: class}
+  knowledge.purge_memories: {record_class: ask_memory, scope: class}
+  insights.purge_expired.notes: {record_class: behaviour_notes, scope: student}
+  insights.purge_expired.flags: {record_class: early_warning, scope: student}
+  public.purge_handles: {record_class: public_links, scope: class}
+  messaging.purge_expired: {record_class: messages, scope: class}
+  messaging.purge_expired.inbound: {record_class: message_inbound, scope: class}
+  fees.purge_payment_events: {record_class: provider_inboxes, scope: class}
+  fees.erase_upi_narrations: {record_class: bank_statements, scope: class}
+  privacy.breach_purge: {record_class: breach_records, scope: class}
+
+exempt_jobs:
+  tally.purge_old_syncs: Tally sync records hold counts only (record class without personal data).
+  admin.purge_tenant_exports: The owner's 24-hour download copy of the whole school (record class without personal data of its own); the records it copies stay in SchoolOS and are held there.
+  ops.purge_idempotency_keys: Request de-duplication keys; ids only, no record about a person.
+  ops.dispatch_outbox: Delivered outbox events (ids and counts only, record class jobs).
+  documents.purge_objects: Removes the stored file of a document the school already deleted (no retention decision).
+  documents.purge_expired_uploads: Abandoned uploads that never became a document.
+  documents.sweep_discarded_objects: Objects of uploads the school discarded before saving.
+  knowledge.purge_orphan_vectors: Search index entries of documents already deleted.
+  changes.expire_requests: Marks old pending corrections as expired; deletes nothing.
+  offboarding.process: The school's own exit (ADR-0029); a school with an active hold is warned in the offboarding checklist (follow-up, ADR-0059).
+  platform.purge_tenant_audit: Control-plane copy of a deleted school's audit chain (ADR-0029).
+  support.purge_closed: Control-plane support tickets; no student data (ADR-0020).

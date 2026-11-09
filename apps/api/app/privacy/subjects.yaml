@@ -98,9 +98,10 @@ contributors:
     subjects: [member]
     classes: [support_access]
     eraser: false
+  # FC-12 (ADR-0059): `legal_holds` shows "Held: yes" for a held student (never the reason).
   privacy:
     subjects: [student, guardian, member]
-    classes: [privacy_requests]
+    classes: [privacy_requests, legal_holds]
     eraser: false
   # R3-1B (ADR-0049): a student's decisions on the school's optional purposes.
   privacy_consents:

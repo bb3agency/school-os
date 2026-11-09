@@ -49,6 +49,7 @@ from app.audit import service as audit
 from app.authz.context import UserContext
 from app.circulars import service as circulars
 from app.circulars.schemas import NoticeCreate
+from app.core import holds
 from app.core import purge as purging
 from app.core.config import DeploymentMode, get_settings
 from app.core.db import tenant_session
@@ -827,6 +828,9 @@ def purge_expired(session: Session) -> int:
     ``privacy.breach.retention_purged`` (actor ``system``; counts only) in the same transaction
     when anything was deleted, like the other tenant retention purges. Returns the breaches
     deleted."""
+    # Legal holds (ADR-0059): a hold on the breach register keeps every closed breach.
+    if holds.check(session, job="privacy.breach_purge", record_class="breach_records").whole_class:
+        return 0
     counts = repo.purge_closed(session, years=settings().retention.closed_years)
     if counts["breaches"]:
         audit.record(

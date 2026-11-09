@@ -261,6 +261,12 @@ source_modules =
     app.privacy.breach_models
     app.privacy.breach_schemas
     app.privacy.breach_config
+    app.privacy.holds_api
+    app.privacy.holds_service
+    app.privacy.holds_repository
+    app.privacy.holds_models
+    app.privacy.holds_schemas
+    app.privacy.holds_config
 forbidden_modules =
     app.platform
 
@@ -1765,6 +1771,7 @@ source_modules =
     app.privacy.consents_config
     app.privacy.consents_templates
     app.privacy.breach_config
+    app.privacy.holds_config
 forbidden_modules =
     sqlalchemy
     fastapi

@@ -48,6 +48,7 @@ from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import decode_cursor, encode_cursor
 from app.changes import service as changes
+from app.core import holds
 from app.core import purge as purging
 from app.core.crypto import ciphertext_key_version
 from app.core.errors import (
@@ -71,7 +72,7 @@ from app.identity.principal import STEP_UP_MAX_AGE
 from app.notifications import service as notifications
 from app.privacy import config as cfg
 from app.privacy import consents_service as consents
-from app.privacy import render
+from app.privacy import holds_service, render
 from app.privacy import repository as repo
 from app.privacy.models import PrivacyNotice, PrivacyRequest, PrivacyRequestEvent
 from app.privacy.schemas import (
@@ -133,6 +134,12 @@ ERASURE_OUTCOME: Final[Mapping[str, str]] = {
     "refused_legal_obligation": "refused_legal_obligation",
     "refused_official_record": "refused_official_record",
 }
+# FC-12 (ADR-0059): what an erasure plan, letter and access report say about a legal hold; the
+# reason code and reference are never shown there.
+LEGAL_HOLD_REASON: Final = (
+    "Held for legal reasons: the school must keep these records while a legal hold applies."
+)
+LEGAL_HOLD_LETTER: Final = "held for legal reasons"
 TEXT_COLUMNS: Final = (
     "requester_name_ciphertext",
     "request_ciphertext",
@@ -1134,7 +1141,15 @@ def letter_html(
             or "nothing yet"
         )
         refused = cast(Sequence[str], erased.get("refused", []))
-        refusal_lines = "; ".join(classes[k].label for k in refused if k in classes) or "none"
+        held = set(cast(Sequence[str], erased.get("held", [])))
+        refusal_lines = (
+            "; ".join(
+                f"{classes[k].label} ({LEGAL_HOLD_LETTER})" if k in held else classes[k].label
+                for k in refused
+                if k in classes
+            )
+            or "none"
+        )
     response = _decrypt(session, row, "response_ciphertext")
     nominee = (_decrypt(session, row, "nominee_ciphertext") or "").split("\n")
     contact = _contact(session)
@@ -1209,6 +1224,7 @@ def contributors() -> list[_Contributor]:
 def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
     """This module's own contribution: the requests and complaints about the subject (no texts:
     they may name other people)."""
+    sections = _hold_sections(session, subject)
     rows = repo.requests_about(
         session,
         student_id=subject.id if subject.kind == "student" else None,
@@ -1216,8 +1232,9 @@ def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
         membership_id=subject.id if subject.kind == "member" else None,
     )
     if not rows:
-        return []
+        return sections
     return [
+        *sections,
         ReportSection(
             class_key="privacy_requests",
             title="Privacy requests and complaints",
@@ -1231,6 +1248,22 @@ def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
                 )
                 for r in rows
             ),
+        ),
+    ]
+
+
+def _hold_sections(session: Session, subject: Subject) -> list[ReportSection]:
+    """FC-12 (ADR-0059, FR-DPDP-046): "Held: yes" when an active legal hold covers the student;
+    never the reason code, the reference or who placed it."""
+    if subject.kind != "student" or not holds_service.student_held(session, subject.id):
+        return []
+    return [
+        ReportSection(
+            class_key="legal_holds",
+            title="Legal hold",
+            columns=("Held",),
+            rows=(("Yes",),),
+            note="The school must keep this student's records for a legal reason for now.",
         )
     ]
 
@@ -1425,6 +1458,8 @@ def _plan(
             if outcome.class_key in erasable:
                 dry[outcome.class_key] = outcome
     rows = []
+    held_student = subject.kind == "student" and holds_service.student_held(session, subject.id)
+    held_classes = holds_service.held_classes(session)
     for key, cls in classes.items():
         if cls.erasure == "no_personal_data":
             continue
@@ -1442,6 +1477,11 @@ def _plan(
         reason = cls.basis
         if code == "retention_running":
             reason = f"Kept until its retention ends ({cls.retention.replace('**', '')}). {reason}"
+        if code in ("erasable", "retention_running") and (held_student or key in held_classes):
+            # FC-12 (ADR-0059, FR-DPDP-045): nothing held is erased; the reason itself is never
+            # shown (C3), only that the school must keep these records for a legal reason.
+            code = "legal_hold"
+            reason = LEGAL_HOLD_REASON
         rows.append(
             PrivacyErasurePlanRowOut(
                 class_key=key,
@@ -1519,6 +1559,7 @@ def execute_erasure(
             "needed."
         )
     kept = [p.class_key for p in plan if p.outcome != "erasable"]
+    held = [p.class_key for p in plan if p.outcome == "legal_hold"]
     now = repo.now(session)
     with _db_errors():
         row = repo.update_request(
@@ -1529,6 +1570,7 @@ def execute_erasure(
     detail = {
         "counts": counts,
         "refused": kept,
+        "held": held,
         "manual_steps": sum(len(v) for v in steps.values()),
     }
     _event(session, ctx, row, "erasure_executed", detail)
@@ -1630,7 +1672,7 @@ def notify_due(session: Session) -> int:
 def export_records(session: Session, *, include_sensitive: bool = False) -> list[RecordTable]:
     """The register for the school's full data export (FR-DPDP-018). Free texts only with
     ``include_sensitive``, decrypted, as a separate table."""
-    tables = repo.export_tables(session)
+    tables = [*repo.export_tables(session), *holds_service.export_records(session)]
     if include_sensitive:
         rows = []
         for r in repo.all_requests(session):
@@ -1694,6 +1736,7 @@ exports.register_module_document(
 
 _PURGE = purging.PurgeTables(
     deleted=(
+        "ops.legal_holds",
         "ops.privacy_request_links",
         "ops.privacy_request_events",
         "ops.privacy_requests",
@@ -1701,6 +1744,22 @@ _PURGE = purging.PurgeTables(
         "ops.privacy_notices",
     )
 )
+
+
+# --- legal holds: the one check (FC-12; ADR-0059; FR-DPDP-043..FR-DPDP-045) ------------------
+
+
+def hold_scope(session: Session, record_class: str) -> holds.HoldScope:
+    """What retention and erasure must keep of ``record_class`` in the current school: the
+    whole class (a hold on the class) and the students under an active hold. The one public
+    hold check: retention jobs reach it through :func:`app.core.holds.check` (registered below),
+    because the modules that own them sit below ``app.privacy`` in the import graph; the
+    erasure plan calls the hold service directly."""
+    whole, student_ids = holds_service.effective(session, record_class)
+    return holds.HoldScope(whole_class=whole, student_ids=student_ids)
+
+
+holds.register_provider(hold_scope)
 
 
 def tenant_data_counts(session: Session) -> dict[str, int]:
@@ -1731,6 +1790,7 @@ __all__ = [
     "execute_erasure",
     "export_records",
     "get_request",
+    "hold_scope",
     "letter_html",
     "list_notices",
     "list_templates",

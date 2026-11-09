@@ -471,6 +471,17 @@ templates:
       title: బోర్డుకు ఉల్లంఘన నివేదిక ఇంకా నమోదు కాలేదు
       body: "పాఠశాల ఒక ఉల్లంఘనను గమనించి {hours} గంటలు అయింది, డేటా ప్రొటెక్షన్ బోర్డుకు వివరమైన నివేదిక ఇంకా నమోదు కాలేదు. ఉల్లంఘన గమనించిన 72 గంటల్లోగా ఇవ్వాలి. ఉల్లంఘన రిజిస్టర్ తెరవండి."
 
+  # FC-12 legal holds (FR-DPDP-049; ADR-0059): review date near or past. Never the reason.
+  privacy.hold.review_due:
+    params: [hold_id, days, state]
+    resource_type: legal_hold
+    en:
+      title: A legal hold is due for review
+      body: "{state, select, overdue {A legal hold passed its review date {days, plural, one {# day} other {# days}} ago.} other {A legal hold is due for review in {days, plural, =0 {less than a day} one {# day} other {# days}}.}} Check whether the school still needs to keep these records, then keep or lift the hold."
+    te:
+      title: ఒక చట్టపరమైన నిలుపుదల సమీక్షకు వచ్చింది
+      body: "{state, select, overdue {ఒక చట్టపరమైన నిలుపుదల సమీక్ష తేదీ {days, plural, one {# రోజు} other {# రోజులు}} క్రితం దాటింది.} other {ఒక చట్టపరమైన నిలుపుదల {days, plural, =0 {ఒక రోజు లోపు} one {# రోజులో} other {# రోజుల్లో}} సమీక్షకు వస్తుంది.}} ఈ రికార్డులు ఇంకా ఉంచాలా అని చూసి, నిలుపుదలను కొనసాగించండి లేదా తొలగించండి."
+
   # R3-1D portal calendar (FR-RDY-006, FR-RDY-007; ADR-0053). Staff only, never parents (D45).
   # Params are a portal code and counts: the readiness of the event's linked profile across the
   # school (students 0 when the event links no profile with a readiness check). The link opens

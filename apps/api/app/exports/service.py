@@ -74,8 +74,8 @@ from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
 from app.authz.resolver import build_snapshot
+from app.core import holds, retention
 from app.core import purge as purging
-from app.core import retention
 from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.errors import Conflict, Forbidden, NotFound, StepUpRequired, ValidationFailed
@@ -1980,6 +1980,9 @@ def purge_expired(tenant_id: uuid.UUID, *, now: dt.datetime | None = None) -> in
     (``export.expired``, system actor)."""
     purged = 0
     with _worker_session(tenant_id) as session:
+        # Legal holds (ADR-0059): a hold on exports keeps every export file.
+        if holds.check(session, job="exports.purge_expired", record_class="exports").whole_class:
+            return 0
         at = now or repo.now(session)
         keep = _retention_days(session)
         for row in repo.due_for_purge(
