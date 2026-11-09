@@ -690,9 +690,14 @@ def fee_dues(
     db: TenantDB,
     section_id: uuid.UUID | None = None,
     class_id: uuid.UUID | None = None,
+    arrears_only: bool = False,
 ) -> DuesOut:
-    """Students with overdue amounts, oldest due first (``finance.read``)."""
-    return service.dues_list(db, ctx, section_id=section_id, class_id=class_id)
+    """Accounts with overdue amounts, oldest due first (``finance.read``): every open account of
+    the current and earlier years with its year; ``arrears_only`` keeps earlier years
+    (FR-FEE-031/032)."""
+    return service.dues_list(
+        db, ctx, section_id=section_id, class_id=class_id, arrears_only=arrears_only
+    )
 
 
 @router.get("/fees/dues.csv", response_class=Response, responses=_CSV)
@@ -701,7 +706,11 @@ def fee_dues_csv(
     db: TenantDB,
     section_id: uuid.UUID | None = None,
     class_id: uuid.UUID | None = None,
+    arrears_only: bool = False,
 ) -> Response:
-    """The dues list as CSV (``fee.report``, step-up). Audited like an export."""
-    filename, text = service.dues_csv(db, ctx, section_id=section_id, class_id=class_id)
+    """The dues list as CSV with an academic year column (``fee.report``, step-up). Audited
+    like an export."""
+    filename, text = service.dues_csv(
+        db, ctx, section_id=section_id, class_id=class_id, arrears_only=arrears_only
+    )
     return _csv(filename, text)

@@ -418,9 +418,28 @@ export function DailyScreen() {
   );
 }
 
-type DuesRow = Dues["rows"][number];
+/**
+ * FM-01 (FR-FEE-031/032): every open account of the current and earlier years, one row per
+ * account with its year, and the arrears tiles. Optional here until the generated client
+ * carries the fields (`make openapi`).
+ */
+type DuesRow = Dues["rows"][number] & {
+  academic_year_label?: string | null;
+  earlier_year?: boolean;
+};
+type DuesTotals = Dues & { arrears_students?: number; arrears_total?: string };
+type DuesQuery = { class_id?: string; arrears_only?: boolean };
 
-/** Dues list (FR-FEE-020): students with overdue amounts, oldest first; CSV with step-up. */
+/** This year's accounts of a selection: reminders never carry earlier years by default. */
+function thisYear(rows: readonly DuesRow[]): string[] {
+  return rows.filter((row) => !row.earlier_year).map((row) => row.account_id);
+}
+
+/**
+ * Dues list (FR-FEE-020, FR-FEE-031): accounts with overdue amounts, oldest first, earlier
+ * years included with a year column and an "earlier years only" filter; CSV with step-up.
+ * Reminders from a row or the selection cover this year's accounts only (FR-FEE-034/035).
+ */
 export function DuesScreen() {
   const t = useTranslations("fees.dues");
   const tn = useTranslations("school.nav");
@@ -433,6 +452,11 @@ export function DuesScreen() {
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
   const [classId, setClassId] = useState("");
+  const [years, setYears] = useState<"" | "arrears">("");
+  const query: DuesQuery = {
+    ...(classId ? { class_id: classId } : {}),
+    ...(years === "arrears" ? { arrears_only: true } : {}),
+  };
   // FR-MSG-025 / FR-MSG-027: reminders and payment links for one row, the rows chosen on the
   // visible page, or everyone in the list.
   const canRemind = useCanSendFeeReminders();
@@ -447,19 +471,17 @@ export function DuesScreen() {
     () => unwrap(api.GET("/api/v1/classes", { params: { query: { limit: 200 } } })),
     { enabled: me !== undefined && allowed },
   );
+  const duesKey = [...KEYS.dues("", classId), years] as const;
   const dues = useApiQuery(
-    KEYS.dues("", classId),
-    () =>
-      unwrap(
-        api.GET("/api/v1/fees/dues", { params: { query: classId ? { class_id: classId } : {} } }),
-      ),
+    duesKey,
+    async (): Promise<DuesTotals> => unwrap(api.GET("/api/v1/fees/dues", { params: { query } })),
     { enabled: me !== undefined && allowed },
   );
   const csv = useCsvDownload(async () => ({
     name: "fee-dues.csv",
     text: await unwrap(
       api.GET("/api/v1/fees/dues.csv", {
-        params: { query: classId ? { class_id: classId } : {} },
+        params: { query },
         parseAs: "text",
       }),
     ),
@@ -492,6 +514,19 @@ export function DuesScreen() {
         cell: (row) => row.class_section,
       },
       {
+        key: "year",
+        name: t("columns.year"),
+        header: t("columns.year"),
+        cell: (row) => (
+          <span className="whitespace-nowrap">
+            {row.academic_year_label ?? "—"}
+            {row.earlier_year ? (
+              <span className="block text-xs text-ink-muted">{t("earlierYear")}</span>
+            ) : null}
+          </span>
+        ),
+      },
+      {
         key: "oldest",
         name: t("columns.oldest"),
         header: t("columns.oldest"),
@@ -522,6 +557,8 @@ export function DuesScreen() {
               header: <span className="sr-only">{t("columns.actions")}</span>,
               hideable: false,
               cell: (row: DuesRow) => {
+                // Earlier-year dues are reminded only with the explicit option (FR-FEE-035).
+                if (row.earlier_year) return null;
                 const name = row.display_name ?? t("noName");
                 const one = (kind: "reminder" | "payment_link") =>
                   openReminders({ account_ids: [row.account_id], all_matching: false, kind });
@@ -621,15 +658,18 @@ export function DuesScreen() {
           label: k.display_en,
         }))
       : [];
-  const chips: FilterChip[] = classId
-    ? [
-        {
-          id: "class",
-          label: t("class"),
-          value: classOptions.find((option) => option.value === classId)?.label ?? "",
-        },
-      ]
-    : [];
+  const chips: FilterChip[] = [
+    ...(classId
+      ? [
+          {
+            id: "class",
+            label: t("class"),
+            value: classOptions.find((option) => option.value === classId)?.label ?? "",
+          },
+        ]
+      : []),
+    ...(years ? [{ id: "years", label: t("years"), value: t("arrearsOnly") }] : []),
+  ];
   return (
     <div className="space-y-5">
       {header}
@@ -639,7 +679,7 @@ export function DuesScreen() {
       ) : (
         <>
           {dues.status === "ready" ? (
-            <dl aria-label={t("totalsLabel")} className="grid gap-3 sm:grid-cols-2">
+            <dl aria-label={t("totalsLabel")} className="grid gap-3 sm:grid-cols-3">
               <StatCard
                 label={t("students")}
                 value={formatCount(dues.data.students, locale)}
@@ -650,6 +690,13 @@ export function DuesScreen() {
                 value={formatInr(dues.data.total_overdue, locale)}
                 unavailableLabel={tc("notAvailable")}
               />
+              {dues.data.arrears_total !== undefined ? (
+                <StatCard
+                  label={t("arrearsTotal")}
+                  value={formatInr(dues.data.arrears_total, locale)}
+                  unavailableLabel={tc("notAvailable")}
+                />
+              ) : null}
             </dl>
           ) : null}
           <DataTableV2
@@ -673,15 +720,26 @@ export function DuesScreen() {
                   onChange={(e) => setClassId(e.target.value)}
                   options={classOptions}
                 />
+                <SelectField
+                  name="years"
+                  label={t("years")}
+                  placeholder={t("allYears")}
+                  value={years}
+                  onChange={(e) => setYears(e.target.value === "arrears" ? "arrears" : "")}
+                  options={[{ value: "arrears", label: t("arrearsOnly") }]}
+                />
               </form>
             }
             chips={chips}
-            onRemoveChip={() => setClassId("")}
-            onClearFilters={() => setClassId("")}
+            onRemoveChip={(id) => (id === "years" ? setYears("") : setClassId(""))}
+            onClearFilters={() => {
+              setClassId("");
+              setYears("");
+            }}
             emptyTitle={t("emptyTitle")}
             emptyBody={t("emptyBody")}
             noResultsTitle={t("noResultsTitle")}
-            onRetry={() => void queryClient.invalidateQueries({ queryKey: KEYS.dues("", classId) })}
+            onRetry={() => void queryClient.invalidateQueries({ queryKey: duesKey })}
             stacked
             {...(canRemind
               ? {
@@ -695,7 +753,7 @@ export function DuesScreen() {
                           size="sm"
                           onClick={() =>
                             openReminders({
-                              account_ids: selected.map((row) => row.account_id),
+                              account_ids: thisYear(selected),
                               all_matching: false,
                               kind: "reminder",
                             })
@@ -708,7 +766,7 @@ export function DuesScreen() {
                           size="sm"
                           onClick={() =>
                             openReminders({
-                              account_ids: selected.map((row) => row.account_id),
+                              account_ids: thisYear(selected),
                               all_matching: false,
                               kind: "payment_link",
                             })

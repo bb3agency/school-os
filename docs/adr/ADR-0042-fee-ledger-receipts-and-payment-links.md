@@ -112,7 +112,7 @@ Sources checked 2026-10-18 for this wave: webhook signature, event id, ordering 
 
 ## Related requirements
 
-FR-FEE-001..030, FR-PAY-001..016 (docs/03 §3.19-3.20), SEC-034..038, PRV-022..024; US-2101..US-2112 (docs/02 C21). Docs: 01 §7.3, 02 §9, 05 §15.1-15.2, 07 §3 TB10, §6.7, 08 §15, 09 §4 "Fees", "Webhooks", 10 §11.2, 14 R2, 17 §5.8, 18 §3.
+FR-FEE-001..045, FR-PAY-001..016 (docs/03 §3.19-3.20), SEC-034..038, PRV-022..024; US-2101..US-2112 (docs/02 C21). Docs: 01 §7.3, 02 §9, 05 §15.1-15.2, 07 §3 TB10, §6.7, 08 §15, 09 §4 "Fees", "Webhooks", 10 §11.2, 14 R2, 17 §5.8, 18 §3.
 
 ## Sources (checked 2026-10-14)
 
@@ -130,3 +130,11 @@ FR-FEE-001..030, FR-PAY-001..016 (docs/03 §3.19-3.20), SEC-034..038, PRV-022..0
 - Decision 13 (never withhold a TC for dues): the TC preview's information note is built (FR-CERT-025, ADR-0045 follow-up).
 - Ask the school reads the fee ledger through `fees.service.ask_student_fees` / `ask_school_fees` while fees are on (FR-KB-044; `finance.read` school-wide only; Tally not consulted).
 - "Send payment link" from the dues list and the fee account sends the parent dues page, whose "Pay online" creates the link through the parent page's path (FR-PAY-005; FR-MSG-027; ADR-0043 follow-up). Who may send is unchanged (D33).
+
+## Follow-up (2026-11-09, FM-01 earlier-year dues; lead decision D84, PO to confirm)
+
+- **Arrears stay on their year's account.** Accounts remain per academic year (decision 3 unchanged) and stay open until settled; nothing is carried forward into the new year's account. The dues list, its CSV and its tiles read every open account of the current and earlier years with a year column and an "arrears only" filter (FR-FEE-031..033).
+- **Reminders.** Automatic reminders cover the current year of students still at the school only; earlier-year dues go out only in a manual send with the explicit `include_earlier_years` option (one message per student with the total), and students who left (`left`, `graduated`) are never in automatic reminders (FR-FEE-034, FR-FEE-035).
+- **Cross-year allocation.** A receipt still covers one account (decision 5 unchanged). The counter shows earlier years first; when the clerk ticks "oldest first across years" the server computes the split and the counter issues one receipt per account (FR-FEE-036, FR-FEE-037). The parent dues page shows earlier years first, payable at the office (FR-FEE-039).
+- **Left with dues.** A follow-up report of students who left with an open balance; never printed on a TC and never blocking one (decision 13, D16; FR-FEE-038, FR-FEE-040).
+- **Write-off.** A new adjustment reason `write_off` (migration `0085_fee_arrears`): maker-checker as every adjustment (decision 6), approved with step-up by a principal or accountant (`fee.concession.approve`), shown "Written off by management" in the statement and in the left-with-dues report (FR-FEE-041..043). No new permission.

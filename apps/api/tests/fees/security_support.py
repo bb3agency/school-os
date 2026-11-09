@@ -642,6 +642,24 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
         ("POST", "/api/v1/fees/day-closes"): _day_close,
         ("GET", "/api/v1/fees/dues"): g(lambda w, a: "/api/v1/fees/dues"),
         ("GET", "/api/v1/fees/dues.csv"): g(lambda w, a: "/api/v1/fees/dues.csv"),
+        # FM-01 earlier-year dues (FR-FEE-036, FR-FEE-038)
+        ("GET", "/api/v1/fees/students/{student_id}/years"): g(
+            lambda w, a: (
+                "/api/v1/fees/students/"
+                + str(
+                    F.scalar(
+                        a, "SELECT student_id FROM fin.student_fee_accounts WHERE id = :i", i=acc(w)
+                    )
+                )
+                + "/years"
+            )
+        ),
+        ("GET", "/api/v1/fees/reports/left-with-dues"): g(
+            lambda w, a: "/api/v1/fees/reports/left-with-dues"
+        ),
+        ("GET", "/api/v1/fees/reports/left-with-dues.csv"): g(
+            lambda w, a: "/api/v1/fees/reports/left-with-dues.csv"
+        ),
         **_online_specs(),
     }
 

@@ -16,6 +16,9 @@ history or staff names.
   ``via: parent_link``).
 - :func:`dues` is what the account owes now per instalment (collectable heads only; taxable heads
   are invoiced in Tally, FR-FEE-023), the late fee shown separately, only while fees are on.
+  ``earlier_years`` (FM-01, FR-FEE-039) is what the same child's open accounts of earlier years
+  still owe, one total per year (label and amount only), shown first on the page; they are paid
+  at the school office (the page's "Pay online" covers this account only).
 - :func:`pay` creates or reuses the payment link for the chosen instalments (``created_via
   parent_page``, the link's handle recorded on the intent) and says whether it was reused, so
   the page's ``public_pay`` budget counts only new links (ADR-0046 decision 9).
@@ -36,9 +39,10 @@ from sqlalchemy.orm import Session
 from app.core.errors import Conflict, NotFound
 from app.documents import service as documents
 from app.fees import _common as c
-from app.fees import ledger, online, receipts
+from app.fees import arrears, ledger, online, receipts
 from app.fees import online_repository as orepo
 from app.fees import repository as repo
+from app.fees.models import StudentFeeAccount
 from app.fees.money import ZERO
 from app.fees.online_schemas import PaymentLinkInfo
 from app.fees.schemas import DueLine
@@ -81,6 +85,14 @@ class DueInstalment:
 
 
 @dataclass(frozen=True, slots=True)
+class EarlierYearDue:
+    """What one earlier academic year still owes (FM-01, FR-FEE-039): its label and amount."""
+
+    label: str
+    due: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class ParentDues:
     """ADR-0046 decision 2 "Dues". ``student_id`` is for the caller's checks only."""
 
@@ -89,6 +101,7 @@ class ParentDues:
     total_due: Decimal
     late_fee_total: Decimal
     as_of: dt.date
+    earlier_years: tuple[EarlierYearDue, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,6 +218,30 @@ def dues(session: Session, account_id: uuid.UUID) -> ParentDues | None:
         total_due=sum((i.due for i in out), ZERO),
         late_fee_total=sum((i.late_fee for i in out), ZERO),
         as_of=today,
+        earlier_years=_earlier_years(session, account, today),
+    )
+
+
+def _earlier_years(
+    session: Session, account: StudentFeeAccount, today: dt.date
+) -> tuple[EarlierYearDue, ...]:
+    """The child's open accounts of years before this account's, oldest first, with what is
+    still collectable (FR-FEE-039)."""
+    years = arrears.years_in_view(session)
+    if years is None or account.academic_year_id not in years.starts:
+        return ()
+    start = years.starts[account.academic_year_id]
+    others = [
+        a
+        for a in arrears.accounts_of(session, years, [account.student_id])
+        if a.status == "open" and years.order(a.academic_year_id) < start
+    ]
+    others.sort(key=lambda a: years.order(a.academic_year_id))
+    dues = ledger.dues_of(session, others, today)
+    return tuple(
+        EarlierYearDue(label=years.labels[a.academic_year_id], due=dues[a.id].collectable)
+        for a in others
+        if dues[a.id].collectable > 0
     )
 
 

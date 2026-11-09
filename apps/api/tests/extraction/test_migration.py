@@ -282,6 +282,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         "0082_audit_ym_fixes",  # audit 2026-11-09 YM-06 e-mail sent at most once per event
         "0083_fee_tax_cert",  # FM-06 tuition fee certificate for income tax (D84)
         "0084_exam_lock_enrol",  # D84 exam lock, marks history, enrolment start (FT-01, FT-09)
+        "0085_fee_arrears",  # FM-01 fee write-off reason (D84)
     }
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
         command.downgrade(cfg, "0017_exports")

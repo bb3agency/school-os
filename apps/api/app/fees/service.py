@@ -34,6 +34,7 @@ from app.core.records import RecordTable
 from app.fees import _common as c
 from app.fees import (
     approvals,
+    arrears,
     ask,
     ledger,
     online,
@@ -133,6 +134,10 @@ daily_csv = reports.daily_csv
 close_day = reports.close_day
 dues_list = reports.dues_list
 dues_csv = reports.dues_csv
+# FM-01 earlier-year dues (FR-FEE-031..045; D84)
+student_years = arrears.student_years
+left_with_dues = arrears.left_with_dues
+left_with_dues_csv = reports.left_with_dues_csv
 # R2-3J: the accounts of a manual WhatsApp fee reminder (FR-MSG-025; messaging.sends)
 ReminderAccount = reports.ReminderAccount
 reminder_accounts = reports.reminder_accounts
@@ -428,7 +433,9 @@ def reminder_dues(session: Session, today: dt.date) -> list[ReminderDue]:
     above zero and at least the school's minimum, and whose due date is ``today`` minus one of
     the school's reminder offsets (default -3, 0, +7 days; ``fin.fee_settings``). System read for
     the daily fee reminders (R2-3G; FR-MSG-014, US-2205); an instalment already paid is never
-    listed. Empty while fees are off."""
+    listed. Empty while fees are off. Earlier-year accounts and students who left (record status
+    ``left`` or ``graduated``) are never listed: automatic reminders cover the current year of
+    students still at the school only (FM-01, FR-FEE-034; D84)."""
     if not fees_on(session, repo.current_tenant_id(session)):
         return []
     current = tenancy.get_current_academic_year(session)
@@ -439,6 +446,8 @@ def reminder_dues(session: Session, today: dt.date) -> list[ReminderDue]:
     minimum = row.min_reminder_amount if row is not None else ZERO
     wanted = {today - dt.timedelta(days=o): o for o in offsets}
     accounts = [a for a in repo.accounts_for_year(session, current.id) if a.status == "open"]
+    live = arrears.live_student_ids(session, {a.student_id for a in accounts})
+    accounts = [a for a in accounts if a.student_id in live]
     out: list[ReminderDue] = []
     for account_id, dues in ledger.dues_of(session, accounts, today).items():
         per: dict[int, list[DueLine]] = {}
@@ -596,6 +605,8 @@ __all__ = [
     "get_tax_certificate",
     "issue_tax_certificate",
     "issue_tax_certificates_bulk",
+    "left_with_dues",
+    "left_with_dues_csv",
     "list_tax_certificates",
     "mark_tax_certificate_pdf_failed",
     "parent_account_student",
@@ -617,6 +628,7 @@ __all__ = [
     "reminder_dues",
     "render_tax_certificate_pdf",
     "retry_tax_certificate_render",
+    "student_years",
     "subject_report",
     "tax_certificate_download_url",
     "tax_certificate_print_page",

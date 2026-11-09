@@ -9263,6 +9263,7 @@
       "plan_change": "Fee plan changed",
       "concession_reversal": "Concession undone",
       "correction": "Correction",
+      "write_off": "Written off by management",
       "other": "Other reason"
     },
     "approvalKinds": {
@@ -9572,8 +9573,14 @@
         "lastPayment": "Last payment",
         "overdue": "Overdue",
         "overdueInr": "Overdue (₹)",
-        "actions": "Actions"
+        "actions": "Actions",
+        "year": "Year"
       },
+      "earlierYear": "Earlier year",
+      "years": "Years",
+      "allYears": "All years",
+      "arrearsOnly": "Earlier years only",
+      "arrearsTotal": "Overdue from earlier years",
       "filterLabel": "Filter dues",
       "totalsLabel": "Totals of overdue fees",
       "noResultsTitle": "No student in this class has an overdue fee",
