@@ -220,12 +220,5 @@ export const reopenToldSchema = z.object({
   channel: z.enum(REOPEN_TOLD_CHANNELS, { error: "chooseOption" }),
 });
 
-/**
- * The `reopen:told` request body (D56). Matches the API's `IncidentReopenToldIn`; defined here
- * until the generated client is regenerated with `channel` in place of `note`.
- */
-export interface ReopenToldBody {
-  tenant_id: string;
-  reopen_seq: number;
-  channel: ReopenToldChannel;
-}
+/** The `reopen:told` request body (D56): a fixed channel, no free-text note. */
+export type ReopenToldBody = components["schemas"]["IncidentReopenToldIn"];

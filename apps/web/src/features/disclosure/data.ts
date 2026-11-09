@@ -16,33 +16,13 @@ export const EDIT = "disclosure.edit";
 export const PUBLISH = "disclosure.publish";
 
 /** A row or column of a `count_table` item (format version 2; FR-DISC-016). */
-export interface FormatChoice {
-  key: string;
-  label: string;
-}
-type GeneratedItem = components["schemas"]["FormatItemOut"];
-/**
- * Format version 2 (FC-02) adds the `count_table` type with its rows and columns, and the draft's
- * carry-over fields. Written by hand until the generated client is regenerated; the generated
- * types stay assignable to these.
- */
-export type FormatItem = Omit<GeneratedItem, "type"> & {
-  type: GeneratedItem["type"] | "count_table";
-  rows?: FormatChoice[] | null;
-  columns?: FormatChoice[] | null;
-};
-export type FormatSection = Omit<components["schemas"]["FormatSectionOut"], "items"> & {
-  items: FormatItem[];
-};
-export type DisclosureFormat = Omit<components["schemas"]["DisclosureFormatOut"], "sections"> & {
-  sections: FormatSection[];
-};
-export type DisclosureDraft = components["schemas"]["DisclosureDraftOut"] & {
-  /** The older format version whose items were carried over (FR-DISC-014); null otherwise. */
-  carried_over_from?: number | null;
-  /** Item keys of the older version that were not carried over. */
-  dropped?: string[];
-};
+export type FormatChoice = components["schemas"]["FormatChoiceOut"];
+/** Format version 2 (FC-02) adds the `count_table` type with its rows and columns. */
+export type FormatItem = components["schemas"]["FormatItemOut"];
+export type FormatSection = components["schemas"]["FormatSectionOut"];
+export type DisclosureFormat = components["schemas"]["DisclosureFormatOut"];
+/** Carries `carried_over_from` and `dropped` (FR-DISC-014) when items came from an older version. */
+export type DisclosureDraft = components["schemas"]["DisclosureDraftOut"];
 export type DerivedValue = components["schemas"]["DerivedValueOut"];
 export type DraftDocument = components["schemas"]["DraftDocumentOut"];
 export type Snapshot = components["schemas"]["SnapshotOut"];

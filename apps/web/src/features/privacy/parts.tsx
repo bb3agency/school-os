@@ -67,8 +67,8 @@ export function DueCell({
   );
 }
 
-// "legal_hold" (FC-12, ADR-0059): listed before the client is regenerated with it.
-const OUTCOME_VARIANTS: Record<ErasurePlanRow["outcome"] | "legal_hold", PillVariant> = {
+// "legal_hold" (FC-12, ADR-0059) blocks erasure while a hold is in force.
+const OUTCOME_VARIANTS: Record<ErasurePlanRow["outcome"], PillVariant> = {
   erasable: "positive",
   refused_official_record: "tag",
   refused_legal_obligation: "tag",

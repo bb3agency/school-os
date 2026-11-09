@@ -23,6 +23,7 @@ import {
   unlockExam,
   unlockSchema,
   useMarksHistory,
+  type Exam,
   type MarkChange,
 } from "./data";
 import { LoadGate, ProblemList } from "./parts";
@@ -34,13 +35,7 @@ const UNLOCK_REASON_ID = "exam-unlock-reason";
  * locks it once results are final; only the principal unlocks it, with a reason (step-up MFA is
  * asked by the BFF client when needed). While locked, nobody can enter or import marks.
  */
-export function ExamLockPanel({
-  exam,
-  section,
-}: {
-  exam: { id: string; name: string } & Record<string, unknown>;
-  section: string;
-}) {
+export function ExamLockPanel({ exam, section }: { exam: Exam; section: string }) {
   const t = useTranslations("marks.lock");
   const tv = useTranslations("validation");
   const can = useStaffCan();

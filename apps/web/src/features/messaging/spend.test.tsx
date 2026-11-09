@@ -7,7 +7,7 @@ import { installBffStub, problem, uninstallBffStub, type BffStub } from "@/test/
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
 import { me } from "@/test/school-fixtures";
 import { CONFIGURE, READ, type Account, type Settings } from "./data";
-import { InrBanner, istToday, spendSchema, type Spend } from "./SpendCard";
+import { InrBanner, istToday, type Spend } from "./SpendCard";
 
 /**
  * FP-11 (FR-MSG-031..034): the "Messages and estimated Meta cost" card and the banner for an
@@ -190,9 +190,13 @@ describe("messages and estimated Meta cost (FR-MSG-032, FR-MSG-033)", () => {
     expect(stub.callsTo("GET /bff/api/v1/messaging/spend")).toHaveLength(1);
   });
 
-  it("parses the API answer strictly enough to refuse a wrong shape", () => {
-    expect(spendSchema.safeParse(SPEND).success).toBe(true);
-    expect(spendSchema.safeParse({ ...SPEND, months: "none" }).success).toBe(false);
+  it("types the API answer strictly enough to refuse a wrong shape", () => {
+    // The generated MessagingSpendOut type: the fixture fits it and a wrong shape does not.
+    const ok: Spend = SPEND;
+    expect(Array.isArray(ok.months)).toBe(true);
+    // @ts-expect-error months is a list of months, not a string.
+    const wrong: Spend = { ...SPEND, months: "none" };
+    expect(Array.isArray(wrong.months)).toBe(false);
   });
 });
 
