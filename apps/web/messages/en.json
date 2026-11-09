@@ -8181,7 +8181,8 @@
   "tally": {
     "nav": {
       "dues": "Fee dues",
-      "connector": "Tally connector"
+      "connector": "Tally connector",
+      "vouchers": "Tally voucher export"
     },
     "off": {
       "title": "The Tally connector is not switched on",
@@ -8387,6 +8388,104 @@
       "module_hidden": {
         "title": "The Tally connector is hidden",
         "body": "Your school runs SchoolOS alongside another ERP. Change this in school settings to set up the connector."
+      }
+    },
+    "vouchers": {
+      "title": "Tally voucher export",
+      "description": "Download receipts, cancellations and refunds as a file you import into Tally yourself. SchoolOS never changes your Tally books.",
+      "noAccessTitle": "You cannot export vouchers",
+      "noAccessBody": "Ask the accountant or principal if you need the Tally file.",
+      "unverifiedTitle": "Try the first file in a test company",
+      "unverifiedBody": "The file follows Tally's standard import format, but it has not yet been tried with your Tally version. Import it into a copy of your company first and check a few vouchers.",
+      "modes": {
+        "cash": "Cash",
+        "cheque": "Cheque",
+        "bank_transfer": "Bank transfer",
+        "upi_qr": "UPI (school QR)",
+        "razorpay": "Online payment"
+      },
+      "kinds": {
+        "receipt": "Receipts",
+        "cancellation": "Cancelled receipts",
+        "refund": "Refunds",
+        "demand": "Fee demand journals"
+      },
+      "mapping": {
+        "title": "Tally ledgers",
+        "description": "Type each ledger name exactly as it is in Tally. The file never creates a ledger; an unknown name stops the import in Tally.",
+        "exactNames": "Names must match Tally exactly, including spaces.",
+        "notSaved": "These are suggestions. Check them against Tally and save.",
+        "partyMode": "Who pays, in Tally",
+        "partyStudent": "Each student's own ledger",
+        "partyReceivable": "One fee receivable ledger for all students",
+        "partyStudentHint": "Uses the ledger linked to each student on the Tally connector. Students without exactly one linked ledger go to the receivable ledger.",
+        "partyStudentNoLinksHint": "The Tally connector is not on, so every student goes to the receivable ledger until ledgers are linked.",
+        "partyReceivableHint": "Every receipt goes to the one receivable ledger; the narration names the student.",
+        "receivable": "Fee receivable ledger",
+        "modeLedger": "Ledger for {mode}",
+        "company": "Tally company name (optional)",
+        "companyHint": "When given, Tally imports into this company only.",
+        "includeDemand": "Also export fee demand (charges, late fees, concessions)",
+        "includeDemandHint": "Leave this off if you raise fee bills in Tally yourself, or the dues are counted twice.",
+        "headLedger": "Income ledger for {head}",
+        "otherIncome": "Income ledger for late fees and adjustments without a fee head",
+        "save": "Save ledgers",
+        "saving": "Saving…",
+        "saved": "Ledgers saved.",
+        "readOnly": "Only the accountant, principal or owner can change these ledgers."
+      },
+      "export": {
+        "title": "Download vouchers",
+        "description": "Only closed days can be exported, so a file never changes. Vouchers in an earlier file are left out unless you ask for them.",
+        "notConfiguredTitle": "Save the Tally ledgers first",
+        "notConfiguredBody": "The file needs a ledger for every payment mode used in the period.",
+        "from": "From",
+        "to": "To",
+        "includeExported": "Include vouchers already exported",
+        "check": "Check period",
+        "newOf": "{new} new of {all}",
+        "cashIn": "Money in",
+        "cashOut": "Money back out",
+        "empty": "No vouchers in this period.",
+        "openDaysTitle": "Some days are not closed yet",
+        "openDaysBody": "Close these days in the daily collection report first: {days}.",
+        "missingTitle": "Some ledgers are not mapped yet",
+        "onReceivable": "{count, plural, one {# student goes} other {# students go}} to the receivable ledger.",
+        "alreadyExported": "{count, plural, one {# voucher was} other {# vouchers were}} in an earlier file and will be left out.",
+        "download": "Download Tally file",
+        "importHint": "In Tally: Gateway of Tally > Import > Vouchers, then choose this file.",
+        "done": "File downloaded. Import it in Tally, then check the vouchers there."
+      },
+      "history": {
+        "title": "Earlier files",
+        "loading": "Loading earlier files",
+        "loadError": "Earlier files could not be loaded. Reload the page to try again.",
+        "empty": "No file has been downloaded yet.",
+        "period": "Period",
+        "vouchers": "Vouchers",
+        "net": "Net money",
+        "by": "Downloaded by",
+        "repeat": "Included vouchers exported before"
+      },
+      "check": {
+        "title": "Compare with Tally",
+        "description": "Balances from the last Tally sync against what SchoolOS says the same students owed that day. Nothing is changed in either place.",
+        "loading": "Comparing with Tally",
+        "off": "The Tally connector is not switched on, so balances cannot be compared.",
+        "noSync": "No sync from Tally has arrived yet.",
+        "summary": "Tally as of {asOf}: {compared, number} ledgers compared, {differing, number} differ.",
+        "notExported": "{count, plural, one {# voucher up to that day is} other {# vouchers up to that day are}} not in a file yet. Import them before you compare.",
+        "ledger": "Tally ledger",
+        "tally": "Tally",
+        "schoolos": "SchoolOS",
+        "difference": "Difference",
+        "allMatch": "Every compared ledger matches.",
+        "states": {
+          "matches": "Matches",
+          "differs": "Differs",
+          "missing_in_tally": "Not in the last Tally sync",
+          "not_in_schoolos": "Not in SchoolOS"
+        }
       }
     }
   },

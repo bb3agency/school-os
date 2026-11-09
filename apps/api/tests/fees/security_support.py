@@ -61,7 +61,9 @@ _days = itertools.count(1)
 
 
 def is_fee_path(path: str) -> bool:
-    return path.startswith(("/api/v1/fees/", "/api/v1/payments/")) or path.endswith("/fee-accounts")
+    return path.startswith(
+        ("/api/v1/fees/", "/api/v1/payments/", "/api/v1/tally/vouchers/")  # FM-03: fees gate
+    ) or path.endswith("/fee-accounts")
 
 
 @contextlib.contextmanager

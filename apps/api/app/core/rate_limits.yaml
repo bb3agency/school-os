@@ -225,6 +225,9 @@ routes:
   POST /api/v1/fees/reminders/preview: [search]
   # FP-02: a closure preview reads every guardian of the school
   POST /api/v1/messaging/closures/preview: [search]
+  # FM-03: the Tally voucher file reads a period's receipts, cancellations, refunds and demand
+  GET /api/v1/tally/vouchers/preview: [search]
+  POST /api/v1/tally/vouchers/export: [exports]
   POST /api/v1/platform/invoice-runs: [platform_emergency]
   # audit-chain verification (R-19)
   POST /api/v1/platform/audit/verify: [platform_audit_verify]

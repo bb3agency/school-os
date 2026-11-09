@@ -67,6 +67,8 @@ READ_ONLY_EXPENSIVE_OK = {
     ("GET", "/api/v1/imports/{import_id}/sheet"),
     ("GET", "/api/v1/documents/{document_id}/sheet"),
     ("GET", "/api/v1/admin/tenant-export"),
+    # FM-03: the list of earlier Tally voucher files (rows only; the file is not kept).
+    ("GET", "/api/v1/tally/vouchers/exports"),
     ("GET", "/api/v1/support/tickets"),
     ("GET", "/api/v1/platform/support/tickets"),
     ("GET", "/api/v1/import-templates"),

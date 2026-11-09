@@ -475,6 +475,14 @@ export function SchoolShell({
           icon: "server",
         },
         {
+          // FM-03 (FR-TALLY-011..030): the Tally voucher file; needs fees, not the connector.
+          href: "/settings/tally/vouchers",
+          label: t("tally.nav.vouchers"),
+          permission: ["tally.configure", "fee.report"],
+          feature: "fees",
+          icon: "inbox",
+        },
+        {
           // R2-3J (FR-MSG-014, US-2205): receipt paper, GST line and fee reminder days.
           href: "/settings/fees",
           label: t("fees.nav.feeSettings"),

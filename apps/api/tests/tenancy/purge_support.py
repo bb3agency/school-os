@@ -1202,6 +1202,36 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             p=tparty,
             s=sync,
         )
+        # FM-03 voucher export (0094_tally_vouchers): mapping, one export, one voucher record.
+        texport = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.tally_export_settings (id, tenant_id, party_mode, "
+            "receivable_ledger, updated_by) VALUES (:i, :t, 'student', 'Fee receivable', :u)",
+            i=uuid.uuid4(),
+            t=t,
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.tally_voucher_exports (id, tenant_id, period_from, period_to, "
+            "include_exported, include_demand, party_mode, vouchers, new_vouchers, cash_total, "
+            "file_sha256, created_by) VALUES (:i, :t, '2026-11-01', '2026-11-01', false, false, "
+            "'student', 1, 1, 10.00, :h, :u)",
+            i=texport,
+            t=t,
+            h=bytes(32),
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.tally_exported_vouchers (id, tenant_id, voucher_key, kind, "
+            "export_id) VALUES (:i, :t, :k, 'receipt', :e)",
+            i=uuid.uuid4(),
+            t=t,
+            k=f"receipt:{uuid.uuid4()}",
+            e=texport,
+        )
         # --- R2-1B fees (0058_fees_core): one row in every fin table --------------------------
         f = {
             k: uuid.uuid4() for k in ("head", "plan", "acct", "rcpt", "conc", "adj", "canc", "rfd")
