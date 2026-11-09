@@ -827,6 +827,12 @@ Built only if the owner reopens D10 (wave R3-2E; D43).
 | POST | `/dq/calendar` (school's own event: `label` 3-120 characters, no personal data; dates; `profile_keys` ≤ 5; `source_kind`; `document_id`?; owner) → 201 | `readiness.calendar.manage` (`Idempotency-Key`) |
 | DELETE | `/dq/calendar/{event_key}?academic_year_id=` (own events, or undo a confirmation; reminders already sent stay in the history) → 204 | `readiness.calendar.manage` (`If-Match`) |
 | POST | `/tasks/{task_id}/portal-event` (`{"event_key"}`; the task's due date becomes the event's confirmed closing date) | `readiness.calendar.manage` and a school-wide `task.manage` (403 otherwise); 404 for a task out of reach; 422 `not_circular_task`; `Idempotency-Key` |
+| GET | `/dq/readiness/{profile_key}/follow-ups?section_id=&state=&fix_owner=` (FO-01: one line per student and fix owner while the readiness still names it; state `not_started` / `waiting` / `overdue` / `update_reported`, last step, promised date; totals per owner) | `dq.readiness.read`; section out of reach 404 |
+| GET | `/dq/readiness/{profile_key}/follow-ups/{student_id}` (steps recorded, oldest first, and open follow-ups) | `dq.readiness.read`; student out of reach 404 |
+| POST | `/dq/readiness/{profile_key}/follow-ups` (`student_ids` 1-300, `fix_owner`, `event`, `channel`?, `occurred_on`?, `promised_on`?) → 201 `{"recorded"}` | `dq.readiness.manage`; `Idempotency-Key`; 404 student out of reach; 422 `no_open_fix`, `event_not_for_owner`, `channel_required`, `channel_not_allowed`, `future_date`, `too_old`, `before_step`, `too_far`, `not_allowed`, `required` |
+| GET | `/dq/udise-todo?state=` (FO-03: steps to repeat in UDISE+ computed from TCs, leavers, admissions and promotions; open first; totals) | `dq.readiness.read`; progression items for school-wide readers only |
+| PUT | `/dq/udise-todo/{item_key}` (`{"state": "done" \| "not_needed"}`) | `dq.readiness.manage`; no `If-Match` for the first tick, `If-Match` for a change (400 `if_match_required`, 412 stale); 404 for an item out of reach |
+| DELETE | `/dq/udise-todo/{item_key}` (undo a tick) → 204 | `dq.readiness.manage` (`If-Match`); 404 when nothing is ticked |
 
 #### Public (R3.2) — through the BFF with the service token, **no user token**
 
