@@ -48,7 +48,108 @@ const headSchema = z.object({
     .string()
     .optional()
     .transform((v) => v === "on"),
+  tax_tuition: z
+    .string()
+    .optional()
+    .transform((v) => v === "on"),
 });
+
+const HEAD_KINDS = ["tuition", "admission", "exam", "books", "transport", "other"] as const;
+type HeadKind = (typeof HEAD_KINDS)[number];
+
+/** FM-06 (FR-FEE-047): change whether a head counts as tuition on the tax certificate. */
+const headTaxSchema = z.object({
+  tax_tuition: z
+    .string()
+    .optional()
+    .transform((v) => v === "on"),
+});
+
+/**
+ * The head's kind and "counts as tuition for tax" (FR-FEE-047): the box follows the kind (on
+ * for tuition, off otherwise, as the API's default) until the person ticks or clears it.
+ */
+function HeadKindAndTax() {
+  const t = useTranslations("fees.setup");
+  const tf = useTranslations("fees");
+  const tt = useTranslations("fees.taxCertificate");
+  const hintId = useId();
+  const [kind, setKind] = useState<HeadKind>("tuition");
+  const [taxTuition, setTaxTuition] = useState<boolean | null>(null);
+  return (
+    <>
+      <SelectField
+        name="kind"
+        label={t("headKind")}
+        value={kind}
+        onChange={(e) => setKind(e.target.value as HeadKind)}
+        options={HEAD_KINDS.map((k) => ({ value: k, label: tf(`headKinds.${k}`) }))}
+      />
+      <div>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            name="tax_tuition"
+            aria-describedby={hintId}
+            checked={taxTuition ?? kind === "tuition"}
+            onChange={(e) => setTaxTuition(e.target.checked)}
+          />
+          {tt("headToggle")}
+        </label>
+        <p id={hintId} className="text-sm text-ink-muted">
+          {tt("headToggleHint")}
+        </p>
+      </div>
+    </>
+  );
+}
+
+/** Edit a head's "counts as tuition for tax" (`fee.manage`, If-Match; FR-FEE-047). */
+function HeadTaxDialog({ head }: { head: Head }) {
+  const tt = useTranslations("fees.taxCertificate");
+  const api = useBffClient("staff");
+  const hintId = useId();
+  return (
+    <ActionDialog
+      triggerLabel={tt("editHead")}
+      triggerSize="sm"
+      triggerVariant="ghost"
+      triggerDescription={head.name}
+      title={tt("editHeadTitle", { name: head.name })}
+      confirmLabel={tt("save")}
+      consequence={tt("editHeadConsequence")}
+      schema={headTaxSchema}
+      invalidate={[KEYS.heads]}
+      errorNamespace="fees"
+      submit={(input) =>
+        unwrap(
+          api.PATCH("/api/v1/fees/heads/{head_id}", {
+            params: { path: { head_id: head.id } },
+            headers: { "If-Match": ifMatch(head.version) },
+            body: { tax_tuition: input.tax_tuition },
+          }),
+        )
+      }
+    >
+      {() => (
+        <div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="tax_tuition"
+              aria-describedby={hintId}
+              defaultChecked={head.tax_tuition}
+            />
+            {tt("headToggle")}
+          </label>
+          <p id={hintId} className="text-sm text-ink-muted">
+            {tt("headToggleHint")}
+          </p>
+        </div>
+      )}
+    </ActionDialog>
+  );
+}
 
 interface Column {
   label: string;
@@ -619,6 +720,7 @@ function PlanRow({ plan, classes }: { plan: Plan; classes: Map<string, string> }
 export function SetupScreen() {
   const t = useTranslations("fees.setup");
   const tf = useTranslations("fees");
+  const tt = useTranslations("fees.taxCertificate");
   const tn = useTranslations("school.nav");
   const can = useStaffCan();
   const me = useStaffMe();
@@ -700,6 +802,7 @@ export function SetupScreen() {
                             name: input.name,
                             kind: input.kind,
                             gst_exempt: !input.taxable,
+                            tax_tuition: input.tax_tuition,
                             sort_order: 100,
                           },
                         }),
@@ -721,16 +824,7 @@ export function SetupScreen() {
                           error={errors.name}
                           maxLength={80}
                         />
-                        <SelectField
-                          name="kind"
-                          label={t("headKind")}
-                          options={(
-                            ["tuition", "admission", "exam", "books", "transport", "other"] as const
-                          ).map((k) => ({
-                            value: k,
-                            label: tf(`headKinds.${k}`),
-                          }))}
-                        />
+                        <HeadKindAndTax />
                         <label className="flex items-center gap-2">
                           <input type="checkbox" name="taxable" />
                           {t("headTaxable")}
@@ -753,6 +847,7 @@ export function SetupScreen() {
                         <Th>{t("headName")}</Th>
                         <Th>{t("headKind")}</Th>
                         <Th>{t("headTax")}</Th>
+                        <Th>{tt("headColumn")}</Th>
                         <Th>{t("headInUse")}</Th>
                       </Tr>
                     </THead>
@@ -765,6 +860,12 @@ export function SetupScreen() {
                           <Td>{h.name}</Td>
                           <Td>{tf(`headKinds.${h.kind}`)}</Td>
                           <Td>{h.gst_exempt ? t("exempt") : t("taxable")}</Td>
+                          <Td>
+                            <span className="inline-flex flex-wrap items-center gap-2">
+                              {h.tax_tuition ? tt("yes") : tt("no")}
+                              {can(MANAGE) ? <HeadTaxDialog head={h} /> : null}
+                            </span>
+                          </Td>
                           <Td>
                             {h.active ? (
                               <Badge tone="success">{t("inUse")}</Badge>

@@ -35,6 +35,7 @@ import {
 import { PaymentLinks } from "@/features/payments/PaymentLinks";
 import { FeeRemindersDialog, useCanSendFeeReminders } from "@/features/messaging/FeeReminders";
 import { MessageHistory } from "@/features/messaging/MessagesScreen";
+import { TaxCertificatePanel } from "./TaxCertificates";
 import { READ as MESSAGE_READ, type FeeReminderSelection } from "@/features/messaging/data";
 import {
   Amount,
@@ -537,6 +538,7 @@ export function AccountScreen({ accountId }: { accountId: string }) {
   const tc = useTranslations("common");
   const tu = useTranslations("ui");
   const tp = useTranslations("payments.links");
+  const tt = useTranslations("fees.taxCertificate");
   const locale = useLocale() as Locale;
   const can = useStaffCan();
   const me = useStaffMe();
@@ -653,6 +655,8 @@ export function AccountScreen({ accountId }: { accountId: string }) {
               { id: "statement", label: t("tabStatement"), panel: <Statement accountId={a.id} /> },
               { id: "requests", label: t("tabRequests"), panel: <Requests account={a} /> },
               { id: "links", label: tp("tab"), panel: <PaymentLinks account={a} /> },
+              // FM-06 (FR-FEE-049): the tuition fee certificate for income tax.
+              { id: "tax", label: tt("tab"), panel: <TaxCertificatePanel account={a} /> },
               // FR-MSG-028: the messages about this student (metadata only, message.read).
               ...(can(MESSAGE_READ)
                 ? [

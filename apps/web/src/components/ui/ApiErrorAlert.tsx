@@ -41,7 +41,8 @@ export type ErrorNamespace =
   | "platform.incidents"
   | "portalCalendar"
   | "privacy"
-  | "disclosure";
+  | "disclosure"
+  | "fees.taxCertificate";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

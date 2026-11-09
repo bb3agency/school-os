@@ -291,6 +291,14 @@ export function SchoolShell({
           activePattern: "^/fees/(receipts|accounts)(/.*)?$",
         },
         {
+          // FM-06 (FR-FEE-055): tuition fee certificates for income tax.
+          href: "/fees/tax-certificates",
+          label: t("fees.nav.taxCertificates"),
+          permission: ["fee.collect", "finance.read"],
+          feature: "fees",
+          icon: "file",
+        },
+        {
           href: "/fees/approvals",
           label: t("fees.nav.approvals"),
           permission: [
