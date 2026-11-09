@@ -165,7 +165,8 @@ function StaffSelect({ fieldId, error }: { fieldId: string; error?: string | und
 }
 
 /** Student search as a combobox with a listbox of up to 8 matches (WAI-ARIA combobox). */
-function StudentCombobox({
+/** Student search combobox; also used by the legal hold dialog (FC-12). */
+export function StudentCombobox({
   fieldId,
   error,
   onPick,

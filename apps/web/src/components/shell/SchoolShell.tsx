@@ -215,6 +215,13 @@ export function SchoolShell({
           icon: "alert",
         },
         {
+          // FC-12 legal holds (ADR-0059): owner and principal only.
+          href: "/privacy/holds",
+          label: t("holds.nav"),
+          permission: "privacy.hold.manage",
+          icon: "lock",
+        },
+        {
           href: "/settings/consent-purposes",
           label: t("consents.purposes.nav"),
           permission: "tenant.settings.manage",
