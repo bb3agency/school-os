@@ -20,7 +20,18 @@ from sqlalchemy.orm import Session
 from app.core.ids import new_id
 from app.core.record_tables import dump_table
 from app.core.records import RecordTable
-from app.tally.models import Bill, Device, EnrolmentCode, Group, Party, PartyLink, Sync
+from app.tally.models import (
+    Bill,
+    Device,
+    EnrolmentCode,
+    ExportedVoucher,
+    ExportSettings,
+    Group,
+    Party,
+    PartyLink,
+    Sync,
+    VoucherExport,
+)
 
 
 def current_tenant_id(session: Session) -> uuid.UUID:
@@ -519,6 +530,10 @@ def export_tables(session: Session) -> list[RecordTable]:
         dump_table(session, Party.__table__, name="tally_parties"),
         dump_table(session, PartyLink.__table__, name="tally_party_links"),
         dump_table(session, Bill.__table__, name="tally_bills"),
+        # FM-03 (0094_tally_vouchers): the ledger mapping and the export history.
+        dump_table(session, ExportSettings.__table__, name="tally_export_settings"),
+        dump_table(session, VoucherExport.__table__, name="tally_voucher_exports"),
+        dump_table(session, ExportedVoucher.__table__, name="tally_exported_vouchers"),
     ]
 
 

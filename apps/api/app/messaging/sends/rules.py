@@ -79,6 +79,29 @@ def next_open(  # noqa: PLR0911 - one return per window case
     return None
 
 
+def closure_next_open(
+    now: dt.datetime, *, window_start: dt.time, window_end: dt.time
+) -> dt.datetime | None:
+    """FP-02 (FR-MSG-050; ADR-0043 amendment of 2026-11-09, lead decision D85): ``None`` when
+    an urgent closure message may be sent at ``now`` (``window_start`` <= IST time <
+    ``window_end``, also inside the school's quiet hours); otherwise the IST moment the window
+    opens again (never outside it)."""
+    local = ist_now(now)
+    t = local.time()
+    if window_start <= t < window_end:
+        return None
+    day = local.date() if t < window_start else local.date() + dt.timedelta(days=1)
+    return dt.datetime.combine(day, window_start, tzinfo=IST)
+
+
+def not_opened(sent_at: dt.datetime | None, now: dt.datetime, *, hours: int, opened: bool) -> bool:
+    """FP-01 (FR-MSG-045): a message sent at least ``hours`` ago that was neither read on
+    WhatsApp nor opened on its parent page (a follow-up list, never a resend)."""
+    if opened or sent_at is None:
+        return False
+    return now - sent_at >= dt.timedelta(hours=hours)
+
+
 def next_morning(now: dt.datetime, quiet_end: dt.time) -> dt.datetime:
     """Tomorrow's first sending time (the daily cap is reached for today)."""
     return dt.datetime.combine(ist_today(now) + dt.timedelta(days=1), quiet_end, tzinfo=IST)
@@ -140,6 +163,7 @@ __all__ = [
     "IST",
     "cap_reached",
     "closes_at",
+    "closure_next_open",
     "estimate_cost",
     "ist_midnight",
     "ist_now",
@@ -147,6 +171,7 @@ __all__ = [
     "job_due",
     "next_morning",
     "next_open",
+    "not_opened",
     "parent_amount",
     "parent_date",
     "too_late",

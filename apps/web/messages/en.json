@@ -241,6 +241,7 @@
       "label": "Main",
       "home": "Home",
       "structure": "School structure",
+      "calendar": "School calendar",
       "users": "Users and roles",
       "billing": "Plan and billing",
       "audit": "Audit log",
@@ -2186,9 +2187,27 @@
       "quiet_hours_empty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00.",
       "invalid_time": "Enter a time as HH:MM, for example 07:00.",
       "keys_rejected": "Razorpay did not accept this key id and secret. Copy both again from the Razorpay dashboard (Account & Settings > API keys).",
-      "write_off_reduces_due": "A write-off is a negative amount on a fee line, like -1500."
+      "write_off_reduces_due": "A write-off is a negative amount on a fee line, like -1500.",
+      "channel_required": "Choose how you reached the parent or the office.",
+      "channel_not_allowed": "This step does not take a channel. Leave it empty.",
+      "event_not_for_owner": "This step does not fit who must fix it. Choose another step.",
+      "before_step": "The promised date cannot be before the step. Choose a later date.",
+      "too_far": "The date is too far ahead. Choose an earlier date.",
+      "not_allowed": "This value is not allowed here. Leave it empty.",
+      "no_open_fix": "Nothing is waiting for this fix any more. Reload the list.",
+      "document_not_found": "Choose a document from the list.",
+      "label_required": "Type the name of the certificate.",
+      "label_not_allowed": "Only an 'other' certificate takes a name.",
+      "unknown_kind": "Choose a certificate from the list.",
+      "renews_not_allowed": "Only an 'other' certificate names the one it renews.",
+      "renews_not_found": "The certificate it renews was changed. Reload the page.",
+      "certificate_expired": "This certificate has expired. Record the renewed one before publishing."
     },
     "api": {
+      "year_result_changed": {
+        "title": "Someone else changed these results",
+        "body": "Reload the section, check the results again and save once more."
+      },
       "generic": {
         "title": "Something went wrong",
         "body": "Try again. If it keeps happening, contact support and give them the reference below."
@@ -3193,7 +3212,11 @@
       "admission_no_not_mapped": "Choose the column with the admission number. Every row needs one to be matched.",
       "aadhaar_full_number_rejected": "this looks like a full Aadhaar number. It was not kept. Keep only the last 4 digits in the file.",
       "aadhaar_last4_only": "this looks like a full Aadhaar number. It was not kept. Keep only the last 4 digits in the file.",
-      "formula_not_evaluated": "this cell holds a formula, which is never run. Replace it with its value in the file."
+      "formula_not_evaluated": "this cell holds a formula, which is never run. Replace it with its value in the file.",
+      "udise_unmatched": "no student has this PEN, or this name, date of birth and class. Choose the student or skip the row.",
+      "udise_match_ambiguous": "more than one student has this name, date of birth and class. Choose the student or skip the row.",
+      "picked_student_unavailable": "the student you chose is no longer in your classes. Choose again.",
+      "duplicate_student_in_file": "another row (row {row}) is the same student. Keep one of them."
     },
     "mapping": {
       "duplicate": "Another column already fills this field. Choose a different field, or don't import this column.",
@@ -8165,7 +8188,8 @@
   "tally": {
     "nav": {
       "dues": "Fee dues",
-      "connector": "Tally connector"
+      "connector": "Tally connector",
+      "vouchers": "Tally voucher export"
     },
     "off": {
       "title": "The Tally connector is not switched on",
@@ -8371,6 +8395,104 @@
       "module_hidden": {
         "title": "The Tally connector is hidden",
         "body": "Your school runs SchoolOS alongside another ERP. Change this in school settings to set up the connector."
+      }
+    },
+    "vouchers": {
+      "title": "Tally voucher export",
+      "description": "Download receipts, cancellations and refunds as a file you import into Tally yourself. SchoolOS never changes your Tally books.",
+      "noAccessTitle": "You cannot export vouchers",
+      "noAccessBody": "Ask the accountant or principal if you need the Tally file.",
+      "unverifiedTitle": "Try the first file in a test company",
+      "unverifiedBody": "The file follows Tally's standard import format, but it has not yet been tried with your Tally version. Import it into a copy of your company first and check a few vouchers.",
+      "modes": {
+        "cash": "Cash",
+        "cheque": "Cheque",
+        "bank_transfer": "Bank transfer",
+        "upi_qr": "UPI (school QR)",
+        "razorpay": "Online payment"
+      },
+      "kinds": {
+        "receipt": "Receipts",
+        "cancellation": "Cancelled receipts",
+        "refund": "Refunds",
+        "demand": "Fee demand journals"
+      },
+      "mapping": {
+        "title": "Tally ledgers",
+        "description": "Type each ledger name exactly as it is in Tally. The file never creates a ledger; an unknown name stops the import in Tally.",
+        "exactNames": "Names must match Tally exactly, including spaces.",
+        "notSaved": "These are suggestions. Check them against Tally and save.",
+        "partyMode": "Who pays, in Tally",
+        "partyStudent": "Each student's own ledger",
+        "partyReceivable": "One fee receivable ledger for all students",
+        "partyStudentHint": "Uses the ledger linked to each student on the Tally connector. Students without exactly one linked ledger go to the receivable ledger.",
+        "partyStudentNoLinksHint": "The Tally connector is not on, so every student goes to the receivable ledger until ledgers are linked.",
+        "partyReceivableHint": "Every receipt goes to the one receivable ledger; the narration names the student.",
+        "receivable": "Fee receivable ledger",
+        "modeLedger": "Ledger for {mode}",
+        "company": "Tally company name (optional)",
+        "companyHint": "When given, Tally imports into this company only.",
+        "includeDemand": "Also export fee demand (charges, late fees, concessions)",
+        "includeDemandHint": "Leave this off if you raise fee bills in Tally yourself, or the dues are counted twice.",
+        "headLedger": "Income ledger for {head}",
+        "otherIncome": "Income ledger for late fees and adjustments without a fee head",
+        "save": "Save ledgers",
+        "saving": "Saving…",
+        "saved": "Ledgers saved.",
+        "readOnly": "Only the accountant, principal or owner can change these ledgers."
+      },
+      "export": {
+        "title": "Download vouchers",
+        "description": "Only closed days can be exported, so a file never changes. Vouchers in an earlier file are left out unless you ask for them.",
+        "notConfiguredTitle": "Save the Tally ledgers first",
+        "notConfiguredBody": "The file needs a ledger for every payment mode used in the period.",
+        "from": "From",
+        "to": "To",
+        "includeExported": "Include vouchers already exported",
+        "check": "Check period",
+        "newOf": "{new} new of {all}",
+        "cashIn": "Money in",
+        "cashOut": "Money back out",
+        "empty": "No vouchers in this period.",
+        "openDaysTitle": "Some days are not closed yet",
+        "openDaysBody": "Close these days in the daily collection report first: {days}.",
+        "missingTitle": "Some ledgers are not mapped yet",
+        "onReceivable": "{count, plural, one {# student goes} other {# students go}} to the receivable ledger.",
+        "alreadyExported": "{count, plural, one {# voucher was} other {# vouchers were}} in an earlier file and will be left out.",
+        "download": "Download Tally file",
+        "importHint": "In Tally: Gateway of Tally > Import > Vouchers, then choose this file.",
+        "done": "File downloaded. Import it in Tally, then check the vouchers there."
+      },
+      "history": {
+        "title": "Earlier files",
+        "loading": "Loading earlier files",
+        "loadError": "Earlier files could not be loaded. Reload the page to try again.",
+        "empty": "No file has been downloaded yet.",
+        "period": "Period",
+        "vouchers": "Vouchers",
+        "net": "Net money",
+        "by": "Downloaded by",
+        "repeat": "Included vouchers exported before"
+      },
+      "check": {
+        "title": "Compare with Tally",
+        "description": "Balances from the last Tally sync against what SchoolOS says the same students owed that day. Nothing is changed in either place.",
+        "loading": "Comparing with Tally",
+        "off": "The Tally connector is not switched on, so balances cannot be compared.",
+        "noSync": "No sync from Tally has arrived yet.",
+        "summary": "Tally as of {asOf}: {compared, number} ledgers compared, {differing, number} differ.",
+        "notExported": "{count, plural, one {# voucher up to that day is} other {# vouchers up to that day are}} not in a file yet. Import them before you compare.",
+        "ledger": "Tally ledger",
+        "tally": "Tally",
+        "schoolos": "SchoolOS",
+        "difference": "Difference",
+        "allMatch": "Every compared ledger matches.",
+        "states": {
+          "matches": "Matches",
+          "differs": "Differs",
+          "missing_in_tally": "Not in the last Tally sync",
+          "not_in_schoolos": "Not in SchoolOS"
+        }
       }
     }
   },
@@ -8855,7 +8977,8 @@
         "absence_alert": "Absence alert",
         "fee_reminder": "Fee reminder",
         "fee_receipt": "Fee receipt",
-        "optin_stopped": "Stop confirmation"
+        "optin_stopped": "Stop confirmation",
+        "school_closure": "School closure"
       },
       "languages": {
         "en": "English",
@@ -9201,9 +9324,196 @@
       "noteRates": "Meta's rates were checked on {date}.",
       "noteRatesUnverified": "Rates were last checked on {date} from published summaries, not yet against Meta's rupee rate card.",
       "noteService": "Since 1 October 2026 Meta charges every utility message, also when the parent wrote first, and replies above {free} a month. Automatic replies are counted for the last {days} days only."
+    },
+    "reach": {
+      "open": "Who WhatsApp reaches",
+      "title": "Who WhatsApp reaches",
+      "description": "How many students have at least one guardian who gets WhatsApp messages, section by section, and which families to follow up.",
+      "category": "Messages about",
+      "summary": "{reached} of {students} students reached ({percent}%)",
+      "listNote": "This is a list to follow up with families, not a score for staff. Phone numbers are not shown here.",
+      "coverageCaption": "Students reached per section",
+      "reachedCell": "{reached} ({percent}%)",
+      "seeMissing": "See who is missing in {section}",
+      "allReached": "Everyone reached",
+      "emptyTitle": "No students in your sections",
+      "emptyBody": "Students appear here once they are enrolled in this year's sections.",
+      "unavailableTitle": "WhatsApp is not offered here",
+      "unavailableBody": "WhatsApp messages are not available for this school.",
+      "missingTitle": "Not reached in {section}",
+      "missingDescription": "Students whom no WhatsApp message of this kind reaches, and why for each guardian.",
+      "missingCaption": "Students not reached in {section}",
+      "missingEmptyTitle": "Everyone in this section is reached",
+      "missingEmptyBody": "At least one guardian of every student gets these messages.",
+      "printMissing": "Print join slips for these families",
+      "truncated": "Only the first 2,000 students are listed.",
+      "nameHidden": "Name not shown to you",
+      "noGuardian": "No guardian on record",
+      "primary": "primary",
+      "columns": {
+        "section": "Section",
+        "students": "Students",
+        "reached": "Reached",
+        "optedIn": "Guardians who agreed",
+        "noMobile": "No mobile number",
+        "action": "Follow up",
+        "student": "Student",
+        "guardians": "Guardians and why"
+      },
+      "followUp": {
+        "title": "Families to follow up",
+        "description": "Students this notice did not reach. Not opened means sent {hours} hours ago and neither read on WhatsApp nor opened on the parent page. Nothing is sent again by itself.",
+        "caption": "Students to follow up",
+        "outcome": "What happened",
+        "emptyTitle": "Nobody to follow up",
+        "emptyBody": "Every student's family got and opened this notice, or it is still on its way.",
+        "outcomes": {
+          "opened": "Opened",
+          "pending": "On its way",
+          "not_sent": "Not sent",
+          "failed": "Failed",
+          "not_opened": "Not opened"
+        }
+      }
+    },
+    "closures": {
+      "open": "Urgent closure message",
+      "title": "Urgent closure message",
+      "description": "Tell parents on WhatsApp that the school is closed, for example after a cyclone warning or a Collector's order. Only the principal can send it.",
+      "formTitle": "Send a closure message",
+      "formDescription": "The message goes to every guardian who agreed to school notices. You will be asked to confirm your sign-in.",
+      "audience": "Who gets it",
+      "audiences": {
+        "school": "The whole school",
+        "sections": "Chosen sections"
+      },
+      "sectionCount": "{count, plural, one {# section} other {# sections}}",
+      "from": "Closed on",
+      "to": "Closed until (optional)",
+      "toHint": "Leave empty for one day. At most 7 days.",
+      "reason": "Reason",
+      "reasons": {
+        "weather": "Heavy rain or a storm warning",
+        "government_order": "An order from the government",
+        "local_situation": "The local situation",
+        "other": "Unavoidable reasons"
+      },
+      "check": "Check the message",
+      "messageLabel": "Parents will get this message:",
+      "recipients": "{recipients} messages to {guardians} guardians.",
+      "sendsNow": "It goes out now.",
+      "sendsAt": "It goes out at {when}.",
+      "window": "Closure messages go out between {start} and {end}, also during quiet hours, never later.",
+      "cost": "Estimated Meta cost: {cost} (the school pays Meta).",
+      "recent": "{count, plural, one {# closure message was} other {# closure messages were}} sent recently.",
+      "blocked": "This message cannot be sent now. Check WhatsApp settings.",
+      "send": "{count, plural, one {Send to # guardian} other {Send to # guardians}}",
+      "queued": "{count, plural, one {# message is on its way.} other {# messages are on their way.}}",
+      "principalOnly": "Only the principal can send an urgent closure message.",
+      "recentTitle": "Recent closure messages",
+      "uses": "{count, plural, one {# closure message} other {# closure messages}} in the last {days} days.",
+      "range": "{from} to {to}",
+      "emptyTitle": "No closure messages yet",
+      "emptyBody": "Closure messages the principal sends appear here with their delivery counts.",
+      "unavailableTitle": "WhatsApp is not offered here",
+      "unavailableBody": "WhatsApp messages are not available for this school.",
+      "columns": {
+        "dates": "Closed",
+        "reason": "Reason",
+        "audience": "Sent to",
+        "sentAt": "Sent at"
+      }
     }
   },
   "fees": {
+    "addons": {
+      "title": "Add-on fees",
+      "description": "Transport bands, hostel and activities that only some students pay, on top of the class plan.",
+      "gstTitle": "About GST",
+      "listTitle": "Add-on fees this year",
+      "empty": "No add-on fees yet.",
+      "active": "In use",
+      "inactive": "Switched off",
+      "open": "Students on {label}",
+      "columns": {
+        "label": "Name",
+        "head": "Fee head",
+        "total": "Total for the year (₹)",
+        "students": "Students",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "create": {
+        "title": "New add-on fee",
+        "description": "Name it the way parents know it, and enter what each instalment adds.",
+        "head": "Fee head",
+        "headHint": "Only transport, books or other heads that are exempt from GST.",
+        "headPlaceholder": "Choose a fee head",
+        "label": "Name",
+        "labelHint": "For example: Band 2 (5-10 km) or Hostel.",
+        "amounts": "Amount per instalment (₹)",
+        "instalment": "Instalment {no}",
+        "amountsInvalid": "Enter at least one amount, in rupees with up to two decimals.",
+        "addInstalment": "Add an instalment",
+        "submit": "Save add-on fee"
+      },
+      "panel": {
+        "title": "Students on {label}",
+        "description": "Charged under {head}. The list prints for the bus or hostel register.",
+        "print": "Print list",
+        "perInstalment": "Instalment {no}:",
+        "nobody": "Nobody is on this add-on yet.",
+        "studentsLabel": "Students on this add-on",
+        "noName": "Name hidden",
+        "columns": {
+          "student": "Student",
+          "class": "Class",
+          "from": "From instalment",
+          "charged": "Charged (₹)"
+        }
+      },
+      "assign": {
+        "title": "Put students on or take them off",
+        "action": "What to do",
+        "actions": {
+          "assign": "Put on this add-on",
+          "unassign": "Take off this add-on"
+        },
+        "whom": "Whom",
+        "modes": {
+          "class": "A whole class",
+          "section": "One section",
+          "students": "Picked students"
+        },
+        "choose": "Choose",
+        "startInstalment": "Start from instalment",
+        "startHint": "Charges start with this instalment.",
+        "fromInstalment": "Stop from instalment",
+        "fromHint": "Unpaid charges from this instalment on are credited after approval.",
+        "replace": "Change band: take them off their other add-on of this fee head first",
+        "reason": "Reason",
+        "unassignHint": "Someone else approves the credits. Money already paid comes back only as a refund.",
+        "replaceHint": "Credits for the old band need someone else's approval.",
+        "check": "Check first",
+        "submitAssign": "Put on add-on",
+        "submitUnassign": "Take off add-on"
+      },
+      "result": {
+        "checked": "Checked, nothing saved yet",
+        "done": "Saved",
+        "assigned": "{assigned} students put on, {charges} charges, {skipped} skipped, {credits} credits waiting for approval.",
+        "unassigned": "{ended} students taken off, {notAssigned} were not on it, {credits} credits waiting for approval:"
+      },
+      "picker": {
+        "search": "Find a student",
+        "searchHint": "Part of a name or the admission number.",
+        "find": "Find",
+        "results": "Students found",
+        "add": "Add {name}",
+        "picked": "Picked students",
+        "remove": "Remove {name}"
+      }
+    },
     "off": {
       "title": "Fees are not switched on",
       "body": "This school does not keep its fee ledger in SchoolOS yet. The owner or principal turns fees on in school settings once SchoolOS has enabled them for the school."
@@ -9225,7 +9535,9 @@
       "upiSettings": "UPI QR",
       "feeSettings": "Fee settings",
       "taxCertificates": "Tax certificates",
-      "leftWithDues": "Left with dues"
+      "leftWithDues": "Left with dues",
+      "reports": "Fee reports",
+      "addons": "Add-on fees"
     },
     "modes": {
       "cash": "Cash",
@@ -9276,6 +9588,7 @@
       "concession_reversal": "Concession undone",
       "correction": "Correction",
       "write_off": "Written off by management",
+      "addon_removal": "Add-on fee taken off",
       "other": "Other reason"
     },
     "approvalKinds": {
@@ -10193,6 +10506,139 @@
       },
       "emptyTitle": "No student left with dues",
       "emptyBody": "No student who left or graduated has fees still open."
+    },
+    "periodReports": {
+      "title": "Fee reports",
+      "description": "Collections for a period, demand and balance by class, registers, ageing and the year-end pack for the auditor.",
+      "tabsLabel": "Fee reports",
+      "tabs": {
+        "collections": "Collections",
+        "dcb": "Demand and balance",
+        "registers": "Registers",
+        "ageing": "Ageing",
+        "yearEnd": "Year-end pack"
+      },
+      "periodLabel": "Report period",
+      "from": "From",
+      "to": "To",
+      "periodHint": "Dates are Indian time; at most one year.",
+      "none": "None in this period.",
+      "downloads": "Download",
+      "files": {
+        "receipts": {
+          "csv": "Receipts register (CSV)",
+          "xlsx": "Receipts register (Excel)"
+        },
+        "heads": {
+          "csv": "Collected by head (CSV)"
+        },
+        "dcb": {
+          "csv": "Demand and balance (CSV)",
+          "xlsx": "Demand and balance (Excel)"
+        },
+        "concessions": {
+          "csv": "Concessions register (CSV)"
+        },
+        "adjustments": {
+          "csv": "Adjustments and write-offs (CSV)"
+        },
+        "cancellations": {
+          "csv": "Cancelled receipts (CSV)"
+        },
+        "refunds": {
+          "csv": "Refunds register (CSV)"
+        },
+        "ageing": {
+          "csv": "Ageing by student (CSV)",
+          "xlsx": "Ageing by student (Excel)"
+        }
+      },
+      "print": "Print (A4)",
+      "totalsLabel": "Report totals",
+      "gross": "Receipts issued",
+      "receiptsCount": "{count, plural, one {# receipt} other {# receipts}}",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded",
+      "net": "Net collected",
+      "byHead": "By fee head",
+      "byMode": "By mode",
+      "byCollector": "By collector",
+      "byDay": "By day",
+      "online": "Online",
+      "cancelledReceipts": "Cancelled receipts",
+      "cancelledReceiptsHint": "Cancelled receipts keep their numbers. They are taken off on the day the cancellation was approved.",
+      "columns": {
+        "head": "Head",
+        "collectedInr": "Collected (₹)",
+        "netInr": "Net (₹)",
+        "mode": "Mode",
+        "receipts": "Receipts",
+        "collector": "Collected by",
+        "grossInr": "Issued (₹)",
+        "date": "Date",
+        "receipt": "Receipt",
+        "receiptDate": "Receipt date",
+        "cancelledOn": "Cancelled on",
+        "reason": "Reason",
+        "amountInr": "Amount (₹)",
+        "classSection": "Class and section",
+        "accounts": "Accounts",
+        "demandInr": "Demand (₹)",
+        "concessionsInr": "Concessions (₹)",
+        "writtenOffInr": "Written off (₹)",
+        "netDemandInr": "Net demand (₹)",
+        "balanceInr": "Balance (₹)",
+        "year": "School year",
+        "student": "Student",
+        "type": "Type",
+        "approvedBy": "Approved by",
+        "voucher": "Voucher",
+        "students": "Students",
+        "overdueInr": "Overdue (₹)",
+        "oldest": "Oldest due date",
+        "series": "Series",
+        "first": "First number",
+        "last": "Last number",
+        "used": "Used",
+        "cancelledCount": "Cancelled",
+        "missing": "Missing numbers"
+      },
+      "year": "School year",
+      "currentYear": "Current school year",
+      "netDemand": "Net demand",
+      "collected": "Collected",
+      "balance": "Balance",
+      "earlierYears": "Earlier years",
+      "earlierYearsHint": "Dues of earlier school years still open, with what management wrote off.",
+      "dcbTitle": "Demand, collection and balance, {year}",
+      "notEnrolled": "not enrolled (left or moved)",
+      "allClasses": "All classes",
+      "includeReasons": "Include typed reasons",
+      "truncatedTitle": "Only the first rows are shown",
+      "truncatedBody": "The totals cover every row. Download the report for the full list.",
+      "concessions": "Concessions",
+      "writtenOff": "Written off by management",
+      "adjustments": "Adjustments and write-offs",
+      "refunds": "Refunds paid",
+      "noName": "Name not shown",
+      "bucketOver": "Over {days} days",
+      "bucketRange": "{from} to {to} days",
+      "ageingNote": "Overdue as of {date}. Not yet due: {notDue}.",
+      "byClass": "By class",
+      "noClass": "No current class",
+      "byStudent": "By student",
+      "financialYear": "Financial year",
+      "pack": "Download year-end pack (ZIP)",
+      "packHint": "One ZIP for the auditor or the trust's CA: collections, registers, demand and balance, ageing and the receipt number check. It needs a fresh sign-in and is recorded.",
+      "gapFreeTitle": "No receipt numbers missing",
+      "gapFreeBody": "Every receipt and refund voucher number of this year is accounted for.",
+      "gapsTitle": "Some numbers are missing",
+      "gapsBody": "Numbers were taken but no receipt or voucher has them. Ask SchoolOS support before the audit.",
+      "seriesTitle": "Receipt numbers, {year}",
+      "series": {
+        "receipt": "Receipts",
+        "refund": "Refund vouchers"
+      }
     }
   },
   "payments": {
@@ -10932,6 +11378,61 @@
       "use": "Use these counts"
     }
   },
+  "brief": {
+    "nav": "Weekly brief",
+    "title": "Weekly brief",
+    "description": "What the office did last week and what is due next, as counts. No names and no student details.",
+    "print": "Print",
+    "week": "Week",
+    "weekOption": "{from} to {to}",
+    "period": "Week of {from} to {to}. Counts taken on {asOf}.",
+    "preview": "This week so far (counts taken on {asOf}). The first full weekly brief arrives on Monday morning.",
+    "fewerThan": "fewer than {n}",
+    "footnote": "Counts of students below {n} are shown as “fewer than {n}” so that no child can be singled out. Work counts and money are shown as they are.",
+    "noPermissionTitle": "Only the owner and the principal see the weekly brief",
+    "noPermissionBody": "Ask the school's owner if you need it.",
+    "kpi": {
+      "blockers": "Problems that block a submission",
+      "warnings": "{count, plural, =0 {No warnings} one {# warning} other {# warnings}}",
+      "waiting": "Corrections waiting for approval",
+      "certificates": "Certificates issued in the week",
+      "deadlines": "Portal deadlines in the next {days} days"
+    },
+    "readiness": {
+      "title": "Readiness by board and portal",
+      "none": "No board or portal readiness check applies to this school yet.",
+      "ready": "{ready} of {students} ready",
+      "change": "{change} on the week before",
+      "breakdown": "Waiting for parents: {parent} · Waiting for the school: {school} · Blocked: {blocked}"
+    },
+    "deadlines": {
+      "title": "Portal deadlines in the next {days} days",
+      "none": "No portal window closes in this period.",
+      "closes": "Closes {date} ({days, plural, =0 {today} one {in # day} other {in # days}})",
+      "confirmed": "Dates confirmed by the school",
+      "expected": "Expected dates, not yet confirmed"
+    },
+    "fees": {
+      "title": "Fees",
+      "collected": "{amount} collected in the week, {receipts, plural, one {# receipt} other {# receipts}}",
+      "due": "Still due this year: {balance} ({overdue} overdue); students with a balance: {students}"
+    },
+    "ask": {
+      "title": "AI answers this month",
+      "used": "{answers, plural, one {# answer} other {# answers}} used",
+      "usedOf": "{answers} of {included} answers in your bundle used"
+    },
+    "preferences": {
+      "title": "How you get the brief",
+      "description": "Each Monday morning SchoolOS prepares last week's brief. Choose how you hear about it.",
+      "loading": "Loading your choice…",
+      "inApp": "Notice in SchoolOS",
+      "inAppHint": "A notification in the bell on Monday morning. It stays on while the e-mail is on.",
+      "email": "E-mail",
+      "emailHint": "Counts and a sign-in link only, never names.",
+      "emailUnavailable": "E-mail is not set up for this school yet."
+    }
+  },
   "holds": {
     "nav": "Legal holds",
     "title": "Legal holds",
@@ -11047,6 +11548,134 @@
       "record_class_required": {
         "title": "Choose a kind of record",
         "body": "Choose which kind of record the whole school must keep."
+      }
+    }
+  },
+  "schoolCalendar": {
+    "loadError": "The calendar could not be loaded. Reload the page to try again.",
+    "title": "School calendar",
+    "description": "Working days, holidays and vacations of the academic year. Attendance cannot be marked on a day off.",
+    "year": "Academic year",
+    "showFor": "Show for",
+    "wholeSchool": "Whole school",
+    "aClass": "One class",
+    "notSetUpTitle": "Calendar not set up yet",
+    "notSetUpManage": "Until you save the weekly pattern, attendance can be marked on any day. The grid shows the usual pattern as a suggestion.",
+    "notSetUpRead": "The office has not set up this year's calendar yet. Attendance can be marked on any day until then.",
+    "yearWorkingDays": "{count, plural, one {# working day} other {# working days}} in this academic year (whole school).",
+    "monthWorkingDays": "{count, plural, one {# working day} other {# working days}}",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "gridLabel": "Days of the month",
+    "gridHelp": "Use the arrow keys to move between days, Page Up and Page Down to change the month.",
+    "schoolDay": "School day",
+    "dayOff": "Day off",
+    "entriesTitle": "Holidays, vacations and working days",
+    "noEntries": "No holidays added yet. Add them yourself or check the suggestions below.",
+    "range": "{from} to {to}",
+    "weekday": {
+      "0": "Monday",
+      "1": "Tuesday",
+      "2": "Wednesday",
+      "3": "Thursday",
+      "4": "Friday",
+      "5": "Saturday",
+      "6": "Sunday"
+    },
+    "weekdayShort": {
+      "0": "Mon",
+      "1": "Tue",
+      "2": "Wed",
+      "3": "Thu",
+      "4": "Fri",
+      "5": "Sat",
+      "6": "Sun"
+    },
+    "saturday": {
+      "1": "First Saturday",
+      "2": "Second Saturday",
+      "3": "Third Saturday",
+      "4": "Fourth Saturday",
+      "5": "Fifth Saturday"
+    },
+    "dayKind": {
+      "working": "School day",
+      "working_day": "Extra working day",
+      "weekly_off": "Weekly off",
+      "saturday_off": "Saturday off",
+      "holiday": "Holiday",
+      "vacation": "Vacation",
+      "outside_year": "Outside the year"
+    },
+    "entryKind": {
+      "holiday": "Holiday",
+      "vacation": "Vacation",
+      "working_day": "Extra working day"
+    },
+    "pattern": {
+      "setUp": "Set up calendar",
+      "change": "Change weekly pattern",
+      "title": "Weekly pattern",
+      "description": "Choose the days the school is closed every week.",
+      "weeklyOff": "Closed every week on",
+      "saturdaysOff": "Saturdays off",
+      "save": "Save pattern",
+      "consequence": "From now on, attendance cannot be marked on a day off."
+    },
+    "add": {
+      "open": "Add holiday",
+      "title": "Add a holiday or working day",
+      "description": "A vacation can span up to 92 days. Choose a class only for an exception, such as an exam day.",
+      "suggestionNote": "Check the dates against the department's circular before adding. Change them if they differ.",
+      "kind": "Type",
+      "name": "Name",
+      "nameHint": "For example, Dasara vacation.",
+      "from": "From",
+      "to": "To",
+      "dateHint": "As {format}, for example {example}",
+      "dateInvalid": "Enter a real date as {format}, for example {example}.",
+      "toInvalid": "Enter a real date on or after the first day, as {format}.",
+      "appliesTo": "Applies to",
+      "appliesToHint": "Whole school, or one class as an exception.",
+      "save": "Add",
+      "holidayOnDay": "Make this day a holiday",
+      "workingOnDay": "Make this day a working day",
+      "marksWarning": "{count, plural, one {# attendance mark is} other {# attendance marks are}} already on these days. They no longer count in working-day totals."
+    },
+    "remove": {
+      "open": "Remove",
+      "title": "Remove from the calendar",
+      "description": "Remove {name} from this year's calendar?",
+      "confirm": "Remove",
+      "consequence": "The days go back to the weekly pattern."
+    },
+    "suggestions": {
+      "title": "Suggested holidays",
+      "unverifiedTitle": "Not checked against the official calendar",
+      "unverifiedBody": "These dates come from published almanacs and the usual Andhra Pradesh pattern. Check each one against the department's academic calendar before adding it.",
+      "none": "No more suggestions for this year.",
+      "check": "Check and add"
+    },
+    "attendanceWarning": {
+      "title": "Not a school day",
+      "body": "{kind} in the school calendar. Attendance cannot be saved for this day."
+    },
+    "errors": {
+      "calendar_overlap": {
+        "title": "Dates already used",
+        "body": "Another holiday, vacation or working day covers some of these dates. Remove it or choose other dates."
+      },
+      "calendar_not_set_up": {
+        "title": "Set up the calendar first",
+        "body": "Save the weekly pattern, then add holidays."
+      },
+      "calendar_changed": {
+        "title": "Changed meanwhile",
+        "body": "Someone else changed the calendar. The page shows the latest; try again."
+      },
+      "suggestion_already_added": {
+        "title": "Already added",
+        "body": "This suggestion is already in the calendar."
       }
     }
   },
@@ -11166,6 +11795,120 @@
       "save": "Link and confirm the date",
       "consequence": "The window's closing date becomes the task's due date, confirmed from this circular."
     }
+  },
+  "udiseFollowup": {
+    "nav": "Follow-ups",
+    "title": "Follow-ups on fixes outside the school",
+    "description": "Who still has to fix a difference outside the school, and what the office did about it. A follow-up is overdue when nothing was recorded for {days} days or the promised date has passed. It closes by itself once the new value matches.",
+    "colOwner": "Who fixes it",
+    "colState": "State",
+    "colLast": "Last step",
+    "colPromised": "Promised by",
+    "nothingYet": "Nothing recorded yet",
+    "recordStep": "Record a step",
+    "recordAria": "Record a step for {student}",
+    "openList": "Open follow-ups",
+    "filter": "Show",
+    "filterAll": "All",
+    "filterOverdue": "Overdue",
+    "filterNotStarted": "Not contacted yet",
+    "emptyTitle": "Nothing is waiting outside the school",
+    "emptyBody": "No student waits for a parent's Aadhaar update or a UDISE+ correction for this check.",
+    "noneInFilter": "No follow-up matches this filter",
+    "waiting": {
+      "parent_aadhaar": "Waiting on parents",
+      "school_udise": "Waiting on the MEO (UDISE+)"
+    },
+    "waitingNote": "{overdue} overdue, {notStarted} not contacted yet",
+    "summary": {
+      "parent_aadhaar": "Waiting on parents: {open} ({overdue} overdue)",
+      "school_udise": "Waiting on the MEO: {open} ({overdue} overdue)"
+    },
+    "state": {
+      "not_started": "Not contacted yet",
+      "waiting": "Waiting",
+      "update_reported": "Update reported: record the new value",
+      "overdue": "Overdue",
+      "overdue_no_contact": "Overdue: no contact",
+      "overdue_promise_passed": "Overdue: promised date passed"
+    },
+    "event": {
+      "slip_given": "Verification slip given",
+      "parent_contacted": "Parent contacted",
+      "promised_by": "Parent promised an update by",
+      "update_reported": "Update reported done",
+      "request_sent": "Correction request sent",
+      "followed_up": "Followed up with the office"
+    },
+    "channel": {
+      "in_person": "In person",
+      "phone": "Phone call",
+      "whatsapp": "WhatsApp",
+      "letter": "Letter or diary note",
+      "email": "E-mail"
+    },
+    "record": {
+      "title": "Record a step",
+      "confirm": "Record step",
+      "note": "Only the step, how and when are kept. Do not write names or numbers anywhere.",
+      "event": "Step",
+      "channel": "How",
+      "channelHint": "How you reached the parent or the office.",
+      "choose": "Choose",
+      "occurredOn": "When it happened",
+      "promisedOn": "Promised date",
+      "promisedOnHint": "The day the parent said the Aadhaar update will be done."
+    },
+    "slips": {
+      "trigger": "Mark slips given",
+      "title": "Mark slips given",
+      "description": "Records that today the verification slip was given to the parents of {count} students who must update Aadhaar.",
+      "confirm": "Mark slips given"
+    },
+    "errors": {
+      "no_open_fix": {
+        "title": "Nothing is waiting any more",
+        "body": "The difference was fixed meanwhile, or the student is not on this list. Reload the list."
+      }
+    }
+  },
+  "udiseTodo": {
+    "nav": "UDISE+ to-do",
+    "title": "UDISE+ to-do",
+    "description": "What to repeat in the UDISE+ Student Module after something happened here: a transfer certificate issued, a child who left, an admission or a promotion. Do the step on the portal, then tick it here.",
+    "unverifiedTitle": "Check the steps with your MEO office",
+    "unverifiedBody": "These UDISE+ steps come from guides and circulars that are not confirmed for Andhra Pradesh yet. Follow your MEO office's instructions where they differ.",
+    "kpiOpen": "To do",
+    "kpiWaitingLong": "Waiting more than {days} days",
+    "kpiDone": "Done or not needed",
+    "view": "Show",
+    "viewOpen": "To do",
+    "viewClosed": "Done",
+    "colWhat": "What to do in UDISE+",
+    "colWhen": "Since",
+    "wholeSchool": "Whole school",
+    "tcSerial": "TC {serial}",
+    "progressionCounts": "{promoted} promoted, {heldBack} held back, {graduated} passed out",
+    "waitingLong": "Waiting long",
+    "markDone": "Done in UDISE+",
+    "doneAria": "Mark done in UDISE+: {what}",
+    "markNotNeeded": "Not needed",
+    "undo": "Undo",
+    "state": {
+      "open": "To do",
+      "done": "Done",
+      "not_needed": "Not needed"
+    },
+    "action": {
+      "transfer_out": "Transfer certificate issued: mark the child as transferred",
+      "left_without_tc": "Left without a transfer certificate: move the child to the dropbox",
+      "admission_without_pen": "New admission without a PEN: search by name and date of birth, create only if not found, then record the PEN here",
+      "admission_with_pen": "Admission with a PEN: import the child by PEN (do not create a new record)",
+      "progression": "Promotion done: finish the progression for the new year"
+    },
+    "emptyOpenTitle": "Nothing to repeat in UDISE+",
+    "emptyOpenBody": "New transfer certificates, leavers, admissions and promotions will appear here.",
+    "emptyClosedTitle": "Nothing ticked yet"
   },
   "disclosure": {
     "nav": "CBSE disclosure",
@@ -11324,6 +12067,16 @@
         "title": "This is not the page shown now",
         "body": "Only the page shown now can be withdrawn. Reload the page to see it."
       }
+    },
+    "certificates": {
+      "fromRegister": "From the compliance register: {name}",
+      "registerValid": "valid until {date}",
+      "registerNoExpiry": "no expiry",
+      "registerExpired": "expired on {date}",
+      "useRegisterCopy": "Use the register's copy",
+      "registerNotPublishable": "The register's copy can't be published: upload a clean PDF as an 'other' document.",
+      "expiredWarningTitle": "A certificate on this page has expired",
+      "expiredWarningBody": "Record the renewed certificate in the compliance register, or publish knowing the page shows an expired certificate."
     }
   },
   "privacy": {
@@ -11940,6 +12693,367 @@
         "colStudent": "Student",
         "colAdmission": "Admission no.",
         "colClass": "Class"
+      }
+    }
+  },
+  "yearEnd": {
+    "nav": "Year-end results",
+    "title": "Year-end results",
+    "description": "SchoolOS proposes each student's annual result from the year's marks and register. The principal confirms every result before the promotion and the UDISE+ progression.",
+    "progressionLink": "UDISE+ progression sheet",
+    "section": "Section",
+    "pickTitle": "Choose a section",
+    "pickBody": "Pick a section to see its proposed and confirmed results.",
+    "noAccessTitle": "You cannot see annual results",
+    "noAccessBody": "Ask the principal or the office admin if you need them.",
+    "emptyTitle": "No students in this section",
+    "emptyBody": "No student finishes the year in this section.",
+    "cardTitle": "{section} · {year}",
+    "counts": "{confirmed} of {students} confirmed · {detained} detained",
+    "tableLabel": "Annual results of {section}",
+    "unnamed": "Student without a name",
+    "someone": "a staff member",
+    "daysOf": "{days} of {working}",
+    "noProposal": "No marks",
+    "notConfirmed": "Not confirmed",
+    "choose": "Choose a result",
+    "decisionFor": "Result for {name}",
+    "reasonFor": "Reason for detaining {name}",
+    "reasonPlaceholder": "Why the student is detained",
+    "reasonHint": "A detained result needs a reason. Do not type Aadhaar numbers.",
+    "confirmedBy": "Confirmed by {name} on {date}",
+    "save": "{count, plural, =0 {Nothing to save} one {Confirm # result} other {Confirm # results}}",
+    "saveHint": "Only changed results are sent. Students move to the next class only when you run the promotion.",
+    "readOnly": "Only the principal can confirm results.",
+    "savedTitle": "Results saved",
+    "saved": "{written} saved, {unchanged} unchanged.",
+    "savedWarnings": "{count, plural, one {# student is detained in a no-detention class: check the rule before the promotion.} other {# students are detained in a no-detention class: check the rule before the promotion.}}",
+    "promotionNote": "Detained students are suggested as held back on the promotion screen. You can still change the list there.",
+    "columns": {
+      "roll": "Roll",
+      "student": "Student",
+      "percent": "Marks %",
+      "days": "Days attended",
+      "proposed": "SchoolOS proposes",
+      "decision": "Result"
+    },
+    "result": {
+      "passed": "Passed",
+      "promoted": "Promoted",
+      "detained": "Detained",
+      "not_appeared": "Not appeared"
+    },
+    "problems": {
+      "reason_required": "Give a reason for detaining this student.",
+      "aadhaar": "Remove the 12-digit number from the reason."
+    },
+    "warnings": {
+      "no_detention_class": "This class follows the no-detention rule. Detaining is allowed but check the rule first."
+    },
+    "rules": {
+      "title": "How SchoolOS proposes results",
+      "passMark": "Passed at {percent}% or more over all the year's exams; below that, detained.",
+      "noDetention": "This class is in the no-detention list, so SchoolOS never proposes detained here.",
+      "unverified": "Not yet confirmed for your school: check before you rely on it.",
+      "days": "Days attended count days marked present or late. Working days are the days the section was marked until the school calendar is set up."
+    },
+    "progression": {
+      "title": "UDISE+ progression sheet",
+      "description": "Each student's class, confirmed result, marks percentage and days attended, as UDISE+ asks for them. Fill the blanks before you start on the portal.",
+      "back": "Back to year-end results",
+      "year": "Academic year",
+      "noAccessTitle": "You cannot see the progression sheet",
+      "noAccessBody": "Ask the principal or the office admin if you need it.",
+      "emptyTitle": "No students in this year",
+      "emptyBody": "No student finishes this academic year.",
+      "cardTitle": "{year} · {count, plural, one {# student} other {# students}}",
+      "cardBody": "Only confirmed results are shown. Figures come from the time the result was confirmed.",
+      "download": "Download CSV",
+      "downloading": "Preparing the file…",
+      "downloaded": "Saved {name}",
+      "blanksLabel": "Blanks to fill",
+      "tableLabel": "UDISE+ progression of {year}",
+      "complete": "Complete",
+      "blanks": {
+        "result": "{count, plural, =0 {All results confirmed} one {# result not confirmed} other {# results not confirmed}}",
+        "percent": "{count, plural, =0 {Marks for everyone} one {# without marks} other {# without marks}}",
+        "days_attended": "{count, plural, =0 {Attendance for everyone} one {# without attendance} other {# without attendance}}",
+        "udise_pen": "{count, plural, =0 {PEN for everyone} one {# without a PEN} other {# without a PEN}}"
+      },
+      "blankNames": {
+        "result": "result",
+        "percent": "marks",
+        "days_attended": "attendance",
+        "udise_pen": "PEN"
+      },
+      "columns": {
+        "admission": "Admission no.",
+        "student": "Student",
+        "pen": "PEN",
+        "section": "Section",
+        "result": "Result",
+        "percent": "Marks %",
+        "days": "Days attended",
+        "blanks": "Blanks"
+      }
+    },
+    "tc": {
+      "fromSchoolOs": "From SchoolOS: {value}",
+      "use": "Use",
+      "useLabel": "Use the SchoolOS value for {field}",
+      "source": {
+        "year_result": "the confirmed annual result",
+        "attendance_register": "the attendance register up to today"
+      }
+    },
+    "promotion": {
+      "title": "Held back from the confirmed results",
+      "body": "{count, plural, =0 {No student is confirmed as detained.} one {# student is confirmed as detained.} other {# students are confirmed as detained.}}",
+      "unconfirmed": "{count, plural, =0 {Every student has a confirmed result.} one {# student has no confirmed result yet.} other {# students have no confirmed result yet.}}",
+      "noDetention": "{count, plural, one {# of them is in a no-detention class: check the rule.} other {# of them are in a no-detention class: check the rule.}}",
+      "add": "Add them to the held-back list",
+      "added": "Added to the held-back list. Review it before you preview."
+    }
+  },
+  "udise": {
+    "nav": "UDISE+ corrections",
+    "title": "UDISE+ corrections to the MEO",
+    "description": "Names, dates of birth and gender that are wrong in UDISE+. Prepare a request, print the letter for the MEO office and follow it up.",
+    "readinessCrumb": "Board and portal readiness",
+    "aboutTitle": "A request, not a change",
+    "aboutBody": "SchoolOS lists the differences between UDISE+ and the school's admission register. The MEO or MIS coordinator corrects UDISE+; nothing in the school's records changes here. Import the UDISE+ list again afterwards to see which corrections were made.",
+    "noPermissionTitle": "You cannot prepare UDISE+ requests",
+    "noPermissionBody": "Ask the office admin or the principal: this needs permission to run readiness checks.",
+    "profile": "Check",
+    "profiles": {
+      "bseap-ssc-2027": "AP SSC March 2027",
+      "apaar": "APAAR ID"
+    },
+    "unverifiedTitle": "Format not yet confirmed",
+    "unverifiedBody": "This request follows the public guidance we could find. Show it to your MEO office once and tell us if they want another format.",
+    "noneTitle": "Nothing to ask for",
+    "noneBody": "UDISE+ agrees with the school's records for every student this check covers.",
+    "summary": "{lines, plural, one {# correction} other {# corrections}} for {students, plural, one {# student} other {# students}}; {requested, plural, =0 {none requested yet} one {# already requested} other {# already requested}}.",
+    "emptyTitle": "No corrections",
+    "emptyBody": "Nothing to correct in this group.",
+    "notShown": "Student outside your classes",
+    "colStudent": "Student",
+    "colPen": "PEN",
+    "colField": "Field",
+    "colValues": "UDISE+ and correct value",
+    "colEvidence": "Source and evidence",
+    "colState": "Now",
+    "colRequested": "Request",
+    "inUdise": "In UDISE+:",
+    "correct": "Correct:",
+    "blank": "(blank)",
+    "aadhaar": {
+      "yes": "Matches Aadhaar: yes",
+      "no": "Matches Aadhaar: no",
+      "not_recorded": "Aadhaar details not recorded"
+    },
+    "alreadyRequested": "Already requested",
+    "notRequested": "Not requested yet",
+    "lineState": {
+      "open": "Still wrong",
+      "fixed": "Corrected",
+      "unavailable": "Not in your classes"
+    },
+    "status": {
+      "prepared": "Prepared",
+      "sent": "Sent",
+      "done": "Done",
+      "rejected": "Rejected"
+    },
+    "requestsTitle": "Requests",
+    "noRequestsTitle": "No requests yet",
+    "noRequestsBody": "Prepared requests appear here with their state.",
+    "colPrepared": "Prepared on",
+    "colLines": "Corrections",
+    "colSent": "Sent",
+    "colStatus": "State",
+    "linesFor": "{lines, plural, one {# correction} other {# corrections}} for {students, plural, one {# student} other {# students}}",
+    "sentTo": "Sent on {date} to {to}",
+    "notSent": "Not sent yet",
+    "prepare": {
+      "trigger": "{count, plural, =0 {Nothing to request} one {Prepare request (# correction)} other {Prepare request (# corrections)}}",
+      "title": "Prepare a UDISE+ correction request",
+      "description": "{count, plural, one {# correction} other {# corrections}} not yet requested will go into one request.",
+      "confirm": "Prepare request",
+      "consequence": "Nothing changes in the school's records. The principal then prints the letter for the MEO office."
+    },
+    "detail": {
+      "title": "UDISE+ correction request",
+      "progress": "{fixed, plural, =0 {None corrected yet} one {# corrected} other {# corrected}}; {open, plural, =0 {nothing left to correct} one {# still wrong} other {# still wrong}}."
+    },
+    "letter": {
+      "prepare": "Print letter for the MEO",
+      "checking": "Checking…",
+      "open": "Open letter to print",
+      "newTab": "opens in a new tab",
+      "askPrincipal": "The principal or the office admin prints the letter (it needs permission for portal exports)."
+    },
+    "sent": {
+      "trigger": "Record as sent",
+      "title": "Record that the request was sent",
+      "description": "Say when and to which office. Use the role, not a person's name.",
+      "confirm": "Record as sent",
+      "date": "Sent on",
+      "to": "Sent to",
+      "toHint": "The office that will correct UDISE+.",
+      "choose": "Choose an office"
+    },
+    "close": {
+      "description": "{fixed, plural, =0 {No correction is confirmed yet} one {# correction is confirmed} other {# corrections are confirmed}} by the last UDISE+ import; {open, plural, =0 {none is still wrong} one {# is still wrong} other {# are still wrong}}.",
+      "done": {
+        "trigger": "Mark done",
+        "title": "Mark the request done"
+      },
+      "rejected": {
+        "trigger": "Mark rejected",
+        "title": "Mark the request rejected"
+      }
+    },
+    "match": {
+      "colMatch": "Matched by",
+      "rowLabel": "Row {row}",
+      "toReview": "Choose the student",
+      "basis": {
+        "admission_no": "Admission number",
+        "picked": "Chosen by you",
+        "pen_verified": "PEN (verified)",
+        "pen": "PEN",
+        "name_dob_class": "Name, date of birth and class",
+        "skipped": "Skipped"
+      },
+      "pick": {
+        "trigger": "Choose student",
+        "title": "Which student is this row?",
+        "description": "{name}: no student has this PEN, or no single student has this name, date of birth and class.",
+        "confirm": "Use this student",
+        "change": "Change",
+        "consequence": "The UDISE+ values of this row are added to this student when the import is added. The admission register is not changed."
+      },
+      "skip": "Skip row",
+      "skipAria": "Skip the row of {name}",
+      "undo": "Undo choice",
+      "undoAria": "Undo the choice for {name}"
+    },
+    "errors": {
+      "nothing_to_request": {
+        "title": "Nothing to request",
+        "body": "Every difference is already in an open request, or none is left."
+      },
+      "line_not_open": {
+        "title": "Some corrections changed",
+        "body": "Some differences were corrected or requested meanwhile. Reload the page."
+      },
+      "udise_request_state": {
+        "title": "This request changed",
+        "body": "Someone else already updated this request. Reload the page to see it."
+      },
+      "nothing_to_print": {
+        "title": "Nothing left to print",
+        "body": "Every correction in this request is made, or the students are outside your classes."
+      },
+      "import_not_matchable": {
+        "title": "Not a UDISE+ list",
+        "body": "Only a UDISE+ student list matches rows by PEN."
+      },
+      "row_has_admission_no": {
+        "title": "This row has an admission number",
+        "body": "It is matched by that number. Correct the number in the sheet instead."
+      }
+    }
+  },
+  "compliance": {
+    "nav": "Compliance certificates",
+    "title": "Compliance certificates",
+    "description": "The school's own certificates (fire NOC, building safety, recognition, affiliation, water and sanitation): when each one lapses and who renews it.",
+    "recordButton": "Record a certificate",
+    "noPermissionTitle": "You can't see the compliance certificates",
+    "noPermissionBody": "Ask the principal or the office admin if you need to check a certificate.",
+    "unverifiedTitle": "Typical validity is only a guide",
+    "unverifiedBody": "The list of certificates and their usual validity come from public sources that SchoolOS has not checked against the rules. Always type the dates printed on your certificate.",
+    "emptyTitle": "No certificates yet",
+    "emptyBody": "Record the school's fire NOC, recognition and other certificates so SchoolOS can remind you before they lapse.",
+    "colCertificate": "Certificate",
+    "colValidity": "Valid until",
+    "colOwner": "Renewed by",
+    "colCopy": "Copy",
+    "colActions": "Actions",
+    "reference": "No. {number}",
+    "daysLeft": "{days, plural, =0 {lapses today} one {# day left} other {# days left}}",
+    "daysAgo": "{days, plural, one {expired # day ago} other {expired # days ago}}",
+    "noOwner": "No one chosen",
+    "ownerLeft": "A former member",
+    "ownerInactive": "No longer active: choose someone else",
+    "copyHidden": "A document you can't open",
+    "noCopy": "No copy attached",
+    "state": {
+      "valid": "Valid",
+      "expiring": "Expires soon",
+      "expired": "Expired",
+      "no_expiry": "No expiry",
+      "missing": "Not recorded"
+    },
+    "counts": {
+      "expired": "Expired",
+      "expiring": "Expiring within {days} days",
+      "missing": "Not recorded",
+      "valid": "Valid"
+    },
+    "actions": {
+      "record": "Record",
+      "recordAria": "Record the {name}",
+      "renew": "Renew",
+      "renewAria": "Record the renewed {name}",
+      "edit": "Correct",
+      "editAria": "Correct the {name}",
+      "remove": "Remove",
+      "removeAria": "Remove the {name}"
+    },
+    "form": {
+      "recordTitle": "Record a certificate",
+      "renewTitle": "Record the renewed {name}",
+      "editTitle": "Correct the {name}",
+      "description": "Type the details as printed on the certificate.",
+      "renewDescription": "The current certificate is kept in the history. Type the details of the new one as printed.",
+      "kind": "Certificate",
+      "choose": "Choose a certificate",
+      "issuedByHint": "Usually issued by: {authority}.",
+      "typicalValidity": "Often valid for {months, plural, one {# month} other {# months}}.",
+      "typicalNoExpiry": "Usually does not expire.",
+      "label": "Name of the certificate",
+      "referenceNo": "Certificate number",
+      "issuedBy": "Issued by",
+      "validFrom": "Valid from",
+      "validUntil": "Valid until",
+      "validUntilHint": "The last day it is valid. Leave empty if it does not expire.",
+      "document": "Copy in Documents",
+      "documentHint": "Upload the scan in Documents first. To also show it on the CBSE disclosure page, upload a PDF as an 'other' document.",
+      "noDocument": "No copy",
+      "loading": "Loading documents…",
+      "owner": "Who renews it",
+      "noOwner": "No one chosen",
+      "ownerHint": "Reminders go to this person and to everyone who manages compliance certificates.",
+      "notes": "Notes",
+      "record": "Record certificate",
+      "save": "Save changes"
+    },
+    "removeDialog": {
+      "title": "Remove this certificate?",
+      "confirm": "Remove",
+      "consequence": "Use this only for a certificate recorded by mistake. It stays in the history as removed; if it was a renewal, the earlier certificate becomes current again."
+    },
+    "errors": {
+      "certificate_not_current": {
+        "title": "This certificate was replaced",
+        "body": "Only the current certificate can be changed. Reload the page to see the latest one."
+      },
+      "conflict": {
+        "title": "Someone recorded this at the same time",
+        "body": "Reload the page and check the certificate before trying again."
       }
     }
   }

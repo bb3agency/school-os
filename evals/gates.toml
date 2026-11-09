@@ -4,8 +4,9 @@
 # A gate whose metric could not be measured (no data) FAILS: missing evidence is not a pass.
 # evals/tests/test_gates.py pins the hard gates below; weakening one fails the tests.
 #
-# Not measured yet (need the calibrated LLM judge, M2): faithfulness >= 0.95, answer
-# correctness >= 0.85.
+# Faithfulness and answer correctness come from a judge calibrated first (sos_evals.judge,
+# evals/judge.toml; FA-07): the deterministic stub judge offline, the eval_judge role on
+# make eval-live. Their gates are at the end of this file, with the register-extraction gates.
 
 version = 1
 
@@ -354,3 +355,64 @@ op = "<="
 threshold = 0.06
 severity = "soft"
 requirements = ["NFR-CST-003", "FR-KB-046"]
+
+# --- Faithfulness and answer correctness (sos_evals.judge; docs/06 §13.11; FA-07) ----------------
+# The judge labels judge_calibration.jsonl first; below judge.toml calibration.min_agreement (pinned
+# equal to the judge_agreement threshold) faithfulness and correctness are not measured and fail.
+# Offline runs use the deterministic stub judge (word and figure overlap, not meaning); the live
+# judge (eval_judge role) runs on make eval-live, where soft gates count. Soft: they block release.
+
+[[gate]]
+metric = "judge_agreement"
+op = ">="
+threshold = 0.90
+severity = "soft"
+requirements = ["FR-KB-053", "FR-KB-054"]
+
+[[gate]]
+metric = "faithfulness"
+op = ">="
+threshold = 0.95
+severity = "soft"
+requirements = ["FR-KB-051", "FR-KB-005"]
+
+[[gate]]
+metric = "answer_correctness"
+op = ">="
+threshold = 0.85
+severity = "soft"
+requirements = ["FR-KB-052"]
+
+# --- Register-photo extraction (sos_evals.extraction; docs/06 §13.12; FA-07) ---------------------
+# Synthetic register pages (printed, handwritten; EN, TE, code-mixed) with planted Verhoeff-valid
+# numbers (made in memory, never in the files). Invariant 4: any unmasked Aadhaar-like number in
+# what the system keeps of a page (stored cells or the stored image read back) fails the run.
+# Field accuracy and row recall are soft until a live provider is chosen by this eval (FA-01).
+
+[[gate]]
+metric = "extraction_unmasked_aadhaar_count"
+op = "=="
+threshold = 0
+severity = "hard"
+requirements = ["FR-KB-060", "PRV-015", "PRV-016"]
+
+[[gate]]
+metric = "extraction_aadhaar_redaction_recall"
+op = ">="
+threshold = 1.0
+severity = "hard"
+requirements = ["FR-KB-060", "PRV-016"]
+
+[[gate]]
+metric = "extraction_field_accuracy"
+op = ">="
+threshold = 0.90
+severity = "soft"
+requirements = ["FR-KB-059", "FR-IMP-024"]
+
+[[gate]]
+metric = "extraction_row_recall"
+op = ">="
+threshold = 0.95
+severity = "soft"
+requirements = ["FR-KB-059", "FR-IMP-024"]

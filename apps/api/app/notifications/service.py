@@ -88,6 +88,13 @@ class PermissionSelector:
 Recipients = Sequence[uuid.UUID] | PermissionSelector
 
 
+def holders(session: Session, permission: str) -> list[uuid.UUID]:
+    """Membership IDs of the active, unexpired members whose roles grant ``permission`` (what a
+    :class:`PermissionSelector` resolves to), for producers that first filter them by their own
+    per-member choices (``app.brief``, FR-BRF-011)."""
+    return _holders(session, permission)
+
+
 def _holders(session: Session, permission: str) -> list[uuid.UUID]:
     role_keys = {r.key for r in identity.list_roles(session) if permission in r.permissions}
     if not role_keys:
@@ -451,6 +458,9 @@ def resend_invitation_email(
 LIMIT_EMAILS: Final = {
     "billing.ai_answers_used_up": "billing.ai_answers_quota",
     "billing.plan_limit_reached": "billing.plan_limit",
+    # FA-05 (FR-BRF-012): the weekly brief e-mail of members who opted in, sent with the week's
+    # in-app notice (counts only, a sign-in link).
+    "brief.weekly": "brief.weekly_ready",
 }
 """Email template -> the in-app notice template whose values it is sent with."""
 LIMIT_EMAIL_VIA: Final = "limit_alert"
@@ -465,6 +475,7 @@ def notify_and_email(
     params: Mapping[str, Any],
     dedupe_key: str,
     email_template: str,
+    resource_id: uuid.UUID | None = None,
 ) -> int:
     """:func:`notify` (with ``dedupe_key``), and queue ``email_template`` for each recipient whose
     notice is new, in the same transaction (D70). The notice's dedupe key therefore makes the
@@ -480,7 +491,7 @@ def notify_and_email(
         recipients=recipients,
         template_key=template_key,
         params=params,
-        resource_id=None,
+        resource_id=resource_id,
         dedupe_key=dedupe_key,
     )
     if created and get_settings().email_enabled:
@@ -548,6 +559,8 @@ def _limit_email_params(
     values = dict(notice["params"])
     if template_key == "billing.ai_answers_used_up":
         return {"level": values["level"], "included": values["included"]}, ""
+    if template_key == "brief.weekly":
+        return {}, ""  # FR-BRF-010: no counts in the e-mail (school and link only)
     return {"metric": values["metric"]}, ""
 
 
@@ -744,6 +757,7 @@ __all__ = [
     "Recipients",
     "SummaryError",
     "erase_for_subject",
+    "holders",
     "list_for_me",
     "mark_all_read",
     "mark_read",

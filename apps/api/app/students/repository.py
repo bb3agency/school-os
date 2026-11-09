@@ -197,6 +197,22 @@ def student_ids_in_sections(
     return list(session.scalars(stmt.order_by(Enrollment.student_id)))
 
 
+def student_ids_finishing_year(
+    session: Session, *, academic_year_id: uuid.UUID, section_ids: Collection[uuid.UUID] | None
+) -> list[uuid.UUID]:
+    """Students who end the year in these sections: enrolment ``active`` or ``completed`` (a
+    promotion closed it) in that year (``section_ids`` None = every section). FT-08."""
+    stmt = select(Enrollment.student_id).where(
+        Enrollment.academic_year_id == academic_year_id,
+        Enrollment.status.in_(("active", "completed")),
+    )
+    if section_ids is not None:
+        if not section_ids:
+            return []
+        stmt = stmt.where(Enrollment.section_id.in_(list(section_ids)))
+    return list(session.scalars(stmt.distinct().order_by(Enrollment.student_id)))
+
+
 def all_student_ids(session: Session) -> list[uuid.UUID]:
     return list(session.scalars(select(Student.id).order_by(Student.id)))
 
@@ -625,6 +641,29 @@ def promotions_from(session: Session, from_academic_year_id: uuid.UUID) -> list[
         .order_by(PromotionRun.committed_at.desc(), PromotionRun.id.desc())
     )
     return list(session.scalars(stmt, execution_options={"populate_existing": True}))
+
+
+def promotions_into(session: Session, to_academic_year_id: uuid.UUID) -> list[PromotionRun]:
+    """Committed (not undone) promotions into ``to_academic_year_id``, newest first."""
+    stmt = (
+        select(PromotionRun)
+        .where(
+            PromotionRun.to_academic_year_id == to_academic_year_id,
+            PromotionRun.undone_at.is_(None),
+        )
+        .order_by(PromotionRun.committed_at.desc(), PromotionRun.id.desc())
+    )
+    return list(session.scalars(stmt))
+
+
+def last_changed_on(
+    session: Session, student_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, dt.datetime]:
+    """Student id -> when the record row last changed (``updated_at``)."""
+    if not student_ids:
+        return {}
+    stmt = select(Student.id, Student.updated_at).where(Student.id.in_(list(student_ids)))
+    return {row[0]: row[1] for row in session.execute(stmt)}
 
 
 def insert_promotion(

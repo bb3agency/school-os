@@ -15,6 +15,10 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from app.core.textnorm import nfc
 
 AttendanceStatus = Literal["present", "absent", "late", "leave"]
+CalendarEntryKind = Literal["holiday", "vacation", "working_day"]
+CalendarDayKind = Literal[
+    "working", "working_day", "weekly_off", "saturday_off", "holiday", "vacation", "outside_year"
+]
 RecordSource = Literal["mark", "import"]
 
 
@@ -63,27 +67,55 @@ class AttendanceDayStudent(_Out):
     )
 
 
+class CalendarDayOut(_Out):
+    """One date of the school calendar (FT-06, FR-CAL-004)."""
+
+    on_date: dt.date
+    working: bool
+    kind: CalendarDayKind = Field(
+        description="working (weekly pattern), working_day (an extra working day), weekly_off, "
+        "saturday_off, holiday, vacation or outside_year"
+    )
+    name: str | None = Field(default=None, description="The holiday's or working day's name")
+    entry_id: uuid.UUID | None = None
+
+
 class AttendanceDayOut(_Out):
     section: RecordSectionOut
     on_date: dt.date
     marked: bool = Field(description="Whether any student of the section is marked that day")
     students: list[AttendanceDayStudent]
     counts: dict[str, int] = Field(description="Students per status that day")
+    calendar: CalendarDayOut | None = Field(
+        default=None,
+        description="The day in the school calendar for the section's class (FR-CAL-010); "
+        "None when the year has no calendar. Attendance on a day that is not ``working`` is "
+        "refused (422 ``holiday``).",
+    )
 
 
 class AttendanceMonthStudent(_Out):
     student: RosterStudentOut
     days: dict[str, AttendanceStatus] = Field(description="ISO date -> status (marked days only)")
-    counts: dict[str, int]
+    counts: dict[str, int] = Field(
+        description="Days per status; with a calendar also ``not_marked``: working days up to "
+        "today (from the student's explicit start) without a mark (FR-CAL-011)"
+    )
 
 
 class AttendanceMonthOut(_Out):
-    """The month register: school days (dates with any mark) x students (A4 print)."""
+    """The month register: school days x students (A4 print). Without a calendar a school day is
+    a date with any mark; with one, the working days up to today plus any marked date."""
 
     section: RecordSectionOut
     month: str
     school_days: list[dt.date]
     students: list[AttendanceMonthStudent]
+    calendar_set: bool = Field(default=False, description="Whether the year has a calendar")
+    working_days: list[dt.date] = Field(
+        default_factory=list,
+        description="The month's working days for the section's class (empty without a calendar)",
+    )
 
 
 class AttendanceEntryIn(_In):
@@ -292,3 +324,98 @@ __all__ = [
     "SheetIssueOut",
     "WriteResultOut",
 ]
+
+
+# --- school calendar (FT-06; FR-CAL-*) ---------------------------------------------------------
+
+Weekday = Annotated[int, Field(ge=0, le=6, description="0 = Monday .. 6 = Sunday")]
+SaturdayNumber = Annotated[int, Field(ge=1, le=5, description="1 = first Saturday of the month")]
+SuggestionKey = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{1,62}$")]
+
+
+class CalendarPatternIn(_In):
+    """The weekly pattern of a year's calendar (FR-CAL-001). Saving it the first time sets up the
+    calendar; from then on attendance on days off is refused."""
+
+    weekly_off: list[Weekday] = Field(max_length=6, description="Weekdays off, e.g. [6] Sunday")
+    saturdays_off: list[SaturdayNumber] = Field(
+        max_length=5, description="Saturdays of the month that are off, e.g. [2]"
+    )
+
+
+class CalendarEntryIn(_In):
+    """A holiday, vacation or extra working day (FR-CAL-002), for the whole school or one class
+    (``class_id``, a per-class exception, FR-CAL-003)."""
+
+    kind: CalendarEntryKind
+    name: Annotated[Text, Field(min_length=1, max_length=80)]
+    starts_on: dt.date
+    ends_on: dt.date
+    class_id: uuid.UUID | None = None
+    suggestion: SuggestionKey | None = Field(
+        default=None, description="The suggestion this entry adopts (FR-CAL-014)"
+    )
+
+
+class CalendarEntryOut(_Out):
+    id: uuid.UUID
+    kind: CalendarEntryKind
+    name: str
+    starts_on: dt.date
+    ends_on: dt.date
+    class_id: uuid.UUID | None
+    suggestion: str | None = Field(description="The adopted suggestion's code")
+    days: int = Field(description="Calendar days the entry spans")
+
+
+class CalendarEntryAddedOut(CalendarEntryOut):
+    attendance_marks: int = Field(
+        description="Attendance marks already dated inside the entry (FR-CAL-008): for a holiday "
+        "or vacation they no longer count in working-day totals"
+    )
+
+
+class SchoolCalendarOut(_Out):
+    """A year's school calendar (FR-CAL-001..FR-CAL-003)."""
+
+    academic_year_id: uuid.UUID
+    starts_on: dt.date
+    ends_on: dt.date
+    set_up: bool = Field(description="False until the pattern is saved the first time")
+    weekly_off: list[int]
+    saturdays_off: list[int]
+    entries: list[CalendarEntryOut]
+    working_days: int | None = Field(
+        description="Whole-school working days of the year (None before set-up)"
+    )
+    version: int = Field(description="0 before set-up; send as If-Match to change the pattern")
+
+
+class CalendarMonthOut(_Out):
+    """One month of the calendar for the whole school or a class (FR-CAL-009)."""
+
+    academic_year_id: uuid.UUID
+    month: str
+    class_id: uuid.UUID | None
+    set_up: bool
+    days: list[CalendarDayOut]
+    working_days: int
+
+
+class CalendarSuggestionOut(_Out):
+    code: str = Field(description="Send as ``suggestion`` when adding it")
+    group: str
+    group_label: str
+    name: str
+    kind: CalendarEntryKind
+    starts_on: dt.date
+    ends_on: dt.date
+
+
+class CalendarSuggestionsOut(_Out):
+    """Holiday suggestions inside the year not yet adopted for the whole school (FR-CAL-013).
+    Unverified: the school checks the dates before adding them."""
+
+    verified: bool
+    source: str
+    items: list[CalendarSuggestionOut]

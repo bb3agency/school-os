@@ -285,6 +285,15 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         "0085_fee_arrears",  # FM-01 fee write-off reason (D84)
         "0086_dpdp_readiness",  # FC-03 / FP-13 DPDP readiness, notice at admission, WhatsApp
         "0087_legal_holds",  # FC-12 legal holds (ADR-0059)
+        "0088_fee_addons",  # FM-02 per-student add-on fees (D85)
+        "0089_school_calendar",  # FT-06 school calendar (D85)
+        "0090_year_end",  # FT-08 year-end results (D85)
+        "0091_udise_followup",  # FO-01/FO-03 follow-ups and UDISE+ to-do ticks
+        "0092_udise_corrections",  # FO-02 UDISE+ correction requests, FO-04 UDISE+ row matches
+        "0093_msg_reach_closure",  # FP-02 urgent closure messages (D85)
+        "0094_tally_vouchers",  # FM-03 Tally voucher export (D85)
+        "0095_weekly_brief",  # FA-05 weekly management brief
+        "0096_compliance_register",  # FC-01 compliance certificate register
     }
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
         command.downgrade(cfg, "0017_exports")

@@ -113,8 +113,14 @@ contributors:
     subjects: [student, guardian, member]
     classes: [breach_records]
     eraser: false
+  # FA-05: a member's own weekly-brief delivery choice (the briefs hold counts only).
+  brief:
+    subjects: [member]
+    classes: [brief_preferences]
+    eraser: true
 no_personal_data:
   ops: Background job runs, the outbox and idempotency keys hold ids and counts only.
   admin: Whole-school archives asked for by the owner and the school's retention settings; nothing about one person.
+  compliance: The school's own certificates (fire NOC, building safety, recognition, affiliation, water and sanitation) and who renews them; nothing about one student.
   disclosure: The school's public CBSE disclosure holds school-level facts and counts that the school publishes on purpose; nothing about one student.
   tenancy: The school's structure (years, classes, sections) and its encryption keys; nothing about one person.

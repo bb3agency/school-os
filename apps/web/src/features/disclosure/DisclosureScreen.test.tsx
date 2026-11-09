@@ -58,6 +58,7 @@ const DRAFT: DisclosureDraft = {
   documents: {},
   from_schoolos: {},
   missing: [],
+  expired_policy: "warn",
   version: 3,
   updated_at: null,
   updated_by_name: null,

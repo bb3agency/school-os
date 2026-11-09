@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from sos_evals import authorised_recall, contextual, cost
+from sos_evals import authorised_recall, contextual, cost, extraction
 from sos_evals.gates import GateResult
 from sos_evals.runner import ItemOutcome, Metrics, RunResult
 
@@ -36,6 +36,8 @@ LOWER_IS_BETTER = frozenset(
         "cost_per_answer_usd",
         "cost_per_answer_inr",
         "cost_per_question_usd",
+        "extraction_unmasked_aadhaar_count",
+        "extraction_needless_redactions",
     }
 )
 _MAX_LISTED = 20
@@ -154,6 +156,10 @@ def to_markdown(report: Report) -> str:
                 "memory_",
                 "authorised_recall_",
                 "cost_",
+                "judge_",
+                "faithfulness",
+                "answer_correctness",
+                "extraction_",
             )
         )
     ]
@@ -198,7 +204,61 @@ def to_markdown(report: Report) -> str:
     lines += _authorised_recall_lines(report.run) or ["Not measured."]
     lines += ["", "## Cost per answer (FA-02, NFR-CST-003)", ""]
     lines += cost.report_lines(report.run.metrics, report.run.cost_report) or ["Not measured."]
+    lines += ["", "## Faithfulness and answer correctness (FA-07, docs/06 §13.11)", ""]
+    lines += _judge_lines(report.run) or ["Not measured."]
+    lines += ["", "## Register-photo extraction (FA-07, docs/06 §13.12)", ""]
+    lines += _extraction_lines(report.run) or ["Not measured."]
     return "\n".join(lines) + "\n"
+
+
+def _judge_lines(run: RunResult) -> list[str]:
+    m = run.metrics
+    if run.judge_name is None:
+        return []
+    lines = [
+        f"- Judge: `{run.judge_name}` · calibration items {m.judge_calibration_items} · "
+        f"agreement {fmt(m.judge_agreement)} · kappa {fmt(m.judge_kappa)}",
+        f"- Faithfulness {fmt(m.faithfulness)} over {m.faithfulness_claims} factual sentences · "
+        f"answer correctness {fmt(m.answer_correctness)} over {m.answer_correctness_items} "
+        "questions",
+    ]
+    if run.judge_cost_usd is not None:
+        lines.append(f"- Judge spend (eval cost, not per answer): ${run.judge_cost_usd:.4f}")
+    wrong = [o for o in run.judge_outcomes if o.verdict != o.label]
+    if wrong:
+        lines.append(
+            "- Disagreements: "
+            + ", ".join(f"`{o.id}` ({o.kind}, {o.perturbation})" for o in wrong[:_MAX_LISTED])
+        )
+    return lines
+
+
+def _extraction_lines(run: RunResult) -> list[str]:
+    """Counts and leak kinds only: never a value a page carried (invariant 4)."""
+    if not run.extraction_outcomes:
+        return []
+    m = run.metrics
+    lines = [
+        f"- Pages {m.extraction_items} · planted numbers {m.extraction_planted} · redaction "
+        f"recall {fmt(m.extraction_aadhaar_redaction_recall)} · unmasked "
+        f"{fmt(m.extraction_unmasked_aadhaar_count)} · field accuracy "
+        f"{fmt(m.extraction_field_accuracy)} · row recall {fmt(m.extraction_row_recall)} · "
+        f"images withheld {m.extraction_images_withheld} · needless redactions "
+        f"{m.extraction_needless_redactions}",
+    ]
+    for kind in ("printed", "handwritten"):
+        sub = extraction.aggregate([o for o in run.extraction_outcomes if o.script == kind])
+        lines.append(
+            f"- {kind}: field accuracy {fmt(sub.extraction_field_accuracy)}, row recall "
+            f"{fmt(sub.extraction_row_recall)}"
+        )
+    for o in run.extraction_outcomes:
+        if o.leaked_planted or o.unmasked_numbers:
+            lines.append(
+                f"- `{o.id}` ({o.script}, {o.locale}): {o.unmasked_numbers} unmasked number(s) "
+                f"in {', '.join(o.leak_places) or 'output'}"
+            )
+    return lines
 
 
 def _failures(outcomes: Sequence[ItemOutcome]) -> list[str]:

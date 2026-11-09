@@ -9,10 +9,12 @@ from app.admin.api import router as admin_router
 from app.apaar.api import router as apaar_router
 from app.audit.api import router as audit_router
 from app.breakglass.api import router as breakglass_router
+from app.brief.api import router as brief_router
 from app.certificates.api import public_router as certificates_public_router
 from app.certificates.api import router as certificates_router
 from app.changes.api import router as changes_router
 from app.circulars.api import router as circulars_router
+from app.compliance.api import router as compliance_router
 from app.core import ratelimit
 from app.core.config import DeploymentMode, Settings, get_settings
 from app.core.errors import install_error_handlers
@@ -25,13 +27,17 @@ from app.disclosure.api import router as disclosure_router
 from app.documents.api import router as documents_router
 from app.dq.api import router as dq_router
 from app.dq.api import tasks_router as dq_tasks_router
+from app.dq.followup_api import router as dq_followup_router
+from app.dq.udise_api import router as udise_router
 from app.exports.api import router as exports_router
 from app.extraction.api import router as extraction_router
 from app.fees import webhook as payments_webhook
 from app.fees.api import router as fees_router
+from app.fees.api_addons import router as fees_addons_router
 from app.fees.api_arrears import router as fees_arrears_router
 from app.fees.api_online import router as payments_router
 from app.fees.api_online import webhook_router as payments_webhook_router
+from app.fees.api_reports import router as fees_reports_router
 from app.fees.api_tax import router as fees_tax_router
 from app.fees.api_upi import router as fees_upi_router
 from app.identity.api import router as identity_router
@@ -57,6 +63,7 @@ from app.public.config import rules as public_rules
 from app.students.api import router as students_router
 from app.tally.api import agent_router as tally_agent_router
 from app.tally.api import router as tally_router
+from app.tally.api_vouchers import router as tally_vouchers_router
 from app.tenancy.api import router as tenancy_router
 
 API_PREFIX = "/api/v1"
@@ -91,7 +98,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(audit_router)
     app.include_router(documents_router)
     app.include_router(imports_router)
+    app.include_router(udise_router)  # FO-02 UDISE+ correction requests (before dq paths)
     app.include_router(dq_router)
+    app.include_router(dq_followup_router)
     # R3-1D (FR-RDY-010): link a circular task to a portal calendar event.
     app.include_router(dq_tasks_router)
     app.include_router(platform_tenant_router)
@@ -117,12 +126,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(readiness_router)
     # FC-12 legal holds (ADR-0059).
     app.include_router(holds_router)
+    # FA-05 weekly management brief (FR-BRF-001..015).
+    app.include_router(brief_router)
+    # FC-01 school compliance certificate register.
+    app.include_router(compliance_router)
     # R2-1B fees (ADR-0042): every route answers 404 module_hidden while fees are off.
     app.include_router(fees_router)
     # R2-2E UPI and bank statements (ADR-0042 decision 9).
     app.include_router(fees_upi_router)
     app.include_router(fees_tax_router)  # FM-06 tuition fee certificates
     app.include_router(fees_arrears_router)
+    app.include_router(fees_reports_router)  # FM-04 accountant and management reports
+    app.include_router(fees_addons_router)  # FM-02 add-on fees
     # R2-2D online payments (ADR-0042): the school's Razorpay account, payment links, the
     # Razorpay webhook (require_webhook_signature("razorpay")) and online reconciliation.
     app.include_router(payments_router)
@@ -132,6 +147,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     # tally.connector.enabled (default off, 404). The agent routes are device-signed.
     app.include_router(tally_router)
     app.include_router(tally_agent_router)
+    # FM-03: the Tally voucher file (fees gate; SchoolOS never writes to Tally) and the
+    # ledger-vs-Tally check (also needs the connector flag).
+    app.include_router(tally_vouchers_router)
     # R2 public surface (ADR-0047): parent link pages through the BFF's service token only;
     # every route is pinned in app/public/public_routes.yaml.
     app.include_router(public_router)

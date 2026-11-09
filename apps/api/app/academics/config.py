@@ -52,11 +52,35 @@ class SheetRules(_Model):
     max_issues: int = Field(ge=10, le=1000)
 
 
+YearResult = Literal["passed", "promoted", "detained", "not_appeared"]
+
+
+class NoDetention(_Model):
+    verified: bool
+    class_codes: tuple[str, ...]
+    source: str = Field(min_length=10)
+
+
+class YearEndRules(_Model):
+    """FT-08 (D85; FR-YRE-*): the proposal rule and the RTE warning (unverified, D3)."""
+
+    rule_version: int = Field(ge=1)
+    pass_percent: float = Field(ge=0, le=100)
+    pass_percent_verified: bool
+    pass_percent_source: str = Field(min_length=10)
+    no_detention: NoDetention
+    attended_statuses: tuple[AttendanceStatus, ...] = Field(min_length=1)
+    max_entries: int = Field(ge=10, le=2000)
+    max_reason_chars: int = Field(ge=50, le=500)
+    max_sheet_students: int = Field(ge=100, le=20000)
+
+
 class AcademicsConfig(_Model):
     version: int = Field(ge=1)
     attendance: AttendanceRules
     marks: MarksRules
     sheets: SheetRules
+    year_end: YearEndRules
 
 
 @lru_cache(maxsize=1)
@@ -74,5 +98,7 @@ __all__ = [
     "MarksRules",
     "SheetLimits",
     "SheetRules",
+    "YearEndRules",
+    "YearResult",
     "load_config",
 ]

@@ -38,6 +38,17 @@ ConcessionBasis = Literal["amount", "percent"]
 AdjustmentReason = Literal[
     "late_fee_waiver", "plan_change", "concession_reversal", "correction", "write_off", "other"
 ]
+# ``addon_removal``: a credit proposed when a student is taken off an add-on fee mid-year (FM-02,
+# FR-FEE-090; D85). Made only by the add-on flow, never requested by hand.
+AdjustmentReasonOut = Literal[
+    "late_fee_waiver",
+    "plan_change",
+    "concession_reversal",
+    "correction",
+    "write_off",
+    "addon_removal",
+    "other",
+]
 CancelReason = Literal[
     "wrong_student", "wrong_amount", "cheque_dishonoured", "duplicate_entry", "other"
 ]
@@ -411,7 +422,7 @@ class StatementEntry(_Out):
     source_id: uuid.UUID | None
     # The adjustment's reason code (``write_off`` is shown "Written off by management";
     # FR-FEE-042); null for other kinds.
-    reason_code: AdjustmentReason | None = None
+    reason_code: AdjustmentReasonOut | None = None
 
 
 class StatementOut(_Out):
@@ -638,7 +649,7 @@ class AdjustmentOut(_Out):
     instalment_no: int
     head_id: uuid.UUID | None
     amount: Money
-    reason_code: AdjustmentReason
+    reason_code: AdjustmentReasonOut
     reason: str
     source_plan_id: uuid.UUID | None
     status: RequestStatus

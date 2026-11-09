@@ -40,6 +40,7 @@ MessagePurpose = Literal[
     "fee_reminder",
     "fee_receipt",
     "optin_stopped",
+    "school_closure",
 ]
 
 
@@ -244,6 +245,11 @@ class JoinSlipsIn(_In):
     student_ids: list[uuid.UUID] | None = Field(default=None, min_length=1, max_length=400)
     section_id: uuid.UUID | None = None
     categories: list[OptinCategory] = Field(min_length=1, max_length=3)
+    missing_only: bool = Field(
+        default=False,
+        description="FP-01 (FR-MSG-043): only the students whom a chosen category reaches no "
+        'guardian of (the coverage card\'s "Print slips for the missing ones").',
+    )
 
     @model_validator(mode="after")
     def _one_audience(self) -> JoinSlipsIn:

@@ -388,3 +388,13 @@ __all__ = [
     "verifications_of",
     "withdraw_verification",
 ]
+
+
+def count_issued_between(session: Session, start: dt.datetime, end: dt.datetime) -> int:
+    """Certificates of the current school issued in ``[start, end)`` (a count only)."""
+    stmt = select(func.count()).where(
+        Certificate.issued_at.is_not(None),
+        Certificate.issued_at >= start,
+        Certificate.issued_at < end,
+    )
+    return int(session.execute(stmt).scalar_one())

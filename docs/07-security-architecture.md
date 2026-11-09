@@ -220,6 +220,8 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | exam.unlock (FT-01: unlock a locked exam with a reason so its marks can be corrected) | — | ✓ᴿ | — | — | — | — | — | — | — |
 | marks.record (M5: enter and import marks) | — | ✓ | — | — | — | ✓ | S | — | — |
 | marks.read (M5: see marks) | — | ✓ | — | — | — | ✓ | S | — | — |
+| year_result.read (FT-08: annual results, held-back suggestions, UDISE+ progression sheet; school-wide only) | — | ✓ | ✓ | — | — | ✓ | — | — | — |
+| year_result.confirm (FT-08: confirm each student's annual result; detained needs a reason) | — | ✓ | — | — | — | — | — | — | — |
 | tally.device.manage (M6: enrol the Tally edge agent with a one-time code, revoke it; ADR-0032 Proposed, behind a flag) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | tally.configure (M6: choose Tally ledger groups, link Tally ledgers to students; ADR-0032 Proposed, behind a flag) | ✓ | ✓ | — | — | ✓ | — | — | — | — |
 | breakglass.approve | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
@@ -240,6 +242,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | messaging.optin.record (R2-1C: record opt-in/opt-out with evidence, print join slips) | — | ✓ | ✓ | ✓ | — | — | S | — | — |
 | message.read (R2-1C: delivery log, message history, opt-in states) | ✓ | ✓ | ✓ | ✓ | ✓ | — | S | — | ✓ |
 | message.send (R2-3G: send an approved notice on WhatsApp, send again with a reason, revoke a parent link) | — | ✓ | ✓ | — | — | — | — | — | — |
+| message.closure.send (FP-02: send an urgent school closure message on WhatsApp, also during quiet hours, 06:00-21:30 IST; ADR-0043 amendment, lead decision D85) | — | ✓ᴿ | — | — | — | — | — | — | — |
 | fee.collect (R2-1B: take payments at the counter, issue receipts, request receipt cancellations; fee permissions are school-wide only, FR-FEE-024) | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
 | fee.manage (R2-1B: fee heads, plans, applying plans, adjustment requests, fee settings, day close) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.concession.request (R2-1B) | — | ✓ | ✓ | — | ✓ | — | — | — | — |
@@ -249,14 +252,18 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | fee.refund.approve (R2-1B: maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
 | fee.report (R2-1B: download the day book and dues lists, bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
 | fee.reconcile (R2-2E: import bank statements, confirm UPI receipts seen in the bank, work through UPI exceptions; school-wide only) | — | ✓ | — | — | ✓ | — | — | — | — |
+| fee.addon.read (FM-02: who is on each add-on fee, such as a transport band, hostel or activity, without amounts; for a transport in-charge; school-wide only) | — | ✓ | ✓ | — | ✓ | — | — | — | — |
 | payments.configure (R2-2D: connect, test, rotate the webhook secret of, or disconnect the school's own Razorpay account; ADR-0042) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | consent.read (R3-1B: optional-purpose consents, the consent view with APAAR and WhatsApp opt-ins, section counts, print consent forms; ADR-0049) | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
 | consent.record (R3-1B: record a family's decision with the signed form, print forms; ADR-0049) | — | ✓ | ✓ | ✓ | — | — | — | — | — |
 | privacy.breach.read (R3-1B: the school's breach register, duties, clocks and drafts; ADR-0050) | ✓ | ✓ | — | — | — | — | — | — | ✓ |
 | privacy.breach.manage (R3-1B: record and update breaches, duties, affected people, the parent-notice draft) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
 | privacy.hold.manage (FC-12: see legal holds, place or lift one; two different people, one asks, another approves; ADR-0059, D84) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| brief.read (FA-05: the weekly management brief, counts only, and the member's own delivery choice; D85) | ✓ | ✓ | — | — | — | — | — | — | — |
 | disclosure.edit (R3-1C: edit the CBSE Appendix IX draft, see the published history, download the published files; CBSE schools only; ADR-0051) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | disclosure.publish (R3-1C: publish the disclosure, withdraw it, change its public link; ADR-0051) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| compliance.read (FC-01: the school's compliance certificate register, states, renewal history and dashboard counts; school-level facts, no personal data; D85) | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
+| compliance.manage (FC-01: record, renew, correct and remove the school's certificates, choose who renews them; D85) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | privacy.read (R3-1A: requests and grievances list and detail within the reader's student reach, notice records, record classes) | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
 | privacy.request.manage (R3-1A: log requests and grievances, record verification, link change requests, build access reports, record notice issues, write responses) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | privacy.request.decide (R3-1A: release an access report, approve an erasure, close an access, erasure or grievance request; maker-checker against the person who logged it) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |

@@ -16,8 +16,11 @@ from sos_evals.conversations import ConversationCase
 from sos_evals.conversations import validate_cases as validate_conversation_cases
 from sos_evals.due import DueCase
 from sos_evals.due import validate_cases as validate_due_cases
+from sos_evals.extraction import ExtractionCase
+from sos_evals.extraction import validate_cases as validate_extraction_cases
 from sos_evals.fees import FeeCase
 from sos_evals.fees import validate_cases as validate_fee_cases
+from sos_evals.judge import CalibrationItem, validate_calibration
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
 
 EVALS_DIR = Path(__file__).resolve().parents[1]
@@ -28,6 +31,8 @@ FEES_FILE = "fees.jsonl"
 CONTEXTUAL_FILE = "contextual.jsonl"
 CONVERSATIONS_FILE = "conversations.jsonl"
 DUE_FILE = "due.jsonl"
+EXTRACTION_FILE = "extraction.jsonl"
+JUDGE_CALIBRATION_FILE = "judge_calibration.jsonl"
 
 Suite = Literal["fast", "full"]
 
@@ -52,6 +57,10 @@ class Dataset:
     """Scripted Ask conversations (ADR-0034; every suite runs all of them)."""
     due: tuple[DueCase, ...] = ()
     """Synthetic "what's due" cases for ``list_due_tasks`` (D74; every suite runs all)."""
+    extraction: tuple[ExtractionCase, ...] = ()
+    """Synthetic register pages for the extraction eval (FA-07; every suite runs all)."""
+    judge_calibration: tuple[CalibrationItem, ...] = ()
+    """Labelled items the judge is calibrated on before it scores (FA-07; every suite)."""
 
     def select(self, suite: Suite) -> tuple[EvalItem, ...]:
         if suite == "full":
@@ -83,6 +92,8 @@ def dataset_files(directory: Path) -> list[Path]:
         directory / CONTEXTUAL_FILE,
         directory / CONVERSATIONS_FILE,
         directory / DUE_FILE,
+        directory / EXTRACTION_FILE,
+        directory / JUDGE_CALIBRATION_FILE,
     ]
 
 
@@ -119,11 +130,20 @@ def load(directory: Path = DATASETS_DIR) -> Dataset:
         ConversationCase.model_validate(row) for row in _read_jsonl(directory / CONVERSATIONS_FILE)
     )
     due = tuple(DueCase.model_validate(row) for row in _read_jsonl(directory / DUE_FILE))
+    extraction = tuple(
+        ExtractionCase.model_validate(row) for row in _read_jsonl(directory / EXTRACTION_FILE)
+    )
+    calibration = tuple(
+        CalibrationItem.model_validate(row)
+        for row in _read_jsonl(directory / JUDGE_CALIBRATION_FILE)
+    )
     try:
         validate_cases(circulars)
         validate_fee_cases(fees)
         validate_due_cases(due)
         validate_conversation_cases(conversations)
+        validate_extraction_cases(extraction)
+        validate_calibration(calibration)
         contextual = load_contextual(directory / CONTEXTUAL_FILE)
     except ValueError as exc:
         raise DatasetError(str(exc)) from exc
@@ -136,6 +156,8 @@ def load(directory: Path = DATASETS_DIR) -> Dataset:
         contextual=contextual,
         conversations=conversations,
         due=due,
+        extraction=extraction,
+        judge_calibration=calibration,
     )
 
 

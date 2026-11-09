@@ -125,6 +125,8 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}"): {
         "cells": [{"column": 1, "value": "Synthetica BOLA"}]
     },
+    # FO-04: a person's match decision for a UDISE+ row.
+    ("PUT", "/api/v1/imports/{import_id}/rows/{row_no}/match"): {"decision": "skip"},
     ("POST", "/api/v1/documents/{document_id}/sheet/versions"): {
         "base_version_no": 1,
         "edits": [{"row_no": 2, "column": 0, "value": "Synthetica BOLA"}],
@@ -216,7 +218,19 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "document_id": "01920000-0000-7000-8000-000000000001"
     },
     ("POST", "/api/v1/exams/{exam_id}/lock"): None,
+    # FT-06 school calendar (FR-CAL-*).
+    ("PUT", "/api/v1/academic-years/{year_id}/calendar"): {"weekly_off": [], "saturdays_off": []},
+    ("POST", "/api/v1/academic-years/{year_id}/calendar/entries"): {
+        "kind": "holiday",
+        "name": "Synthetic holiday",
+        "starts_on": "2026-12-25",
+        "ends_on": "2026-12-25",
+    },
+    ("DELETE", "/api/v1/academic-years/{year_id}/calendar/entries/{entry_id}"): None,
     ("POST", "/api/v1/exams/{exam_id}/unlock"): {"reason": "Synthetic correction"},
+    ("POST", "/api/v1/sections/{section_id}/year-results"): {
+        "entries": [{"student_id": "01920000-0000-7000-8000-000000000001", "result": "passed"}]
+    },
     ("POST", "/api/v1/students/{student_id}/flags"): {"indicator": "attendance"},
     ("POST", "/api/v1/insights/flags/{flag_id}/actions"): {"kind": "other"},
     ("POST", "/api/v1/insights/flags/{flag_id}/close"): {"reason": "improved"},
@@ -308,6 +322,7 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/imports/{import_id}/revert"),
         ("GET", "/api/v1/imports/{import_id}/sheet"),
         ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}"),
+        ("PUT", "/api/v1/imports/{import_id}/rows/{row_no}/match"),
         ("GET", "/api/v1/imports/{import_id}/sheet/export"),
         ("GET", "/api/v1/imports/{import_id}/preset-mapping"),
         # Cancelling needs student.identity_change.request (the owner only approves).
@@ -331,6 +346,12 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/exams/{exam_id}/lock"),
         ("POST", "/api/v1/exams/{exam_id}/unlock"),
         ("GET", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/history"),
+        # FT-08 (D85): year-end results are not owner permissions.
+        ("GET", "/api/v1/sections/{section_id}/year-results"),
+        ("POST", "/api/v1/sections/{section_id}/year-results"),
+        ("GET", "/api/v1/academic-years/{year_id}/year-results/held-back"),
+        ("GET", "/api/v1/academic-years/{year_id}/udise-progression"),
+        ("GET", "/api/v1/academic-years/{year_id}/udise-progression/csv"),
         ("GET", "/api/v1/insights/flags/{flag_id}"),
         ("POST", "/api/v1/students/{student_id}/flags"),
         ("POST", "/api/v1/insights/flags/{flag_id}/actions"),
@@ -840,11 +861,39 @@ def _b_upi(w: Any, key: str) -> uuid.UUID:
     return value
 
 
+def _udise() -> ModuleType:
+    """tests/dq/udise_security_support.py (FO-02 UDISE+ correction requests)."""
+    name = "sos_test_dq_udise_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "dq" / "udise_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
 def _tax() -> ModuleType:
     """tests/fees/tax_security_support.py (FM-06: a tuition fee certificate of school B)."""
     name = "sos_test_fees_tax_security_support"
     if name not in sys.modules:
         path = Path(__file__).resolve().parents[1] / "fees" / "tax_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def _addons() -> ModuleType:
+    """tests/fees/addon_security_support.py (FM-02 add-on fees)."""
+    name = "sos_test_fees_addon_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "addon_security_support.py"
         spec = importlib.util.spec_from_file_location(name, path)
         assert spec is not None
         assert spec.loader is not None
@@ -946,6 +995,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "notice_id": _b_notice,
     # M5: an exam, a flag and a behaviour note of school B.
     "exam_id": lambda w: _m5().b_exam(w),
+    # FT-06: a holiday of school B's calendar (FR-CAL-005).
+    "entry_id": lambda w: _m5().b_calendar_entry(w),
     "flag_id": lambda w: _m5().b_flag(w),
     "note_id": lambda w: _m5().b_note(w),
     # Tally connector (M6): an agent and a ledger of school B.
@@ -965,6 +1016,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "line_id": lambda w: _b_upi(w, "line_id"),
     # FM-06: a tuition fee certificate of school B.
     "tax_certificate_id": lambda w: _tax().b_certificate(_ADMIN[0], w),
+    # FM-02: an add-on fee of school B.
+    "addon_id": lambda w: _addons().b_addon(_ADMIN[0], w),
     # R2-2D online payments: a payment link and a reconciliation item of school B.
     "intent_id": lambda w: _b_fee(w, "intent_id"),
     "recon_item_id": lambda w: _b_fee(w, "recon_item_id"),
@@ -978,7 +1031,28 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "breach_id": lambda w: _consents().b_breach(_ADMIN[0], w),
     # FC-12 (ADR-0059): a legal hold of school B.
     "hold_id": lambda w: _consents().b_hold(_ADMIN[0], w),
+    # FO-02: a UDISE+ correction request of school B.
+    "correction_id": lambda w: _udise().b_request(_ADMIN[0], w),
+    # FA-05 (FR-BRF-002): a stored weekly brief of school B.
+    "brief_id": lambda w: _b_brief(_ADMIN[0], w),
 }
+
+
+def _b_brief(admin: Engine, w: Any) -> uuid.UUID:
+    """A stored weekly brief of school B (counts only)."""
+    if "bola_brief" not in w.b.ids:
+        brief_id = uuid.uuid4()
+        with admin.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO ops.weekly_briefs (id, tenant_id, week_start, counts) "
+                    "VALUES (:i, :t, '2026-10-05', CAST(:c AS jsonb))"
+                ),
+                {"i": brief_id, "t": w.b.tenant_id, "c": '{"v": 1}'},
+            )
+        w.b.ids["bola_brief"] = brief_id
+    value: uuid.UUID = w.b.ids["bola_brief"]
+    return value
 
 
 def _id_routes() -> list[tuple[str, str]]:
@@ -995,8 +1069,11 @@ def _id_routes() -> list[tuple[str, str]]:
         # A readiness profile key (ADR-0040) and a privacy notice template key (R3-1A) name
         # configuration, not an object of the school; so does a portal calendar event key
         # (ADR-0053): it is looked up only inside the caller's school (cross-school 404 in
-        # tests/dq/test_calendar_api.py).
-        if isinstance(rc.original_route, APIRoute) and params - {"profile_key", "event_key", "key"}:
+        # tests/dq/test_calendar_api.py). A UDISE+ to-do item key (FO-03, ``kind:uuid``) is derived
+        # only from the caller's own reach (cross-school 404 in
+        # tests/dq/test_udise_followup_api.py::test_FR_UDI_039_todo_authz_scope_and_tenant).
+        configuration = {"profile_key", "event_key", "key", "item_key"}
+        if isinstance(rc.original_route, APIRoute) and params - configuration:
             out.extend((m, str(rc.path)) for m in sorted(rc.methods or ()))
     return sorted(out)
 
@@ -1007,6 +1084,20 @@ ID_ROUTES = _id_routes()
 BODIES.update(_fees().BOLA_BODIES)
 BODIES.update(_upi().BOLA_BODIES)
 BODIES.update(_tax().BOLA_BODIES)
+BODIES.update(_addons().BOLA_BODIES)
+BODIES.update(_udise().BOLA_BODIES)
+# FO-02: dq.readiness.manage and export.portal are the principal's, not the owner's.
+ACTOR.update(
+    dict.fromkeys(
+        (
+            ("GET", "/api/v1/dq/udise-corrections/{correction_id}"),
+            ("POST", "/api/v1/dq/udise-corrections/{correction_id}/sent"),
+            ("POST", "/api/v1/dq/udise-corrections/{correction_id}/close"),
+            ("GET", "/api/v1/dq/udise-corrections/{correction_id}/letter"),
+        ),
+        "principal",
+    )
+)
 BODIES.update(_disclosure().BOLA_BODIES)
 
 
@@ -1045,12 +1136,33 @@ BODIES.update(_consents().BOLA_BODIES)
 PRIVACY_REQUESTS = "/api/v1/privacy/requests/{request_id}"
 
 
+def _compliance() -> ModuleType:
+    """tests/compliance/support.py (FC-01: a compliance certificate of school B)."""
+    name = "sos_test_compliance_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "compliance" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+BODIES.update(_compliance().BOLA_BODIES)
+
+
 def _b_id(template: str, w: Any) -> uuid.UUID:
     """School B's object for ``template``: ``request_id`` is a privacy request on the privacy
     routes (R3-1A) and a break-glass request elsewhere."""
     if template.startswith(PRIVACY_REQUESTS):
         value: uuid.UUID = _privacy().b_request(w)
         return value
+    if template.startswith(_compliance().BOLA_PREFIX):
+        # FC-01: ``certificate_id`` is a compliance certificate on the compliance routes.
+        cert: uuid.UUID = _compliance().b_certificate(_ADMIN[0], w)
+        return cert
     return PARAM_TO_B[_param(template)](w)
 
 
@@ -1060,6 +1172,7 @@ QUERY: dict[tuple[str, str], dict[str, str]] = {
     ("GET", "/api/v1/sections/{section_id}/attendance/month"): {"month": "2026-09"},
     ("GET", "/api/v1/imports/{import_id}/preset-mapping"): {"preset": "register-excel"},
     ("GET", "/api/v1/sections/{section_id}/join-slips"): {"categories": "notices"},
+    ("GET", "/api/v1/academic-years/{year_id}/calendar/month"): {"month": "2026-11"},
     **_disclosure().BOLA_QUERY,
 }
 

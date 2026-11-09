@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.fees.models import Adjustment, StudentFeeAccount
-from app.fees.schemas import AdjustmentReason
+from app.fees.schemas import AdjustmentReasonOut
 
 
 def accounts_in_years(
@@ -59,13 +59,13 @@ def write_off_sums(
 
 def adjustment_reasons(
     session: Session, adjustment_ids: Collection[uuid.UUID]
-) -> dict[uuid.UUID, AdjustmentReason]:
+) -> dict[uuid.UUID, AdjustmentReasonOut]:
     if not adjustment_ids:
         return {}
     stmt = select(Adjustment.id, Adjustment.reason_code).where(
         Adjustment.id.in_(list(adjustment_ids))
     )
-    return {r[0]: cast(AdjustmentReason, r[1]) for r in session.execute(stmt)}
+    return {r[0]: cast(AdjustmentReasonOut, r[1]) for r in session.execute(stmt)}
 
 
 __all__ = ["accounts_in_years", "adjustment_reasons", "write_off_sums"]

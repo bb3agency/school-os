@@ -162,6 +162,12 @@ EXPECTED_TABLES = {
     # R3-1D (0064_portal_calendar, ADR-0053): confirmed portal dates and reminders sent.
     "portal_calendar_dates",
     "portal_reminders",
+    # FO-01/FO-03 (0091_udise_followup): follow-up log and UDISE+ to-do ticks.
+    "dq_followups",
+    "udise_movement_marks",
+    # FO-02 (0092_udise_corrections): UDISE+ correction requests to the MEO.
+    "udise_correction_requests",
+    "udise_correction_lines",
     "import_batches",
     "import_mapping_templates",
     "documents",
@@ -183,6 +189,9 @@ EXPECTED_TABLES = {
     "exams",
     "exam_marks",
     "exam_mark_history",  # FT-01 (0084_exam_lock_enrol)
+    "school_calendars",  # FT-06 (0089_school_calendar)
+    "calendar_entries",
+    "year_results",  # FT-08 (0090_year_end)
     "behaviour_notes",
     "insight_flags",
     "flag_actions",
@@ -195,6 +204,9 @@ EXPECTED_TABLES = {
     "tally_parties",
     "tally_party_links",
     "tally_bills",  # D63 (0077_tally_bills)
+    "tally_export_settings",  # FM-03 (0094_tally_vouchers)
+    "tally_voucher_exports",
+    "tally_exported_vouchers",
     # Ask memory (0038_ask_conversations, ADR-0034): each person's own items and switch.
     "ask_memories",
     "ask_memory_settings",
@@ -237,6 +249,13 @@ EXPECTED_TABLES = {
     "fees_receipt_allocations",
     # FM-06 (0083_fee_tax_cert): tuition fee certificates for income tax.
     "fees_tax_certificates",
+    # FM-02 (0088_fee_addons): add-on fee templates and assignments.
+    "fees_addons",
+    "fees_addon_assignments",
+    # FP-02 (0093_msg_reach_closure): urgent closure messages.
+    "messaging_closures",
+    # FC-01 (0096_compliance_register): the school's certificate register.
+    "compliance_certificates",
     "fees_receipt_cancellations",
     "fees_refunds",
     "fees_day_closes",

@@ -53,6 +53,14 @@ from sos_evals.contextual import (
 from sos_evals.conversations import ConversationCase, ConversationRun, TurnResult, script_of
 from sos_evals.due import DueCase, DueCitation, DueResult, DueTask
 from sos_evals.english_first import NoticeResult, has_telugu
+from sos_evals.extraction import (
+    KEPT_FIELDS,
+    ExtractionResult,
+    RegisterPage,
+    mask,
+    page_numbers,
+    without_numbers,
+)
 from sos_evals.fees import FeeCase, FeeCitation, FeeResult, inr
 from sos_evals.schema import Asker, CorpusItem, EvalItem, Locale
 
@@ -341,6 +349,25 @@ class PerfectStub(_ConversationOracle):
             case, [f"Fee due from Tally: {inr(case.expected_total)} (linked ledgers only)."]
         )
 
+    def extract_register_page(self, page: RegisterPage) -> ExtractionResult:
+        """A perfect pipeline over the page's OCR reading: keeps only the kept columns, masks
+        every number, blacks out each piece that shows one, and discards the image when a number
+        has no position (FA-07; PRV-015, PRV-016)."""
+        numbers = page_numbers(page)
+        rows = tuple(
+            {c.column: mask(c.text, numbers) for c in row if c.column in KEPT_FIELDS}
+            for row in page.rows
+        )
+        if not numbers:
+            return ExtractionResult(
+                rows=rows, image="original", image_text=tuple(page.reading_order())
+            )
+        unplaced = [n.text for n in page.margin if not n.placed]
+        if len(without_numbers(unplaced, numbers)) < len(unplaced):
+            return ExtractionResult(rows=rows, image="withheld")
+        kept = without_numbers(page.reading_order(), numbers)
+        return ExtractionResult(rows=rows, image="redacted", image_text=tuple(kept))
+
 
 class LeakyStub(PerfectStub):
     """Ranks without the ACL filter and answers leakage probes from the forbidden sources."""
@@ -401,6 +428,14 @@ class LeakyStub(PerfectStub):
         ] or list(case.ledgers)
         lines = [f"Fee due: {inr(ledger.balance)}." for ledger in guessed]
         return self._fee_answer(case, lines)
+
+    def extract_register_page(self, page: RegisterPage) -> ExtractionResult:
+        """Stores every column as read and keeps the original image (no masking, no redaction)."""
+        return ExtractionResult(
+            rows=tuple({c.column: c.text for c in row} for row in page.rows),
+            image="original",
+            image_text=tuple(page.reading_order()),
+        )
 
     def run_conversation(self, case: ConversationCase) -> ConversationRun:
         """Keeps one shared history for everyone: every earlier question, whoever asked it and

@@ -43,6 +43,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
+from app.academics import service as academics
 from app.apaar import service as apaar
 from app.audit import service as audit
 from app.authz.context import UserContext
@@ -80,6 +81,7 @@ from app.certificates.schemas import (
     PublicDuplicate,
     ReasonIn,
     TcFeeNote,
+    TcInputSuggestion,
     VerificationOut,
     VerificationReasonIn,
 )
@@ -938,7 +940,29 @@ def preview(
     )
     out = _preview_out(record, sensitive=sensitive)
     if certificate_type == "transfer":
-        out = out.model_copy(update={"fee_note": _fee_note(session, ctx, student_id)})
+        out = out.model_copy(
+            update={
+                "fee_note": _fee_note(session, ctx, student_id),
+                "input_suggestions": _input_suggestions(session, record, student_id),
+            }
+        )
+    return out
+
+
+def _input_suggestions(
+    session: Session, record: _Record, student_id: uuid.UUID
+) -> list[TcInputSuggestion]:
+    """FT-08 (FR-YRE-014..FR-YRE-016): "From SchoolOS" values for the TC inputs the school's
+    format asks for (AP TC: qualified for promotion, working days, days attended), from the
+    confirmed annual result and the attendance register. Only inputs the layout has, and only
+    choices it accepts; the person may change them, and nothing is filled in silently."""
+    inputs = record.layout.inputs
+    out: list[TcInputSuggestion] = []
+    for found in academics.tc_suggestions(session, student_id, today=_today(session)):
+        spec = inputs.get(found.key)
+        if spec is None or (spec.kind == "choice" and found.value not in spec.choices):
+            continue
+        out.append(TcInputSuggestion(key=found.key, value=found.value, source=found.source))
     return out
 
 
@@ -2648,6 +2672,34 @@ def admission_register_page(
     return templates.render_register(page)
 
 
+@dataclass(frozen=True, slots=True)
+class IssuedTransfer:
+    """An issued (not cancelled) original transfer certificate: ids, serial and date only."""
+
+    certificate_id: uuid.UUID
+    student_id: uuid.UUID
+    serial: str | None
+    issued_on: dt.date
+
+
+def issued_transfer_certificates(
+    session: Session, student_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, IssuedTransfer]:
+    """System read for the UDISE+ to-do list (``app.dq``, FO-03, FR-UDI-032): the issued
+    original TC of each student that has one. ``student_ids`` MUST come from the caller's own
+    scoped reads; no permission is applied here."""
+    rows = repo.transfer_certificates_of(session, list(student_ids))
+    return {
+        sid: IssuedTransfer(
+            certificate_id=row.id,
+            student_id=sid,
+            serial=row.serial,
+            issued_on=(row.issued_at or row.created_at).astimezone(IST).date(),
+        )
+        for sid, row in rows.items()
+    }
+
+
 # --- full data export and offboarding ------------------------------------------------------------
 
 
@@ -2681,6 +2733,13 @@ tenancy.register_data_owner(
 )
 
 
+def issued_count(session: Session, start: dt.datetime, end: dt.datetime) -> int:
+    """Certificates of the whole school issued in ``[start, end)`` (later cancellations
+    included): a count only, for the weekly management brief (FR-BRF-005). No permission check:
+    the caller (``app.brief``) checks ``brief.read``."""
+    return repo.count_issued_between(session, start, end)
+
+
 __all__ = [
     "APPROVE",
     "ISSUE",
@@ -2692,6 +2751,7 @@ __all__ = [
     "CertificateNotIssued",
     "CertificateNotPending",
     "FormatChanged",
+    "IssuedTransfer",
     "NoCurrentYear",
     "NotRequester",
     "SelfApprovalForbidden",
@@ -2708,6 +2768,8 @@ __all__ = [
     "formats_catalog",
     "get_certificate",
     "get_verification",
+    "issued_count",
+    "issued_transfer_certificates",
     "list_certificates",
     "mark_pdf_failed",
     "preview",

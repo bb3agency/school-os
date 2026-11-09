@@ -51,6 +51,17 @@ classes:
     erasure: no_personal_data
     source: SchoolOS defaults and the school's settings
 
+  school_calendar:
+    label: School calendar (working days and holidays)
+    owner: academics
+    tables: [sis.school_calendars, sis.calendar_entries]
+    classification: C1
+    docs_row: School structure, settings and keys
+    retention: Life of the school
+    basis: Which days the school works; nothing about one person.
+    erasure: no_personal_data
+    source: Set up by the school
+
   school_structure:
     label: Academic years, classes, sections and school keys
     owner: tenancy
@@ -162,7 +173,8 @@ classes:
              fin.receipt_counters, fin.receipts, fin.receipt_allocations,
              fin.receipt_cancellations, fin.refunds, fin.ledger_entries, fin.day_closes,
              fin.provider_payments, fin.reconciliation_runs, fin.reconciliation_items,
-             fin.upi_settings, fin.upi_confirmations, fin.tax_certificates]
+             fin.upi_settings, fin.upi_confirmations, fin.tax_certificates,
+             fin.fee_addons, fin.fee_addon_assignments]
     classification: C2
     docs_row: Receipts, refunds, cancellations, ledger entries
     retention: 8 years after the end of the financial year (owner decision D21, 2026-10-14; a CA confirms when available)
@@ -195,7 +207,7 @@ classes:
   attendance_and_marks:
     label: Attendance, exams and marks
     owner: academics
-    tables: [sis.attendance_marks, sis.exams, sis.exam_marks, sis.exam_mark_history]
+    tables: [sis.attendance_marks, sis.exams, sis.exam_marks, sis.exam_mark_history, sis.year_results]
     classification: C2
     docs_row: Attendance, exams and marks
     retention: Life of the school (school records)
@@ -239,7 +251,8 @@ classes:
   data_quality:
     label: Data-quality checks
     owner: dq
-    tables: [sis.dq_findings, sis.dq_runs]
+    tables: [sis.dq_findings, sis.dq_runs, sis.dq_followups, sis.udise_movement_marks,
+             sis.udise_correction_requests, sis.udise_correction_lines]
     classification: C2
     docs_row: Data-quality findings and runs
     retention: As the student record (re-checked on every change)
@@ -268,6 +281,17 @@ classes:
     basis: The record of what the school published as CBSE requires; school-level facts and counts, no student data.
     erasure: refused_official_record
     source: Entered and published by the school
+
+  compliance_certificates:
+    label: School compliance certificates
+    owner: compliance
+    tables: [ops.compliance_certificates]
+    classification: C1
+    docs_row: School compliance certificates
+    retention: Life of the school
+    basis: The school's own certificates (fire NOC, building safety, recognition, affiliation) and their renewals; nothing about one person.
+    erasure: no_personal_data
+    source: Recorded by the school office from the certificates the school holds
 
   imports:
     label: Spreadsheet imports
@@ -328,7 +352,7 @@ classes:
   messages:
     label: WhatsApp messages sent
     owner: messaging
-    tables: [msg.messages, msg.send_runs, msg.broadcasts]
+    tables: [msg.messages, msg.send_runs, msg.broadcasts, msg.closures]
     classification: C2
     docs_row: Messages (
     retention: 13 months; encrypted variables erased after 180 days
@@ -429,7 +453,8 @@ classes:
     label: Tally ledgers
     owner: tally
     tables: [ops.tally_parties, ops.tally_bills, ops.tally_party_links, ops.tally_groups,
-             ops.tally_devices, ops.tally_enrolment_codes]
+             ops.tally_devices, ops.tally_enrolment_codes, ops.tally_export_settings,
+             ops.tally_voucher_exports, ops.tally_exported_vouchers]
     classification: C2
     docs_row: Tally party ledgers and links
     retention: "While the connector is on: the latest snapshot per ledger"
@@ -528,3 +553,27 @@ classes:
     basis: Evidence that the family got the privacy notice when the student was admitted.
     erasure: refused_legal_obligation
     source: Recorded by the school office
+
+  # FA-05 (0095_weekly_brief): the stored weekly briefs (school-level counts) and each member's
+  # delivery choice.
+  weekly_briefs:
+    label: Weekly management briefs
+    owner: brief
+    tables: [ops.weekly_briefs]
+    classification: C1
+    docs_row: Weekly management briefs
+    retention: 104 weeks (2 years)
+    basis: School-level counts for the owner and principal; nothing about one student or one person.
+    erasure: no_personal_data
+    source: Made by SchoolOS from the school's own counts
+
+  brief_preferences:
+    label: Weekly brief delivery choices
+    owner: brief
+    tables: [ops.brief_preferences]
+    classification: C1
+    docs_row: Weekly brief delivery choices
+    retention: While the person works at the school
+    basis: Whether a staff member wants the weekly brief in-app and by e-mail.
+    erasure: allowed
+    source: Chosen by the staff member

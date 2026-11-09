@@ -33,20 +33,24 @@ from app.core import purge as purging
 from app.core.records import RecordTable
 from app.fees import _common as c
 from app.fees import (
+    addons,
     approvals,
     arrears,
     ask,
     ledger,
     online,
     parent_pages,
+    period_reports,
     receipts,
     refund_hooks,
     reports,
     setup,
     statements,
+    tally_feed,
     tax_certificates,
     upi,
 )
+from app.fees import addons_repository as addon_repo
 from app.fees import late_fees as late
 from app.fees import online_repository as orepo
 from app.fees import repository as repo
@@ -141,6 +145,18 @@ left_with_dues_csv = reports.left_with_dues_csv
 # R2-3J: the accounts of a manual WhatsApp fee reminder (FR-MSG-025; messaging.sends)
 ReminderAccount = reports.ReminderAccount
 reminder_accounts = reports.reminder_accounts
+# FM-04 accountant and management reports (FR-FEE-061..075)
+collection_register = period_reports.collection_register
+collection_print = period_reports.collection_print
+collection_download = period_reports.collection_download
+dcb = period_reports.dcb
+dcb_download = period_reports.dcb_download
+registers = period_reports.registers
+register_download = period_reports.register_download
+ageing = period_reports.ageing
+ageing_download = period_reports.ageing_download
+series_check = period_reports.series_check
+year_end_pack = period_reports.year_end_pack
 
 post_late_fees = late.post_for_school
 
@@ -483,6 +499,7 @@ def export_records(session: Session) -> list[RecordTable]:
         *orepo.export_tables(session),
         *upi_repo.export_tables(session),
         *trepo.export_tables(session),
+        *addon_repo.export_tables(session),
     ]
 
 
@@ -514,6 +531,9 @@ _PURGE = purging.PurgeTables(
         "fin.payment_connections",
         "fin.adjustments",
         "fin.concessions",
+        # FM-02 (0088_fee_addons): ledger entries and adjustments reference assignments
+        "fin.fee_addon_assignments",
+        "fin.fee_addons",
         "fin.student_fee_accounts",
         "fin.fee_plan_instalments",
         "fin.fee_plan_lines",
@@ -558,8 +578,54 @@ ParentTaxCertificate = tax_certificates.ParentTaxCertificate
 parent_tax_certificate = tax_certificates.parent_tax_certificate
 parent_tax_certificate_pdf = tax_certificates.parent_tax_certificate_pdf
 
+# --- FM-03 Tally voucher export and ledger-vs-Tally check (FR-TALLY-011..030; app.tally) --------
+
+TALLY_MODES = tally_feed.MODES
+TallyFeed = tally_feed.TallyFeed
+TallyFeedCash = tally_feed.FeedCash
+TallyFeedDemand = tally_feed.FeedDemand
+TallyFeedHead = tally_feed.FeedHead
+tally_feed_heads = tally_feed.heads
+tally_feed_for = tally_feed.tally_feed
+balances_as_of = tally_feed.balances_as_of
+
+
+# --- FM-02 add-on fees (FR-FEE-081..100; app.fees.api_addons) -----------------------------------
+
+ADDON_READ = addons.ADDON_READ
+list_addons = addons.list_addons
+create_addon = addons.create_addon
+update_addon = addons.update_addon
+assign_addon = addons.assign
+unassign_addon = addons.unassign
+addon_students = addons.students_of
+
+
+def collected_between(session: Session, first: dt.date, last: dt.date) -> tuple[int, Decimal]:
+    """(receipts issued, net amount collected) over the receipt days ``first``..``last``: the
+    sum of the day books (receipts less the cancellations and refunds dated that day, as
+    ``GET /fees/reports/daily`` computes ``net_total``). Totals only, for the weekly management
+    brief (FR-BRF-007); the caller (``app.brief``) checks ``brief.read`` and that fees are on."""
+    count = 0
+    net = ZERO
+    day = first
+    while day <= last:
+        rows = repo.receipts_on(session, day)
+        cancelled = repo.receipts_by_id(
+            session, {x.receipt_id for x in repo.cancellations_on(session, day)}
+        )
+        count += len(rows)
+        net += (
+            sum((r.amount for r in rows), ZERO)
+            - sum((r.amount for r in cancelled.values()), ZERO)
+            - sum((x.amount for x in repo.refunds_on(session, day)), ZERO)
+        )
+        day += dt.timedelta(days=1)
+    return count, net
+
 
 __all__ = [
+    "ADDON_READ",
     "COLLECT",
     "CONCESSION_APPROVE",
     "CONCESSION_REQUEST",
@@ -573,6 +639,7 @@ __all__ = [
     "RENDER_EVENT",
     "RENDER_TASK",
     "REPORT",
+    "TALLY_MODES",
     "TAX_CERTIFICATE_PREPARING",
     "TAX_CERTIFICATE_RENDER_TASK",
     "AskClassFees",
@@ -593,9 +660,18 @@ __all__ = [
     "ReminderAccount",
     "ReminderDue",
     "SelfApprovalForbidden",
+    "TallyFeed",
+    "TallyFeedCash",
+    "TallyFeedDemand",
+    "TallyFeedHead",
     "account_summary",
+    "addon_students",
     "ask_school_fees",
     "ask_student_fees",
+    "assign_addon",
+    "balances_as_of",
+    "collected_between",
+    "create_addon",
     "create_payment_intent",
     "dues_for_student",
     "enabled",
@@ -607,6 +683,7 @@ __all__ = [
     "issue_tax_certificates_bulk",
     "left_with_dues",
     "left_with_dues_csv",
+    "list_addons",
     "list_tax_certificates",
     "mark_tax_certificate_pdf_failed",
     "parent_account_student",
@@ -630,8 +707,12 @@ __all__ = [
     "retry_tax_certificate_render",
     "student_years",
     "subject_report",
+    "tally_feed_for",
+    "tally_feed_heads",
     "tax_certificate_download_url",
     "tax_certificate_print_page",
     "tenant_data_counts",
+    "unassign_addon",
+    "update_addon",
     "upi_payee",
 ]

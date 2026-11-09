@@ -60,6 +60,7 @@ from app.core.pdf import PrintDocument
 from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
 from app.dq import engine, readiness
+from app.dq import followup_repository as followup_repo
 from app.dq import repository as repo
 from app.dq.explanations import Language, load_explanations
 from app.dq.masking import FULL_MASK
@@ -1320,7 +1321,7 @@ def export_records(session: Session) -> list[RecordTable]:
     """Worker only: every data-quality run and finding of the current school for its full data
     export (``app.admin``; the caller checked ``tenant.export_all`` and audits the export).
     Findings carry the masked values the engine stored (FR-DQ-006), never C3 values."""
-    return repo.export_record_tables(session)
+    return [*repo.export_record_tables(session), *followup_repo.export_record_tables(session)]
 
 
 __all__ = [
@@ -1335,6 +1336,8 @@ __all__ = [
     "UNLINK_TASK",
     "WAIVE",
     "BlockerRef",
+    "ClosingWindow",
+    "ReadinessTotals",
     "execute_queued_run",
     "export_records",
     "findings_for_student",
@@ -1348,6 +1351,7 @@ __all__ = [
     "purge_tenant_data",
     "readiness_slip_students",
     "readiness_slips_document",
+    "readiness_totals",
     "request_run",
     "resolve_finding",
     "resolve_with_change_request",
@@ -1359,6 +1363,7 @@ __all__ = [
     "tenant_data_counts",
     "unlink_change_request",
     "waive_finding",
+    "windows_closing",
 ]
 
 
@@ -1370,8 +1375,14 @@ _PURGE = purging.PurgeTables(
     # R3-1D portal calendar (ops; migration 0067): reminders reference ops.tasks, so dq is
     # purged before circulars (app/tenancy/offboarding.yaml).
     deleted=(
+        # FO-01/FO-03 (0091_udise_followup): the follow-up log and the UDISE+ to-do ticks.
+        "sis.dq_followups",
+        "sis.udise_movement_marks",
         "ops.portal_reminders",
         "ops.portal_calendar_dates",
+        # FO-02 (0092_udise_corrections): lines reference their request.
+        "sis.udise_correction_lines",
+        "sis.udise_correction_requests",
         "sis.dq_findings",
         "sis.dq_runs",
     ),
@@ -1387,6 +1398,83 @@ def purge_tenant_data(session: Session) -> dict[str, int]:
     """Delete the current school's rows of this module (offboarding only: the database allows it
     only as ``sos_purger`` for a school in ``offboarding``)."""
     return _PURGE.delete(session)
+
+
+# --- weekly management brief (FA-05; FR-BRF-003, FR-BRF-006) --------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ReadinessTotals:
+    """School-level readiness of one profile (counts only)."""
+
+    profile_key: str
+    label_en: str
+    students: int
+    ready: int
+    needs_parent: int
+    needs_school: int
+    blocked: int
+
+
+@dataclass(frozen=True, slots=True)
+class ClosingWindow:
+    """A portal window of the school's calendar that closes soon (no student data)."""
+
+    event_key: str
+    portal: str
+    label_en: str
+    closes_on: dt.date
+    days_left: int
+    confirmed: bool
+
+
+def readiness_totals(session: Session, ctx: UserContext, *, limit: int) -> list[ReadinessTotals]:
+    """Readiness totals of the school's readiness profiles (at most ``limit``), in ``ctx``'s
+    reach: the same counts as ``GET /dq/readiness/{profile_key}`` (FR-BRF-003)."""
+    from app.dq import readiness_service  # noqa: PLC0415 - imports this module
+
+    out: list[ReadinessTotals] = []
+    for profile in [p for p in school_profiles(session) if p.readiness][:limit]:
+        totals = readiness_service.summary(session, ctx, profile.key).totals
+        out.append(
+            ReadinessTotals(
+                profile_key=profile.key,
+                label_en=profile.label_en,
+                students=totals.students,
+                ready=totals.ready,
+                needs_parent=totals.needs_parent,
+                needs_school=totals.needs_school,
+                blocked=totals.blocked,
+            )
+        )
+    return out
+
+
+def windows_closing(session: Session, today: dt.date, days: int) -> list[ClosingWindow]:
+    """Portal calendar windows of the current academic years that close within ``days`` days of
+    ``today`` (not yet closed), soonest first (FR-BRF-006; the dates of ``GET /readiness/
+    calendar``)."""
+    from app.dq import calendar as cal  # noqa: PLC0415 - pure, kept local like its service
+    from app.dq import calendar_service  # noqa: PLC0415 - imports this module
+
+    years = [
+        y
+        for y in tenancy.list_academic_years(session, include_archived=False)
+        if y.ends_on >= today
+    ]
+    out = [
+        ClosingWindow(
+            event_key=e.key,
+            portal=e.portal,
+            label_en=e.label_en,
+            closes_on=e.window.closes_on,
+            days_left=cal.days_left(e.window, today),
+            confirmed=e.window.confirmed,
+        )
+        for e in calendar_service.events_in_force(session, years)
+        if 0 <= cal.days_left(e.window, today) <= days
+    ]
+    return sorted(out, key=lambda w: (w.closes_on, w.event_key))
 
 
 tenancy.register_data_owner(

@@ -482,19 +482,33 @@ templates:
       title: ఒక చట్టపరమైన నిలుపుదల సమీక్షకు వచ్చింది
       body: "{state, select, overdue {ఒక చట్టపరమైన నిలుపుదల సమీక్ష తేదీ {days, plural, one {# రోజు} other {# రోజులు}} క్రితం దాటింది.} other {ఒక చట్టపరమైన నిలుపుదల {days, plural, =0 {ఒక రోజు లోపు} one {# రోజులో} other {# రోజుల్లో}} సమీక్షకు వస్తుంది.}} ఈ రికార్డులు ఇంకా ఉంచాలా అని చూసి, నిలుపుదలను కొనసాగించండి లేదా తొలగించండి."
 
+  # FC-01 compliance certificates (FR-COMP-011, FR-COMP-012): a school certificate lapses soon or
+  # has lapsed. `certificate` is the catalogue label (never a name the school typed). Staff only.
+  compliance.certificate.expiring:
+    params: [certificate, days, state]
+    resource_type: compliance_certificate
+    en:
+      title: "{state, select, expired {A school certificate has expired} other {A school certificate expires soon}}"
+      body: "{state, select, expired {{certificate} expired {days, plural, one {# day} other {# days}} ago.} other {{certificate} expires {days, plural, =0 {today} one {in # day} other {in # days}}.}} Start the renewal, then record the new certificate in the compliance register."
+    te:
+      title: "{state, select, expired {పాఠశాల ధృవపత్రం గడువు ముగిసింది} other {పాఠశాల ధృవపత్రం గడువు త్వరలో ముగుస్తుంది}}"
+      body: "{state, select, expired {{certificate} గడువు {days, plural, one {# రోజు} other {# రోజులు}} క్రితం ముగిసింది.} other {{certificate} గడువు {days, plural, =0 {ఈ రోజు} one {# రోజులో} other {# రోజుల్లో}} ముగుస్తుంది.}} పునరుద్ధరణ ప్రారంభించి, కొత్త ధృవపత్రాన్ని రిజిస్టర్‌లో నమోదు చేయండి."
+
   # R3-1D portal calendar (FR-RDY-006, FR-RDY-007; ADR-0053). Staff only, never parents (D45).
   # Params are a portal code and counts: the readiness of the event's linked profile across the
   # school (students 0 when the event links no profile with a readiness check). The link opens
   # the school's portal calendar (resource id: the academic year).
   portal_calendar.reminder:
-    params: [portal, days, ready, students]
+    # FO-01/FO-03 (FR-UDI-028, FR-UDI-038): overdue follow-ups of the linked profile and UDISE+
+    # to-do items waiting too long (UDISE+ events only); counts only.
+    params: [portal, days, ready, students, overdue, todo]
     resource_type: portal_calendar
     en:
       title: "{portal, select, udise_plus {UDISE+} bseap {AP SSC board} cbse {CBSE} cisce {CISCE} apaar {APAAR} school_admin {School administration} rte {RTE admissions} other {Portal}} window closes {days, plural, =0 {today} one {tomorrow} other {in # days}}"
-      body: "{students, plural, =0 {Check the dates and who owns the work on the portal calendar.} other {{ready} of # students are ready. Open the portal calendar to see the window and fix what is not ready.}}"
+      body: "{students, plural, =0 {Check the dates and who owns the work on the portal calendar.} other {{ready} of # students are ready. Open the portal calendar to see the window and fix what is not ready.}} {overdue, plural, =0 {} one {# follow-up on a fix outside the school is overdue.} other {# follow-ups on fixes outside the school are overdue.}} {todo, plural, =0 {} one {# UDISE+ to-do item has waited too long.} other {# UDISE+ to-do items have waited too long.}}"
     te:
       title: "{portal, select, udise_plus {UDISE+} bseap {AP SSC బోర్డు} cbse {CBSE} cisce {CISCE} apaar {APAAR} school_admin {పాఠశాల పరిపాలన} rte {RTE ప్రవేశాలు} other {పోర్టల్}} గడువు {days, plural, =0 {ఈరోజే} one {రేపు} other {# రోజుల్లో}} ముగుస్తుంది"
-      body: "{students, plural, =0 {పోర్టల్ క్యాలెండర్‌లో తేదీలు, పని ఎవరిదో చూడండి.} other {# మంది విద్యార్థుల్లో {ready} మంది సిద్ధంగా ఉన్నారు. గడువు చూడటానికి, సిద్ధంగా లేనివాటిని సరిచేయడానికి పోర్టల్ క్యాలెండర్ తెరవండి.}}"
+      body: "{students, plural, =0 {పోర్టల్ క్యాలెండర్‌లో తేదీలు, పని ఎవరిదో చూడండి.} other {# మంది విద్యార్థుల్లో {ready} మంది సిద్ధంగా ఉన్నారు. గడువు చూడటానికి, సిద్ధంగా లేనివాటిని సరిచేయడానికి పోర్టల్ క్యాలెండర్ తెరవండి.}} {overdue, plural, =0 {} other {# ఫాలో-అప్‌లు గడువు దాటాయి.}} {todo, plural, =0 {} other {# UDISE+ పనులు చాలా రోజులుగా పెండింగ్‌లో ఉన్నాయి.}}"
   # --- R3-1A privacy requests (ADR-0048; FR-DPDP-006): the daily due-date reminder, counts only.
   privacy.requests_due:
     params: [due, overdue]
@@ -533,3 +547,17 @@ templates:
     te:
       title: "{metric, select, students {విద్యార్థులు} staff_users {సిబ్బంది వినియోగదారులు} documents {పత్రాలు} storage_gb {నిల్వ} ai_tokens_month {AI వినియోగం} ai_budget_inr {AI బడ్జెట్} other {వినియోగం}}: మీ ప్లాన్ పరిమితిలో {threshold}%"
       body: "మీ పాఠశాల ప్లాన్ పరిమితిలో {threshold}% చేరింది. {metric, select, ai_budget_inr {AI బడ్జెట్ పూర్తయితే, బడ్జెట్ మళ్లీ వచ్చే వరకు Ask రాసిన సమాధానం లేకుండా వెతుకులాట ఫలితాలు మాత్రమే చూపిస్తుంది; మిగతావన్నీ పని చేస్తాయి.} other {పరిమితులు పనిని ఎప్పుడూ ఆపవు: అందరూ యథావిధిగా పని చేయవచ్చు, ఏదీ ఆపివేయబడదు.}} మీ ప్లాన్ చూడటానికి సెట్టింగ్‌లు > ప్లాన్ మరియు బిల్లింగ్ తెరవండి, లేదా పెద్ద ప్లాన్ గురించి SchoolOS సపోర్ట్‌ను అడగండి."
+
+  # FA-05 weekly management brief (FR-BRF-010..FR-BRF-012; D85). Sent on Monday mornings to the
+  # holders of brief.read (owner, principal) who did not turn it off. Params are school-wide work
+  # counts only (open blocker findings, corrections waiting, portal windows closing within the
+  # brief's deadline_days); the link opens the stored week's brief.
+  brief.weekly_ready:
+    params: []
+    resource_type: weekly_brief
+    en:
+      title: Your weekly school brief is ready
+      body: "Last week's summary is ready. Open it to see readiness, portal deadlines, certificates and fees."
+    te:
+      title: మీ వారపు పాఠశాల సారాంశం సిద్ధంగా ఉంది
+      body: "గత వారపు సారాంశం సిద్ధంగా ఉంది. సంసిద్ధత, పోర్టల్ గడువులు, సర్టిఫికెట్లు, ఫీజుల కోసం దాన్ని తెరవండి."

@@ -123,6 +123,10 @@ _SAMPLE_PARAMS: dict[str, Any] = {
     "level": "used_up",
     "included": 500,
     "metric": "students",
+    # FA-05 weekly brief counts.
+    "blockers": 3,
+    "waiting": 1,
+    "deadlines": 2,
 }
 
 

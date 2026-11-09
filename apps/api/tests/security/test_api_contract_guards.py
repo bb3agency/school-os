@@ -289,6 +289,7 @@ NON_UUID_PATH_PARAMS = {
     ("DELETE", "/api/v1/platform/flags/{key}/tenants/{tenant_id}", "key"),
     # A spreadsheet row number inside an import the caller already reaches (bounded int).
     ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}", "row_no"),
+    ("PUT", "/api/v1/imports/{import_id}/rows/{row_no}/match", "row_no"),
     # A readiness profile key: a bounded, pattern-checked configuration key (ADR-0040).
     ("GET", "/api/v1/dq/readiness/{profile_key}", "profile_key"),
     ("GET", "/api/v1/dq/readiness/{profile_key}/students", "profile_key"),
@@ -299,6 +300,14 @@ NON_UUID_PATH_PARAMS = {
     # calendar file event or the school's own event, found only inside the caller's school.
     ("PUT", "/api/v1/dq/calendar/{event_key}", "event_key"),
     ("DELETE", "/api/v1/dq/calendar/{event_key}", "event_key"),
+    # FO-01/FO-03: follow-ups per readiness profile and the UDISE+ to-do item key (a kind and
+    # the uuid of the record it comes from), bounded and pattern-checked; derived only from the
+    # caller's own reach.
+    ("GET", "/api/v1/dq/readiness/{profile_key}/follow-ups", "profile_key"),
+    ("POST", "/api/v1/dq/readiness/{profile_key}/follow-ups", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/follow-ups/{student_id}", "profile_key"),
+    ("PUT", "/api/v1/dq/udise-todo/{item_key}", "item_key"),
+    ("DELETE", "/api/v1/dq/udise-todo/{item_key}", "item_key"),
     # R2-1A: a certificate verification code (ADR-0045), bounded; the guard shape-checks it.
     ("GET", "/api/v1/public/certificates/{code}", "code"),
     # R2-2D: the Razorpay webhook route value (ADR-0047 decision 3), bounded; the guard resolves.
@@ -365,6 +374,8 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.certificates.schemas.ContentLine.key": "printed field code",
     "app.certificates.schemas.Blocker.attribute_key": "attribute catalog key",
     "app.certificates.schemas.PreviewWarning.attribute_key": "attribute catalog key",
+    # FT-08 (D85): the TC input a "From SchoolOS" value is for.
+    "app.certificates.schemas.TcInputSuggestion.key": "certificate input code",
     # R2-1A (ADR-0045): TC format codes and printed line codes.
     "app.certificates.schemas.CertificateFormatOut.key": "TC format code",
     "app.certificates.schemas.FormatLineOut.key": "printed line code",
@@ -401,7 +412,20 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.dq.schemas.PortalWindowOut.event_key": "portal calendar event code",
     "app.dq.schemas.CalendarEventOut.event_key": "portal calendar event code",
     "app.dq.schemas.CalendarReadinessOut.profile_key": "DQ profile code",
+    "app.dq.followup_schemas.FollowupListOut.profile_key": "DQ profile code",
+    "app.dq.followup_schemas.FollowupHistoryOut.profile_key": "DQ profile code",
+    "app.dq.followup_schemas.MovementItemOut.item_key": "UDISE+ to-do item code (kind:uuid)",
+    # FO-02: readiness profile, attribute catalog and recipient role codes, not secrets.
+    "app.dq.udise_schemas.UdiseCandidatesOut.profile_key": "DQ profile code",
+    "app.dq.udise_schemas.UdiseRequestOut.profile_key": "DQ profile code",
+    "app.dq.udise_schemas.UdiseRequestDetailOut.profile_key": "DQ profile code",
+    "app.dq.udise_schemas.UdiseLineOut.attribute_key": "attribute catalog key",
+    "app.dq.udise_schemas.UdiseRecipientOut.key": "recipient role code",
+    "app.dq.udise_schemas.UdiseGroupOut.key": "field group code",
     "app.circulars.schemas.TaskOut.portal_event_key": "portal calendar event code",
+    # FA-05 weekly brief: readiness profile and portal calendar event codes, not secrets.
+    "app.brief.schemas.ReadinessLineOut.profile_key": "DQ profile code",
+    "app.brief.schemas.DeadlineOut.event_key": "portal calendar event code",
     "app.exports.schemas.ExportProfileOut.key": "export profile code",
     "app.exports.schemas.ExportOut.profile_key": "export profile code",
     "app.imports.schemas.Issue.message_key": "i18n message key",
@@ -417,6 +441,8 @@ RESPONSE_FIELD_ALLOWLIST = {
     # R2-3J (FR-MSG-025): a digest of who would get a fee reminder; it grants nothing either.
     "app.messaging.sends.schemas.FeeReminderPreviewOut.preview_token": "fee reminder preview "
     "digest",
+    # FP-02 (FR-MSG-048): a digest of who would get the closure message; it grants nothing.
+    "app.messaging.sends.schemas.ClosurePreviewOut.preview_token": "closure preview digest",
     "app.identity.schemas.PermissionOut.key": "permission key",
     "app.identity.schemas.RoleOut.key": "role key",
     "app.platform.schemas.FlagOut.key": "feature flag key",
@@ -479,6 +505,10 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/disclosure/link/rotate"): "a state change (step-up, audited): a repeat "
     "only issues another link and revokes the previous one",
     ("POST", "/api/v1/fleet/heartbeat"): "machine route; nonce and timestamp make it replay-safe",
+    # FM-03 (FR-TALLY-022): the vouchers a file carries are recorded once (UNIQUE key); a
+    # repeat carries none of them as new and is audited again like any download.
+    ("POST", "/api/v1/tally/vouchers/export"): "a download; already exported vouchers are "
+    "recorded once, a repeat adds nothing new",
     # FP-13 (FR-DPDP-061): a preview; a repeat only makes another unsent parent notice (the
     # screen passes parent_notice_id to reuse the first); the send itself takes the key.
     ("POST", "/api/v1/privacy/notices/whatsapp/preview"): "a preview; sends nothing",
@@ -523,6 +553,8 @@ IDEMPOTENCY_EXEMPT = {
     # FT-01 (D84): a repeat answers 409 exam_already_locked / exam_not_locked.
     ("POST", "/api/v1/exams/{exam_id}/lock"): "a state transition (409 when locked)",
     ("POST", "/api/v1/exams/{exam_id}/unlock"): "a state transition (409 when not locked)",
+    # FT-08 (D85): confirming results is an upsert keyed by student and year.
+    ("POST", "/api/v1/sections/{section_id}/year-results"): "an upsert keyed by student and year",
     ("POST", "/api/v1/academic-years/{year_id}/promotions:preview"): "a preview",
     ("POST", "/api/v1/academic-years/{year_id}/promotions:undo"): "a state transition",
     ("POST", "/api/v1/platform/invoice-runs"): "idempotent per month (one run per month)",
@@ -538,6 +570,8 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/messages/{message_id}/revoke-link"): "a state transition (revoked false on "
     "repeat)",
     ("POST", "/api/v1/fees/reminders/preview"): "computes counts (R2-3J); stores and sends nothing",
+    ("POST", "/api/v1/messaging/closures/preview"): "computes counts (FP-02); stores and sends "
+    "nothing",
     ("POST", "/api/v1/messaging/templates/sync"): "re-reads Meta; creating is idempotent per "
     "template name",
     ("POST", "/api/v1/messaging/join-slips"): "a print view; each print makes new single-use "
@@ -603,6 +637,9 @@ IDEMPOTENCY_EXEMPT = {
     "student and year, a repeat with the same receipts answers it unchanged (no new serial)",
     ("POST", "/api/v1/fees/tax-certificates/bulk"): "idempotent by design: as one certificate, a "
     "repeat issues nothing new",
+    # FM-02 add-on fees (FR-FEE-089, FR-FEE-090).
+    ("POST", "/api/v1/fees/addons/{addon_id}/unassign"): "idempotent by design: a repeat finds "
+    "no active assignment (not_assigned) and one credit stands per assignment and instalment",
 }
 
 

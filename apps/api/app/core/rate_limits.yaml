@@ -198,6 +198,8 @@ routes:
   GET /api/v1/students/{student_id}/certificates/preview: [render]
   POST /api/v1/notices/{notice_id}/render: [render]
   GET /api/v1/dq/readiness/{profile_key}/slips: [render]
+  # FO-02: the UDISE+ correction letter to the MEO
+  GET /api/v1/dq/udise-corrections/{correction_id}/letter: [render]
   GET /api/v1/students/{student_id}/apaar-consent/form: [render]
   GET /api/v1/sections/{section_id}/apaar-consent-forms: [render]
   GET /api/v1/consents/forms: [render]
@@ -208,6 +210,10 @@ routes:
   GET /api/v1/dq/readiness: [readiness_reads, readiness_school]
   GET /api/v1/dq/readiness/{profile_key}: [readiness_reads, readiness_school]
   GET /api/v1/dq/readiness/{profile_key}/students: [readiness_reads, readiness_school]
+  # FO-02: UDISE+ correction requests assess the readiness of the school's students
+  GET /api/v1/dq/udise-corrections/candidates: [readiness_reads, readiness_school]
+  POST /api/v1/dq/udise-corrections: [readiness_reads, readiness_school]
+  GET /api/v1/dq/udise-corrections/{correction_id}: [readiness_reads, readiness_school]
   # R3-1D (FR-RDY-003): the portal calendar shows each event's readiness counts
   GET /api/v1/dq/calendar: [readiness_reads, readiness_school]
   POST /api/v1/academic-years/{year_id}/promotions:preview: [heavy_jobs]
@@ -217,6 +223,11 @@ routes:
   POST /api/v1/privacy/notices/whatsapp/preview: [search]
   # R2-3J: a fee reminder preview reads the dues and guardians of every chosen account
   POST /api/v1/fees/reminders/preview: [search]
+  # FP-02: a closure preview reads every guardian of the school
+  POST /api/v1/messaging/closures/preview: [search]
+  # FM-03: the Tally voucher file reads a period's receipts, cancellations, refunds and demand
+  GET /api/v1/tally/vouchers/preview: [search]
+  POST /api/v1/tally/vouchers/export: [exports]
   POST /api/v1/platform/invoice-runs: [platform_emergency]
   # audit-chain verification (R-19)
   POST /api/v1/platform/audit/verify: [platform_audit_verify]
@@ -238,6 +249,13 @@ routes:
   GET /api/v1/fees/tax-certificates/{tax_certificate_id}/print: [render]
   POST /api/v1/fees/tax-certificates/{tax_certificate_id}/render: [render]
   POST /api/v1/fees/tax-certificates/bulk: [heavy_jobs]
+  # FM-04 accountant and management reports: the print view, downloads and the year-end pack
+  GET /api/v1/fees/reports/collections/print: [render]
+  GET /api/v1/fees/reports/collections/download: [exports]
+  GET /api/v1/fees/reports/dcb/download: [exports]
+  GET /api/v1/fees/reports/registers/download: [exports]
+  GET /api/v1/fees/reports/ageing/download: [exports]
+  GET /api/v1/fees/reports/year-end-pack: [exports]
   # support tickets
   POST /api/v1/support/tickets: [support_tickets]
   POST /api/v1/platform/support/tickets: [support_tickets]

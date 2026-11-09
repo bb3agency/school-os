@@ -18,19 +18,28 @@ from fastapi import APIRouter, Depends, Query, Response
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require, require_any
 from app.authz.http import IdempotencyDep
-from app.messaging.sends import service
+from app.messaging.sends import closures, reach, service
 from app.messaging.sends.schemas import (
     AutomaticOut,
     BroadcastConfirmIn,
+    BroadcastFollowUpOut,
     BroadcastOut,
     BroadcastPage,
     BroadcastPreviewIn,
     BroadcastPreviewOut,
     BroadcastReportOut,
+    ClosureConfirmIn,
+    ClosureIn,
+    ClosureOut,
+    ClosurePage,
+    ClosurePreviewOut,
+    CoverageOut,
     FeeReminderPreviewOut,
     FeeRemindersConfirmIn,
     FeeReminderSelectionIn,
     FeeRemindersOut,
+    NotReachedOut,
+    OptinCategoryName,
     ReceiptWhatsAppOut,
     RevokeLinkOut,
 )
@@ -39,6 +48,7 @@ router = APIRouter()
 
 Sender = Annotated[UserContext, Depends(require(service.SEND, scope="school"))]
 Reader = Annotated[UserContext, Depends(require(service.READ))]
+SchoolReader = Annotated[UserContext, Depends(require(service.READ, scope="school"))]
 # R2-3J: the counter (fee.collect) or a sender; the service requires either school-wide.
 ReceiptSender = Annotated[UserContext, Depends(require_any(service.FEE_COLLECT, service.SEND))]
 
@@ -215,6 +225,101 @@ def send_receipt_whatsapp(
     return idem.run(
         db, None, lambda: service.send_receipt_whatsapp(db, ctx, receipt_id), status_code=202
     )
+
+
+# --- FP-01: opt-in coverage and reach follow-up (FR-MSG-039..046) -------------------------------
+
+
+@router.get("/messaging/coverage", response_model=CoverageOut, responses=_UNAVAILABLE)
+def coverage(
+    ctx: Reader,
+    db: TenantDB,
+    category: Annotated[OptinCategoryName, Query()] = "notices",
+) -> CoverageOut:
+    """Opt-in coverage per section of the current year for one category: students, students
+    with at least one guardian WhatsApp reaches, guardians opted in and without a mobile number
+    (FR-MSG-039, FR-MSG-040; ``message.read``; class teachers: their sections). Counts only."""
+    return reach.coverage(db, ctx, category)
+
+
+@router.get(
+    "/sections/{section_id}/optins/not-reached",
+    response_model=NotReachedOut,
+    responses=_UNAVAILABLE,
+)
+def not_reached(
+    ctx: Reader,
+    db: TenantDB,
+    section_id: uuid.UUID,
+    category: Annotated[OptinCategoryName, Query()] = "notices",
+) -> NotReachedOut:
+    """The section's students whom no WhatsApp message of the category reaches, with each
+    guardian's relation and reason code (FR-MSG-041, FR-MSG-042; ``message.read``, scope: 404
+    outside it). Names within the reader's scope; no phone numbers. Print join slips for them
+    with ``POST /messaging/join-slips`` (FR-MSG-043)."""
+    return reach.not_reached(db, ctx, section_id, category)
+
+
+@router.get(
+    "/messaging/broadcasts/{broadcast_id}/follow-up",
+    response_model=BroadcastFollowUpOut,
+    responses=_UNAVAILABLE,
+)
+def broadcast_follow_up(ctx: Reader, db: TenantDB, broadcast_id: uuid.UUID) -> BroadcastFollowUpOut:
+    """Students of the broadcast's sections the notice did not reach: not sent, failed, or not
+    opened 48 hours after sending (read receipt or parent page view) (FR-MSG-044, FR-MSG-045;
+    ``message.read``; class teachers: their sections). A list to act on; nothing is resent."""
+    return reach.broadcast_follow_up(db, ctx, broadcast_id)
+
+
+# --- FP-02: urgent closure message (FR-MSG-047..055; ADR-0043 amendment, D85) ------------------
+
+# Step-up MFA for the preview too (a POST under a step-up permission; SEC-005): the principal
+# signs in again once and has five minutes to preview and send.
+ClosureSender = Annotated[
+    UserContext, Depends(require(closures.SEND, scope="school", step_up=True))
+]
+
+
+@router.post(
+    "/messaging/closures/preview", response_model=ClosurePreviewOut, responses=_UNAVAILABLE
+)
+def preview_closure(
+    ctx: ClosureSender, db: TenantDB, body: ClosureIn, response: Response
+) -> ClosurePreviewOut:
+    """Before sending an urgent closure message: recipients, guardians left out by reason, the
+    English text, when sending starts (06:00-21:30 IST window, also during quiet hours) and the
+    estimated Meta cost (FR-MSG-048; ``message.closure.send``: the principal). Nothing is sent.
+    Errors: 422 ``closed_from`` (``in_past``, ``too_far_ahead``), ``closed_to``
+    (``before_closed_from``, ``too_long``), ``section_ids``."""
+    response.headers["Cache-Control"] = "no-store"
+    return closures.preview_closure(db, ctx, body)
+
+
+@router.post(
+    "/messaging/closures", response_model=ClosureOut, status_code=202, responses=_UNAVAILABLE
+)
+def send_closure(
+    *, ctx: ClosureSender, db: TenantDB, body: ClosureConfirmIn, idem: IdempotencyDep
+) -> Response:
+    """Send the previewed closure message (FR-MSG-049..053; ``message.closure.send`` with
+    step-up MFA, 428 without; ``Idempotency-Key``): the ``school_closure`` utility template to
+    every guardian opted in for notices, inside the closure window, within the daily cap.
+    Errors: 409 ``preview_stale``, ``messaging_not_connected``, ``messaging_paused``,
+    ``template_not_approved``, ``template_paused``, ``messaging_currency_not_inr``,
+    ``notices_off``; 422 as the preview. Audited ``messaging.closure.sent``."""
+    return idem.run(db, body, lambda: closures.send_closure(db, ctx, body), status_code=202)
+
+
+@router.get("/messaging/closures", response_model=ClosurePage, responses=_UNAVAILABLE)
+def list_closures(
+    ctx: SchoolReader,
+    db: TenantDB,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> ClosurePage:
+    """Closure messages sent recently with live delivery counts, and how many were sent in the
+    window shown (FR-MSG-054; ``message.read`` school-wide). Counts only."""
+    return closures.list_closures(db, ctx, limit=limit)
 
 
 __all__ = ["router"]

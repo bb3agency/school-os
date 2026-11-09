@@ -523,6 +523,49 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             h=_sha("conflict"),
             r=ids["dqrun"],
         )
+        # --- FO-01/FO-03 (0091_udise_followup): a follow-up step and a UDISE+ to-do tick ------
+        _run(
+            c,
+            "INSERT INTO sis.dq_followups (id, tenant_id, student_id, profile_key, fix_owner, "
+            "event, occurred_on, recorded_by, recorded_by_membership) VALUES (:i, :t, :s, "
+            "'bseap-ssc-2027', 'parent_aadhaar', 'slip_given', '2026-11-02', :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            s=ids["student"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.udise_movement_marks (id, tenant_id, item_key, kind, student_id, "
+            "state, marked_by, marked_by_membership) VALUES (:i, :t, :k, 'admission', :s, "
+            "'done', :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            k=f"admission:{ids['student']}",
+            s=ids["student"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        # --- UDISE+ correction requests (0092_udise_corrections; FO-02) ----------------------
+        udise_request = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO sis.udise_correction_requests (id, tenant_id, profile_key, "
+            "lines_count, students_count, prepared_by) VALUES (:i, :t, 'apaar', 1, 1, :u)",
+            i=udise_request,
+            t=t,
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.udise_correction_lines (id, tenant_id, request_id, student_id, "
+            "attribute_key) VALUES (:i, :t, :r, :s, 'full_name')",
+            i=uuid.uuid4(),
+            t=t,
+            r=udise_request,
+            s=ids["student"],
+        )
         # --- certificates and registers (0033_certificates) ---------------------------------
         _run(
             c,
@@ -915,6 +958,21 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             y=ids["year1"],
             k=portal_task,
         )
+        # --- weekly brief (FA-05, 0095_weekly_brief): a stored week and a member's choice ----
+        _run(
+            c,
+            "INSERT INTO ops.weekly_briefs (id, tenant_id, week_start, counts) "
+            "VALUES (:i, :t, '2026-11-02', CAST('{\"v\": 1}' AS jsonb))",
+            i=uuid.uuid4(),
+            t=t,
+        )
+        _run(
+            c,
+            "INSERT INTO ops.brief_preferences (tenant_id, membership_id, email) "
+            "VALUES (:t, :m, true)",
+            t=t,
+            m=ids["m1"],
+        )
         parent_notice = uuid.uuid4()
         _run(
             c,
@@ -942,6 +1000,16 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             "(:i, :t, 'absence_alerts', current_date)",
             i=uuid.uuid4(),
             t=t,
+        )
+        # --- FP-02 urgent closure messages (0093_msg_reach_closure) -------------------------
+        _run(
+            c,
+            "INSERT INTO msg.closures (id, tenant_id, whole_school, closed_from, closed_to, "
+            "reason_code, sent_by) VALUES (:i, :t, true, current_date, current_date, "
+            "'weather', :u)",
+            i=uuid.uuid4(),
+            t=t,
+            u=u["user"],
         )
         # --- CBSE disclosure (R3-1C, 0065_disclosure): a draft, a snapshot and its document --
         snapshot = uuid.uuid4()
@@ -971,6 +1039,29 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             s=snapshot,
             d=ids["doc"],
             v=ids["ver"],
+        )
+        # --- FC-01 (0096_compliance_register): a renewed certificate and its predecessor -----
+        renewed = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.compliance_certificates (id, tenant_id, kind, valid_until, "
+            "document_id, owner_membership_id, recorded_by) VALUES (:i, :t, 'fire_noc', "
+            "current_date + 300, :d, :m, :u)",
+            i=renewed,
+            t=t,
+            d=ids["doc"],
+            m=ids["m1"],
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.compliance_certificates (id, tenant_id, kind, valid_until, status, "
+            "superseded_by, superseded_at, recorded_by) VALUES (:i, :t, 'fire_noc', "
+            "current_date - 10, 'superseded', :s, now(), :u)",
+            i=uuid.uuid4(),
+            t=t,
+            s=renewed,
+            u=u["user"],
         )
         # --- student timeline and early warning (M5, 0035_student_insights) ---------------
         exam, flag, mark = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
@@ -1005,6 +1096,27 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             sec=ids["section"],
             u=u["user"],
         )
+        # FT-06 (0089_school_calendar): the year's calendar and one class holiday.
+        _run(
+            c,
+            "INSERT INTO sis.school_calendars (id, tenant_id, academic_year_id, created_by, "
+            "updated_by) VALUES (:i, :t, :y, :u, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            y=ids["year1"],
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.calendar_entries (id, tenant_id, academic_year_id, class_id, kind, "
+            "name, starts_on, ends_on, created_by) VALUES (:i, :t, :y, :c, 'holiday', "
+            "'Synthetic holiday', '2026-08-15', '2026-08-15', :u)",
+            i=uuid.uuid4(),
+            t=t,
+            y=ids["year1"],
+            c=ids["class"],
+            u=u["user"],
+        )
         # FT-01 (0084_exam_lock_enrol): one change of that mark.
         _run(
             c,
@@ -1016,6 +1128,19 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
             e=exam,
             m=mark,
+            s=ids["student"],
+            sec=ids["section"],
+            u=u["user"],
+        )
+        # FT-08 (0090_year_end): the student's confirmed annual result.
+        _run(
+            c,
+            "INSERT INTO sis.year_results (id, tenant_id, academic_year_id, student_id, "
+            "section_id, result, rule_version, confirmed_by) VALUES (:i, :t, :y, :s, :sec, "
+            "'promoted', 1, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            y=ids["year1"],
             s=ids["student"],
             sec=ids["section"],
             u=u["user"],
@@ -1128,6 +1253,36 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
             p=tparty,
             s=sync,
+        )
+        # FM-03 voucher export (0094_tally_vouchers): mapping, one export, one voucher record.
+        texport = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.tally_export_settings (id, tenant_id, party_mode, "
+            "receivable_ledger, updated_by) VALUES (:i, :t, 'student', 'Fee receivable', :u)",
+            i=uuid.uuid4(),
+            t=t,
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.tally_voucher_exports (id, tenant_id, period_from, period_to, "
+            "include_exported, include_demand, party_mode, vouchers, new_vouchers, cash_total, "
+            "file_sha256, created_by) VALUES (:i, :t, '2026-11-01', '2026-11-01', false, false, "
+            "'student', 1, 1, 10.00, :h, :u)",
+            i=texport,
+            t=t,
+            h=bytes(32),
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.tally_exported_vouchers (id, tenant_id, voucher_key, kind, "
+            "export_id) VALUES (:i, :t, :k, 'receipt', :e)",
+            i=uuid.uuid4(),
+            t=t,
+            k=f"receipt:{uuid.uuid4()}",
+            e=texport,
         )
         # --- R2-1B fees (0058_fees_core): one row in every fin table --------------------------
         f = {
@@ -1301,6 +1456,41 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             s=ids["student"],
             h=b"\x00" * 32,
             m=ids["m1"],
+        )
+        # FM-02 (0088_fee_addons): an add-on fee, one student on it and its charge.
+        addon, assignment = uuid.uuid4(), uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO fin.fee_addons (id, tenant_id, academic_year_id, head_id, label, "
+            "amounts, created_by) VALUES (:i, :t, :y, :h, 'Synthetic band', "
+            '\'{"1": "10.00"}\'::jsonb, :m)',
+            i=addon,
+            t=t,
+            y=ids["year1"],
+            h=f["head"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.fee_addon_assignments (id, tenant_id, addon_id, account_id, head_id, "
+            "start_instalment, assigned_by) VALUES (:i, :t, :d, :a, :h, 1, :m)",
+            i=assignment,
+            t=t,
+            d=addon,
+            a=f["acct"],
+            h=f["head"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.ledger_entries (id, tenant_id, account_id, entry_kind, amount, "
+            "instalment_no, head_id, entry_date, addon_assignment_id) VALUES (:i, :t, :a, "
+            "'charge', 10, 1, :h, '2026-09-01', :s)",
+            i=uuid.uuid4(),
+            t=t,
+            a=f["acct"],
+            h=f["head"],
+            s=assignment,
         )
         # --- R2-2D online payments (0059_payments_online): one row in every online table ------
         o = {k: uuid.uuid4() for k in ("handle", "conn", "intent", "run")}

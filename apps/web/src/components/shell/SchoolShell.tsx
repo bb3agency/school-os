@@ -80,7 +80,11 @@ export function SchoolShell({
   const groups: SchoolNavSection[] = [
     {
       id: "overview",
-      items: [{ href: "/", label: t("school.nav.home"), exact: true, icon: "home" }],
+      items: [
+        { href: "/", label: t("school.nav.home"), exact: true, icon: "home" },
+        // FA-05 (FR-BRF-001): the weekly management brief, owner and principal only.
+        { href: "/brief", label: t("brief.nav"), permission: "brief.read", icon: "chart" },
+      ],
     },
     {
       id: "records",
@@ -143,6 +147,13 @@ export function SchoolShell({
           permission: ["marks.read", "marks.record", "exam.manage"],
           icon: "chart",
         },
+        {
+          // FT-08 (FR-YRE-019): year-end results and the UDISE+ progression sheet.
+          href: "/year-end",
+          label: t("yearEnd.nav"),
+          permission: "year_result.read",
+          icon: "clipboard",
+        },
         { href: "/flags", label: t("insights.nav"), permission: "insights.read", icon: "flag" },
       ],
     },
@@ -163,11 +174,26 @@ export function SchoolShell({
           icon: "checkCircle",
         },
         {
+          // FO-03 (FR-UDI-031..040): what to repeat in UDISE+ after a TC, a leaver, an
+          // admission or a promotion.
+          href: "/findings/udise-todo",
+          label: t("udiseTodo.nav"),
+          permission: "dq.readiness.read",
+          icon: "checkCircle",
+        },
+        {
           // R3-1D (US-3101, ADR-0053): portal and board windows with reminders to staff.
           href: "/findings/calendar",
           label: t("portalCalendar.nav"),
           permission: "dq.readiness.read",
           icon: "calendar",
+        },
+        {
+          // FO-02 (FR-UDI-001..008): UDISE+ correction requests to the MEO office.
+          href: "/findings/udise-corrections",
+          label: t("udise.nav"),
+          permission: "dq.readiness.manage",
+          icon: "file",
         },
         {
           href: "/change-requests",
@@ -342,12 +368,29 @@ export function SchoolShell({
           icon: "chart",
         },
         {
+          // FM-02 (FR-FEE-095): add-on fees; a transport in-charge reads who is on them.
+          href: "/fees/addons",
+          label: t("fees.nav.addons"),
+          permission: ["fee.addon.read", "finance.read", "fee.manage"],
+          feature: "fees",
+          icon: "layers",
+        },
+        {
           // FM-01 (FR-FEE-038): students who left with fees still open.
           href: "/fees/left-with-dues",
           label: t("fees.nav.leftWithDues"),
           permission: "finance.read",
           feature: "fees",
           icon: "chart",
+        },
+        {
+          // FM-04 (FR-FEE-061..074): period, DCB, registers, ageing and the year-end pack.
+          href: "/fees/reports/collections",
+          label: t("fees.nav.reports"),
+          permission: "finance.read",
+          feature: "fees",
+          icon: "chart",
+          activePattern: "^/fees/reports(/|$)",
         },
         {
           // R2-2E (US-2109): bank statements, UPI confirmations and exceptions.
@@ -436,6 +479,14 @@ export function SchoolShell({
           icon: "server",
         },
         {
+          // FM-03 (FR-TALLY-011..030): the Tally voucher file; needs fees, not the connector.
+          href: "/settings/tally/vouchers",
+          label: t("tally.nav.vouchers"),
+          permission: ["tally.configure", "fee.report"],
+          feature: "fees",
+          icon: "inbox",
+        },
+        {
           // R2-3J (FR-MSG-014, US-2205): receipt paper, GST line and fee reminder days.
           href: "/settings/fees",
           label: t("fees.nav.feeSettings"),
@@ -458,6 +509,13 @@ export function SchoolShell({
           permission: ["payments.configure", "finance.read"],
           feature: "fees",
           icon: "creditCard",
+        },
+        {
+          // FC-01: the school's compliance certificates (fire NOC, recognition, affiliation).
+          href: "/compliance",
+          label: t("compliance.nav"),
+          permission: "compliance.read",
+          icon: "checkCircle",
         },
         {
           // R3-1C (US-2901, ADR-0051): the CBSE Appendix IX disclosure, CBSE schools only.

@@ -32,6 +32,7 @@ def test_FR_MSG_005_catalogue_is_utility_only() -> None:
         "absence_alert",
         "fee_reminder",
         "fee_receipt",
+        "school_closure",  # FP-02 (FR-MSG-047): a safety update, utility
     }
     assert {t.category for t in templates.values()} == {"utility"}
 
@@ -64,6 +65,9 @@ def test_PRV_026_variables_carry_only_what_the_purpose_needs() -> None:
         "due_date",
         "amount",
         "receipt_number",
+        # FP-02 (FR-MSG-047): the closure dates and a reason phrase from config, no free text
+        "dates",
+        "reason",
     }
     for item in cat.catalogue().templates.values():
         assert {v.name for v in item.variables} <= allowed

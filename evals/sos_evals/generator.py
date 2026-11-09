@@ -25,8 +25,12 @@ from sos_evals.conversation_cases import CASES as CONVERSATION_CASES
 from sos_evals.conversations import ConversationCase
 from sos_evals.due import DueCase
 from sos_evals.due_cases import CASES as DUE_CASES
+from sos_evals.extraction import ExtractionCase
+from sos_evals.extraction_cases import CASES as EXTRACTION_CASES
 from sos_evals.fee_cases import CASES as FEE_CASES
 from sos_evals.fees import FeeCase
+from sos_evals.judge import CalibrationItem
+from sos_evals.judge_cases import build as build_judge_calibration
 from sos_evals.schema import CATEGORIES, Asker, Category, CorpusItem, EvalItem, Locale, Role
 from sos_evals.synthetic import (
     B_DOCS,
@@ -798,7 +802,9 @@ def _jsonl(
     | Sequence[FeeCase]
     | Sequence[CtxDocument | CtxQuestion]
     | Sequence[ConversationCase]
-    | Sequence[DueCase],
+    | Sequence[DueCase]
+    | Sequence[ExtractionCase]
+    | Sequence[CalibrationItem],
 ) -> str:
     return "".join(
         json.dumps(row.model_dump(mode="json"), ensure_ascii=False, sort_keys=True) + "\n"
@@ -809,7 +815,8 @@ def _jsonl(
 def render() -> dict[str, str]:
     """File name -> content of every dataset file."""
     items = build_questions()
-    files = {"corpus.jsonl": _jsonl(build_corpus())}
+    corpus = build_corpus()
+    files = {"corpus.jsonl": _jsonl(corpus)}
     for category in CATEGORIES:
         files[f"{category}.jsonl"] = _jsonl([i for i in items if i.category == category])
     files["circulars.jsonl"] = _jsonl(CIRCULAR_CASES)
@@ -819,6 +826,8 @@ def render() -> dict[str, str]:
     files["contextual.jsonl"] = _jsonl(rows)
     files["conversations.jsonl"] = _jsonl(CONVERSATION_CASES)
     files["due.jsonl"] = _jsonl(DUE_CASES)
+    files["extraction.jsonl"] = _jsonl(EXTRACTION_CASES)
+    files["judge_calibration.jsonl"] = _jsonl(build_judge_calibration(corpus))
     return files
 
 

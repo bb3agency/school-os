@@ -106,6 +106,11 @@ def test_FR_ADM_001_other_modules_export_their_tables_without_ciphertext(
         "dq_findings",
         "portal_calendar_dates",
         "portal_reminders",
+        # FO-02 (0092_udise_corrections) and FO-01/FO-03 (0091_udise_followup).
+        "udise_correction_requests",
+        "udise_correction_lines",
+        "dq_followups",
+        "udise_movement_marks",
         "import_batches",
         "import_mapping_templates",
         "documents",

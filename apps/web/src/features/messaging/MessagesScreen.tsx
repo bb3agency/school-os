@@ -37,6 +37,7 @@ import {
   type MessageStatus,
   type RevokeLinkOut,
 } from "./data";
+import { CLOSURE_SEND } from "./reach-data";
 import { AutomaticCard, BroadcastsCard } from "./BroadcastScreens";
 import { MessagingGate } from "./WhatsAppSettingsScreen";
 
@@ -354,11 +355,23 @@ export function MessagesScreen({
         title={t("logTitle")}
         description={t("logDescription")}
         actions={
-          can(RECORD) ? (
-            <ButtonLink href="/messages/slips" variant="secondary">
-              {t("slips.open")}
-            </ButtonLink>
-          ) : null
+          <>
+            {allowed ? (
+              <ButtonLink href="/messages/reach" variant="secondary">
+                {t("reach.open")}
+              </ButtonLink>
+            ) : null}
+            {allowed || can(CLOSURE_SEND) ? (
+              <ButtonLink href="/messages/closures" variant="secondary">
+                {t("closures.open")}
+              </ButtonLink>
+            ) : null}
+            {can(RECORD) ? (
+              <ButtonLink href="/messages/slips" variant="secondary">
+                {t("slips.open")}
+              </ButtonLink>
+            ) : null}
+          </>
         }
       />
       {me !== undefined && !allowed ? (

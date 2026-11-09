@@ -63,6 +63,7 @@ const DRAFT: DisclosureDraft = {
   documents: { fire_safety: [{ id: "d1", title: "Fire NOC", publishable: true }] },
   from_schoolos: {},
   missing: [],
+  expired_policy: "warn",
   version: 3,
   updated_at: null,
   updated_by_name: null,

@@ -81,6 +81,21 @@ voucher today.
 Filter by class and print it for the principal. The principal can then **Send reminder** or
 **Send payment link** on WhatsApp to the parents who agreed.
 
+**Fee reports** answers month-end and year-end questions. Pick the dates (at most one year):
+
+- **Collections**: what was collected by day, head, mode and collector. Cancelled receipts keep
+  their numbers and are listed apart; refunds are taken off. Select **Print (A4)** for the file.
+- **Demand and balance (DCB)**: for a school year, per class and section, what was charged,
+  conceded, written off, collected and still owed, and the earlier years' dues still open.
+- **Registers**: concessions, adjustments (write-offs show as "Written off by management"),
+  cancellations and refunds, with who asked and who approved.
+- **Ageing**: overdue amounts by how long they are overdue, earlier years in their own column.
+- **Year-end pack**: everything above for a financial year in one ZIP for the auditor or the
+  trust's CA, with a check that the receipt numbers have no gaps.
+
+Downloads (CSV or Excel) ask you to sign in again with your second step and are recorded.
+Typed reasons stay out of a register download unless you tick **Include typed reasons**.
+
 ## 6. Reconciliation
 
 **UPI** (**Reconcile UPI**):

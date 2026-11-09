@@ -261,22 +261,201 @@ class ReceiptWhatsAppOut(_Out):
     messages: list[ReceiptMessageOut]
 
 
+# --- FP-01: opt-in coverage and reach follow-up (FR-MSG-039..046) -------------------------------
+
+OptinCategoryName = Literal["notices", "attendance", "fees"]
+FollowUpOutcome = Literal["not_sent", "failed", "not_opened"]
+
+
+class SectionCoverageOut(_Out):
+    """One section's coverage for a category: students with at least one guardian who can get
+    WhatsApp messages (opted in, for the guardian's current mobile number)."""
+
+    section_id: uuid.UUID
+    label: str
+    students: int
+    students_reached: int
+    guardians: int
+    guardians_opted_in: int
+    guardians_without_mobile: int
+
+
+class CoverageOut(_Out):
+    """Opt-in coverage per section of the current year (FR-MSG-039, FR-MSG-040; counts only; a
+    class teacher sees their sections)."""
+
+    category: OptinCategoryName
+    students: int
+    students_reached: int
+    guardians: int
+    guardians_opted_in: int
+    sections: list[SectionCoverageOut]
+
+
+class GuardianReachOut(_Out):
+    """One guardian of a listed student: relation and why no message reaches them, as a code
+    (no_optin, opted_out, no_mobile_number, optin_for_other_number; in a broadcast follow-up
+    also the message's status or skip/failure reason). Never a phone number."""
+
+    guardian_id: uuid.UUID
+    relationship: str
+    is_primary: bool
+    reason: str
+
+
+class NotReachedStudentOut(_Out):
+    student_id: uuid.UUID
+    name: str | None = Field(description="Null when the reader may not see student names.")
+    class_section: str | None
+    guardians: list[GuardianReachOut]
+
+
+class NotReachedOut(_Out):
+    """A section's students whom no WhatsApp message of the category reaches (FR-MSG-041,
+    FR-MSG-042): the follow-up list for the class teacher and the office. Join slips for them
+    are printed with ``POST /messaging/join-slips`` (``student_ids``; FR-MSG-043)."""
+
+    section_id: uuid.UUID
+    label: str
+    category: OptinCategoryName
+    students: int
+    items: list[NotReachedStudentOut]
+    truncated: bool
+
+
+class FollowUpStudentOut(_Out):
+    student_id: uuid.UUID
+    name: str | None
+    class_section: str | None
+    outcome: FollowUpOutcome
+    guardians: list[GuardianReachOut]
+
+
+class BroadcastFollowUpOut(_Out):
+    """Students of a broadcast's sections the notice did not reach (FR-MSG-044, FR-MSG-045):
+    ``not_sent`` (no message to any guardian), ``failed`` (every message failed or was
+    skipped) or ``not_opened`` (sent ``not_opened_hours`` ago, neither read on WhatsApp nor
+    opened on the parent page). A list to act on, never an automatic resend."""
+
+    broadcast_id: uuid.UUID
+    notice_id: uuid.UUID
+    not_opened_hours: int
+    outcomes: dict[str, int] = Field(
+        description="Students by outcome (opened, pending, not_sent, failed, not_opened)."
+    )
+    items: list[FollowUpStudentOut]
+    truncated: bool
+
+
+# --- FP-02: urgent closure message (FR-MSG-047..055) --------------------------------------------
+
+ClosureReasonCode = Literal["weather", "government_order", "local_situation", "other"]
+
+
+class ClosureIn(_In):
+    """An urgent closure message: the whole school or chosen sections of the current year, the
+    closure dates (``closed_to`` defaults to ``closed_from``) and a reason from the list."""
+
+    whole_school: bool = True
+    section_ids: list[uuid.UUID] | None = Field(default=None, min_length=1, max_length=300)
+    closed_from: dt.date
+    closed_to: dt.date | None = None
+    reason: ClosureReasonCode
+
+    @model_validator(mode="after")
+    def _audience(self) -> ClosureIn:
+        if self.whole_school == (self.section_ids is not None):
+            raise ValueError("choose the whole school or section_ids, not both or neither")
+        return self
+
+
+class ClosureConfirmIn(ClosureIn):
+    """Send the previewed closure message (``Idempotency-Key``; step-up). The preview token pins
+    who gets it (409 ``preview_stale`` when that changed)."""
+
+    preview_token: str = Field(min_length=8, max_length=80)
+
+
+class ClosurePreviewOut(_Out):
+    preview_token: str
+    guardians: int
+    recipients: int
+    skipped: dict[str, int] = Field(
+        description="Guardians left out by reason (no_optin, opted_out, optin_for_other_number, "
+        "no_mobile_number)."
+    )
+    languages: dict[str, int]
+    language_fallbacks: int
+    estimated_cost_inr: str
+    utility_rate_inr: str
+    gst_percent: str
+    message_en: str = Field(description="The English message parents will get.")
+    sends_at: dt.datetime | None = Field(
+        description="When sending starts: null = now; otherwise the next opening of the closure "
+        "window (06:00 IST by default)."
+    )
+    window_start: dt.time
+    window_end: dt.time
+    blocked_reason: str | None
+    recent_closures: int = Field(description="Closure messages sent in the last uses_window_days.")
+
+
+class ClosureOut(_Out):
+    id: uuid.UUID
+    whole_school: bool
+    section_ids: list[uuid.UUID]
+    closed_from: dt.date
+    closed_to: dt.date
+    reason: str
+    recipients: int
+    queued: int
+    skipped: dict[str, int]
+    languages: dict[str, int]
+    estimated_cost_inr: str
+    counts: dict[str, int] = Field(description="Messages by status now.")
+    sent_by: uuid.UUID
+    sent_at: dt.datetime
+
+
+class ClosurePage(_Out):
+    """Recent closure messages (the principal's count of uses, FR-MSG-054)."""
+
+    items: list[ClosureOut]
+    uses: int
+    uses_window_days: int
+    window_start: dt.time
+    window_end: dt.time
+    reasons: list[str]
+
+
 __all__ = [
     "AutomaticOut",
     "BroadcastConfirmIn",
+    "BroadcastFollowUpOut",
     "BroadcastOut",
     "BroadcastPage",
     "BroadcastPreviewIn",
     "BroadcastPreviewOut",
     "BroadcastReportOut",
     "BroadcastStatus",
+    "ClosureConfirmIn",
+    "ClosureIn",
+    "ClosureOut",
+    "ClosurePage",
+    "ClosurePreviewOut",
+    "CoverageOut",
     "FeeReminderPreviewOut",
     "FeeReminderSelectionIn",
     "FeeRemindersConfirmIn",
     "FeeRemindersOut",
+    "FollowUpStudentOut",
+    "GuardianReachOut",
+    "NotReachedOut",
+    "NotReachedStudentOut",
     "ReceiptMessageOut",
     "ReceiptWhatsAppOut",
     "RevokeLinkOut",
     "SectionCountsOut",
+    "SectionCoverageOut",
     "SendRunOut",
 ]

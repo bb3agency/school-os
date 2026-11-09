@@ -117,6 +117,48 @@ class AutomaticConfig(_Model):
     fee_reminder_time: dt.time
 
 
+class ReachConfig(_Model):
+    """FP-01 (FR-MSG-039..046): opt-in coverage and the reach follow-up lists."""
+
+    # A message sent this long ago that was neither read on WhatsApp nor opened on its parent
+    # page counts as "not opened" (a follow-up list, never an automatic resend).
+    not_opened_hours: int = Field(ge=1, le=240)
+    # Most students listed in one follow-up list (a section or a broadcast audience).
+    max_list_rows: int = Field(ge=10, le=5000)
+
+
+ClosureReason = Literal["weather", "government_order", "local_situation", "other"]
+CLOSURE_REASONS: Final[tuple[ClosureReason, ...]] = get_args(ClosureReason)
+
+
+class ClosureReasonText(_Model):
+    en: str = Field(min_length=3, max_length=80)
+    te: str = Field(min_length=3, max_length=80)
+
+
+class ClosureConfig(_Model):
+    """FP-02 (FR-MSG-047..055; ADR-0043 amendment of 2026-11-09, lead decision D85): the urgent
+    closure message. It may be sent between ``window_start`` and ``window_end`` IST, also inside
+    the school's quiet hours, and never outside that window."""
+
+    window_start: dt.time
+    window_end: dt.time
+    # The closure may start today or within this many days, and last at most max_days days.
+    max_days_ahead: int = Field(ge=0, le=30)
+    max_days: int = Field(ge=1, le=31)
+    # Shown on the principal's screen: closure messages sent in the last this many days.
+    uses_window_days: int = Field(ge=7, le=366)
+    reasons: dict[ClosureReason, ClosureReasonText]
+
+    @model_validator(mode="after")
+    def _window(self) -> ClosureConfig:
+        if not self.window_start < self.window_end:
+            raise ValueError("closures.window_start must be before window_end (same IST day)")
+        if set(self.reasons) != set(CLOSURE_REASONS):
+            raise ValueError(f"closures.reasons must list {', '.join(CLOSURE_REASONS)}")
+        return self
+
+
 RateKey = Literal[
     "utility_out_of_window", "utility_in_window", "service_above_free_tier", "marketing"
 ]
@@ -205,6 +247,8 @@ class MessagingConfig(_Model):
     inbox: InboxConfig
     broadcasts: BroadcastConfig
     automatic: AutomaticConfig
+    reach: ReachConfig
+    closures: ClosureConfig
 
     @model_validator(mode="after")
     def _age_inside_dedupe(self) -> MessagingConfig:
@@ -263,9 +307,12 @@ def classify(text: str | None, button_payload: str | None = None) -> tuple[Keywo
 
 
 __all__ = [
+    "CLOSURE_REASONS",
     "LANGUAGES",
     "OPTIN_CATEGORIES",
     "RATE_KEYS",
+    "ClosureConfig",
+    "ClosureReason",
     "Keyword",
     "Language",
     "MessagingConfig",

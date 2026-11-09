@@ -980,10 +980,58 @@ def slips_document(
     return PrintDocument(page, telugu_font=telugu), len(ordered)
 
 
+@dataclass(frozen=True, slots=True)
+class OpenFix:
+    """A student of the profile with who must still act (FO-01 follow-ups; no values)."""
+
+    student_id: uuid.UUID
+    section_id: uuid.UUID
+    status: rd.Status
+    owners: tuple[str, ...]
+
+
+def open_fixes(
+    session: Session,
+    ctx: UserContext,
+    profile_key: str,
+    *,
+    section_id: uuid.UUID | None = None,
+    student_ids: Collection[uuid.UUID] | None = None,
+) -> list[OpenFix]:
+    """The profile's students in the caller's reach (``dq.readiness.read`` and
+    ``student.read_basic``) whose readiness names at least one fix owner, with their live
+    status (FR-UDI-022). ``section_id`` outside the reach: 404. ``student_ids`` limits the
+    result (ids outside the reach are left out)."""
+    profile = readiness_profile(profile_key)
+    sections = _profile_sections(session, profile)
+    if section_id is not None:
+        _section(session, ctx, section_id)
+        wanted = [section_id] if section_id in sections else []
+    else:
+        wanted = list(sections)
+    ids = _in_reach(session, ctx, wanted) if wanted else []
+    if student_ids is not None:
+        chosen = set(student_ids)
+        ids = [sid for sid in ids if sid in chosen]
+    ids = dq.board_students(session, profile.key, ids)
+    placements = students.current_placements(session, ids)
+    ids = [sid for sid in ids if placements.get(sid) in sections]
+    assessed = _assess(session, profile, ids)
+    out: list[OpenFix] = []
+    for sid in ids:
+        student = assessed[sid]
+        owners = _owners(student)
+        if student.status != "ready" and owners:
+            out.append(OpenFix(sid, placements[sid], student.status, tuple(owners)))
+    return out
+
+
 __all__ = [
     "MANAGE",
     "MAX_SLIPS",
     "READ",
+    "OpenFix",
+    "open_fixes",
     "readiness_profile",
     "request_run",
     "section_students",

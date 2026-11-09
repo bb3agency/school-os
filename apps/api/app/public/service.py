@@ -379,6 +379,12 @@ def revoke_for_target(
     return _revoke_rows(session, rows, reason, by_user=by_user)
 
 
+def viewed_handles(session: Session, handle_ids: Collection[uuid.UUID]) -> set[uuid.UUID]:
+    """System read for the reach follow-up (FP-01, FR-MSG-045): which of the given parent links
+    were opened at least once. Ids only."""
+    return repo.viewed(session, handle_ids)
+
+
 # --- purge ------------------------------------------------------------------------------------
 
 
@@ -445,4 +451,5 @@ __all__ = [
     "revoke_for_target",
     "subject_report",
     "tenant_data_counts",
+    "viewed_handles",
 ]

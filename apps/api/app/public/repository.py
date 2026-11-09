@@ -112,6 +112,16 @@ def mark_revoked(session: Session, handle_ids: Collection[uuid.UUID], reason: st
     return int(getattr(result, "rowcount", 0) or 0)
 
 
+def viewed(session: Session, handle_ids: Collection[uuid.UUID]) -> set[uuid.UUID]:
+    """The handles among ``handle_ids`` opened at least once."""
+    if not handle_ids:
+        return set()
+    stmt = select(PublicHandle.id).where(
+        PublicHandle.id.in_(list(handle_ids)), PublicHandle.view_count > 0
+    )
+    return set(session.scalars(stmt))
+
+
 def count_view(session: Session, handle_id: uuid.UUID) -> bool:
     """Count one view; ``True`` when it was the first one (``first_viewed_at`` set now)."""
     row = session.execute(
@@ -227,4 +237,5 @@ __all__ = [
     "open_for_target",
     "purge_expired",
     "resolve_any",
+    "viewed",
 ]

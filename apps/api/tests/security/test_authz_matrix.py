@@ -9,6 +9,7 @@ route table, so a new route without a matrix entry fails the suite.
 
 from __future__ import annotations
 
+import datetime as dt
 import importlib.util
 import itertools
 import sys
@@ -1170,6 +1171,78 @@ def _calendar_own_event(w: Any, a: Engine) -> str:
     return key
 
 
+def _parent_fix_student(w: Any) -> uuid.UUID:
+    """FO-01: a fresh Class IX student in 9A whose Aadhaar-as-printed name differs."""
+    from app.students.schemas import ValueIn
+
+    name = f"Kommineni Matrix {uuid.uuid4().hex[:8].capitalize()} Sai Kumar"
+    extra = [
+        ValueIn(
+            attribute_key="aadhaar_name_as_printed",
+            source="aadhaar_as_printed",
+            value=name.replace(" Sai Kumar", " Saikumar"),
+        ),
+        ValueIn(
+            attribute_key="aadhaar_dob_as_printed", source="aadhaar_as_printed", value="2012-03-14"
+        ),
+        ValueIn(
+            attribute_key="aadhaar_gender_as_printed", source="aadhaar_as_printed", value="male"
+        ),
+        ValueIn(attribute_key="full_name", source="udise_plus", value=name),
+        ValueIn(attribute_key="dob", source="udise_plus", value="2012-03-14"),
+        ValueIn(attribute_key="gender", source="udise_plus", value="male"),
+    ]
+    sid: uuid.UUID = SW.create(w.a, name=name, section_key="section_9a", extra=extra)
+    return sid
+
+
+def _followup_record(w: Any, r: str, a: Engine) -> Request:
+    body = {
+        "student_ids": [str(_parent_fix_student(w))],
+        "fix_owner": "parent_aadhaar",
+        "event": "slip_given",
+    }
+    return "/api/v1/dq/readiness/bseap-ssc-2027/follow-ups", body, {}
+
+
+def _todo_student(w: Any) -> uuid.UUID:
+    """FO-03: a fresh admission in 9A (admission date in the current year's window)."""
+    from app.students.schemas import ValueIn
+
+    extra = [
+        ValueIn(attribute_key="admission_date", source="admission_register", value="2026-10-30")
+    ]
+    name = f"Kommineni Todo {uuid.uuid4().hex[:8].capitalize()}"
+    sid: uuid.UUID = SW.create(w.a, name=name, section_key="section_9a", extra=extra)
+    return sid
+
+
+def _todo_mark(w: Any, r: str, a: Engine) -> Request:
+    return f"/api/v1/dq/udise-todo/admission:{_todo_student(w)}", {"state": "done"}, {}
+
+
+def _todo_reopen(w: Any, r: str, a: Engine) -> Request:
+    sid = _todo_student(w)
+    owner = w.person("owner")
+    with a.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO sis.udise_movement_marks (id, tenant_id, item_key, kind, student_id, "
+                "state, marked_by, marked_by_membership) VALUES (:i, :t, :k, 'admission', :s, "
+                "'done', :u, :m)"
+            ),
+            {
+                "i": uuid.uuid4(),
+                "t": w.a.tenant_id,
+                "k": f"admission:{sid}",
+                "s": sid,
+                "u": owner.user_id,
+                "m": owner.membership_id,
+            },
+        )
+    return f"/api/v1/dq/udise-todo/admission:{sid}", None, {"If-Match": 'W/"1"'}
+
+
 def _calendar_confirm(w: Any, r: str, a: Engine) -> Request:
     return (
         f"/api/v1/dq/calendar/{_calendar_own_event(w, a)}",
@@ -1686,6 +1759,22 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # FO-01/FO-03 (FR-UDI-029, FR-UDI-039): read with dq.readiness.read, record and tick with
+    # dq.readiness.manage; each write works on its own fresh student.
+    ("GET", "/api/v1/dq/readiness/{profile_key}/follow-ups"): lambda w, r, a: (
+        "/api/v1/dq/readiness/bseap-ssc-2027/follow-ups",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/follow-ups/{student_id}"): lambda w, r, a: (
+        f"/api/v1/dq/readiness/bseap-ssc-2027/follow-ups/{_student(w, r)}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/dq/readiness/{profile_key}/follow-ups"): _followup_record,
+    ("GET", "/api/v1/dq/udise-todo"): lambda w, r, a: ("/api/v1/dq/udise-todo", None, {}),
+    ("PUT", "/api/v1/dq/udise-todo/{item_key}"): _todo_mark,
+    ("DELETE", "/api/v1/dq/udise-todo/{item_key}"): _todo_reopen,
     # R3-1D portal calendar (ADR-0053): read with dq.readiness.read, change with
     # readiness.calendar.manage; each write works on its own fresh own event.
     ("GET", "/api/v1/dq/calendar"): lambda w, r, a: ("/api/v1/dq/calendar", None, {}),
@@ -2013,8 +2102,72 @@ SPECS: dict[tuple[str, str], Builder] = {
         {"reason": "Synthetic correction after lock"},
         {},
     ),
+    # FT-06 school calendar (FR-CAL-*): school A's 2025-26 year (its current year keeps no
+    # calendar, so the attendance specs above mark any day).
+    ("GET", "/api/v1/academic-years/{year_id}/calendar"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/calendar",
+        None,
+        {},
+    ),
+    ("PUT", "/api/v1/academic-years/{year_id}/calendar"): lambda w, r, a: (
+        f"/api/v1/academic-years/{IN.world_calendar_year(w)}/calendar",
+        {"weekly_off": [], "saturdays_off": []},
+        {},
+    ),
+    ("GET", "/api/v1/academic-years/{year_id}/calendar/month"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/calendar/month?month=2026-11",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/academic-years/{year_id}/calendar/suggestions"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/calendar/suggestions",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/academic-years/{year_id}/calendar/entries"): lambda w, r, a: (
+        f"/api/v1/academic-years/{IN.world_calendar_year(w)}/calendar/entries",
+        {
+            "kind": "holiday",
+            "name": "Matrix holiday",
+            "starts_on": (day := IN.world_calendar_day()),
+            "ends_on": day,
+        },
+        {},
+    ),
+    ("DELETE", "/api/v1/academic-years/{year_id}/calendar/entries/{entry_id}"): lambda w, r, a: (
+        f"/api/v1/academic-years/{IN.world_calendar_year(w)}/calendar/entries/"
+        f"{IN.world_calendar_entry(w)}",
+        None,
+        {},
+    ),
     ("GET", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/history"): lambda w, r, a: (
         _m5_marks(w, "/history"),
+        None,
+        {},
+    ),
+    # FT-08 (D85): year-end results, held-back suggestions and the UDISE+ progression sheet.
+    ("GET", "/api/v1/sections/{section_id}/year-results"): lambda w, r, a: (
+        _m5_section(w, "/year-results"),
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/sections/{section_id}/year-results"): lambda w, r, a: (
+        _m5_section(w, "/year-results"),
+        {"entries": [{"student_id": str(_m5_s9a(w)), "result": "passed"}]},
+        {},
+    ),
+    ("GET", "/api/v1/academic-years/{year_id}/year-results/held-back"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/year-results/held-back",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/academic-years/{year_id}/udise-progression"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/udise-progression",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/academic-years/{year_id}/udise-progression/csv"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/udise-progression/csv",
         None,
         {},
     ),
@@ -2231,6 +2384,90 @@ SPECS.update(
         ("POST", "/api/v1/tally/parties/{party_id}/links"): _tally_link,
         ("DELETE", "/api/v1/tally/parties/{party_id}/links/{student_id}"): _tally_unlink,
         ("GET", "/api/v1/tally/dues"): lambda w, r, a: ("/api/v1/tally/dues", None, {}),
+    }
+)
+
+
+# --- FM-03 Tally voucher export (fees gate; the check also needs the connector flag) -------------
+
+_VOUCHER_DAYS_BACK = 25  # a past day no other matrix row closes (day closes go 1, 2, 3... back)
+
+
+def _voucher_period(w: Any, a: Engine) -> dict[str, Any]:
+    """Once per world: a receipt of school A dated a past day that is then closed, and a saved
+    mapping, so every allowed role downloads a file (``include_exported``: repeats too)."""
+    if "tally_voucher_day" not in w.a.ids:
+        import datetime as dt
+        from unittest import mock
+
+        from app.fees import _common
+        from app.fees import service as fees
+
+        f = _fees().F
+        day = f.today() - dt.timedelta(days=_VOUCHER_DAYS_BACK)
+        real = _common.now
+        with mock.patch.object(
+            _common, "now", lambda s: real(s) - dt.timedelta(days=_VOUCHER_DAYS_BACK)
+        ):
+            f.issue(w.a, f.account(w.a), "1.00", role="office_staff")
+            f.call(w.a, "accountant", fees.close_day, day)
+        with a.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO ops.tally_export_settings (id, tenant_id, party_mode, "
+                    "receivable_ledger, mode_ledgers, updated_by) VALUES (:i, :t, 'student', "
+                    "'Fee receivable', '{\"cash\": \"Cash\"}', :u) "
+                    "ON CONFLICT (tenant_id) DO NOTHING"
+                ),
+                {"i": uuid.uuid4(), "t": w.a.tenant_id, "u": w.person("owner").user_id},
+            )
+        w.a.ids["tally_voucher_day"] = day
+    day = w.a.ids["tally_voucher_day"]
+    return {"period_from": str(day), "period_to": str(day), "include_exported": True}
+
+
+def _voucher_settings_put(w: Any, r: str, a: Engine) -> Request:
+    body = {
+        "party_mode": "student",
+        "receivable_ledger": "Fee receivable",
+        "mode_ledgers": {"cash": "Cash"},
+    }
+    return "/api/v1/tally/vouchers/settings", body, {}
+
+
+def _voucher_preview(w: Any, r: str, a: Engine) -> Request:
+    q = _voucher_period(w, a)
+    return (
+        f"/api/v1/tally/vouchers/preview?period_from={q['period_from']}&period_to={q['period_to']}",
+        None,
+        {},
+    )
+
+
+SPECS.update(
+    {
+        ("GET", "/api/v1/tally/vouchers/settings"): lambda w, r, a: (
+            "/api/v1/tally/vouchers/settings",
+            None,
+            {},
+        ),
+        ("PUT", "/api/v1/tally/vouchers/settings"): _voucher_settings_put,
+        ("GET", "/api/v1/tally/vouchers/preview"): _voucher_preview,
+        ("POST", "/api/v1/tally/vouchers/export"): lambda w, r, a: (
+            "/api/v1/tally/vouchers/export",
+            _voucher_period(w, a),
+            {},
+        ),
+        ("GET", "/api/v1/tally/vouchers/exports"): lambda w, r, a: (
+            "/api/v1/tally/vouchers/exports",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/tally/vouchers/check"): lambda w, r, a: (
+            "/api/v1/tally/vouchers/check",
+            None,
+            {},
+        ),
     }
 )
 
@@ -2487,6 +2724,55 @@ SPECS.update(
 )
 
 
+# --- FP-01 reach follow-up and FP-02 urgent closures (FR-MSG-039..055; D85) ---------------------
+
+
+def _closure_day() -> str:
+    return (dt.datetime.now(dt.UTC) + dt.timedelta(days=1)).date().isoformat()
+
+
+SPECS.update(
+    {
+        ("GET", "/api/v1/messaging/coverage"): lambda w, r, a: (
+            "/api/v1/messaging/coverage",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/sections/{section_id}/optins/not-reached"): lambda w, r, a: (
+            f"/api/v1/sections/{w.a.ids['section_9a']}/optins/not-reached",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/messaging/broadcasts/{broadcast_id}/follow-up"): lambda w, r, a: (
+            f"/api/v1/messaging/broadcasts/{_send_broadcast(w, a)}/follow-up",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/messaging/closures/preview"): lambda w, r, a: (
+            "/api/v1/messaging/closures/preview",
+            {"whole_school": True, "closed_from": _closure_day(), "reason": "weather"},
+            {},
+        ),
+        # A digest that is not the preview's: the guard passed, the service says 409.
+        ("POST", "/api/v1/messaging/closures"): lambda w, r, a: (
+            "/api/v1/messaging/closures",
+            {
+                "whole_school": True,
+                "closed_from": _closure_day(),
+                "reason": "weather",
+                "preview_token": "cl_" + "0" * 40,
+            },
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
+        ("GET", "/api/v1/messaging/closures"): lambda w, r, a: (
+            "/api/v1/messaging/closures",
+            None,
+            {},
+        ),
+    }
+)
+
+
 # --- R2-3J: manual fee reminders, a receipt on WhatsApp, notice withdrawal ---------------------
 
 # Guard passed; the service refuses: manual fee reminders also need finance.read (FR-MSG-025).
@@ -2585,6 +2871,40 @@ def _tax() -> ModuleType:
 
 
 SPECS.update(_tax().matrix_specs())
+
+
+def _fee_reports() -> ModuleType:
+    """tests/fees/reports_security_support.py (FM-04 accountant and management reports)."""
+    name = "sos_test_fees_reports_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "reports_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_fee_reports().matrix_specs())
+
+
+def _addons() -> ModuleType:
+    """tests/fees/addon_security_support.py (FM-02 add-on fees)."""
+    name = "sos_test_fees_addon_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "addon_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_addons().matrix_specs())
 
 
 def _disclosure() -> ModuleType:
@@ -2696,6 +3016,110 @@ def _consents() -> ModuleType:
 SPECS.update(_consents().matrix_specs())
 
 
+def _udise() -> ModuleType:
+    """tests/dq/udise_security_support.py (FO-02 UDISE+ correction requests)."""
+    name = "sos_test_dq_udise_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "dq" / "udise_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_udise().matrix_specs())
+
+
+def _udise_match(w: Any, r: str, a: Engine) -> Request:
+    """FO-04 (FR-UDI-014): skip the unmatched row of a fresh UDISE+ list of school A."""
+    data = IM.xlsx_bytes(
+        [
+            ["Name of Student", "Date of Birth", "Class", "Section"],
+            ["Synthetica Nobody", "02/02/2012", "IX", "A"],
+        ]
+    )
+    batch_id = IM.start(a, w.a, data, source="udise_plus")
+    return (
+        f"/api/v1/imports/{batch_id}/rows/2/match",
+        {"decision": "skip"},
+        _if_match(IM.batch(a, batch_id)["version"]),
+    )
+
+
+SPECS[("PUT", "/api/v1/imports/{import_id}/rows/{row_no}/match")] = _udise_match
+
+
+# FA-05 weekly management brief (FR-BRF-002): one stored week of school A (counts only).
+_BRIEF: dict[str, uuid.UUID] = {}
+
+
+def _brief_week(w: Any, a: Engine) -> uuid.UUID:
+    if not _BRIEF:
+        brief_id = uuid.uuid4()
+        counts = (
+            '{"v": 1, "as_of": "2026-10-19", "readiness": [], "findings": {"blockers": 0, '
+            '"warnings": 0, "students_with_blockers": 0}, "changes_waiting": 0, '
+            '"certificates_issued": 0, "deadlines": [], "fees": null, "ask": null}'
+        )
+        with a.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO ops.weekly_briefs (id, tenant_id, week_start, counts) "
+                    "VALUES (:i, :t, '2026-10-12', CAST(:c AS jsonb))"
+                ),
+                {"i": brief_id, "t": w.a.tenant_id, "c": counts},
+            )
+        _BRIEF["week"] = brief_id
+    return _BRIEF["week"]
+
+
+SPECS.update(
+    {
+        ("GET", "/api/v1/brief/weekly"): lambda w, r, a: ("/api/v1/brief/weekly", None, {}),
+        ("GET", "/api/v1/brief/weekly/history"): lambda w, r, a: (
+            "/api/v1/brief/weekly/history",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/brief/weekly/{brief_id}"): lambda w, r, a: (
+            f"/api/v1/brief/weekly/{_brief_week(w, a)}",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/brief/preferences"): lambda w, r, a: (
+            "/api/v1/brief/preferences",
+            None,
+            {},
+        ),
+        ("PUT", "/api/v1/brief/preferences"): lambda w, r, a: (
+            "/api/v1/brief/preferences",
+            {"in_app": True, "email": False},
+            {},
+        ),
+    }
+)
+
+
+def _compliance() -> ModuleType:
+    """tests/compliance/support.py (FC-01 compliance certificates of school A)."""
+    name = "sos_test_compliance_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "compliance" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_compliance().matrix_specs())
+
+
 def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one answer per route family
     creates = {
         "/api/v1/users",
@@ -2719,6 +3143,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         "/api/v1/tasks",
         "/api/v1/circular-suggestions/{suggestion_id}/confirm",
         "/api/v1/exams",
+        "/api/v1/academic-years/{year_id}/calendar/entries",
         "/api/v1/students/{student_id}/flags",
         "/api/v1/insights/flags/{flag_id}/actions",
         "/api/v1/students/{student_id}/behaviour-notes",
@@ -2731,6 +3156,8 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         "/api/v1/guardians/{guardian_id}/optins",
         # R3-1D portal calendar (FR-RDY-005): the school's own event
         "/api/v1/dq/calendar",
+        # FO-01 (FR-UDI-025): a follow-up step
+        "/api/v1/dq/readiness/{profile_key}/follow-ups",
     }
     accepted = {
         "/api/v1/documents",
@@ -2761,16 +3188,23 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         _consents().MATRIX_ACCEPTED
     ):
         return 202
+    if (method, path) in _udise().MATRIX_STATUS:
+        return int(_udise().MATRIX_STATUS[(method, path)])  # FO-02: guard passed (no difference)
     if (method, path) in _disclosure().MATRIX_STATUS:
         return int(_disclosure().MATRIX_STATUS[(method, path)])
     if (method, path) in _consents().MATRIX_STATUS:
         return int(_consents().MATRIX_STATUS[(method, path)])
-    if method == "POST" and path in _privacy().MATRIX_CREATES | _consents().MATRIX_CREATES:
+    if method == "POST" and path in (
+        _privacy().MATRIX_CREATES | _consents().MATRIX_CREATES | _compliance().MATRIX_CREATES
+    ):
         return 201
     if (method, path) in _privacy().MATRIX_STATUS:
         return int(_privacy().MATRIX_STATUS[(method, path)])
     if method == "POST" and path in (
-        _fees().MATRIX_CREATES | _upi().MATRIX_CREATES | _tax().MATRIX_CREATES
+        _fees().MATRIX_CREATES
+        | _upi().MATRIX_CREATES
+        | _tax().MATRIX_CREATES
+        | _addons().MATRIX_CREATES
     ):
         return 201
     if (method, path) in _fees().ONLINE_REFUSED:
@@ -2784,6 +3218,8 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"),
     ):
         return 409  # guard passed; a stale digest / nobody to send to (R2-3J)
+    if (method, path) == ("POST", "/api/v1/messaging/closures"):
+        return 409  # guard passed; the digest is not the preview's (FP-02)
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
     if method == "POST" and path.startswith("/api/v1/me/invitations/"):
@@ -2797,6 +3233,8 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         "/api/v1/tally/parties/{party_id}/links/{student_id}",
         "/api/v1/messaging/account",
         "/api/v1/dq/calendar/{event_key}",
+        "/api/v1/academic-years/{year_id}/calendar/entries/{entry_id}",
+        "/api/v1/dq/udise-todo/{item_key}",
     ):
         return 204
     return 201 if method == "POST" and path in creates else 200
@@ -2807,6 +3245,11 @@ def _call(api: Any, w: Any, admin: Engine, role: str, key: tuple[str, str], **kw
         # R2-1B: fees are on for school A only while the request is built and sent.
         with _fees().on(admin, w.a.tenant_id, key[1]):
             path, body, headers = SPECS[key](w, role, admin)
+            if key[1].startswith("/api/v1/tally/"):
+                # FM-03: the voucher routes follow the fees gate; the check also needs the
+                # connector flag.
+                with _tally().flag_on(admin, w.a.tenant_id):
+                    return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
             return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
     if _disclosure().is_disclosure_path(key[1]):
         # R3-1C: the disclosure is offered to CBSE schools only (FR-DISC-001).
