@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted (lead, 2026-10-21; owner may revisit)** (docs/18 §8 D42). Adds one public handle kind; no new `SECURITY DEFINER` function and no new `definer_access` table |
+| Status | **Accepted (lead, 2026-10-21; owner may revisit)** (docs/18 §8 D42). **Amended 2026-11-09** (format version 2, staff as counts only; lead decision D84). Adds one public handle kind; no new `SECURITY DEFINER` function and no new `definer_access` table |
 | Date | 2026-10-21 |
 | Deciders | Lead engineer (for the product owner, who may revisit) |
 | Amends / supersedes | Amends [ADR-0047](ADR-0047-routing-public-requests-and-webhooks-to-a-school.md) decision 1 (adds the kind `school_disclosure` to `core.public_handles.kind`); decision 2 (the resolver) is unchanged |
@@ -16,7 +16,7 @@
 
 ## Decision
 
-1. **A versioned format file.** `app/disclosure/formats/cbse-appendix-ix.yaml` lists the sections and items in CBSE's order; each item says how it is filled: `school` (from school settings), `derived` (computed from SchoolOS data: section count, teacher-section ratio, staff counts by role, the active fee plans as a table of heads and annual amounts per class), `input` (typed by staff, with type and limits), `document` (an uploaded PDF), `link` (an https URL, for the video). It carries `source` URLs and `verified: false`. Only CBSE schools (`boards` contains `CBSE`, FR-TEN-020) see the feature.
+1. **A versioned format file.** `app/disclosure/formats/cbse-appendix-ix.yaml` (since the 2026-11-09 amendment one file per version, `cbse-appendix-ix.v{n}.yaml`) lists the sections and items in CBSE's order; each item says how it is filled: `school` (from school settings), `derived` (computed from SchoolOS data: section count, teacher-section ratio, staff counts by role, the active fee plans as a table of heads and annual amounts per class), `input` (typed by staff, with type and limits), `document` (an uploaded PDF), `link` (an https URL, for the video). It carries `source` URLs and `verified: false`. Only CBSE schools (`boards` contains `CBSE`, FR-TEN-020) see the feature.
 2. **Draft, then publish a frozen snapshot.** Staff edit a draft (inputs and chosen documents; derived values shown as they are now). **Publishing** (`disclosure.publish`ᴿ) freezes everything into an append-only `ops.disclosure_snapshots` row: the full content as JSON (derived values copied, not live), `content_sha256`, the document version ids, the format version, who published and when. The public page always shows the latest published snapshot; nothing becomes public until a person publishes it, and publishing again replaces it. A snapshot can be withdrawn (the page then answers the uniform 404) with a reason.
 3. **No student personal data, by construction.** The format allows only school-level facts and aggregates; it has no item that names or counts fewer than 10 children (board results are given as numbers appeared and passed and pass percentage per class and year, never names; a count under 10 is shown as "fewer than 10"). Inputs refuse Aadhaar-like and phone-like numbers except in the two contact fields; documents are chosen from the school's documents and the publisher confirms "These documents contain no student's personal data" (the check is the person's; the documents' own Aadhaar masking still applies). Names published are adults in public roles (principal, committee members) that the school types and is responsible for.
 4. **Served through a public handle on the public origin.** A new handle kind `school_disclosure` (one live handle per school; no expiry; revocable, which changes the link) maps an opaque 22-character key to the school; the page is `{SOS_PUBLIC_BASE_URL}/d/{key}` on the shared tier and the same path on a dedicated host's public host. The route `GET /api/v1/public/disclosure/{key}` declares `require_public_handle("school_disclosure")`, is listed in `app/public/public_routes.yaml`, and returns the snapshot content as an explicit allowlist; documents open through `GET /api/v1/public/disclosure/{key}/documents/{n}` (presigned ≤ 5 minutes, only document versions in the snapshot). The resolver is unchanged: like other parent kinds, the handle resolves only while the school is `active` (a suspended school's page is the uniform 404; its downloaded file still works). Rate limits `public_ip` and `public_lookup_fail` apply; no view counts beyond a per-day total.
@@ -39,6 +39,16 @@
 - A document version a snapshot published cannot be deleted (documents delete guard `document_published`); the version must be a clean PDF of a circular, policy or other school document, never C3.
 - A school that removes CBSE from its boards stops showing the page (uniform 404).
 
+## Amendment 2026-11-09: format version 2, staff as counts only (FC-02)
+
+CBSE circular 1/2026 (12 Jan 2026) revised Appendix IX. Its annexure was not read (the copy found is a scan; D3 stays open), so version 2 follows public secondary summaries and stays `verified: false` with its sources.
+
+1. **Versions side by side.** Format files are named `{key}.v{version}.yaml`; `cbse-appendix-ix.v1.yaml` is unchanged and `cbse-appendix-ix.v2.yaml` is new. New drafts use the highest version. Snapshots keep the version they were published with and their frozen content, so every version 1 snapshot stays as published and renderable.
+2. **Drafts move forward item by item.** A draft saved with version 1 is shown, saved and published in version 2 with every item whose key, fill and type are the same in both and whose value version 2 accepts; the draft lists the item keys left behind (`dropped`) and the save is audited with `from_version`. No migration rewrites stored drafts.
+3. **New in version 2:** registered students per class (active enrolments of the current academic year through `students.service`, below 10 published as "fewer than 10"), staff strength by category from SchoolOS members, numbers of vice principals and head teachers, a count table of staff by category and highest qualification (a new input type `count_table`: whole numbers per row and column), CWSN-friendly toilets, library size and books; the DEO certificate item now reads "DEO certificate or self-certification".
+4. **Counts only, never named teachers (lead decision D84, PO to confirm).** The summaries name "strength and qualifications" of the principal, vice principals, head teachers, PGT/TGT/PRT, special educators and counsellors. SchoolOS publishes these as numbers. Publishing a list of named teachers with their qualifications would publish staff personal data and would need the school's notice to staff and a privacy review; if a checked copy of the annexure requires names, that is a new amendment.
+5. **Calendar.** The yearly reminder to refresh the disclosure is built separately (portal calendar), not in this module.
+
 ## Alternatives considered
 
 | Option | Why not chosen |
@@ -50,4 +60,4 @@
 
 ## Related requirements
 
-FR-DISC-001..012, FR-PUB-003, FR-PUB-011, SEC-036, SEC-050, PRV-037; docs/02 C29; docs/03 §3.28; docs/05 §16.4; docs/07 §6.8, §11.3; docs/09 "R3 planned endpoints"; docs/17 §5.10.
+FR-DISC-001..019, FR-PUB-003, FR-PUB-011, SEC-036, SEC-050, PRV-037; docs/02 C29; docs/03 §3.28; docs/05 §16.4; docs/07 §6.8, §11.3; docs/09 "R3 planned endpoints"; docs/17 §5.10.
