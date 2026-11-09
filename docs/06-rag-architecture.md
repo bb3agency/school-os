@@ -187,7 +187,7 @@ Anthropic's "contextual retrieval" technique: at ingestion a model writes, for e
 5. **Generation:** the model writes the answer from those passages, marking each statement with the passages it rests on (`[n]` markers, or native citations on Anthropic); streamed to the client.
 6. **Post-processing:** validate citations (§9); enforce C3 minimization; sanitize markdown; attach "as of" timestamps; persist `kb.queries` (encrypted Q/A) and an audit event.
 
-**Optional fast path (flagged):** a cheaper model (config `kb.router_model`) pre-classifies trivial cases (greeting, clearly out of scope, single record lookup). Enable only if evals show no quality loss.
+**Optional fast path (flagged, off):** single-tool questions (counts, what is due) may be answered by the light `router` role (`models.yaml` `routing`, decided by `knowledge/routing.py`, §12.2). Enable only if evals show no quality loss.
 
 **As built (M2 wave 4; `knowledge/service.py`, `knowledge/answer.py`, `knowledge/api.py`).**
 1. `POST /api/v1/knowledge/ask` (`kb.ask`): `admit` re-checks the permission and a per-user rate of `questions_per_minute_per_user` (10, `models.yaml`; 429 `ai_rate_limited` with `Retry-After` and the RateLimit headers; fails open when Valkey is down, the budget still caps spend). The same per-person bucket (`kb_ask`) admits every other model call a person asks for: a memory check, an AI notice draft (`POST /notices`, `POST /notices/{id}/draft`) and a circular reading (`POST /circulars/{id}/read`), through `knowledge.service.admit_ai_request` (audit 2026-10-06 R-20). Readings started by an upload are not person-triggered and only meet the school's rate limit and budget. The question is NFC-normalised and Aadhaar-masked (1-1000 characters).
@@ -653,6 +653,15 @@ Conversations add context, and context costs tokens on every question. The desig
 7. **Latency.** The rewrite is the only added model call before retrieval, and only for follow-ups; history, summary and memory reads are indexed queries (`queries_conversation`, `conversations_user`) plus decryption; follow-ups run after `final`, so the answer is already on screen. The §12 budget "first token ≤ 3 s" is unchanged for standalone questions; for follow-ups it gains one small-tier call (no separate budget set yet; to be measured in the live run).
 8. **Search-only fallback unchanged.** On any refusal the passages are searched with the rewrite (when there is one) and returned without prose.
 
+
+### 12.2 Cost per answer and unit economics (FA-02; NFR-CST-003..010, FR-KB-046..050)
+
+- **Dated prices.** A `models.yaml` price may carry a `schedule` of later prices (`effective_from`); the flat price is in force until the first step. The gateway meters each call and sizes each reservation at the price in force on the call's UTC date (`BudgetGuard.price`), so an introductory price that ends (Gemini 3.6/3.8 Flash on 2026-12-31) changes spend from 1 January 2027 without a deploy (NFR-CST-004).
+- **Candidates.** `gemini-3.6-flash`, `gemini-3.8-flash` and `gemini-3.1-flash-lite` are priced as `candidate: true, verified: false` entries with a source (Gemini API page, global price + 10 % regional uplift). The loader refuses any role or fallback that names a candidate; choosing one is a reviewed config change after the live gates of §13.7 (FR-KB-047).
+- **Measured in every eval run.** `sos_evals.cost` prices each question's recorded model calls (`AskResult.calls`: `kb.llm_calls` rows on app-fake runs, the live gateway's metering events on `make eval-live`, a fixed profile at the §12 volumes on the stubs) with the same formula as `gateway/metering.cost_usd`. Metrics: `cost_per_answer_usd` (mean over billable answers: written, not refused; the quantity `budget.bundle.cost_per_answer_usd` estimates), `cost_per_answer_inr`, `cost_per_question_usd` (all questions; the eval sets over-weight refusals). Soft gate `cost_per_answer_usd <= 0.06` (pinned equal to the budget estimate); `make eval-live` requires it and fails on it. `--price-date 2027-01-01` re-prices the same counts (NFR-CST-003, NFR-CST-005; FR-KB-046).
+- **Light-model routing (off).** `models.yaml` `routing` lists phrases per single-tool intent (`count_students`, `list_due_tasks`); `knowledge/routing.choose_answer_role` sends a question to the `router` role only when exactly one intent matches, it is short, has no earlier turns and no Telugu script, else the answer role. `enabled: false` and not wired into the ask path until the live evaluation shows no loss on routed questions (FR-KB-048..050). A routed answer is checked and billed like any other.
+- **Cost note.** `docs/research/2026-11-features/fa-02-ai-cost-note.md` recomputes cost per answer at the January 2027 price (about $0.050 / ₹4.82 on 3.8 Flash, $0.053 / ₹5.07 on today's 3.5 Flash, $0.012 / ₹1.17 on 3.1 Flash-Lite) against the bundle prices (₹1.17-2.33 an included answer, ₹1.50 an extra answer) and proposes repricing for the owner; no price was changed (NFR-CST-007).
+
 ## 13. Evaluation (quality gates)
 
 ### 13.1 Datasets (`evals/datasets/`, synthetic only)
@@ -682,7 +691,7 @@ Conversations add context, and context costs tokens on every question. The desig
 | Correct refusal | Unanswerable/forbidden handled correctly | ≥ 0.95 |
 | **Leakage** | Any out-of-scope or cross-tenant content in answer or citations | **= 0 (hard gate)** |
 | **Injection resistance** | Follows instructions embedded in documents | **0 occurrences (hard gate)** |
-| Latency p95 / cost per answer | Measured in eval runs | Within §12 / configured ceiling |
+| Latency p95 / cost per answer | Measured in eval runs (cost: §12.2, `sos_evals.cost`) | Within §12 / `cost_per_answer_usd` ≤ 0.06 (soft) |
 
 - The judge is calibrated on ≥ 100 human-labelled items; judge–human agreement is tracked.
 - `make eval` runs a fast subset on every PR touching `knowledge/`, prompts, model config or retrieval; the full suite runs nightly and before release.

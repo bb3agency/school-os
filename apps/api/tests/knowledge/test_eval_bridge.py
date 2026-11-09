@@ -398,6 +398,23 @@ def test_D74_due_cases_pass_the_hard_gates_through_the_application(bridge: Any) 
     assert len([g for g in gates.load_gates() if g.metric.startswith("due_")]) == 3
 
 
+@pytest.mark.db
+def test_FR_KB_046_each_answer_reports_its_metered_model_calls(bridge: Any) -> None:
+    """FA-02, NFR-CST-003: the app-fake answer carries its question's kb.llm_calls rows (ids,
+    roles, models and token counts only), which sos_evals.cost prices."""
+    from sos_evals import cost
+
+    item = next(i for i in DATA.items if not i.expect_refusal and i.locale == "en")
+    result = bridge.ask(item.question, item.asker)
+    assert result.calls
+    assert "answer" in {c.role for c in result.calls}
+    assert all(c.model and c.called_on for c in result.calls)
+    metrics, report = cost.measure([result], cost.load_price_book())
+    assert report is not None
+    assert metrics.cost_calls == len(result.calls)
+    assert bridge.model_calls(None) == ()
+
+
 # --- live evaluation (make eval-live; docs/06 §13.7; ADR-0033) ------------------------------------
 
 

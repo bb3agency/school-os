@@ -2083,10 +2083,14 @@ version = "0.1.0"
 source = { editable = "evals" }
 dependencies = [
     { name = "pydantic" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = "==2.13.5" }]
+requires-dist = [
+    { name = "pydantic", specifier = "==2.13.5" },
+    { name = "pyyaml", specifier = "==6.0.3" },
+]
 
 [[package]]
 name = "sos-worker"

@@ -57,7 +57,7 @@ import redis
 from app.authz.kv import KVStore, KVUnavailable
 from app.core.ids import new_id
 from app.core.logging import get_logger
-from app.knowledge.config.llm import LlmConfig, RoleConfig
+from app.knowledge.config.llm import LlmConfig, ModelPrice, RoleConfig
 from app.knowledge.domain import Feature
 from app.knowledge.gateway.errors import (
     AiDisabled,
@@ -502,9 +502,14 @@ class BudgetGuard:
     def budget_usd(self, settings: TenantAiSettings) -> Decimal:
         return settings.monthly_budget_inr / self._config.budget.usd_inr_rate
 
+    def price(self, model: str) -> ModelPrice:
+        """The list price of ``model`` in force today (UTC call date; NFR-CST-004): a scheduled
+        price change (an introductory price ending) applies from its date."""
+        return self._config.price_on(model, self._now().astimezone(UTC).date())
+
     def estimate_usd(self, role_config: RoleConfig) -> Decimal:
         """Worst-case list price of one call of this role (no cache discount)."""
-        price = self._config.prices[role_config.model]
+        price = self.price(role_config.model)
         tokens_in = Decimal(self._config.budget.reservation.input_tokens)
         tokens_out = Decimal(role_config.max_output_tokens)
         return (

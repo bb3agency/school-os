@@ -10,9 +10,10 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from datetime import date
 from pathlib import Path
 
-from sos_evals import datasets, gates, generator, report, runner
+from sos_evals import cost, datasets, gates, generator, report, runner
 from sos_evals.stubs import STUBS
 
 EXIT_HARNESS_ERROR = 3
@@ -32,8 +33,11 @@ def build_report(
     gates_file: Path = gates.GATES_FILE,
     baseline_file: Path | None = None,
     fail_on_soft: bool = False,
+    models_file: Path = cost.MODELS_FILE,
+    price_date: date | None = None,
 ) -> report.Report:
     data = datasets.load(datasets_dir)
+    prices = cost.load_price_book(models_file)
     stub = STUBS[adapter](data.corpus, data.items)
     result = runner.run(
         data.select(suite),
@@ -54,6 +58,8 @@ def build_report(
         english=stub,
         recall=stub,
         recall_fast=suite == "fast",
+        prices=prices,
+        price_date=price_date,
     )
     gate_results = gates.evaluate(gates.load_gates(gates_file), result.metrics)
     code = gates.exit_code(gate_results, fail_on_soft=fail_on_soft)
@@ -80,6 +86,8 @@ def _run(args: argparse.Namespace) -> int:
         gates_file=args.gates,
         baseline_file=baseline_file,
         fail_on_soft=args.fail_on_soft,
+        models_file=args.models,
+        price_date=args.price_date,
     )
     json_path, md_path = report.write(result, args.out)
     for gate in result.gates:
@@ -141,6 +149,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="default: evals/baselines/<adapter>-<suite>.json",
     )
     run.add_argument("--out", type=Path, default=REPORTS_DIR)
+    run.add_argument(
+        "--models",
+        type=Path,
+        default=cost.MODELS_FILE,
+        help="models.yaml with the prices (default: the API's knowledge config)",
+    )
+    run.add_argument(
+        "--price-date",
+        type=date.fromisoformat,
+        default=None,
+        help="price every recorded call at the prices in force on this date (YYYY-MM-DD), "
+        "e.g. 2027-01-01 when introductory prices end; default: each call's own date",
+    )
     run.add_argument(
         "--fail-on-soft",
         action="store_true",

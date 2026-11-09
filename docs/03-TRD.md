@@ -738,6 +738,21 @@ Release R3 of the 2026-27 plan (docs/18 §3 R3; before DPDP's day-to-day duties 
 
 *As built (FO-05, wave F1, 2026-11-09; no migration: the portal kind is not stored in the database):* FR-RDY-011..018 and FR-RDY-020 are built and tested (`tests/dq/test_calendar.py`, `tests/dq/test_calendar_api.py`, `tests/platform/test_board_sync.py`, web `features/portal-calendar/calendar.test.tsx`); FR-RDY-019 is the checklist `docs/ops/portal-calendar-refresh.md`. The OpenAPI `CalendarPortal` enum gains `school_admin` and `rte` when the document is regenerated.
 
+
+### 3.31 AI unit economics (FR-KB-046..050) (FA-02, wave F1)
+
+Cost per answer measured by the eval harness, candidate answer models priced but not selected, and light-model routing of single-tool questions kept off (docs/research/2026-11-features/ai-platform.md FA-02; cost note `docs/research/2026-11-features/fa-02-ai-cost-note.md`; docs/06 §12.2). No migration, no route, no permission. Costs: NFR-CST-003..010 (§4.8).
+
+| ID | Requirement | Verify |
+|---|---|---|
+| FR-KB-046 | Every eval answer MUST carry the model calls its question made (role, model, token counts incl. cache writes and reads, UTC call date; never text): the question's `kb.llm_calls` rows on app runs, the live gateway's metering events on `make eval-live`, a fixed profile on the stubs. | T |
+| FR-KB-047 | Candidate answer models (`gemini-3.6-flash`, `gemini-3.8-flash`, `gemini-3.1-flash-lite`) MUST be priced in `models.yaml` as `candidate: true` with `verified: false` and a source until checked on the provider's regional price list; the loader MUST refuse a role or fallback that selects a candidate. Selection needs the live gates (docs/06 §13.7). *(Lead decision D84, PO to confirm.)* | T |
+| FR-KB-048 | The `router` role and light-model routing MUST stay off (`routing.enabled: false`) until the live evaluation shows the light role passes every hard gate on the routed questions and the owner accepts answers from a fast model for simple questions. *(Lead decision D84, PO to confirm.)* | T |
+| FR-KB-049 | The routing decision (`knowledge/routing.py`) MUST be deterministic and config-driven (`models.yaml` `routing`): a question goes to the light role only when exactly one whitelisted tool's phrases match it, it is at most `max_question_chars` long, it has no earlier turns (unless `route_with_history`) and it has no Telugu script; a routed question uses at most `routing.max_tool_rounds` tool rounds. | T |
+| FR-KB-050 | Anything the routing rules cannot classify as single-tool MUST keep the answer role. A routed question MUST go through the same retrieval filters, tool permissions, citation validation and "not found" rule as any other (invariant 8) and counts as a billable answer like any other (ADR-0038). | T |
+
+*As built (wave F1, FA-02, 2026-11-09):* FR-KB-046..049 are built and tested (`evals/tests/test_cost.py`, `apps/api/tests/knowledge/test_unit_economics.py`, `test_eval_bridge.py::test_FR_KB_046_*`). Routing is decided but not wired into the ask path; FR-KB-050 binds the wiring that lands with the live run that justifies switching it on.
+
 ---
 
 ## 4. Non-functional requirements
@@ -833,6 +848,14 @@ Release R3 of the 2026-27 plan (docs/18 §3 R3; before DPDP's day-to-day duties 
 | NFR-OBS-002 | SLO dashboards and alerting per 11-Operations. |
 | NFR-CST-001 | LLM spend tracked per tenant/feature; alerts at 80% and 100% of budget. |
 | NFR-CST-002 | Infra cost per active school tracked monthly; design choices favour managed, low-ops services. |
+| NFR-CST-003 | `make eval` MUST report cost per billable answer (mean USD and INR of the model calls of answered, full-mode questions) and cost per question, priced from recorded token counts at `models.yaml` prices; a soft gate `cost_per_answer_usd <= 0.06` (pinned equal to `budget.bundle.cost_per_answer_usd`) blocks release and `make eval-live`; no recorded call fails it. (FA-02) |
+| NFR-CST-004 | `models.yaml` prices MAY carry an effective-date schedule; gateway metering, budget reservations and eval cost MUST use the price in force on the call's UTC date. Intro prices that end (Gemini 3.6/3.8 Flash on 2026-12-31) are recorded with their January 2027 step. (FA-02) |
+| NFR-CST-005 | `python -m sos_evals run --price-date YYYY-MM-DD` MUST price a run's recorded calls at that date's prices (projection), and the report MUST state the price date and name models priced with `verified: false` prices. (FA-02) |
+| NFR-CST-006 | Bundle budgets, cost estimates and repricing proposals MUST use the price in force after any introductory period (January 2027 for the Gemini 3.6/3.8 Flash candidates), never an introductory price. (FA-02) |
+| NFR-CST-007 | Bundle prices (`platform/billing.yaml`, the catalogue rows, the pricing page) MUST change only by owner decision and a new catalogue version; FA-02 proposes prices (cost note §5) and changes none. (FA-02) |
+| NFR-CST-008 | Before the first paid AI bundle, the measured cost per answer from `make eval-live` at the post-introductory price SHOULD be compared with the bundle prices and the comparison given to the owner. *(Lead decision D84, PO to confirm.)* (FA-02) |
+| NFR-CST-009 | `budget.bundle.cost_per_answer_usd` MUST be re-checked against `kb.llm_calls` (and the eval gate) once real usage exists; a measured cost above it means the derived budgets and the gate threshold change together. (FA-02, ADR-0038 C1) |
+| NFR-CST-010 | Batch (half) pricing MAY be used only for offline jobs (contextual chunk headers, the eval judge) and only once batch staging is shown to fit the Zero Data Retention set-up (unverified). (FA-02) |
 
 ---
 

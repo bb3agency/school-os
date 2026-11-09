@@ -25,6 +25,11 @@ Authorised retrieval recall (docs/06 §6): `stub-perfect` returns the oracle's o
 authorised chunks (recall 1.0); `stub-leaky` puts a chunk the caller may not see first.
 
 Latencies are derived from a hash of the question so reports are reproducible.
+
+Cost per answer (FA-02, NFR-CST-003): every stub answer records the model calls of
+``ANSWERED_CALLS`` (a refusal ``REFUSED_CALLS``): token counts at the docs/06 §12 volumes the
+``models.yaml`` budget estimate assumes, on each role's configured model. They prove the metric
+and its gate; the real counts come from ``kb.llm_calls`` on app runs.
 """
 
 from __future__ import annotations
@@ -34,7 +39,7 @@ import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 
 from sos_evals.acl import retrievable, visible
-from sos_evals.adapters import AnswerSegment, AskResult, Citation, Retrieved
+from sos_evals.adapters import AnswerSegment, AskResult, Citation, ModelCall, Retrieved
 from sos_evals.authorised_recall import RecallHit, RecallLevel, RecallRetrieved
 from sos_evals.circulars import CircularCase, CircularResult, SuggestedDeadline, dates_in
 from sos_evals.contextual import (
@@ -60,6 +65,15 @@ _TE_PREFIX = "సమాధానం: "
 RECALL_SCHOOL_CHUNKS = 4000
 """The stubs' notional school size for the authorised-recall probes (no vectors, no DB)."""
 EN_STAND_IN = "The cited passage from the school's records answers this."
+ANSWERED_CALLS = (
+    ModelCall(role="answer", input_tokens=10_000, output_tokens=800),
+    ModelCall(role="answer", input_tokens=10_000, output_tokens=800),
+    ModelCall(role="followups", input_tokens=2_000, output_tokens=200),
+)
+"""Two tool-use rounds of ~10k input (tool results, prompt, history) and ~800 output tokens
+including thinking, then the follow-up suggestions (docs/06 §12; models.yaml budget note)."""
+REFUSED_CALLS = (ModelCall(role="answer", input_tokens=10_000, output_tokens=200),)
+"""One round that finds nothing and says so."""
 """What an English-first answer says instead of copying a Telugu passage (it cites it)."""
 
 
@@ -233,6 +247,7 @@ class PerfectStub(_ConversationOracle):
             refused=True,
             provided_sources=tuple(provided),
             language=self._language(locale),
+            calls=REFUSED_CALLS,
         )
 
     def ask(self, question: str, asker: Asker) -> AskResult:
@@ -251,6 +266,7 @@ class PerfectStub(_ConversationOracle):
             language=self._language(item.locale),
             followups=() if self.telugu else (english,),
             title=None if self.telugu else "New conversation",
+            calls=ANSWERED_CALLS,
         )
 
     def read_circular(self, case: CircularCase) -> CircularResult:

@@ -5,7 +5,7 @@
 # evals/tests/test_gates.py pins the hard gates below; weakening one fails the tests.
 #
 # Not measured yet (need the calibrated LLM judge, M2): faithfulness >= 0.95, answer
-# correctness >= 0.85, cost per answer within the configured ceiling.
+# correctness >= 0.85.
 
 version = 1
 
@@ -339,3 +339,18 @@ op = ">="
 threshold = 0.95
 severity = "soft"
 requirements = ["FR-KB-001", "FR-KB-007"]
+
+# Cost per answer (sos_evals.cost; FA-02, docs/06 §14.1). All model calls of the run's questions,
+# from recorded token counts (kb.llm_calls on app runs) at the models.yaml price in force on each
+# call date (or --price-date), divided by the billable answers. The ceiling is the estimate the
+# bundle budgets are derived from (models.yaml budget.bundle.cost_per_answer_usd, USD per answer;
+# evals/tests/test_cost.py pins them equal): a run above it means budgets and bundle prices rest
+# on a wrong estimate. Soft: it blocks release (--fail-on-soft), not merge. No recorded call =
+# no evidence = FAIL.
+
+[[gate]]
+metric = "cost_per_answer_usd"
+op = "<="
+threshold = 0.06
+severity = "soft"
+requirements = ["NFR-CST-003", "FR-KB-046"]

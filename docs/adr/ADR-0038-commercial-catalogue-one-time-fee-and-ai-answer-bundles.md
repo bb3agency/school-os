@@ -129,3 +129,16 @@ Lead decision D50 (docs/14) refines decision 4; nothing else changes.
   both files, `billing.yaml` → `ai_answers.excluded_routes` and `models.yaml` →
   `budget.bundle.excluded_routes` (`[memory]`), pinned equal by
   `tests/knowledge/test_ask_finish_unit.py` like the billable statuses. No migration.
+
+## Cost note (2026-11-09, FA-02; the decision is unchanged)
+
+The C1 commercial note recomputed for the price in force from January 2027 (estimates; no live
+call is possible under D2): about **$0.050 (₹4.82)** per answer on `gemini-3.8-flash` after its
+introductory price ends on 2026-12-31, **$0.053 (₹5.07)** on today's `gemini-3.5-flash`, and
+**$0.012 (₹1.17)** if `gemini-3.1-flash-lite` passes the hard gates. Every bundle and the ₹1.50
+extra answer stay below estimated cost except on Flash-Lite; the loss per school stays bounded by
+the derived budget cap. `budget.bundle.cost_per_answer_usd` ($0.06) still covers the January 2027
+price, so the derived budgets need no change. `make eval` now measures cost per answer with a soft
+gate at $0.06 (NFR-CST-003). Repricing is an owner decision and a new catalogue version; the
+proposal (price at a 40 % margin on the **measured** cost after the first `make eval-live`) is in
+`docs/research/2026-11-features/fa-02-ai-cost-note.md` §5. No price was changed.

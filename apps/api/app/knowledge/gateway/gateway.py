@@ -524,7 +524,7 @@ class Gateway:
         usage = usage or wire.RawUsage(0, 0)
         model = role_config.model
         cost = cost_usd(
-            self._config.prices[model], self._config.cache_multipliers(role_config.provider), usage
+            self._guard.price(model), self._config.cache_multipliers(role_config.provider), usage
         )
         month_spend: Decimal | None = None
         unsettled: UnsettledSpend | None = None
