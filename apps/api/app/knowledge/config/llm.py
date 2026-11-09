@@ -115,11 +115,56 @@ class ModelCapabilities(ConfigModel):
     means the model is never used with an explicit cache."""
 
 
+class PriceStep(ConfigModel):
+    """A list price that replaces the one before it from ``effective_from`` (NFR-CST-004)."""
+
+    effective_from: date
+    input_usd_per_mtok: Decimal = Field(gt=0)
+    output_usd_per_mtok: Decimal = Field(gt=0)
+
+
 class ModelPrice(ConfigModel):
-    """List price per million tokens, for spend per tenant and feature (NFR-CST-001)."""
+    """List price per million tokens, for spend per tenant and feature (NFR-CST-001).
+
+    ``input_usd_per_mtok``/``output_usd_per_mtok`` are the price in force until the first
+    ``schedule`` step (an introductory price, for example); each step then applies from its
+    ``effective_from`` date (NFR-CST-004). Use :meth:`on` for the price of a given call date.
+    """
 
     input_usd_per_mtok: Decimal = Field(gt=0)
     output_usd_per_mtok: Decimal = Field(gt=0)
+    schedule: tuple[PriceStep, ...] = ()
+    """Later prices, in ascending ``effective_from`` order."""
+    candidate: bool = False
+    """FR-KB-047: a model priced for cost estimates and the live evaluation only. No role or
+    fallback may select it (checked at load); selection needs the live gates (docs/06 §13.7)."""
+    verified: bool = True
+    """False while the price is read from a page other than the provider's own regional price
+    list (``source`` says where); estimates using it are labelled as such."""
+    source: str | None = Field(default=None, max_length=400)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> ModelPrice:
+        dates = [step.effective_from for step in self.schedule]
+        if dates != sorted(set(dates)):
+            raise ValueError("price schedule must be in strictly ascending effective_from order")
+        if not self.verified and not self.source:
+            raise ValueError("an unverified price needs a source")
+        return self
+
+    def on(self, day: date) -> ModelPrice:
+        """The flat price in force on ``day`` (the call date, UTC; NFR-CST-004)."""
+        current: ModelPrice | PriceStep = self
+        for step in self.schedule:
+            if step.effective_from <= day:
+                current = step
+        return ModelPrice(
+            input_usd_per_mtok=current.input_usd_per_mtok,
+            output_usd_per_mtok=current.output_usd_per_mtok,
+            candidate=self.candidate,
+            verified=self.verified,
+            source=self.source,
+        )
 
 
 class CachePriceMultipliers(ConfigModel):
@@ -127,6 +172,39 @@ class CachePriceMultipliers(ConfigModel):
 
     write: Decimal = Field(gt=0, le=10)
     read: Decimal = Field(gt=0, le=1)
+
+
+class AnswerRouting(ConfigModel):
+    """Light-model routing of single-tool questions (FR-KB-049, FR-KB-050; docs/06 §5).
+
+    OFF (``enabled: false``) until the live evaluation shows the light role passes every hard
+    gate on the routed questions (docs/06 §13.7). :func:`app.knowledge.routing.choose_answer_role`
+    is the decision; it routes a question only when exactly one tool's phrases match it, it is
+    short, has no earlier turns and is not in Telugu script, and otherwise keeps the answer role.
+    """
+
+    enabled: bool = False
+    light_role: Literal["router"] = "router"
+    """The role (``roles.router``: model, output cap, thinking) that answers a routed question."""
+    max_tool_rounds: int = Field(default=1, ge=1, le=3)
+    """Tool rounds a routed question may use (a single-tool question needs one)."""
+    max_question_chars: int = Field(default=160, ge=20, le=1000)
+    """Longer questions keep the answer role (they rarely need just one tool)."""
+    route_with_history: bool = False
+    """False: a question with earlier turns in its conversation keeps the answer role."""
+    single_tool_intents: dict[str, tuple[str, ...]] = Field(default_factory=dict)
+    """Tool name (``tools.yaml``) -> lower-case phrases that mark a question it alone answers."""
+
+    @model_validator(mode="after")
+    def _phrases(self) -> AnswerRouting:
+        for tool, phrases in self.single_tool_intents.items():
+            if not phrases or any(not p.strip() or p != p.casefold() for p in phrases):
+                raise ValueError(
+                    f"routing.single_tool_intents.{tool}: non-empty lower-case phrases"
+                )
+        if self.enabled and not self.single_tool_intents:
+            raise ValueError("routing.enabled needs at least one single_tool_intents entry")
+        return self
 
 
 class Limits(ConfigModel):
@@ -425,6 +503,8 @@ class LlmConfig(ConfigModel):
     streaming: Streaming = Field(default_factory=Streaming)
     conversation: Conversation = Field(default_factory=Conversation)
     query_log: QueryLog = Field(default_factory=QueryLog)
+    routing: AnswerRouting = Field(default_factory=AnswerRouting)
+    """FR-KB-049: light-model routing of single-tool questions (off by default)."""
 
     @model_validator(mode="before")
     @classmethod
@@ -472,6 +552,11 @@ class LlmConfig(ConfigModel):
     def _check_settings(self, where: str, config: RoleSettings) -> None:
         if config.model not in self.prices:
             raise ValueError(f"{where}: no price for model {config.model}")
+        if self.prices[config.model].candidate:
+            raise ValueError(
+                f"{where}: {config.model} is a candidate (priced for estimates only); selecting "
+                "it needs the live evaluation (docs/06 §13.7, FR-KB-047)"
+            )
         caps = self.capabilities.get(config.model)
         if caps is None:
             raise ValueError(f"{where}: no capabilities for model {config.model}")
@@ -499,6 +584,10 @@ class LlmConfig(ConfigModel):
             # A replayed tool-use turn carries no thinking blocks (domain.ModelTurn has none);
             # only a model whose tool calls carry a replayable signature may think here.
             raise ValueError("roles.answer: thinking must be disabled for the tool-use loop")
+
+    def price_on(self, model: str, day: date) -> ModelPrice:
+        """The list price of ``model`` in force on ``day`` (the call date; NFR-CST-004)."""
+        return self.prices[model].on(day)
 
     def cache_multipliers(self, provider: Provider) -> CachePriceMultipliers:
         """Cached-token price multipliers of a provider (metering, NFR-CST-001)."""

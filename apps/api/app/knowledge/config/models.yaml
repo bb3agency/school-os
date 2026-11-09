@@ -225,6 +225,41 @@ prices:
   claude-opus-5-5:
     input_usd_per_mtok: "4.00"
     output_usd_per_mtok: "20.00"
+  # Candidate answer models (FA-02; FR-KB-047, NFR-CST-004). candidate: true = priced for cost
+  # estimates (`make eval --price-date`, docs/06 §14.1) and the live evaluation ONLY: no role or
+  # fallback may select one (the loader refuses it); selection needs the live gates (docs/06
+  # §13.7, D2). Prices from Google's Gemini API pricing page (global), accessed 2026-11-09, plus
+  # 10 % for the regional endpoint as above; NOT checked on Google's Vertex AI price list, so
+  # verified: false. The flat price is the introductory price, in force until 2026-12-31; the
+  # schedule step is the price from 1 January 2027, which budgets and repricing must use.
+  gemini-3.6-flash:
+    candidate: true
+    verified: false
+    source: "Gemini API pricing (aistudio.google.com/docs/pricing), 2026-11-09: $0.75/$3.75 to 2026-12-31, then $1.50/$7.50; +10 % regional"
+    input_usd_per_mtok: "0.825"
+    output_usd_per_mtok: "4.125"
+    schedule:
+      - effective_from: 2027-01-01
+        input_usd_per_mtok: "1.65"
+        output_usd_per_mtok: "8.25"
+  gemini-3.8-flash:
+    candidate: true
+    verified: false
+    source: "Gemini API pricing (aistudio.google.com/docs/pricing), 2026-11-09: $0.75/$3.75 to 2026-12-31, then $1.50/$7.50; +10 % regional"
+    input_usd_per_mtok: "0.825"
+    output_usd_per_mtok: "4.125"
+    schedule:
+      - effective_from: 2027-01-01
+        input_usd_per_mtok: "1.65"
+        output_usd_per_mtok: "8.25"
+  # Light model for single-tool questions behind `routing` (FR-KB-049). asia-south1 serving was
+  # not confirmed when checked (global/us/eu only), which the live preflight must show first.
+  gemini-3.1-flash-lite:
+    candidate: true
+    verified: false
+    source: "Gemini API pricing (aistudio.google.com/docs/pricing), 2026-11-09: $0.25/$1.50; +10 % regional"
+    input_usd_per_mtok: "0.275"
+    output_usd_per_mtok: "1.65"
 
 # Anthropic prompt-cache writes and reads, as multiples of the model's input price (5-minute entries).
 cache_price_multipliers:
@@ -308,6 +343,25 @@ citations:
     from them, write the number of each passage that states it in square brackets, like [3] or
     [2][5]. Use only numbers of passages you were given in this conversation. Never add a marker to
     a sentence the passage does not support, and never write passage numbers anywhere else.
+
+# Light-model routing of single-tool questions (FR-KB-049, FR-KB-050; docs/06 §5, FA-02). OFF:
+# turn it on only after the live evaluation shows the `router` role passes every hard gate on the
+# routed questions (docs/06 §13.7) and the owner accepts "simple questions answered by a fast
+# model". app/knowledge/routing.py decides: a question goes to `light_role` only when exactly one
+# tool's phrases match it, it is at most max_question_chars long, it has no earlier turns (unless
+# route_with_history) and it has no Telugu script; anything else keeps the answer role. Not wired
+# into the ask path yet: wiring lands with the live run that justifies switching it on.
+routing:
+  enabled: false
+  light_role: router
+  max_tool_rounds: 1
+  max_question_chars: 160
+  route_with_history: false
+  single_tool_intents:
+    count_students: ["how many students", "number of students", "student count", "how many boys",
+      "how many girls", "class strength", "strength of class"]
+    list_due_tasks: ["what's due", "what is due", "due this week", "due today", "due tomorrow",
+      "pending tasks", "deadlines this week"]
 
 limits:
   max_tool_rounds: 3                  # ADR-0008, §5 step 3
