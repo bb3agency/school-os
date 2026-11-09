@@ -2769,6 +2769,15 @@ def record_statuses(session: Session, student_ids: Collection[uuid.UUID]) -> dic
 LIVE_STATUSES: tuple[str, ...] = repo.LIVE_STATUSES
 
 
+def active_students_added_since(
+    session: Session, since: dt.datetime
+) -> dict[uuid.UUID, dt.datetime]:
+    """Active students whose record was added on or after ``since`` (id -> when), for the
+    privacy notice given at admission (FC-03, FR-DPDP-058). System read of ids and timestamps
+    only: the caller shows names through :func:`summaries` (the reader's scope)."""
+    return repo.active_added_since(session, since)
+
+
 def guardian_phone_index(
     session: Session, guardian_id: uuid.UUID, *, key_version: int | None = None
 ) -> GuardianPhoneIndex | None:

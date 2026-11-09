@@ -1,0 +1,56 @@
+# DPDP readiness checklist and the privacy notice sent on WhatsApp (FC-03, FP-13;
+# FR-DPDP-053..FR-DPDP-066). Versioned configuration read by app/privacy/readiness_config.py.
+#
+# Not legal advice (owner decision D30): the checklist shows what the school has recorded in
+# SchoolOS against docs/08 §12 and §16.3; it does not say the school complies with the law.
+version: 1
+
+# Checklist items in display order. "kind" says where the answer comes from:
+#   setting   the school's settings (privacy contact)
+#   notices   the notice records (parents and staff, current template version)
+#   mark      a date (and optional evidence document) the school records on the checklist page
+#   requests  the request register (at least one request closed end to end)
+#   consents  optional-purpose consent forms (not applicable without an active purpose)
+items:
+  - key: privacy_contact
+    kind: setting
+    source: docs/08 §16.3 (privacy contact set before May 2027)
+  - key: notices
+    kind: notices
+    source: docs/08 §12 (school notice issued before first real data), §16.3
+  - key: dpa_signed
+    kind: mark
+    source: docs/08 §12 (DPA signed before first real data)
+  - key: dpia_done
+    kind: mark
+    source: docs/08 §12 (DPIA done before first real data), docs/legal/dpia-template.md
+  - key: test_request
+    kind: requests
+    source: docs/08 §16.3 (one test request run end to end)
+  - key: breach_contact
+    kind: mark
+    source: docs/08 §16 (breach handling; who to call, phone tree)
+  - key: retention_reviewed
+    kind: mark
+    source: docs/08 §12 (annual policy review); reviewed within the current academic year
+  - key: consent_forms
+    kind: consents
+    source: docs/08 §16 (consents for optional purposes, ADR-0049)
+
+# Students listed without a notice record at most (the rest are counted only).
+admission_list_limit: 200
+
+# The M4 parent notice made from the parents' privacy notice (FP-13). Plain text only: the
+# parent notice refuses phone numbers, e-mail addresses and Aadhaar-like numbers, so the contact
+# is named, not dialled. Placeholders: {school_name}, {privacy_contact_name}, {template_version}.
+# Title at most 120 characters and body at most 1500 after filling (the M4 limits).
+whatsapp_notice:
+  title_en: "Privacy notice from {school_name}"
+  body_en: >-
+    {school_name} has issued its privacy notice for parents (version {template_version}).
+    It explains what information the school keeps about your child and your family, why the
+    school keeps it, who it is shared with and for how long it is kept.
+    You can ask the school for a copy of your child's information, ask for a correction or
+    deletion, withdraw a consent you gave, or make a complaint.
+    A printed copy of the full notice is available at the school office.
+    For questions, contact {privacy_contact_name} at the school office.

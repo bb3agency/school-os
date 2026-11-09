@@ -28,6 +28,10 @@ Relationship = Literal["self", "father", "mother", "guardian", "nominee", "other
 Verification = Literal["in_person_document", "guardian_phone_on_record", "staff_sign_in"]
 Audience = Literal["parents", "staff"]
 NoticeChannel = Literal["paper", "school_whatsapp_group", "sos_notice", "email", "other"]
+# FP-13: ``sos_whatsapp`` is recorded only by "Send this privacy notice on WhatsApp".
+NoticeChannelOut = Literal[
+    "paper", "school_whatsapp_group", "sos_notice", "email", "other", "sos_whatsapp"
+]
 NoticeLanguage = Literal["en", "te"]
 LinkKind = Literal["change_request"]
 ErasureOutcomeCode = Literal[
@@ -101,8 +105,15 @@ class PrivacyNoticeOut(_Out):
     audience: Audience
     language: NoticeLanguage
     issued_on: dt.date
-    channel: NoticeChannel
+    channel: NoticeChannelOut
     document_id: uuid.UUID | None
+    parent_notice_id: uuid.UUID | None = Field(
+        default=None, description="FP-13: the parent notice sent on WhatsApp (sos_whatsapp)."
+    )
+    broadcast_id: uuid.UUID | None = Field(
+        default=None,
+        description="FP-13: the WhatsApp broadcast; see /privacy/notices/{id}/delivery.",
+    )
     recorded_by_name: str | None
     recorded_at: dt.datetime
 

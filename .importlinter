@@ -261,6 +261,12 @@ source_modules =
     app.privacy.breach_models
     app.privacy.breach_schemas
     app.privacy.breach_config
+    app.privacy.readiness_api
+    app.privacy.readiness_config
+    app.privacy.readiness_models
+    app.privacy.readiness_repository
+    app.privacy.readiness_schemas
+    app.privacy.readiness_service
 forbidden_modules =
     app.platform
 
@@ -1755,6 +1761,9 @@ forbidden_modules =
     app.privacy.consents_models
     app.privacy.breach_repository
     app.privacy.breach_models
+    # FC-03 / FP-13 DPDP readiness (0083_dpdp_readiness)
+    app.privacy.readiness_repository
+    app.privacy.readiness_models
 allow_indirect_imports = True
 
 # R3-1B: consent and breach configuration and print templates stay pure (no database or web).
@@ -1765,6 +1774,7 @@ source_modules =
     app.privacy.consents_config
     app.privacy.consents_templates
     app.privacy.breach_config
+    app.privacy.readiness_config
 forbidden_modules =
     sqlalchemy
     fastapi

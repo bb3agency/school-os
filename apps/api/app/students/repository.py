@@ -201,6 +201,16 @@ def all_student_ids(session: Session) -> list[uuid.UUID]:
     return list(session.scalars(select(Student.id).order_by(Student.id)))
 
 
+def active_added_since(session: Session, since: dt.datetime) -> dict[uuid.UUID, dt.datetime]:
+    """Active students whose record was created at or after ``since`` (id -> created_at)."""
+    stmt = (
+        select(Student.id, Student.created_at)
+        .where(Student.status == "active", Student.created_at >= since)
+        .order_by(Student.created_at, Student.id)
+    )
+    return {row[0]: row[1] for row in session.execute(stmt)}
+
+
 def admission_numbers(session: Session) -> dict[uuid.UUID, str]:
     """Student id -> admission number (unique per school ignoring case, ``students_adm_no_ci``)."""
     stmt = select(Student.id, Student.admission_no).where(Student.admission_no.is_not(None))

@@ -2846,6 +2846,9 @@ def test_SEC_003_role_route_matrix(
     )
     if needs_create:
         expected = 403
+    whatsapp = _privacy().WHATSAPP_ALSO_NEEDS.get(key)
+    if whatsapp is not None and granted and not all(p in held for p in whatsapp):
+        expected = 403  # FP-13: the service also needs notice.draft/approve and message.send
     also = _consents().ALSO_NEEDS.get(key)
     if also is not None and granted and also not in held:
         expected = 403  # R3-1B: recording a withdrawal also needs consent.record (FR-DPDP-026)

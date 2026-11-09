@@ -1448,15 +1448,40 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
         )
         # --- R3-1A privacy requests (0066_privacy_requests; ADR-0048) -------------------------
         pr = uuid.uuid4()
+        notice_id = uuid.uuid4()
         _run(
             c,
             "INSERT INTO ops.privacy_notices (id, tenant_id, template_key, template_version, "
             "audience, issued_on, channel, document_id, recorded_by, recorded_by_membership) "
             "VALUES (:i, :t, 'notice_parents', '0.1', 'parents', '2026-09-01', 'paper', "
             ":d, :u, :m)",
+            i=notice_id,
+            t=t,
+            d=ids["doc"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        # FC-03 (0086_dpdp_readiness): readiness marks and the notice given at admission.
+        _run(
+            c,
+            "INSERT INTO ops.privacy_readiness_marks (id, tenant_id, item, done_on, document_id, "
+            "recorded_by, recorded_by_membership) VALUES (:i, :t, 'dpa_signed', '2026-09-01', "
+            ":d, :u, :m)",
             i=uuid.uuid4(),
             t=t,
             d=ids["doc"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.privacy_admission_notices (id, tenant_id, student_id, given_on, "
+            "channel, notice_id, recorded_by, recorded_by_membership) VALUES (:i, :t, :s, "
+            "'2026-09-02', 'paper', :n, :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            s=ids["student"],
+            n=notice_id,
             u=u["user"],
             m=ids["m1"],
         )

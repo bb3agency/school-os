@@ -7,7 +7,7 @@ import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
-import { Button, buttonClasses } from "@/components/ui/Button";
+import { Button, ButtonLink, buttonClasses } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -20,7 +20,9 @@ import { useStaffCan, useStaffMeQuery } from "@/lib/bff/staff-me";
 import { typedDateToIso, useDateInput } from "@/lib/date-format";
 import { formatDate, formatDateTime } from "@/lib/format";
 import * as z from "@/lib/zod";
+import { Link } from "@/i18n/navigation";
 import { NoticePdfButton } from "./parts";
+import { WHATSAPP_PERMS } from "./WhatsAppNoticeScreens";
 import {
   NOTICE_CHANNELS,
   PRIVACY_KEYS,
@@ -34,6 +36,15 @@ import {
 } from "./types";
 
 const TEMPLATE_KEYS: readonly TemplateKey[] = ["notice_parents", "notice_staff"];
+
+/**
+ * FP-13: a notice record sent on WhatsApp carries its broadcast. LEAD: after `make openapi`
+ * `PrivacyNoticeOut` has `broadcast_id`; read it directly then.
+ */
+function hasBroadcast(row: PrivacyNotice): boolean {
+  const value = (row as { broadcast_id?: unknown }).broadcast_id;
+  return typeof value === "string" && value.length > 0;
+}
 
 /** The "Record that we issued it" form; the API checks the audience and version again. */
 export function buildNoticeSchema(today = todayInIndia()) {
@@ -74,6 +85,7 @@ export function NoticesScreen() {
   const tch = useTranslations("privacy.channels");
   const tl = useTranslations("language");
   const tn = useTranslations("school.nav");
+  const tw = useTranslations("privacy.whatsapp");
   const api = useBffClient("staff");
   const can = useStaffCan();
   const mePending = useStaffMeQuery().isPending;
@@ -94,6 +106,8 @@ export function NoticesScreen() {
   });
 
   const manage = can(PRIVACY_MANAGE);
+  // FP-13: "Send on WhatsApp" also needs parent notice approval and message sending.
+  const canWhatsApp = WHATSAPP_PERMS.every((permission) => can(permission));
   const header = (
     <PageHeader
       title={t("title")}
@@ -101,10 +115,17 @@ export function NoticesScreen() {
       breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
       actions={
         manage && templates.data ? (
-          <Button onClick={() => setRecording(true)}>
-            <Icon name="plus" className="size-4" />
-            {t("record")}
-          </Button>
+          <span className="flex flex-wrap gap-2">
+            {canWhatsApp ? (
+              <ButtonLink href="/privacy/notices/whatsapp" variant="secondary">
+                {tw("open")}
+              </ButtonLink>
+            ) : null}
+            <Button onClick={() => setRecording(true)}>
+              <Icon name="plus" className="size-4" />
+              {t("record")}
+            </Button>
+          </span>
         ) : null
       }
     />
@@ -178,7 +199,23 @@ export function NoticesScreen() {
       cell: (row) => <span className="num">{row.template_version}</span>,
     },
     { key: "language", header: t("colLanguage"), cell: (row) => tl(row.language) },
-    { key: "channel", header: t("colChannel"), cell: (row) => tch(row.channel) },
+    {
+      key: "channel",
+      header: t("colChannel"),
+      cell: (row) =>
+        // FP-13: a notice sent on WhatsApp from SchoolOS links to who it reached.
+        hasBroadcast(row) ? (
+          <Link
+            href={`/privacy/notices/${row.id}/delivery`}
+            className="font-semibold text-primary underline"
+          >
+            {tw("channel")}
+            <span className="sr-only">: {tw("delivery.title")}</span>
+          </Link>
+        ) : (
+          tch(row.channel)
+        ),
+    },
     {
       key: "by",
       header: t("colRecordedBy"),

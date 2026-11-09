@@ -100,7 +100,7 @@ contributors:
     eraser: false
   privacy:
     subjects: [student, guardian, member]
-    classes: [privacy_requests]
+    classes: [privacy_requests, privacy_admission_notices]
     eraser: false
   # R3-1B (ADR-0049): a student's decisions on the school's optional purposes.
   privacy_consents:

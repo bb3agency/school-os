@@ -286,7 +286,10 @@
         "feeApprovals": "మీ కోసం ఫీజు అభ్యర్థనలు",
         "feeApprovalsNote": "మీరు నిర్ణయించగల రాయితీలు, రద్దులు మరియు వాపసులు",
         "readiness": "పోర్టల్ సంసిద్ధత",
-        "readinessNote": "{profile}: {students} మంది విద్యార్థులలో {ready} మంది సిద్ధం"
+        "readinessNote": "{profile}: {students} మంది విద్యార్థులలో {ready} మంది సిద్ధం",
+        "dpdp": "DPDP readiness",
+        "dpdpValue": "{done} of {applicable}",
+        "dpdpNote": "Recorded in SchoolOS. Not legal advice."
       },
       "work": {
         "title": "వేచి ఉన్న పనులు",
@@ -11207,7 +11210,8 @@
     "nav": {
       "requests": "అభ్యర్థనలు మరియు ఫిర్యాదులు",
       "notices": "నోటీసులు",
-      "settings": "గోప్యత సంప్రదింపు"
+      "settings": "గోప్యత సంప్రదింపు",
+      "readiness": "DPDP readiness"
     },
     "status": {
       "received": "అందింది",
@@ -11564,7 +11568,8 @@
       "school_whatsapp_group": "పాఠశాల WhatsApp గ్రూప్",
       "sos_notice": "SchoolOS నోటీసు",
       "email": "ఇ-మెయిల్",
-      "other": "మరో విధంగా"
+      "other": "మరో విధంగా",
+      "sos_whatsapp": "WhatsApp from SchoolOS"
     },
     "settings": {
       "title": "గోప్యత సంప్రదింపు",
@@ -11662,7 +11667,9 @@
       "not_a_consent_withdrawal": {
         "title": "సమ్మతి ఉపసంహరణ కాదు",
         "body": "విద్యార్థి గురించిన సమ్మతి ఉపసంహరణ అభ్యర్థన మాత్రమే ఉపసంహరణను నమోదు చేస్తుంది."
-      }
+      },
+      "notice_not_current": "The privacy notice changed. Prepare the message again.",
+      "no_parents_notice": "Record the parents' notice first."
     },
     "withdraw": {
       "action": "Mark as withdrawn",
@@ -11676,6 +11683,143 @@
       "hint": "Who asked to stop, when, and how you confirmed it was them. Never write an Aadhaar number.",
       "body": "For an access, erasure or complaint request, write down how the person withdrew it. It is kept as the answer on the request.",
       "someoneElse": "Someone other than the person who logged this complaint must mark it as withdrawn."
+    },
+    "readiness": {
+      "title": "DPDP readiness",
+      "description": "What the school has recorded in SchoolOS for its data protection duties.",
+      "noPermissionTitle": "You cannot see the DPDP checklist",
+      "noPermissionBody": "Ask the principal or the school owner if you need it.",
+      "notLegalAdviceTitle": "Not legal advice",
+      "notLegalAdvice": "This checklist shows what the school has recorded in SchoolOS. It does not say the school meets the law. Take advice if you are unsure.",
+      "progress": "{done} of {applicable} done",
+      "checklistTitle": "Checklist",
+      "loading": "Loading the checklist",
+      "loadErrorTitle": "The checklist could not be loaded",
+      "retry": "Try again",
+      "recordedOn": "Recorded for {date}",
+      "closedRequests": "{count, plural, =0 {No request closed yet} one {# request closed} other {# requests closed}}",
+      "record": "Record",
+      "status": {
+        "done": "Done",
+        "todo": "To do",
+        "not_applicable": "Does not apply"
+      },
+      "items": {
+        "privacy_contact": {
+          "title": "Privacy contact set",
+          "help": "Name the person parents and staff contact about their data, with a phone or e-mail.",
+          "link": "Set the privacy contact"
+        },
+        "notices": {
+          "title": "Notices given with the current version",
+          "help": "Record that the school gave the current parents' and staff notices.",
+          "link": "Open the notices"
+        },
+        "dpa_signed": {
+          "title": "Data processing agreement signed",
+          "help": "The school signed the agreement that says SchoolOS processes data only on its instructions.",
+          "link": "Record the date"
+        },
+        "dpia_done": {
+          "title": "Data protection impact assessment done",
+          "help": "The school went through the impact assessment template and kept its answers.",
+          "link": "Record the date"
+        },
+        "test_request": {
+          "title": "One request handled end to end",
+          "help": "Log a practice request, answer it and close it, so the office knows the steps.",
+          "link": "Open requests"
+        },
+        "breach_contact": {
+          "title": "Breach contact and phone tree recorded",
+          "help": "Who to call first if data is lost or leaked, and who calls whom.",
+          "link": "Record the date"
+        },
+        "retention_reviewed": {
+          "title": "Retention settings reviewed this year",
+          "help": "Check how long each kind of record is kept, once every academic year.",
+          "link": "Record the date"
+        },
+        "consent_forms": {
+          "title": "Consent forms in use",
+          "help": "Needed only if the school asks for consent for optional purposes such as photos.",
+          "link": "Open consents"
+        }
+      },
+      "markTitle": "Record: {item}",
+      "markBody": "Write down the date the school did this. Keep the paper or file in the office.",
+      "markConfirm": "Record it",
+      "fieldDoneOn": "Date done",
+      "admission": {
+        "title": "Notice given at admission",
+        "summary": "{count, plural, =0 {Every family admitted after {since} has a notice record.} one {# student admitted after {since} has no notice record.} other {# students admitted after {since} have no notice record.}}",
+        "noNotice": "Record the parents' notice first. Families admitted after it are listed here.",
+        "hidden": "{count} more are outside the classes you can see.",
+        "recordAll": "Record for all {count} listed",
+        "recordOne": "Record",
+        "colStudent": "Student",
+        "colClass": "Class",
+        "colAdded": "Added on",
+        "colActions": "Notice",
+        "emptyTitle": "Nobody waiting",
+        "emptyBody": "Every family admitted after the notice has a record.",
+        "dialogTitle": "{count, plural, one {Record the notice for # student} other {Record the notice for # students}}",
+        "dialogBody": "Write down when and how the family got the parents' privacy notice.",
+        "dialogConfirm": "Record it",
+        "fieldGivenOn": "Given on",
+        "fieldChannel": "How"
+      },
+      "channels": {
+        "paper": "On paper",
+        "in_person": "In person at admission",
+        "school_whatsapp_group": "School WhatsApp group",
+        "sos_whatsapp": "WhatsApp from SchoolOS",
+        "email": "E-mail",
+        "other": "Some other way"
+      }
+    },
+    "whatsapp": {
+      "open": "Send on WhatsApp",
+      "title": "Send the privacy notice on WhatsApp",
+      "description": "Send the parents' privacy notice to every family who agreed to get school notices.",
+      "notices": "Notices",
+      "noPermissionTitle": "You cannot send this notice",
+      "noPermissionBody": "Sending needs the right to approve parent notices and send WhatsApp messages. Ask the principal.",
+      "notLegalAdvice": "The notice text is a template, not legal advice. The school decides what it sends.",
+      "intro": "SchoolOS makes a short parent notice from the parents' privacy notice and shows who would get it and what Meta charges before anything is sent.",
+      "prepare": "Prepare the message",
+      "preparing": "Preparing",
+      "recipients": "Messages to send",
+      "leftOut": "Families left out",
+      "cost": "Estimated Meta cost incl. GST",
+      "leftOutHint": "Families left out (no WhatsApp agreement or no mobile number) need a paper copy. They are listed after sending.",
+      "blockedTitle": "WhatsApp messages cannot be sent now",
+      "blockedBody": "Check the WhatsApp settings first, then prepare the message again.",
+      "send": "{count, plural, one {Send # message} other {Send # messages}}",
+      "sending": "Sending",
+      "refresh": "Check again",
+      "channel": "WhatsApp from SchoolOS",
+      "backToNotices": "Back to notices",
+      "delivery": {
+        "title": "Who got the privacy notice",
+        "description": "Sent on {date}. Give a paper copy to the families it did not reach.",
+        "print": "Print",
+        "loading": "Loading delivery",
+        "counts": {
+          "read": "Read",
+          "delivered": "Delivered",
+          "waiting": "Still sending",
+          "notReached": "Students not reached"
+        },
+        "guardiansNote": "Counts are per parent. Failed: {failed}. Left out before sending: {leftOut}.",
+        "notReachedTitle": "Give a paper copy",
+        "hidden": "{count, plural, one {# more student is outside the classes you can see.} other {# more students are outside the classes you can see.}}",
+        "emptyTitle": "Every family got it",
+        "emptyBody": "No paper copies are needed for the classes you can see.",
+        "colStudent": "Student",
+        "colAdmission": "Admission no.",
+        "colClass": "Class"
+      }
     }
   }
 }

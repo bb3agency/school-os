@@ -14,6 +14,7 @@ import { KpiCard } from "@/components/ui/StatCard";
 import { Timeline, type TimelineItem } from "@/components/ui/Timeline";
 import { KEYS as FEE_KEYS, isFeesOff } from "@/features/fees/data";
 import { ImportStatusBadge, SourceName } from "@/features/imports/ImportsScreen";
+import { readinessApi } from "@/features/privacy/readiness-api";
 import { READINESS_KEYS } from "@/features/readiness/data";
 import { DQ_KEYS } from "@/features/findings/data";
 import { Link } from "@/i18n/navigation";
@@ -108,6 +109,14 @@ export interface HomeData {
   feeApprovals?: Loadable<number> | null;
   /** Readiness for the first portal profile, only for principals with dq.findings.read. */
   readiness?: Loadable<ReadinessToday | null> | null;
+  /** FC-03: DPDP readiness items done (GET /privacy/readiness), principals with privacy.read. */
+  dpdp?: Loadable<DpdpToday> | null;
+}
+
+/** FC-03: DPDP readiness checklist items done of those that apply (not legal advice). */
+export interface DpdpToday {
+  done: number;
+  applicable: number;
 }
 
 /** A number the API returned, or null ("—") while loading or when it failed. */
@@ -343,9 +352,22 @@ export function HomeView({ data }: { data: HomeData }) {
       />
     );
   }
+  if (data.dpdp) {
+    const dpdp = data.dpdp.status === "ready" ? data.dpdp.data : null;
+    kpi.dpdp = (
+      <KpiCard
+        key="dpdp"
+        href="/privacy/readiness"
+        label={t("kpi.dpdp")}
+        value={dpdp ? t("kpi.dpdpValue", { done: dpdp.done, applicable: dpdp.applicable }) : null}
+        unavailableLabel={tc("notAvailable")}
+        comparison={t("kpi.dpdpNote")}
+      />
+    );
+  }
   const KPI_ORDER: Record<HomeRole, readonly string[]> = {
     office: ["blockers", "warnings", "affected", "pending"],
-    principal: ["readiness", "blockers", "pending", "feesNet", "feeApprovals", "warnings"],
+    principal: ["readiness", "dpdp", "blockers", "pending", "feesNet", "feeApprovals", "warnings"],
     accountant: ["feesNet", "feesCash", "feeApprovals", "pending", "blockers"],
     teacher: ["blockers", "pending"],
   };
@@ -711,6 +733,8 @@ export function HomeScreen() {
   const canFeeApprovals =
     has(HOME_PERM.feeApprove) && (role === "accountant" || role === "principal");
   const canReadiness = canChecks && role === "principal";
+  // FC-03: the DPDP readiness tile is the principal's and owner's (privacy.read).
+  const canDpdp = has("privacy.read") && role === "principal";
 
   const checks = useApiQuery(
     ["staff", "home", "dq-summary"],
@@ -771,6 +795,15 @@ export function HomeScreen() {
     { enabled: canReadiness && firstProfile !== null },
   );
 
+  const dpdpQuery = useApiQuery(
+    ["staff", "home", "dpdp"],
+    async (): Promise<DpdpToday> => {
+      const out = await readinessApi.readiness(api);
+      return { done: out.done, applicable: out.applicable };
+    },
+    { enabled: canDpdp },
+  );
+
   // Fees switched off for the school (404 module_hidden) hide the fee sections entirely.
   const feesHidden = isFeesOff(feeStatus) || (feeStatus.status === "ready" && !feesOn);
   const fees: Loadable<FeesToday> | null =
@@ -829,6 +862,7 @@ export function HomeScreen() {
         fees,
         feeApprovals,
         readiness,
+        dpdp: canDpdp ? dpdpQuery : null,
       }}
     />
   );

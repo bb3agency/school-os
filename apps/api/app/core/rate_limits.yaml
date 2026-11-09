@@ -213,6 +213,8 @@ routes:
   POST /api/v1/academic-years/{year_id}/promotions:preview: [heavy_jobs]
   # R2-3G: a broadcast preview reads every guardian of the chosen sections
   POST /api/v1/notices/{notice_id}/broadcasts/preview: [search]
+  # FP-13: the privacy notice preview makes a parent notice and the same broadcast preview
+  POST /api/v1/privacy/notices/whatsapp/preview: [search]
   # R2-3J: a fee reminder preview reads the dues and guardians of every chosen account
   POST /api/v1/fees/reminders/preview: [search]
   POST /api/v1/platform/invoice-runs: [platform_emergency]

@@ -36,6 +36,10 @@ class PrivacyNotice(Base):
     issued_on: Mapped[dt.date] = mapped_column(Date)
     channel: Mapped[str] = mapped_column(Text)
     document_id: Mapped[uuid.UUID | None]
+    # FP-13 (0086_dpdp_readiness): the M4 parent notice and the broadcast that sent it on
+    # WhatsApp (channel ``sos_whatsapp`` only; set once at insert).
+    parent_notice_id: Mapped[uuid.UUID | None]
+    broadcast_id: Mapped[uuid.UUID | None]
     recorded_by: Mapped[uuid.UUID]
     recorded_by_membership: Mapped[uuid.UUID]
     recorded_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())

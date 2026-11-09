@@ -496,10 +496,23 @@ classes:
   privacy_notices:
     label: Privacy notices issued
     owner: privacy
-    tables: [ops.privacy_notices]
+    tables: [ops.privacy_notices, ops.privacy_readiness_marks]
     classification: C1
     docs_row: Notice records (
     retention: Life of the school
     basis: Which notice version the school issued, when and how.
     erasure: no_personal_data
     source: Recorded by the school
+
+  # FC-03 (0086_dpdp_readiness): one date and channel per student admitted after the
+  # school-wide notice; evidence that the family got the notice (DPDP Rule 3).
+  privacy_admission_notices:
+    label: Privacy notice given at admission
+    owner: privacy
+    tables: [ops.privacy_admission_notices]
+    classification: C1
+    docs_row: Notice given at admission
+    retention: Kept with the student's record
+    basis: Evidence that the family got the privacy notice when the student was admitted.
+    erasure: refused_legal_obligation
+    source: Recorded by the school office
