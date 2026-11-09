@@ -78,6 +78,7 @@ DATASET_FILES: Final = (
     "fees.jsonl",
     "contextual.jsonl",
     "conversations.jsonl",
+    "judge_calibration.jsonl",  # FA-07: the live judge is calibrated before it scores
 )
 # Hard gates that must exist before a role may go live (docs/06 s13.7) and the English-first
 # gates (s13.8, ADR-0036).
@@ -92,6 +93,7 @@ REQUIRED_HARD_GATES: Final = (
     "fee_leakage_count",
     "english_first_telugu_outputs",
     "english_first_english_answer_rate",
+    "extraction_unmasked_aadhaar_count",  # FA-07, invariant 4
 )
 REQUIRED_SOFT_GATES: Final = (
     "recall_at_10",
@@ -99,6 +101,9 @@ REQUIRED_SOFT_GATES: Final = (
     "citation_coverage",
     "language_match",
     "cost_per_answer_usd",  # FA-02, NFR-CST-003: eval-live fails on soft gates
+    "judge_agreement",  # FA-07: the live judge's calibration, then faithfulness and correctness
+    "faithfulness",
+    "answer_correctness",
 )
 
 Status = Literal["ok", "missing", "info"]

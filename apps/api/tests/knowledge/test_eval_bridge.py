@@ -455,3 +455,99 @@ def test_ADR_0033_the_live_run_uses_the_live_provider_of_every_role(
     gateway = B.live_gateway(load_llm_config())
     assert isinstance(gateway._routes["gemini"].transport, GeminiTransport)
     assert set(gateway._routes) == {"gemini"}
+
+
+# --- FA-07: register-photo extraction and the live judge (docs/06 §13.11, §13.12) ---------------
+
+
+def test_FR_KB_061_kept_fields_of_the_harness_are_the_extraction_config() -> None:
+    from app.extraction.settings import extraction_config
+    from sos_evals.extraction import KEPT_FIELDS
+
+    assert tuple(extraction_config().fields) == KEPT_FIELDS
+
+
+def test_FR_KB_060_FR_KB_061_every_register_page_through_the_real_pipeline() -> None:
+    """Each synthetic page through extraction.service.read_page (fake OCR that reads the
+    redacted copy back from its pixels): no unmasked number in anything kept, every planted
+    number masked or blacked out, the image discarded only when a number cannot be placed."""
+    from sos_evals import extraction
+
+    found, outcomes = extraction.run(DATA.extraction, B)
+    assert found.extraction_unmasked_aadhaar_count == 0
+    assert found.extraction_aadhaar_redaction_recall == 1.0
+    assert found.extraction_row_recall == 1.0
+    assert found.extraction_field_accuracy is not None
+    assert found.extraction_field_accuracy >= 0.95
+    images = {o.id: o.image for o in outcomes}
+    for case in DATA.extraction:
+        if not case.planted:
+            expected = "original"
+        elif case.note == "unplaced":
+            expected = "withheld"
+        else:
+            expected = "redacted"
+        assert images[case.id] == expected, case.id
+
+
+def test_FR_KB_060_a_pipeline_that_keeps_the_original_image_fails_the_hard_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Not vacuous: when the pipeline keeps the unredacted original, the gate sees the number."""
+    from app.extraction import service as extraction_service
+    from sos_evals import extraction
+
+    real = extraction_service.read_page
+
+    def no_redaction(image: bytes, provider: Any, *, settings: Any = None) -> Any:
+        clean = real(image, provider, settings=settings).clean
+        return extraction_service.PageReading(
+            type(clean)(clean.rows, False, clean.dropped_fields), None
+        )
+
+    monkeypatch.setattr(extraction_service, "read_page", no_redaction)
+    case = next(c for c in DATA.extraction if c.note == "margin_split")
+    found, outcomes = extraction.run([case], B)
+    assert found.extraction_unmasked_aadhaar_count == 1
+    assert outcomes[0].leak_places == ("image",)
+
+
+class _JudgeGateway:
+    def __init__(self, verdict: bool) -> None:
+        self.verdict = verdict
+        self.sent: list[tuple[Any, str, str, str]] = []
+
+    def generate_json(
+        self, metering: Any, role: str, system: str, text_: str, schema: Any
+    ) -> dict[str, Any]:
+        self.sent.append((metering, role, system, text_))
+        assert schema == B.JUDGE_SCHEMA
+        return {"verdict": self.verdict}
+
+
+def test_FR_KB_055_live_judge_calls_the_eval_judge_role_with_the_versioned_prompts() -> None:
+    from app.knowledge.gateway.metering import RecordingSink
+    from sos_evals.judge import load_config
+
+    prompts = load_config().live
+    tenant = uuid.uuid4()
+    gateway = _JudgeGateway(verdict=True)
+    judge = B.GatewayJudge(gateway, tenant, RecordingSink())
+    assert judge.supported("Exams start at 09:30.", ["Circular: exams start at 09:30."])
+    gateway.verdict = False
+    assert not judge.correct("When?", "At 10:00.", "09:30")
+    (m1, role1, system1, text1), (m2, role2, system2, text2) = gateway.sent
+    assert (m1.tenant_id, m1.feature, role1) == (tenant, "eval", "eval_judge")
+    assert (m2.feature, role2) == ("eval", "eval_judge")
+    assert system1 == prompts.faithfulness_system.strip()
+    assert system2 == prompts.correctness_system.strip()
+    assert "Passage 1:" in text1
+    assert "Reference answer:" in text2
+    assert judge.calls == []
+
+
+def test_FR_KB_055_the_offline_bridge_has_no_judge_of_its_own() -> None:
+    """Offline the harness uses its stub judge; only make eval-live brings the eval_judge."""
+    offline = object.__new__(B.AppFakeAdapter)
+    offline._live = False
+    assert offline.judge is None
