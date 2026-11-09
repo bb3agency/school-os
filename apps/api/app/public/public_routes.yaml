@@ -62,3 +62,8 @@ routes:
     guard: public_handle
     kinds: [school_disclosure]
   # --- end R3-1C ------------------------------------------------------------------------------
+  # --- FM-06 tuition fee certificate: the parent receipt and dues pages' button (D84) --------
+  GET /api/v1/public/links/current/tax-certificate:
+    guard: public_handle
+    kinds: [parent_receipt, parent_dues]
+  # --- end FM-06 ------------------------------------------------------------------------------

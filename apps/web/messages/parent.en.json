@@ -107,5 +107,10 @@
     "save": "Save my choice",
     "saved": "Saved. Messages and pages from the school will be in your choice.",
     "saveFailed": "Your choice was not saved. Try again in a few minutes."
+  },
+  "tax": {
+    "button": "Tax certificate FY {year}",
+    "notIssued": "The tuition fee certificate for FY {year} is not ready yet. Ask the school office for it.",
+    "note": "For income tax: it shows the tuition fees paid in the financial year (April to March)."
   }
 }

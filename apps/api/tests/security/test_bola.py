@@ -834,6 +834,20 @@ def _b_upi(w: Any, key: str) -> uuid.UUID:
     return value
 
 
+def _tax() -> ModuleType:
+    """tests/fees/tax_security_support.py (FM-06: a tuition fee certificate of school B)."""
+    name = "sos_test_fees_tax_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "tax_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
 def _disclosure() -> ModuleType:
     """tests/disclosure/security_support.py (R3-1C: CBSE on per call, snapshots of a school)."""
     name = "sos_test_disclosure_security_support"
@@ -943,6 +957,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     # R2-2E UPI (ADR-0042 decision 9): school B's bank statement and its credit line.
     "statement_id": lambda w: _b_upi(w, "statement_id"),
     "line_id": lambda w: _b_upi(w, "line_id"),
+    # FM-06: a tuition fee certificate of school B.
+    "tax_certificate_id": lambda w: _tax().b_certificate(_ADMIN[0], w),
     # R2-2D online payments: a payment link and a reconciliation item of school B.
     "intent_id": lambda w: _b_fee(w, "intent_id"),
     "recon_item_id": lambda w: _b_fee(w, "recon_item_id"),
@@ -982,6 +998,7 @@ ID_ROUTES = _id_routes()
 
 BODIES.update(_fees().BOLA_BODIES)
 BODIES.update(_upi().BOLA_BODIES)
+BODIES.update(_tax().BOLA_BODIES)
 BODIES.update(_disclosure().BOLA_BODIES)
 
 

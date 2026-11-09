@@ -152,6 +152,8 @@ class HeadCreate(_In):
     kind: HeadKind
     gst_exempt: bool = True
     sort_order: int = Field(default=100, ge=0, le=10000)
+    # FM-06 (FR-FEE-047): "counts as tuition for tax"; omitted = on for kind tuition.
+    tax_tuition: bool | None = None
 
 
 class HeadPatch(_In):
@@ -160,6 +162,7 @@ class HeadPatch(_In):
     gst_exempt: bool | None = None
     active: bool | None = None
     sort_order: int | None = Field(default=None, ge=0, le=10000)
+    tax_tuition: bool | None = None
 
 
 class HeadOut(_Out):
@@ -170,6 +173,7 @@ class HeadOut(_Out):
     gst_exempt: bool
     active: bool
     sort_order: int
+    tax_tuition: bool
     version: int
 
 

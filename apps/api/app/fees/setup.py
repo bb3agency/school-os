@@ -22,7 +22,7 @@ from app.authz.context import UserContext
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.core.ids import new_id
 from app.fees import _common as c
-from app.fees import ledger
+from app.fees import ledger, tax_config
 from app.fees import repository as repo
 from app.fees.models import FeeHead, FeePlan, FeePlanInstalment, FeePlanLine, FeeSettings
 from app.fees.money import ZERO, total
@@ -176,6 +176,11 @@ def create_head(session: Session, ctx: UserContext, data: HeadCreate) -> HeadOut
             kind=data.kind,
             gst_exempt=data.gst_exempt,
             sort_order=data.sort_order,
+            tax_tuition=(
+                data.tax_tuition
+                if data.tax_tuition is not None
+                else data.kind in tax_config.load_config().counting.default_on_for_kinds
+            ),
             created_by=ctx.membership_id,
         )
     c.record(
@@ -183,7 +188,12 @@ def create_head(session: Session, ctx: UserContext, data: HeadCreate) -> HeadOut
         action="fee.head.created",
         resource_type="fee_head",
         resource_id=row.id,
-        summary={"code": row.code, "kind": row.kind, "gst_exempt": row.gst_exempt},
+        summary={
+            "code": row.code,
+            "kind": row.kind,
+            "gst_exempt": row.gst_exempt,
+            "tax_tuition": row.tax_tuition,
+        },
     )
     return _head_out(row)
 
@@ -216,7 +226,12 @@ def update_head(
         action="fee.head.updated",
         resource_type="fee_head",
         resource_id=row.id,
-        summary={"fields": sorted(values), "active": row.active, "gst_exempt": row.gst_exempt},
+        summary={
+            "fields": sorted(values),
+            "active": row.active,
+            "gst_exempt": row.gst_exempt,
+            "tax_tuition": row.tax_tuition,
+        },
     )
     return _head_out(row)
 

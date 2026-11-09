@@ -86,6 +86,8 @@ BODIES: dict[str, dict[str, Any] | None] = {
     "POST /api/v1/public/links/current/pay": {"instalments": [1]},
     "GET /api/v1/public/links/current/payment": None,
     "POST /api/v1/public/links/current/optin": {"language": "en"},
+    # FM-06: the tuition fee certificate PDF of a receipt or dues link (a read).
+    "GET /api/v1/public/links/current/tax-certificate": None,
     # R3-1C CBSE disclosure (ADR-0051; SEC-050): the key is in the path.
     "GET /api/v1/public/disclosure/{key}": None,
     "GET /api/v1/public/disclosure/{key}/documents/{n}": None,

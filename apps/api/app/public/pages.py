@@ -51,6 +51,7 @@ from app.public.schemas import (
     ParentPayOut,
     ParentReceiptLineOut,
     ParentReceiptOut,
+    ParentTaxCertificateOut,
     ParentUpiOut,
 )
 from app.public.service import HandleView
@@ -106,6 +107,14 @@ def _receipt(session: Session, handle: HandleView) -> fees.ParentReceipt:
     return found
 
 
+def _tax_certificate(session: Session, student_id: uuid.UUID) -> ParentTaxCertificateOut | None:
+    """FM-06 (FR-FEE-057): the "Tax certificate" button of the child's receipt or dues page."""
+    found = fees.parent_tax_certificate(session, student_id)
+    if found is None:
+        return None
+    return ParentTaxCertificateOut(financial_year=found.financial_year, issued=found.issued)
+
+
 def receipt(session: Session, handle: HandleView) -> ParentReceiptOut:
     found = _receipt(session, handle)
     return ParentReceiptOut(
@@ -123,6 +132,7 @@ def receipt(session: Session, handle: HandleView) -> ParentReceiptOut:
         mode=found.mode,
         cancelled_on=found.cancelled_on,
         has_pdf=found.pdf_ready,
+        tax_certificate=_tax_certificate(session, found.student_id),
     )
 
 
@@ -166,6 +176,7 @@ def dues(session: Session, handle: HandleView) -> ParentDuesOut:
         pay_online=bool(found.instalments) and fees.payments_connected(session),
         upi=ParentUpiOut(payee_name=upi[0], upi_id=upi[1], qr_svg=upi[2]) if upi else None,
         office_phone=messaging.office_phone(session),
+        tax_certificate=_tax_certificate(session, student_id),
     )
 
 
@@ -244,6 +255,30 @@ def document(
     return ParentDocumentLinkOut.model_validate({"url": url, "expires_at": expires_at})
 
 
+def tax_certificate(
+    session: Session, handle: HandleView
+) -> ParentDocumentLinkOut | ParentDocumentPreparingOut:
+    """FM-06 (FR-FEE-058): the PDF of the child's latest issued tuition fee certificate of the
+    button's financial year, from a receipt or dues link (presigned, at most 5 minutes). A read:
+    nothing is issued here. 404 when none is issued (or fees are off); 202 ``preparing`` while
+    the worker makes the PDF."""
+    if handle.kind == "parent_receipt":
+        student_id = _receipt(session, handle).student_id
+    elif handle.kind == "parent_dues":
+        _, student_id = _account(session, handle)
+    else:
+        raise PublicNotFound()
+    found = fees.parent_tax_certificate_pdf(session, student_id)
+    if found == fees.TAX_CERTIFICATE_PREPARING:
+        return ParentDocumentPreparingOut(
+            status="preparing", retry_after_s=rules().document_retry_after_s
+        )
+    if found is None or isinstance(found, str):
+        raise PublicNotFound()
+    url, expires_at = found
+    return ParentDocumentLinkOut.model_validate({"url": url, "expires_at": expires_at})
+
+
 # --- opt-in -------------------------------------------------------------------------------------
 
 
@@ -301,4 +336,5 @@ __all__ = [
     "receipt",
     "set_language",
     "target",
+    "tax_certificate",
 ]

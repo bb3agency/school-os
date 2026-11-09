@@ -19,6 +19,8 @@ after the resolve still wins. Every key that does not open a page gets the same 
   link on the school's own Razorpay account; only new links spend ``public_pay`` (5 a day).
 - ``GET /public/links/current/payment``: the status of that link (the return page polls it).
 - ``POST /public/links/current/optin``: the parent's message language on an opt-in link.
+- ``GET /public/links/current/tax-certificate`` (FM-06): the child's issued tuition fee
+  certificate PDF from a receipt or dues link (a read; never issues one).
 
 The BFF adds what the browser needs (the CSRF token bound to the cookie, the Origin check, the
 303 to Razorpay); none of these routes takes a user token.
@@ -66,6 +68,10 @@ DocumentToken = Annotated[
     PublicCaller, Depends(require_public_handle("parent_notice", "parent_receipt"))
 ]
 DuesToken = Annotated[PublicCaller, Depends(require_public_handle("parent_dues"))]
+# FM-06: the tuition fee certificate button sits on receipt and dues pages.
+TaxCertificateToken = Annotated[
+    PublicCaller, Depends(require_public_handle("parent_receipt", "parent_dues"))
+]
 OptinToken = Annotated[PublicCaller, Depends(require_public_handle("parent_optin"))]
 PAY_POLICY = "public_pay"
 
@@ -163,6 +169,34 @@ def current_document(caller: DocumentToken) -> ParentDocumentLinkOut | JSONRespo
     with tenant_session(caller.tenant_id) as session:
         handle, _ = _parent_handle(session, caller)
         out = pages.document(session, handle)
+    if isinstance(out, ParentDocumentPreparingOut):
+        return JSONResponse(
+            status_code=202,
+            content=out.model_dump(mode="json"),
+            headers={"Retry-After": str(out.retry_after_s)},
+        )
+    return out
+
+
+@router.get(
+    "/public/links/current/tax-certificate",
+    response_model=ParentDocumentLinkOut,
+    responses={
+        **_NOT_FOUND,
+        202: {
+            "model": ParentDocumentPreparingOut,
+            "description": "The certificate's PDF is being made; try again after Retry-After.",
+        },
+    },
+)
+def current_tax_certificate(caller: TaxCertificateToken) -> ParentDocumentLinkOut | JSONResponse:
+    """The PDF of the child's tuition fee certificate for the financial year the page's "Tax
+    certificate" button names (FM-06; FR-FEE-058), presigned for at most 5 minutes. A read: it
+    opens the latest certificate the school issued and never issues one; 404 while none is
+    issued, 202 ``preparing`` while its PDF is being made. Audited by fees. Not a view."""
+    with tenant_session(caller.tenant_id) as session:
+        handle, _ = _parent_handle(session, caller)
+        out = pages.tax_certificate(session, handle)
     if isinstance(out, ParentDocumentPreparingOut):
         return JSONResponse(
             status_code=202,

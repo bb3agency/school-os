@@ -9,7 +9,7 @@ import { loadLinkView } from "@/server/public/view";
  * `/p/view`: the parent page for the link in the parent cookie (ADR-0046 decisions 2 and 6,
  * FR-PUB-008..010): notice, receipt, dues or opt-in. The API re-resolves the link on every
  * request and counts the view; a dead link is the uniform expired page with status 404. The
- * query carries only reason codes from the page's own forms (`pay`, `pdf`, `saved`).
+ * query carries only reason codes from the page's own forms (`pay`, `pdf`, `tax`, `saved`).
  */
 export const dynamic = "force-dynamic";
 
@@ -27,6 +27,9 @@ function notice(query: Record<string, string | string[] | undefined>): PageNotic
       ? { kind: "pdfPreparing", minutes: wait }
       : { kind: "pdfPreparing" };
   }
+  // FM-06 (FR-FEE-058): back from /p/tax-certificate.
+  if (query.tax === "0") return { kind: "tax" };
+  if (query.tax === "preparing") return { kind: "taxPreparing" };
   if (query.saved === "1") return { kind: "saved", ok: true };
   if (query.saved === "0") return { kind: "saved", ok: false };
   return null;

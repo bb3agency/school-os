@@ -28,12 +28,24 @@ type Dues = components["schemas"]["ParentDuesOut"];
 type Optin = components["schemas"]["ParentOptinOut"];
 type Payment = components["schemas"]["ParentPaymentStatusOut"];
 type T = ReturnType<typeof parentTranslator>;
+/**
+ * FM-06 (FR-FEE-057): the "Tax certificate FY ..." button block of the receipt and dues pages
+ * (`tax_certificate` on ParentReceiptOut and ParentDuesOut). Hand-written until the API client
+ * is regenerated; null or absent = no button.
+ */
+type TaxCertificateButton = { financial_year: string; issued: boolean } | null | undefined;
+
+function taxButtonOf(block: object): TaxCertificateButton {
+  return (block as { tax_certificate?: TaxCertificateButton }).tax_certificate;
+}
 
 /** A one-line message from the page's own forms (reason codes from the query). */
 export type PageNotice =
   | { kind: "pay"; error: PayError }
   | { kind: "pdf" }
   | { kind: "pdfPreparing"; minutes?: number }
+  | { kind: "tax" }
+  | { kind: "taxPreparing" }
   | { kind: "saved"; ok: boolean };
 
 /** The self-hosted Telugu font, only on Telugu pages (ADR-0044 decision 3). */
@@ -125,6 +137,45 @@ function NoticeSheet({ notice, t, flash }: { notice: Notice; t: T; flash: PageNo
         </a>
       ) : null}
     </section>
+  );
+}
+
+// --- tuition fee certificate (FM-06) -----------------------------------------------------------
+
+function TaxCertificate({
+  button,
+  t,
+  flash,
+}: {
+  button: TaxCertificateButton;
+  t: T;
+  flash: PageNotice | null;
+}) {
+  if (!button) return null;
+  const year = button.financial_year;
+  return (
+    <div className="public-tax" id="tax">
+      {flash?.kind === "tax" ? (
+        <Banner tone="amber" icon="alert">
+          {t("common.pdfUnavailable")}
+        </Banner>
+      ) : null}
+      {flash?.kind === "taxPreparing" ? (
+        <p className="public-banner public-banner-amber" role="status" aria-live="polite">
+          <PublicIcon name="clock" />
+          <span>{t("common.pdfPreparing")}</span>
+        </p>
+      ) : null}
+      {button.issued ? (
+        // eslint-disable-next-line @next/next/no-html-link-for-pages -- a plain link (no client router)
+        <a className="public-button" href="/p/tax-certificate">
+          {t("tax.button", { year })}
+        </a>
+      ) : (
+        <p className="public-muted">{t("tax.notIssued", { year })}</p>
+      )}
+      <p className="public-muted">{t("tax.note")}</p>
+    </div>
   );
 }
 
@@ -222,6 +273,7 @@ function ReceiptSheet({
         <p className="public-muted">{t("common.pdfNotReady")}</p>
       )}
       <p className="public-note">{t("receipt.keep")}</p>
+      <TaxCertificate button={taxButtonOf(receipt)} t={t} flash={flash} />
     </section>
   );
 }
@@ -351,6 +403,7 @@ function DuesSheet({
         ) : null}
       </p>
       <p className="public-muted">{t("dues.noCard")}</p>
+      <TaxCertificate button={taxButtonOf(dues)} t={t} flash={flash} />
     </section>
   );
 }

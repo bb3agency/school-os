@@ -232,6 +232,10 @@ routes:
   POST /api/v1/fees/bank-statements: [imports]
   POST /api/v1/fees/bank-statements/rematch: [heavy_jobs]
   POST /api/v1/fees/upi/utr-check: [search]
+  # FM-06 tuition fee certificates: the print view and PDF retry render; bulk issue is heavy
+  GET /api/v1/fees/tax-certificates/{tax_certificate_id}/print: [render]
+  POST /api/v1/fees/tax-certificates/{tax_certificate_id}/render: [render]
+  POST /api/v1/fees/tax-certificates/bulk: [heavy_jobs]
   # support tickets
   POST /api/v1/support/tickets: [support_tickets]
   POST /api/v1/platform/support/tickets: [support_tickets]

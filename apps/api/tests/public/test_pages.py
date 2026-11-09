@@ -433,6 +433,7 @@ def test_US_2402_receipt_page_shows_the_receipt_card_and_refuses_other_guardians
     assert set(card) == {
         "receipt_number", "receipt_date", "student_name", "class_section", "admission_no",
         "lines", "amount", "amount_in_words", "mode", "cancelled_on", "has_pdf",
+        "tax_certificate",
     }  # fmt: skip
     assert card["receipt_number"] == receipt.receipt_number
     assert card["amount"] == "1500.00"
@@ -489,7 +490,7 @@ def test_US_2403_dues_page_shows_first_name_and_class_only(
     dues = body["dues"]
     assert set(dues) == {
         "child_first_name", "class_name", "as_of", "instalments", "total_due", "late_fee_total",
-        "pay_online", "upi", "office_phone",
+        "pay_online", "upi", "office_phone", "tax_certificate",
     }  # fmt: skip
     assert dues["child_first_name"] == "Synthetica"  # first name only, never the full name
     assert "Fee Student" not in json.dumps(body)

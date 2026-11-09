@@ -43,11 +43,13 @@ from app.fees import (
     reports,
     setup,
     statements,
+    tax_certificates,
     upi,
 )
 from app.fees import late_fees as late
 from app.fees import online_repository as orepo
 from app.fees import repository as repo
+from app.fees import tax_repository as trepo
 from app.fees import upi_repository as upi_repo
 from app.fees._common import (
     COLLECT,
@@ -471,6 +473,7 @@ def export_records(session: Session) -> list[RecordTable]:
         *repo.export_tables(session),
         *orepo.export_tables(session),
         *upi_repo.export_tables(session),
+        *trepo.export_tables(session),
     ]
 
 
@@ -480,6 +483,8 @@ def export_records(session: Session) -> list[RecordTable]:
 # receipts; the online rows that reference receipts go first.
 _PURGE = purging.PurgeTables(
     deleted=(
+        # FM-06 (0083_fee_tax_cert): certificates reference students, members and documents
+        "fin.tax_certificates",
         # R2-2E (0060_fees_upi): confirmations and statement lines reference receipts
         "fin.upi_confirmations",
         "fin.bank_statement_lines",
@@ -527,6 +532,24 @@ def today(session: Session) -> dt.date:
     return c.today(session)
 
 
+# --- FM-06 tuition fee certificates (FR-FEE-046..060; app.fees.api_tax, app.public.pages) ------
+
+issue_tax_certificate = tax_certificates.issue
+issue_tax_certificates_bulk = tax_certificates.issue_bulk
+get_tax_certificate = tax_certificates.get
+list_tax_certificates = tax_certificates.list_certificates
+tax_certificate_print_page = tax_certificates.print_page
+tax_certificate_download_url = tax_certificates.download_url
+retry_tax_certificate_render = tax_certificates.retry_render
+render_tax_certificate_pdf = tax_certificates.render_pdf
+mark_tax_certificate_pdf_failed = tax_certificates.mark_pdf_failed
+TAX_CERTIFICATE_RENDER_TASK = tax_certificates.RENDER_TASK
+TAX_CERTIFICATE_PREPARING = tax_certificates.PDF_PREPARING
+ParentTaxCertificate = tax_certificates.ParentTaxCertificate
+parent_tax_certificate = tax_certificates.parent_tax_certificate
+parent_tax_certificate_pdf = tax_certificates.parent_tax_certificate_pdf
+
+
 __all__ = [
     "COLLECT",
     "CONCESSION_APPROVE",
@@ -541,6 +564,8 @@ __all__ = [
     "RENDER_EVENT",
     "RENDER_TASK",
     "REPORT",
+    "TAX_CERTIFICATE_PREPARING",
+    "TAX_CERTIFICATE_RENDER_TASK",
     "AskClassFees",
     "AskInstalment",
     "AskSchoolFees",
@@ -553,6 +578,7 @@ __all__ = [
     "ParentPayment",
     "ParentPaymentStatus",
     "ParentReceipt",
+    "ParentTaxCertificate",
     "PaymentsNotConnected",
     "ReceiptForMessage",
     "ReminderAccount",
@@ -567,12 +593,19 @@ __all__ = [
     "export_records",
     "fee_structure",
     "fee_targets_of_student",
+    "get_tax_certificate",
+    "issue_tax_certificate",
+    "issue_tax_certificates_bulk",
+    "list_tax_certificates",
+    "mark_tax_certificate_pdf_failed",
     "parent_account_student",
     "parent_dues",
     "parent_pay",
     "parent_payment",
     "parent_receipt",
     "parent_receipt_pdf",
+    "parent_tax_certificate",
+    "parent_tax_certificate_pdf",
     "parent_upi_qr",
     "payment_link",
     "payments_connected",
@@ -582,7 +615,11 @@ __all__ = [
     "receipt_message_event",
     "reminder_accounts",
     "reminder_dues",
+    "render_tax_certificate_pdf",
+    "retry_tax_certificate_render",
     "subject_report",
+    "tax_certificate_download_url",
+    "tax_certificate_print_page",
     "tenant_data_counts",
     "upi_payee",
 ]

@@ -2548,6 +2548,23 @@ def _upi() -> ModuleType:
 SPECS.update(_upi().matrix_specs())
 
 
+def _tax() -> ModuleType:
+    """tests/fees/tax_security_support.py (FM-06 tuition fee certificates of school A)."""
+    name = "sos_test_fees_tax_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "tax_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_tax().matrix_specs())
+
+
 def _disclosure() -> ModuleType:
     """tests/disclosure/security_support.py (R3-1C: CBSE on per call, snapshots of a school)."""
     name = "sos_test_disclosure_security_support"
@@ -2730,7 +2747,9 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         return 201
     if (method, path) in _privacy().MATRIX_STATUS:
         return int(_privacy().MATRIX_STATUS[(method, path)])
-    if method == "POST" and path in _fees().MATRIX_CREATES | _upi().MATRIX_CREATES:
+    if method == "POST" and path in (
+        _fees().MATRIX_CREATES | _upi().MATRIX_CREATES | _tax().MATRIX_CREATES
+    ):
         return 201
     if (method, path) in _fees().ONLINE_REFUSED:
         return 409  # guard passed; no Razorpay partner application in tests (R2-2D)
