@@ -23,8 +23,9 @@ from typing import Any
 from sqlalchemy import Engine
 
 from app.core.db import tenant_session
+from app.privacy import config as privacy_cfg
 from app.privacy import service as privacy
-from app.privacy.schemas import PrivacyRequestCreate, PrivacySubjectIn
+from app.privacy.schemas import PrivacyNoticeIn, PrivacyRequestCreate, PrivacySubjectIn
 
 _HERE = Path(__file__).resolve()
 
@@ -102,6 +103,29 @@ def notice_file(school: Any) -> uuid.UUID:
         out = privacy.request_notice_pdf(db, _ctx(school, "office_admin"), "notice_staff")
     assert EX.run(school, out.export_id) == "ready"
     return out.export_id
+
+
+def parents_notice(school: Any) -> uuid.UUID:
+    """A parents' notice issue of the school (FC-03: admission notices refer to one)."""
+    key = "privacy_matrix_parents_notice"
+    if key not in school.ids:
+        version = privacy_cfg.notice_template("notice_parents").template_version
+        admin = school.people["office_admin"]
+        with tenant_session(school.tenant_id, admin.user_id) as db:
+            out = privacy.record_notice(
+                db,
+                _ctx(school, "office_admin"),
+                PrivacyNoticeIn(
+                    template_key="notice_parents",
+                    template_version=version,
+                    audience="parents",
+                    issued_on=dt.datetime.now(dt.UTC).date() - dt.timedelta(days=1),
+                    channel="paper",
+                ),
+            )
+        school.ids[key] = out.id
+    value: uuid.UUID = school.ids[key]
+    return value
 
 
 def b_request(w: Any) -> uuid.UUID:
@@ -191,15 +215,82 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
             {},
             {},
         ),
+        # FC-03 / FP-13 DPDP readiness (FR-DPDP-053..066).
+        ("GET", "/api/v1/privacy/readiness"): _g(lambda w: "/api/v1/privacy/readiness"),
+        ("POST", "/api/v1/privacy/readiness/marks"): lambda w, r, a: (
+            "/api/v1/privacy/readiness/marks",
+            {"item": "dpia_done", "done_on": today},
+            {},
+        ),
+        ("GET", "/api/v1/privacy/admission-notices/pending"): _g(
+            lambda w: "/api/v1/privacy/admission-notices/pending"
+        ),
+        ("GET", "/api/v1/privacy/admission-notices/{student_id}"): _g(
+            lambda w: f"/api/v1/privacy/admission-notices/{EX.student(w.a)}"
+        ),
+        ("POST", "/api/v1/privacy/admission-notices"): lambda w, r, a: (
+            "/api/v1/privacy/admission-notices",
+            {
+                "student_ids": [str(EX.student(w.a))],
+                "given_on": today,
+                "channel": "paper",
+                "notice_id": str(parents_notice(w.a)),
+            },
+            {},
+        ),
+        ("POST", "/api/v1/privacy/notices/whatsapp/preview"): lambda w, r, a: (
+            "/api/v1/privacy/notices/whatsapp/preview",
+            {"section_ids": [str(w.a.ids["section_9a"])]},
+            {},
+        ),
+        ("POST", "/api/v1/privacy/notices/whatsapp"): lambda w, r, a: (
+            "/api/v1/privacy/notices/whatsapp",
+            {
+                "parent_notice_id": str(uuid.uuid4()),
+                "preview_token": "bp_" + uuid.uuid4().hex,
+                "section_ids": [str(w.a.ids["section_9a"])],
+            },
+            {},
+        ),
+        ("GET", "/api/v1/privacy/notices/{notice_id}/delivery"): _g(
+            lambda w: f"/api/v1/privacy/notices/{parents_notice(w.a)}/delivery"
+        ),
     }
 
 
-MATRIX_CREATES = frozenset({BASE, "/api/v1/privacy/notices"})
+MATRIX_CREATES = frozenset(
+    {
+        BASE,
+        "/api/v1/privacy/notices",
+        "/api/v1/privacy/readiness/marks",
+        "/api/v1/privacy/admission-notices",
+    }
+)
+# FP-13: sending also needs these, checked by the service (403 without them).
+WHATSAPP_ALSO_NEEDS: dict[tuple[str, str], tuple[str, ...]] = {
+    ("POST", "/api/v1/privacy/notices/whatsapp/preview"): (
+        "notice.draft",
+        "notice.approve",
+        "message.send",
+    ),
+    ("POST", "/api/v1/privacy/notices/whatsapp"): (
+        "notice.draft",
+        "notice.approve",
+        "message.send",
+    ),
+}
 MATRIX_ACCEPTED = frozenset(
     {"/api/v1/privacy/templates/{key}/pdf", f"{BASE}/{{request_id}}/report"}
 )
 # Guard passed; the service answers: no such change request to link (422).
-MATRIX_STATUS: dict[tuple[str, str], int] = {("POST", f"{BASE}/{{request_id}}/links"): 422}
+MATRIX_STATUS: dict[tuple[str, str], int] = {
+    ("POST", f"{BASE}/{{request_id}}/links"): 422,
+    # FC-03: guard passed; the new student has no admission notice record yet.
+    ("GET", "/api/v1/privacy/admission-notices/{student_id}"): 404,
+    # FP-13: guard passed; an unknown parent notice / a paper notice has no delivery.
+    ("POST", "/api/v1/privacy/notices/whatsapp"): 409,
+    ("GET", "/api/v1/privacy/notices/{notice_id}/delivery"): 404,
+}
 
 BOLA_BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", f"{BASE}/{{request_id}}"): {"notes": "Synthetic"},
