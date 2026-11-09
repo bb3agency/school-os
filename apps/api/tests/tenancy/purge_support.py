@@ -1485,6 +1485,16 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             u=u["user"],
             m=ids["m1"],
         )
+        # FC-12 (0087_legal_holds): a hold waiting for approval (offboarding removes it).
+        _run(
+            c,
+            "INSERT INTO ops.legal_holds (id, tenant_id, scope, student_id, reason_code, "
+            "review_on, placed_by) VALUES (:i, :t, 'student', :s, 'court_case', '2027-06-01', :u)",
+            i=uuid.uuid4(),
+            t=t,
+            s=ids["student"],
+            u=u["user"],
+        )
         _run(
             c,
             "INSERT INTO ops.privacy_request_counters (id, tenant_id, year, last_no) "

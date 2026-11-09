@@ -510,6 +510,7 @@ function BulkResult({ result, close }: { result: TaxCertificateBulk; close: () =
     [t("result.reissued"), result.reissued],
     [t("result.unchanged"), result.unchanged],
     [t("result.skipped"), result.skipped_no_tuition],
+    [t("result.skippedTooMany"), result.skipped_too_many_receipts],
   ];
   return (
     <>
@@ -526,6 +527,9 @@ function BulkResult({ result, close }: { result: TaxCertificateBulk; close: () =
       </dl>
       {result.skipped_no_tuition > 0 ? (
         <p className="text-sm text-ink-muted">{t("result.skippedHint")}</p>
+      ) : null}
+      {result.skipped_too_many_receipts > 0 ? (
+        <p className="text-sm text-ink-muted">{t("result.skippedTooManyHint")}</p>
       ) : null}
       <div className="flex justify-end">
         <Button onClick={close}>{t("result.close")}</Button>

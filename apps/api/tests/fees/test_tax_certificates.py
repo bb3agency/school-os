@@ -293,6 +293,30 @@ def test_FR_FEE_050_bulk_for_a_section_skips_students_without_tuition(
     assert W.audit_events(admin_engine, school.tenant_id, "fee.tax_certificate.bulk_issued")
 
 
+def test_FR_FEE_050_bulk_skips_a_student_with_too_many_receipts(
+    school: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One student with more receipts than a certificate lists never fails the whole class."""
+    payer, account = _student_with_account(school)
+    _pay(school, account, "100.00")
+    _pay(school, account, "100.00")
+    cfg = tax_config.load_config()
+    tight = cfg.model_copy(update={"limits": cfg.limits.model_copy(update={"max_receipts": 1})})
+    monkeypatch.setattr("app.fees.tax_certificates.load_config", lambda: tight)
+    out = F.call(
+        school,
+        "accountant",
+        fees.issue_tax_certificates_bulk,
+        TaxCertificateBulkIssue(financial_year=FY, section_id=school.ids["section_9a"]),
+    )
+    assert out.skipped_too_many_receipts >= 1
+    assert out.issued + out.reissued + out.unchanged == len(out.certificate_ids)
+    mine = F.call(school, "accountant", fees.list_tax_certificates, financial_year=FY,
+                  student_id=payer, class_id=None, section_id=None, status="issued",
+                  limit=10, cursor=None)  # fmt: skip
+    assert mine.data == []
+
+
 def test_FR_FEE_052_issued_certificates_are_frozen(school: Any, admin_engine: Engine) -> None:
     student, account = _student_with_account(school)
     _pay(school, account, "100.00")

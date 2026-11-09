@@ -10106,6 +10106,8 @@
         "unchanged": "ఇప్పటికే జారీ, మార్పు లేదు",
         "skipped": "వదిలివేసినవి: ట్యూషన్ చెల్లింపు లేదు",
         "skippedHint": "వదిలివేసిన విద్యార్థులు ఆ సంవత్సరంలో ట్యూషన్ చెల్లించలేదు. సంవత్సరాన్ని, లేదా ఫీజు సెటప్‌లో ఏ ఫీజు హెడ్‌లు ట్యూషన్‌గా లెక్కించబడతాయో చూడండి.",
+        "skippedTooMany": "Skipped: too many receipts",
+        "skippedTooManyHint": "These students paid in more receipts than one certificate lists. Issue their certificates one at a time from the fee account.",
         "close": "మూసివేయండి"
       },
       "filterTarget": "తరగతి లేదా సెక్షన్",

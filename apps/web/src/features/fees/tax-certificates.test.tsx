@@ -331,6 +331,7 @@ describe("certificates list and bulk issue (FR-FEE-050, FR-FEE-055)", () => {
       reissued: 2,
       unchanged: 5,
       skipped_no_tuition: 3,
+      skipped_too_many_receipts: 0,
       certificate_ids: [],
     };
     stub.routes[BULK] = () => Response.json(result);

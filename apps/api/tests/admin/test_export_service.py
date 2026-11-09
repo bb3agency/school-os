@@ -219,6 +219,8 @@ EXPECTED_TABLES = {
     # FC-03 (0086_dpdp_readiness): readiness marks and notices given at admission.
     "privacy_readiness_marks",
     "privacy_admission_notices",
+    # FC-12 (0087_legal_holds): holds without the reference text.
+    "legal_holds",
     "retention_settings",
     # R2-1B fees (0058_fees_core, FR-FEE-027): every fin table, empty ones too.
     "fees_fee_settings",
@@ -233,6 +235,8 @@ EXPECTED_TABLES = {
     "fees_receipt_counters",
     "fees_receipts",
     "fees_receipt_allocations",
+    # FM-06 (0083_fee_tax_cert): tuition fee certificates for income tax.
+    "fees_tax_certificates",
     "fees_receipt_cancellations",
     "fees_refunds",
     "fees_day_closes",

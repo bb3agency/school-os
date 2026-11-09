@@ -340,6 +340,28 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         # R2-1B fees (ADR-0042): reads shared by collectors, readers and approvers; every fee
         # permission is school-wide, re-checked by the service (FR-FEE-024).
         ("GET", "/api/v1/fees/status"): ("finance.read", (*FEE_ALL[1:], "fee.reconcile"), False),
+        # FM-06 (FR-FEE-053) and FM-01 (FR-FEE-036): the counter and finance readers.
+        ("GET", "/api/v1/fees/tax-certificates"): ("fee.collect", ("finance.read",), False),
+        ("GET", "/api/v1/fees/tax-certificates/{tax_certificate_id}"): (
+            "fee.collect",
+            ("finance.read",),
+            False,
+        ),
+        ("GET", "/api/v1/fees/tax-certificates/{tax_certificate_id}/print"): (
+            "fee.collect",
+            ("finance.read",),
+            False,
+        ),
+        ("GET", "/api/v1/fees/tax-certificates/{tax_certificate_id}/download-url"): (
+            "fee.collect",
+            ("finance.read",),
+            False,
+        ),
+        ("GET", "/api/v1/fees/students/{student_id}/years"): (
+            "fee.collect",
+            ("finance.read",),
+            False,
+        ),
         # R2-2E UPI (ADR-0042 decision 9): the counter, setup, finance readers and reconcilers
         # see the UPI details and QR; the confirmed vs unconfirmed report also opens to readers.
         ("GET", "/api/v1/fees/upi-settings"): UPI_READERS,

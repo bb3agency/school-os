@@ -31730,6 +31730,79 @@
         "title": "PurposeUpdate",
         "type": "object"
       },
+      "ReadinessChecklistItemOut": {
+        "properties": {
+          "detail": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "What the status is based on (dates, versions, counts; never names).",
+            "title": "Detail",
+            "type": "object"
+          },
+          "key": {
+            "enum": [
+              "privacy_contact",
+              "notices",
+              "dpa_signed",
+              "dpia_done",
+              "test_request",
+              "breach_contact",
+              "retention_reviewed",
+              "consent_forms"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "mark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReadinessMarkOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For the items the school records here: the latest record."
+          },
+          "source": {
+            "description": "Where the item comes from (docs/08).",
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "done",
+              "todo",
+              "not_applicable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "status",
+          "detail",
+          "mark",
+          "source"
+        ],
+        "title": "ReadinessChecklistItemOut",
+        "type": "object"
+      },
       "ReadinessCounts": {
         "properties": {
           "blocked": {
@@ -31771,7 +31844,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/app__dq__schemas__ReadinessItemOut"
+              "$ref": "#/components/schemas/ReadinessItemOut"
             },
             "title": "Items",
             "type": "array"
@@ -31802,6 +31875,183 @@
           "items"
         ],
         "title": "ReadinessFieldOut",
+        "type": "object"
+      },
+      "ReadinessItemOut": {
+        "properties": {
+          "advisory": {
+            "title": "Advisory",
+            "type": "boolean"
+          },
+          "against": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Against"
+          },
+          "changes": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Bilingual"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changes"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/Bilingual"
+          },
+          "finding_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Id"
+          },
+          "finding_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "open",
+                  "resolved",
+                  "waived",
+                  "reopened",
+                  "needs_confirmation"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Status"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Kinds",
+            "type": "array"
+          },
+          "kinds_text": {
+            "$ref": "#/components/schemas/Bilingual"
+          },
+          "owner": {
+            "enum": [
+              "parent_aadhaar",
+              "school_udise",
+              "school_register",
+              "unknown"
+            ],
+            "title": "Owner",
+            "type": "string"
+          },
+          "owner_label": {
+            "$ref": "#/components/schemas/Bilingual"
+          },
+          "reason": {
+            "enum": [
+              "mismatch",
+              "undecided",
+              "missing",
+              "needs_confirmation"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "segments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DiffSegment"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segments"
+          },
+          "severity": {
+            "enum": [
+              "blocker",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "needs_parent",
+              "needs_school",
+              "blocked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "waived": {
+            "title": "Waived",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reason",
+          "owner",
+          "status",
+          "source",
+          "against",
+          "sources",
+          "kinds",
+          "advisory",
+          "waived",
+          "severity",
+          "explanation",
+          "owner_label",
+          "kinds_text",
+          "segments",
+          "changes",
+          "finding_id",
+          "finding_status"
+        ],
+        "title": "ReadinessItemOut",
         "type": "object"
       },
       "ReadinessMarkIn": {
@@ -31914,7 +32164,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/app__privacy__readiness_schemas__ReadinessItemOut"
+              "$ref": "#/components/schemas/ReadinessChecklistItemOut"
             },
             "title": "Items",
             "type": "array"
@@ -38838,6 +39088,11 @@
             "title": "Skipped No Tuition",
             "type": "integer"
           },
+          "skipped_too_many_receipts": {
+            "default": 0,
+            "title": "Skipped Too Many Receipts",
+            "type": "integer"
+          },
           "students": {
             "title": "Students",
             "type": "integer"
@@ -43466,183 +43721,6 @@
         "title": "DownloadUrlOut",
         "type": "object"
       },
-      "app__dq__schemas__ReadinessItemOut": {
-        "properties": {
-          "advisory": {
-            "title": "Advisory",
-            "type": "boolean"
-          },
-          "against": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Against"
-          },
-          "changes": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/Bilingual"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Changes"
-          },
-          "explanation": {
-            "$ref": "#/components/schemas/Bilingual"
-          },
-          "finding_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Finding Id"
-          },
-          "finding_status": {
-            "anyOf": [
-              {
-                "enum": [
-                  "open",
-                  "resolved",
-                  "waived",
-                  "reopened",
-                  "needs_confirmation"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Finding Status"
-          },
-          "kinds": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Kinds",
-            "type": "array"
-          },
-          "kinds_text": {
-            "$ref": "#/components/schemas/Bilingual"
-          },
-          "owner": {
-            "enum": [
-              "parent_aadhaar",
-              "school_udise",
-              "school_register",
-              "unknown"
-            ],
-            "title": "Owner",
-            "type": "string"
-          },
-          "owner_label": {
-            "$ref": "#/components/schemas/Bilingual"
-          },
-          "reason": {
-            "enum": [
-              "mismatch",
-              "undecided",
-              "missing",
-              "needs_confirmation"
-            ],
-            "title": "Reason",
-            "type": "string"
-          },
-          "segments": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/DiffSegment"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Segments"
-          },
-          "severity": {
-            "enum": [
-              "blocker",
-              "high",
-              "medium",
-              "low",
-              "info"
-            ],
-            "title": "Severity",
-            "type": "string"
-          },
-          "source": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source"
-          },
-          "sources": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Sources",
-            "type": "array"
-          },
-          "status": {
-            "enum": [
-              "ready",
-              "needs_parent",
-              "needs_school",
-              "blocked"
-            ],
-            "title": "Status",
-            "type": "string"
-          },
-          "waived": {
-            "title": "Waived",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "reason",
-          "owner",
-          "status",
-          "source",
-          "against",
-          "sources",
-          "kinds",
-          "advisory",
-          "waived",
-          "severity",
-          "explanation",
-          "owner_label",
-          "kinds_text",
-          "segments",
-          "changes",
-          "finding_id",
-          "finding_status"
-        ],
-        "title": "ReadinessItemOut",
-        "type": "object"
-      },
       "app__identity__schemas__MeOut": {
         "properties": {
           "display_name": {
@@ -43797,79 +43875,6 @@
           "data"
         ],
         "title": "Page[TicketOut]",
-        "type": "object"
-      },
-      "app__privacy__readiness_schemas__ReadinessItemOut": {
-        "properties": {
-          "detail": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "description": "What the status is based on (dates, versions, counts; never names).",
-            "title": "Detail",
-            "type": "object"
-          },
-          "key": {
-            "enum": [
-              "privacy_contact",
-              "notices",
-              "dpa_signed",
-              "dpia_done",
-              "test_request",
-              "breach_contact",
-              "retention_reviewed",
-              "consent_forms"
-            ],
-            "title": "Key",
-            "type": "string"
-          },
-          "mark": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ReadinessMarkOut"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "For the items the school records here: the latest record."
-          },
-          "source": {
-            "description": "Where the item comes from (docs/08).",
-            "title": "Source",
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "done",
-              "todo",
-              "not_applicable"
-            ],
-            "title": "Status",
-            "type": "string"
-          }
-        },
-        "required": [
-          "key",
-          "status",
-          "detail",
-          "mark",
-          "source"
-        ],
-        "title": "ReadinessItemOut",
         "type": "object"
       }
     }

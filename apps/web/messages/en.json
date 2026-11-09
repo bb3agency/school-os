@@ -10106,6 +10106,8 @@
         "unchanged": "Already issued, unchanged",
         "skipped": "Skipped: no tuition paid",
         "skippedHint": "Skipped students paid no tuition in that year. Check the year, or which fee heads count as tuition in fee setup.",
+        "skippedTooMany": "Skipped: too many receipts",
+        "skippedTooManyHint": "These students paid in more receipts than one certificate lists. Issue their certificates one at a time from the fee account.",
         "close": "Close"
       },
       "filterTarget": "Class or section",

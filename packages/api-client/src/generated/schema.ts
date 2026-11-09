@@ -11705,52 +11705,6 @@ export interface components {
             /** Version No */
             version_no: number;
         };
-        /** ReadinessItemOut */
-        app__dq__schemas__ReadinessItemOut: {
-            /** Advisory */
-            advisory: boolean;
-            /** Against */
-            against: string | null;
-            /** Changes */
-            changes: components["schemas"]["Bilingual"][] | null;
-            explanation: components["schemas"]["Bilingual"];
-            /** Finding Id */
-            finding_id: string | null;
-            /** Finding Status */
-            finding_status: ("open" | "resolved" | "waived" | "reopened" | "needs_confirmation") | null;
-            /** Kinds */
-            kinds: string[];
-            kinds_text: components["schemas"]["Bilingual"];
-            /**
-             * Owner
-             * @enum {string}
-             */
-            owner: "parent_aadhaar" | "school_udise" | "school_register" | "unknown";
-            owner_label: components["schemas"]["Bilingual"];
-            /**
-             * Reason
-             * @enum {string}
-             */
-            reason: "mismatch" | "undecided" | "missing" | "needs_confirmation";
-            /** Segments */
-            segments: components["schemas"]["DiffSegment"][] | null;
-            /**
-             * Severity
-             * @enum {string}
-             */
-            severity: "blocker" | "high" | "medium" | "low" | "info";
-            /** Source */
-            source: string | null;
-            /** Sources */
-            sources: string[];
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "ready" | "needs_parent" | "needs_school" | "blocked";
-            /** Waived */
-            waived: boolean;
-        };
         /** MeOut */
         app__identity__schemas__MeOut: {
             /** Display Name */
@@ -11817,33 +11771,6 @@ export interface components {
             data: components["schemas"]["TicketOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
-        };
-        /** ReadinessItemOut */
-        app__privacy__readiness_schemas__ReadinessItemOut: {
-            /**
-             * Detail
-             * @description What the status is based on (dates, versions, counts; never names).
-             */
-            detail: {
-                [key: string]: string | number | boolean | null;
-            };
-            /**
-             * Key
-             * @enum {string}
-             */
-            key: "privacy_contact" | "notices" | "dpa_signed" | "dpia_done" | "test_request" | "breach_contact" | "retention_reviewed" | "consent_forms";
-            /** @description For the items the school records here: the latest record. */
-            mark: components["schemas"]["ReadinessMarkOut"] | null;
-            /**
-             * Source
-             * @description Where the item comes from (docs/08).
-             */
-            source: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "done" | "todo" | "not_applicable";
         };
         /**
          * ApprovalItem
@@ -22684,6 +22611,33 @@ export interface components {
             /** Label Te */
             label_te?: string | null;
         };
+        /** ReadinessChecklistItemOut */
+        ReadinessChecklistItemOut: {
+            /**
+             * Detail
+             * @description What the status is based on (dates, versions, counts; never names).
+             */
+            detail: {
+                [key: string]: string | number | boolean | null;
+            };
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "privacy_contact" | "notices" | "dpa_signed" | "dpia_done" | "test_request" | "breach_contact" | "retention_reviewed" | "consent_forms";
+            /** @description For the items the school records here: the latest record. */
+            mark: components["schemas"]["ReadinessMarkOut"] | null;
+            /**
+             * Source
+             * @description Where the item comes from (docs/08).
+             */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "done" | "todo" | "not_applicable";
+        };
         /** ReadinessCounts */
         ReadinessCounts: {
             /** Blocked */
@@ -22702,11 +22656,57 @@ export interface components {
             /** Attribute Key */
             attribute_key: string;
             /** Items */
-            items: components["schemas"]["app__dq__schemas__ReadinessItemOut"][];
+            items: components["schemas"]["ReadinessItemOut"][];
             /** Reference */
             reference: string | null;
             /** Values */
             values: components["schemas"]["ReadinessValueOut"][];
+        };
+        /** ReadinessItemOut */
+        ReadinessItemOut: {
+            /** Advisory */
+            advisory: boolean;
+            /** Against */
+            against: string | null;
+            /** Changes */
+            changes: components["schemas"]["Bilingual"][] | null;
+            explanation: components["schemas"]["Bilingual"];
+            /** Finding Id */
+            finding_id: string | null;
+            /** Finding Status */
+            finding_status: ("open" | "resolved" | "waived" | "reopened" | "needs_confirmation") | null;
+            /** Kinds */
+            kinds: string[];
+            kinds_text: components["schemas"]["Bilingual"];
+            /**
+             * Owner
+             * @enum {string}
+             */
+            owner: "parent_aadhaar" | "school_udise" | "school_register" | "unknown";
+            owner_label: components["schemas"]["Bilingual"];
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "mismatch" | "undecided" | "missing" | "needs_confirmation";
+            /** Segments */
+            segments: components["schemas"]["DiffSegment"][] | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "blocker" | "high" | "medium" | "low" | "info";
+            /** Source */
+            source: string | null;
+            /** Sources */
+            sources: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "needs_parent" | "needs_school" | "blocked";
+            /** Waived */
+            waived: boolean;
         };
         /** ReadinessMarkIn */
         ReadinessMarkIn: {
@@ -22756,7 +22756,7 @@ export interface components {
             /** Done */
             done: number;
             /** Items */
-            items: components["schemas"]["app__privacy__readiness_schemas__ReadinessItemOut"][];
+            items: components["schemas"]["ReadinessChecklistItemOut"][];
             /**
              * Not Legal Advice
              * @default true
@@ -25406,6 +25406,11 @@ export interface components {
             reissued: number;
             /** Skipped No Tuition */
             skipped_no_tuition: number;
+            /**
+             * Skipped Too Many Receipts
+             * @default 0
+             */
+            skipped_too_many_receipts: number;
             /** Students */
             students: number;
             /** Unchanged */

@@ -414,21 +414,28 @@ def issue_bulk(
     ordered = sorted(
         bases, key=lambda s: (people[s].class_section or "", people[s].display_name or "")
     )
+    too_many = 0
     for student_id in ordered:
-        row, outcome = _issue(
-            session,
-            ctx,
-            financial_year=data.financial_year,
-            start=start,
-            end=end,
-            as_of=as_of,
-            student=people[student_id],
-            heads=head_names,
-            basis=bases[student_id],
-            existing=existing.get(student_id),
-            school=school,
-            bulk=True,
-        )
+        try:
+            row, outcome = _issue(
+                session,
+                ctx,
+                financial_year=data.financial_year,
+                start=start,
+                end=end,
+                as_of=as_of,
+                student=people[student_id],
+                heads=head_names,
+                basis=bases[student_id],
+                existing=existing.get(student_id),
+                school=school,
+                bulk=True,
+            )
+        except TooManyReceipts:
+            # Refused before anything is written (no serial taken): one student with more
+            # receipts than a certificate lists never fails the whole class (FR-FEE-050).
+            too_many += 1
+            continue
         counts[outcome] += 1
         out_ids.append(row.id)
     skipped = len(people) - len(bases)
@@ -443,6 +450,7 @@ def issue_bulk(
             "section_id": data.section_id,
             "students": len(people),
             "skipped_no_tuition": skipped,
+            "skipped_too_many_receipts": too_many,
             **counts,
         },
     )
@@ -450,6 +458,7 @@ def issue_bulk(
         financial_year=data.financial_year,
         students=len(people),
         skipped_no_tuition=skipped,
+        skipped_too_many_receipts=too_many,
         certificate_ids=out_ids,
         **counts,
     )

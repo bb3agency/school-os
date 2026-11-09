@@ -42,7 +42,7 @@ class ReadinessMarkOut(_Out):
     recorded_at: dt.datetime
 
 
-class ReadinessItemOut(_Out):
+class ReadinessChecklistItemOut(_Out):
     key: ItemKey
     status: ItemStatus
     detail: dict[str, str | int | bool | None] = Field(
@@ -66,7 +66,7 @@ class ReadinessOut(_Out):
     not_legal_advice: Literal[True] = True
     done: int
     applicable: int
-    items: list[ReadinessItemOut]
+    items: list[ReadinessChecklistItemOut]
     admission: AdmissionCountsOut
 
 

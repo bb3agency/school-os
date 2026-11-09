@@ -481,6 +481,7 @@ def ready_versions(session: Session) -> list[tuple[DocumentVersion, Document]]:
 # kb.documents on a table with student_id is missing here, so a new link table is added
 # deliberately. This is a read-only cross-module query for the access report (docs/05 §16.1).
 STUDENT_DOCUMENT_LINKS: tuple[tuple[str, str, str], ...] = (
+    ("fin.tax_certificates", "document_id", "student_id"),
     ("sis.apaar_consents", "evidence_document_id", "student_id"),
     ("sis.attribute_values", "evidence_document_id", "student_id"),
     ("sis.certificates", "document_id", "student_id"),

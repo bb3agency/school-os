@@ -65,7 +65,7 @@ from app.privacy.readiness_schemas import (
     AdmissionRecordedOut,
     NoticeDeliveryOut,
     NotReachedRowOut,
-    ReadinessItemOut,
+    ReadinessChecklistItemOut,
     ReadinessMarkIn,
     ReadinessMarkOut,
     ReadinessOut,
@@ -173,7 +173,7 @@ def readiness(session: Session, ctx: UserContext) -> ReadinessOut:
     names = identity.member_display_names(
         session, {m.recorded_by_membership for m in marks.values()}
     )
-    items: list[ReadinessItemOut] = []
+    items: list[ReadinessChecklistItemOut] = []
     for item in config.items:
         detail: dict[str, Any] = {}
         mark = marks.get(item.key)
@@ -208,7 +208,7 @@ def readiness(session: Session, ctx: UserContext) -> ReadinessOut:
             else:
                 status = "done" if answered == len(purposes) else "todo"
         items.append(
-            ReadinessItemOut(
+            ReadinessChecklistItemOut(
                 key=item.key,
                 status=cast(Any, status),
                 detail=detail,

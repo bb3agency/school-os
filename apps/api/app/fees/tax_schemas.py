@@ -113,6 +113,7 @@ class TaxCertificateBulkOut(_Out):
     reissued: int
     unchanged: int
     skipped_no_tuition: int
+    skipped_too_many_receipts: int = 0
     certificate_ids: list[uuid.UUID]
 
 
