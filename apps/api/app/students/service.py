@@ -2695,6 +2695,17 @@ def first_names(session: Session, student_ids: Collection[uuid.UUID]) -> dict[uu
     return out
 
 
+def record_statuses(session: Session, student_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """Each student's record status (``active``, ``provisional``, ``left``, ``graduated``).
+    System read for fees (FM-01: automatic reminders skip students who left, FR-FEE-034; the
+    "left with dues" report, FR-FEE-038); ``student_ids`` MUST come from records the caller
+    already reached (fee accounts). Ids and statuses only."""
+    return {row.id: str(row.status) for row in repo.summary_rows(session, set(student_ids))}
+
+
+LIVE_STATUSES: tuple[str, ...] = repo.LIVE_STATUSES
+
+
 def guardian_phone_index(
     session: Session, guardian_id: uuid.UUID, *, key_version: int | None = None
 ) -> GuardianPhoneIndex | None:

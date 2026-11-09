@@ -1009,6 +1009,7 @@ def _reminder_plan(
         account_ids=data.account_ids,
         section_id=data.section_id,
         class_id=data.class_id,
+        include_earlier_years=data.include_earlier_years,
     )
     if len(picked) > load_config().broadcasts.max_reminder_accounts:
         raise ValidationFailed([_error("account_ids", "too_many")])

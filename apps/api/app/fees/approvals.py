@@ -467,6 +467,11 @@ def request_adjustment(
             raise ValidationFailed([c.error("amount", "above_late_fee")])
     elif data.head_id is None or data.head_id not in _plan_heads(session, account.plan_id):
         raise ValidationFailed([c.error("head_id", "invalid")])
+    # FM-01 (FR-FEE-041, D84): a write-off only lowers what is due, never below zero (checked
+    # with every negative adjustment below); approved like any adjustment (principal or
+    # accountant, step-up) and shown "Written off by management".
+    if data.reason_code == "write_off" and data.amount >= 0:
+        raise ValidationFailed([c.error("amount", "write_off_reduces_due")])
     if abs(data.amount) > c.settings().limits.max_amount:
         raise ValidationFailed([c.error("amount", "too_large")])
     if data.reason_code != "late_fee_waiver" and data.head_id is not None:

@@ -44,6 +44,7 @@ from app.public.schemas import (
     ParentDocumentPreparingOut,
     ParentDueInstalmentOut,
     ParentDuesOut,
+    ParentEarlierYearOut,
     ParentNoticeOut,
     ParentOptinCategoryOut,
     ParentOptinOut,
@@ -150,6 +151,7 @@ def dues(session: Session, handle: HandleView) -> ParentDuesOut:
         child_first_name=child.first_name,
         class_name=child.class_name,
         as_of=found.as_of,
+        earlier_years=[ParentEarlierYearOut(label=e.label, due=e.due) for e in found.earlier_years],
         instalments=[
             ParentDueInstalmentOut(
                 instalment_no=i.instalment_no,

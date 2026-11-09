@@ -488,9 +488,10 @@ def test_US_2403_dues_page_shows_first_name_and_class_only(
     _minimal(body)
     dues = body["dues"]
     assert set(dues) == {
-        "child_first_name", "class_name", "as_of", "instalments", "total_due", "late_fee_total",
-        "pay_online", "upi", "office_phone",
+        "child_first_name", "class_name", "as_of", "earlier_years", "instalments", "total_due",
+        "late_fee_total", "pay_online", "upi", "office_phone",
     }  # fmt: skip
+    assert dues["earlier_years"] == []  # no earlier-year account (FR-FEE-039)
     assert dues["child_first_name"] == "Synthetica"  # first name only, never the full name
     assert "Fee Student" not in json.dumps(body)
     assert "admission_no" not in json.dumps(body)

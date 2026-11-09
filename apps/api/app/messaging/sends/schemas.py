@@ -174,6 +174,12 @@ class FeeReminderSelectionIn(_In):
         "payments connected (``payments_not_connected``) and is sent at most once a day per "
         "account and guardian, apart from reminders.",
     )
+    include_earlier_years: bool = Field(
+        default=False,
+        description="Also remind about earlier-year dues (FM-01, FR-FEE-035; manual sends only): "
+        "one message per student with the total of all its open accounts. Without it an "
+        "earlier-year row answers 422 ``account_ids`` (``earlier_year``).",
+    )
 
     @model_validator(mode="after")
     def _one_selection(self) -> FeeReminderSelectionIn:

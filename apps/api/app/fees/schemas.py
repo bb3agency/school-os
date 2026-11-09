@@ -34,8 +34,9 @@ PdfStatus = Literal["queued", "ready", "failed"]
 RequestStatus = Literal["pending", "approved", "rejected", "withdrawn"]
 ConcessionType = Literal["sibling", "staff_ward", "merit", "hardship", "rte", "other"]
 ConcessionBasis = Literal["amount", "percent"]
+# ``write_off``: management writes off what will not be collected (FM-01, FR-FEE-041; D84).
 AdjustmentReason = Literal[
-    "late_fee_waiver", "plan_change", "concession_reversal", "correction", "other"
+    "late_fee_waiver", "plan_change", "concession_reversal", "correction", "write_off", "other"
 ]
 CancelReason = Literal[
     "wrong_student", "wrong_amount", "cheque_dishonoured", "duplicate_entry", "other"
@@ -337,6 +338,9 @@ class AccountSummary(_Out):
     balance: Money
     overdue: Money
     status: Literal["open", "closed"]
+    # FM-01 (FR-FEE-036): what the student's open accounts of earlier years still owe (counter
+    # search only; zero elsewhere).
+    earlier_years_due: Money = Decimal("0.00")
 
 
 class DueLine(_Out):
@@ -401,6 +405,9 @@ class StatementEntry(_Out):
     receipt_id: uuid.UUID | None
     receipt_number: str | None
     source_id: uuid.UUID | None
+    # The adjustment's reason code (``write_off`` is shown "Written off by management";
+    # FR-FEE-042); null for other kinds.
+    reason_code: AdjustmentReason | None = None
 
 
 class StatementOut(_Out):
@@ -761,15 +768,23 @@ class DuesRow(_Out):
     oldest_due_on: dt.date | None
     balance: Money
     last_payment_on: dt.date | None
+    # FM-01 (FR-FEE-031): one row per open account; earlier-year accounts are arrears.
+    academic_year_id: uuid.UUID
+    academic_year_label: str | None
+    earlier_year: bool
 
 
 class DuesOut(_Out):
-    """Students with overdue amounts, oldest due first (FR-FEE-020)."""
+    """Accounts with overdue amounts, oldest due first (FR-FEE-020); every open account of the
+    current and earlier years (FR-FEE-031). ``students`` counts distinct students; the
+    ``arrears_*`` tiles cover earlier-year accounts only."""
 
     as_of: dt.date
     rows: list[DuesRow]
     students: int
     total_overdue: Money
+    arrears_students: int
+    arrears_total: Money
 
 
 # --- other modules' data contract (fees.service) -------------------------------------------------

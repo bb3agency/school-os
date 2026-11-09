@@ -83,6 +83,13 @@ class ParentDueInstalmentOut(_Out):
     overdue: bool
 
 
+class ParentEarlierYearOut(_Out):
+    """What one earlier academic year still owes (FM-01, FR-FEE-039): its label and amount."""
+
+    label: str
+    due: Rupees
+
+
 class ParentUpiOut(_Out):
     """The school's static UPI QR (SVG, no amount) and payee, when set (R2-2E)."""
 
@@ -99,6 +106,9 @@ class ParentDuesOut(_Out):
     child_first_name: str
     class_name: str | None
     as_of: dt.date
+    # FM-01 (FR-FEE-039): the same child's earlier-year dues, oldest first, shown before this
+    # year's; paid at the school office ("Pay online" covers this year's account only).
+    earlier_years: list[ParentEarlierYearOut]
     instalments: list[ParentDueInstalmentOut]
     total_due: Rupees
     late_fee_total: Rupees

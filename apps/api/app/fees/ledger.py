@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.authz.context import UserContext
 from app.core.errors import NotFound
 from app.fees import _common as c
+from app.fees import arrears_repository as arepo
 from app.fees import repository as repo
 from app.fees.models import FeeHead, FeePlan, FeePlanInstalment, StudentFeeAccount
 from app.fees.money import ZERO
@@ -296,6 +297,7 @@ def statement(session: Session, ctx: UserContext, account_id: uuid.UUID) -> Stat
         r.id: r.receipt_number
         for r in repo.receipts_by_id(session, c.unique_ids(e.receipt_id for e in entries)).values()
     }
+    reasons = arepo.adjustment_reasons(session, c.unique_ids(e.adjustment_id for e in entries))
     running = ZERO
     out: list[StatementEntry] = []
     for e in entries:
@@ -314,6 +316,7 @@ def statement(session: Session, ctx: UserContext, account_id: uuid.UUID) -> Stat
                 receipt_id=e.receipt_id,
                 receipt_number=numbers.get(e.receipt_id) if e.receipt_id else None,
                 source_id=source,
+                reason_code=reasons.get(e.adjustment_id) if e.adjustment_id else None,
             )
         )
     return StatementOut(account_id=account.id, entries=out, balance=running)
@@ -348,6 +351,7 @@ def search_accounts(
     found = {s.id: s for s in page.data}
     accounts = repo.accounts_for_year(session, year_id, list(found))
     dues = dues_of(session, accounts, c.today(session))
+    earlier = _earlier_years_due(session, year_id, {a.student_id for a in accounts})
     rank = {sid: i for i, sid in enumerate(found)}
     out: list[AccountSummary] = []
     for account in sorted(accounts, key=lambda a: rank.get(a.student_id, 0)):
@@ -366,11 +370,31 @@ def search_accounts(
                 balance=d.balance,
                 overdue=d.overdue,
                 status="closed" if account.status == "closed" else "open",
+                earlier_years_due=earlier.get(account.student_id, ZERO),
             )
         )
         if len(out) >= limit:
             break
     return out
+
+
+def _earlier_years_due(
+    session: Session, year_id: uuid.UUID, student_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, Decimal]:
+    """What each student's open accounts of years before ``year_id`` still owe (collectable;
+    FM-01, FR-FEE-036): the counter shows it as "Earlier years" first."""
+    years = tenancy.list_academic_years(session)
+    start = next((y.starts_on for y in years if y.id == year_id), None)
+    if start is None or not student_ids:
+        return {}
+    earlier = [y.id for y in years if y.starts_on < start]
+    accounts = arepo.accounts_in_years(
+        session, earlier, current_year_id=None, student_ids=student_ids
+    )
+    out: dict[uuid.UUID, Decimal] = defaultdict(lambda: ZERO)
+    for d in dues_of(session, accounts, c.today(session)).values():
+        out[d.account.student_id] += d.collectable
+    return dict(out)
 
 
 def accounts_of_student(
