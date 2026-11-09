@@ -9182,6 +9182,7 @@
       "plan_change": "ఫీజు ప్లాన్ మారింది",
       "concession_reversal": "రాయితీ రద్దు",
       "correction": "సవరణ",
+      "write_off": "యాజమాన్యం రద్దు చేసింది",
       "other": "ఇతర కారణం"
     },
     "approvalKinds": {
@@ -9491,8 +9492,14 @@
         "lastPayment": "చివరి చెల్లింపు",
         "overdue": "గడువు దాటినది",
         "overdueInr": "గడువు దాటినది (₹)",
-        "actions": "చర్యలు"
+        "actions": "చర్యలు",
+        "year": "సంవత్సరం"
       },
+      "earlierYear": "గత సంవత్సరం",
+      "years": "సంవత్సరాలు",
+      "allYears": "అన్ని సంవత్సరాలు",
+      "arrearsOnly": "గత సంవత్సరాలు మాత్రమే",
+      "arrearsTotal": "గత సంవత్సరాల బకాయి",
       "filterLabel": "బకాయిలను వడపోయండి",
       "totalsLabel": "గడువు దాటిన ఫీజుల మొత్తాలు",
       "noResultsTitle": "ఈ తరగతిలో ఏ విద్యార్థికీ గడువు దాటిన ఫీజు లేదు",
