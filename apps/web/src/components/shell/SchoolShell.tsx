@@ -342,6 +342,14 @@ export function SchoolShell({
           icon: "chart",
         },
         {
+          // FM-02 (FR-FEE-095): add-on fees; a transport in-charge reads who is on them.
+          href: "/fees/addons",
+          label: t("fees.nav.addons"),
+          permission: ["fee.addon.read", "finance.read", "fee.manage"],
+          feature: "fees",
+          icon: "layers",
+        },
+        {
           // FM-01 (FR-FEE-038): students who left with fees still open.
           href: "/fees/left-with-dues",
           label: t("fees.nav.leftWithDues"),

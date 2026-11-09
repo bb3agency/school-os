@@ -9204,6 +9204,94 @@
     }
   },
   "fees": {
+    "addons": {
+      "title": "Add-on fees",
+      "description": "Transport bands, hostel and activities that only some students pay, on top of the class plan.",
+      "gstTitle": "About GST",
+      "listTitle": "Add-on fees this year",
+      "empty": "No add-on fees yet.",
+      "active": "In use",
+      "inactive": "Switched off",
+      "open": "Students on {label}",
+      "columns": {
+        "label": "Name",
+        "head": "Fee head",
+        "total": "Total for the year (₹)",
+        "students": "Students",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "create": {
+        "title": "New add-on fee",
+        "description": "Name it the way parents know it, and enter what each instalment adds.",
+        "head": "Fee head",
+        "headHint": "Only transport, books or other heads that are exempt from GST.",
+        "headPlaceholder": "Choose a fee head",
+        "label": "Name",
+        "labelHint": "For example: Band 2 (5-10 km) or Hostel.",
+        "amounts": "Amount per instalment (₹)",
+        "instalment": "Instalment {no}",
+        "amountsInvalid": "Enter at least one amount, in rupees with up to two decimals.",
+        "addInstalment": "Add an instalment",
+        "submit": "Save add-on fee"
+      },
+      "panel": {
+        "title": "Students on {label}",
+        "description": "Charged under {head}. The list prints for the bus or hostel register.",
+        "print": "Print list",
+        "perInstalment": "Instalment {no}:",
+        "nobody": "Nobody is on this add-on yet.",
+        "studentsLabel": "Students on this add-on",
+        "noName": "Name hidden",
+        "columns": {
+          "student": "Student",
+          "class": "Class",
+          "from": "From instalment",
+          "charged": "Charged (₹)"
+        }
+      },
+      "assign": {
+        "title": "Put students on or take them off",
+        "action": "What to do",
+        "actions": {
+          "assign": "Put on this add-on",
+          "unassign": "Take off this add-on"
+        },
+        "whom": "Whom",
+        "modes": {
+          "class": "A whole class",
+          "section": "One section",
+          "students": "Picked students"
+        },
+        "choose": "Choose",
+        "startInstalment": "Start from instalment",
+        "startHint": "Charges start with this instalment.",
+        "fromInstalment": "Stop from instalment",
+        "fromHint": "Unpaid charges from this instalment on are credited after approval.",
+        "replace": "Change band: take them off their other add-on of this fee head first",
+        "reason": "Reason",
+        "unassignHint": "Someone else approves the credits. Money already paid comes back only as a refund.",
+        "replaceHint": "Credits for the old band need someone else's approval.",
+        "check": "Check first",
+        "submitAssign": "Put on add-on",
+        "submitUnassign": "Take off add-on"
+      },
+      "result": {
+        "checked": "Checked, nothing saved yet",
+        "done": "Saved",
+        "assigned": "{assigned} students put on, {charges} charges, {skipped} skipped, {credits} credits waiting for approval.",
+        "unassigned": "{ended} students taken off, {notAssigned} were not on it, {credits} credits waiting for approval:"
+      },
+      "picker": {
+        "search": "Find a student",
+        "searchHint": "Part of a name or the admission number.",
+        "find": "Find",
+        "results": "Students found",
+        "add": "Add {name}",
+        "picked": "Picked students",
+        "remove": "Remove {name}"
+      }
+    },
     "off": {
       "title": "Fees are not switched on",
       "body": "This school does not keep its fee ledger in SchoolOS yet. The owner or principal turns fees on in school settings once SchoolOS has enabled them for the school."
@@ -9225,7 +9313,8 @@
       "upiSettings": "UPI QR",
       "feeSettings": "Fee settings",
       "taxCertificates": "Tax certificates",
-      "leftWithDues": "Left with dues"
+      "leftWithDues": "Left with dues",
+      "addons": "Add-on fees"
     },
     "modes": {
       "cash": "Cash",
