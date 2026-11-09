@@ -73,6 +73,9 @@ READ_ONLY_EXPENSIVE_OK = {
     # A preset applied to an existing import's headers (FR-IMP-031): a read, nothing stored.
     ("GET", "/api/v1/imports/{import_id}/preset-mapping"),
     ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}"),
+    # FO-04: a person's match decision for one UDISE+ row re-checks the staged sheet, like an
+    # edited cell; the file was read when the import was created.
+    ("PUT", "/api/v1/imports/{import_id}/rows/{row_no}/match"),
 }
 
 

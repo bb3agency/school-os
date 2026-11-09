@@ -162,6 +162,9 @@ EXPECTED_TABLES = {
     # R3-1D (0064_portal_calendar, ADR-0053): confirmed portal dates and reminders sent.
     "portal_calendar_dates",
     "portal_reminders",
+    # FO-02 (0088_udise_corrections): UDISE+ correction requests to the MEO.
+    "udise_correction_requests",
+    "udise_correction_lines",
     "import_batches",
     "import_mapping_templates",
     "documents",

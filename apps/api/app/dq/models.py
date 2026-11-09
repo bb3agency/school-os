@@ -112,3 +112,37 @@ portal_reminders = Table(
     Column("notified", Integer, nullable=False),
     Column("sent_at", DateTime(timezone=True), nullable=False),
 )
+
+# FO-02 UDISE+ correction requests to the MEO (migration 0088_udise_corrections). The values
+# are read live when a letter is printed: these tables hold ids, field keys and dates only.
+udise_correction_requests = Table(
+    "udise_correction_requests",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("profile_key", Text, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("lines_count", Integer, nullable=False),
+    Column("students_count", Integer, nullable=False),
+    Column("prepared_by", Uuid, nullable=False),
+    Column("prepared_at", DateTime(timezone=True), nullable=False),
+    Column("sent_on", Date),
+    Column("sent_to", Text),
+    Column("sent_by", Uuid),
+    Column("closed_by", Uuid),
+    Column("closed_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("version", Integer, nullable=False),
+)
+
+udise_correction_lines = Table(
+    "udise_correction_lines",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("request_id", Uuid, nullable=False),
+    Column("student_id", Uuid, nullable=False),
+    Column("attribute_key", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)

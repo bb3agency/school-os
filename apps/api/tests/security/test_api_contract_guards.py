@@ -289,6 +289,7 @@ NON_UUID_PATH_PARAMS = {
     ("DELETE", "/api/v1/platform/flags/{key}/tenants/{tenant_id}", "key"),
     # A spreadsheet row number inside an import the caller already reaches (bounded int).
     ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}", "row_no"),
+    ("PUT", "/api/v1/imports/{import_id}/rows/{row_no}/match", "row_no"),
     # A readiness profile key: a bounded, pattern-checked configuration key (ADR-0040).
     ("GET", "/api/v1/dq/readiness/{profile_key}", "profile_key"),
     ("GET", "/api/v1/dq/readiness/{profile_key}/students", "profile_key"),
@@ -401,6 +402,13 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.dq.schemas.PortalWindowOut.event_key": "portal calendar event code",
     "app.dq.schemas.CalendarEventOut.event_key": "portal calendar event code",
     "app.dq.schemas.CalendarReadinessOut.profile_key": "DQ profile code",
+    # FO-02: readiness profile, attribute catalog and recipient role codes, not secrets.
+    "app.dq.udise_schemas.UdiseCandidatesOut.profile_key": "DQ profile code",
+    "app.dq.udise_schemas.UdiseRequestOut.profile_key": "DQ profile code",
+    "app.dq.udise_schemas.UdiseRequestDetailOut.profile_key": "DQ profile code",
+    "app.dq.udise_schemas.UdiseLineOut.attribute_key": "attribute catalog key",
+    "app.dq.udise_schemas.UdiseRecipientOut.key": "recipient role code",
+    "app.dq.udise_schemas.UdiseGroupOut.key": "field group code",
     "app.circulars.schemas.TaskOut.portal_event_key": "portal calendar event code",
     "app.exports.schemas.ExportProfileOut.key": "export profile code",
     "app.exports.schemas.ExportOut.profile_key": "export profile code",

@@ -106,6 +106,8 @@ def test_FR_ADM_001_other_modules_export_their_tables_without_ciphertext(
         "dq_findings",
         "portal_calendar_dates",
         "portal_reminders",
+        "udise_correction_requests",
+        "udise_correction_lines",
         "import_batches",
         "import_mapping_templates",
         "documents",
