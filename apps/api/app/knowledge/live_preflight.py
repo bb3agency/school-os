@@ -93,7 +93,13 @@ REQUIRED_HARD_GATES: Final = (
     "english_first_telugu_outputs",
     "english_first_english_answer_rate",
 )
-REQUIRED_SOFT_GATES: Final = ("recall_at_10", "mrr_at_10", "citation_coverage", "language_match")
+REQUIRED_SOFT_GATES: Final = (
+    "recall_at_10",
+    "mrr_at_10",
+    "citation_coverage",
+    "language_match",
+    "cost_per_answer_usd",  # FA-02, NFR-CST-003: eval-live fails on soft gates
+)
 
 Status = Literal["ok", "missing", "info"]
 _BOOL: Final = TypeAdapter(bool)

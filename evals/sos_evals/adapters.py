@@ -8,6 +8,7 @@ the harness never imports application code and never calls an LLM itself.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -38,6 +39,24 @@ class AnswerSegment(_Model):
     citations: tuple[Citation, ...] = ()
 
 
+class ModelCall(_Model):
+    """One metered model call made while answering (token counts as billed; NFR-CST-003).
+
+    On app runs these are the question's ``kb.llm_calls`` rows (or the live gateway's metering
+    events); the stubs record a fixed profile. Never prompt or answer text."""
+
+    role: str
+    """The ``models.yaml`` role (``answer``, ``followups``, ...)."""
+    model: str | None = None
+    """The model billed; None means the role's configured model in ``models.yaml``."""
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    cache_write_tokens: int = Field(default=0, ge=0)
+    cache_read_tokens: int = Field(default=0, ge=0)
+    called_on: date | None = None
+    """UTC call date, which picks the price in force (NFR-CST-004); None = the run date."""
+
+
 class AskResult(_Model):
     segments: tuple[AnswerSegment, ...]
     refused: bool
@@ -53,6 +72,8 @@ class AskResult(_Model):
     """Follow-up suggestions shown after the answer."""
     title: str | None = None
     """The conversation title shown for the question."""
+    calls: tuple[ModelCall, ...] = ()
+    """Every model call this question made (cost per answer, NFR-CST-003, FR-KB-046)."""
 
     @property
     def text(self) -> str:

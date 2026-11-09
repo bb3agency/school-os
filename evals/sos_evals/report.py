@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from sos_evals import authorised_recall, contextual
+from sos_evals import authorised_recall, contextual, cost
 from sos_evals.gates import GateResult
 from sos_evals.runner import ItemOutcome, Metrics, RunResult
 
@@ -33,6 +33,9 @@ LOWER_IS_BETTER = frozenset(
         "english_first_telugu_outputs",
         "conversation_scope_violations",
         "authorised_recall_leakage_count",
+        "cost_per_answer_usd",
+        "cost_per_answer_inr",
+        "cost_per_question_usd",
     }
 )
 _MAX_LISTED = 20
@@ -150,6 +153,7 @@ def to_markdown(report: Report) -> str:
                 "followup_",
                 "memory_",
                 "authorised_recall_",
+                "cost_",
             )
         )
     ]
@@ -192,6 +196,8 @@ def to_markdown(report: Report) -> str:
     lines += _english_first_lines(report.run) or ["Not measured."]
     lines += ["", "## Authorised retrieval recall (docs/06 §6)", ""]
     lines += _authorised_recall_lines(report.run) or ["Not measured."]
+    lines += ["", "## Cost per answer (FA-02, NFR-CST-003)", ""]
+    lines += cost.report_lines(report.run.metrics, report.run.cost_report) or ["Not measured."]
     return "\n".join(lines) + "\n"
 
 

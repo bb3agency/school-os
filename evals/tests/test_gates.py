@@ -73,6 +73,12 @@ PERFECT = Metrics(
     authorised_recall_at_10=1.0,
     authorised_recall_at_10_critical=1.0,
     authorised_recall_leakage_count=0,
+    cost_questions=10,
+    cost_answers=8,
+    cost_calls=20,
+    cost_per_answer_usd=0.05,
+    cost_per_answer_inr=4.8,
+    cost_per_question_usd=0.045,
 )
 
 
@@ -130,6 +136,8 @@ def test_soft_gates_match_docs_06_section_13() -> None:
         ("ctx_recall_gain_contextual", ">=", 0.10),
         ("ctx_mrr_gain_rerank", ">=", 0.0),
         ("ctx_recall_at_5_contextual_rerank", ">=", 0.90),
+        # FA-02 (NFR-CST-003): cost per answer within the bundle budget estimate.
+        ("cost_per_answer_usd", "<=", 0.06),
     } <= soft
 
 
@@ -191,6 +199,8 @@ def test_boundary_values_pass() -> None:
         {"citation_recall": None},
         {"unsupported_sentence_rate": 0.0201},
         {"unsupported_sentence_rate": None},
+        {"cost_per_answer_usd": 0.0601},
+        {"cost_per_answer_usd": None},
     ],
 )
 def test_per_sentence_release_gates_fail_only_with_fail_on_soft(change: dict[str, object]) -> None:

@@ -622,6 +622,8 @@ class AppFakeAdapter:
         )
         self.transport = EvalFakeTransport()
         self._live = live
+        self._live_sink: Any = None
+        """The live gateway's RecordingSink (its metering events never reach kb.llm_calls)."""
         self._relaxed = relaxed
         self._wire = GeminiWireFake
         # ADR-0036: the main passes run with Telugu switched ON (the dormant Telugu gates);
@@ -653,7 +655,10 @@ class AppFakeAdapter:
     def set_telugu(self, enabled: bool) -> None:
         """Rebuild the knowledge runtime with ``SOS_TELUGU_ENABLED`` = ``enabled`` (ADR-0036)."""
         if self._live:
-            gateway = live_gateway(self._relaxed)
+            from app.knowledge.gateway.metering import RecordingSink
+
+            self._live_sink = self._live_sink or RecordingSink()
+            gateway = live_gateway(self._relaxed, sink=self._live_sink)
             self.K.install_runtime(gateway=gateway, llm_config=self._relaxed, telugu=enabled)
         else:
             # ADR-0033: every role is on Gemini, so the stand-in speaks the Gemini wire through
@@ -1089,6 +1094,51 @@ class AppFakeAdapter:
             language=meta.language,
             followups=outcome.followups,
             title=meta.title,
+            calls=self.model_calls(outcome.query_id),
+        )
+
+    def model_calls(self, query_id: uuid.UUID | None) -> tuple[Any, ...]:
+        """The question's metered model calls for cost per answer (FA-02, FR-KB-046): its
+        ``kb.llm_calls`` rows, or on a live run the gateway's metering events (token counts,
+        role, model and date only)."""
+        from sos_evals.adapters import ModelCall
+
+        if query_id is None:
+            return ()
+        if self._live_sink is not None:
+            return tuple(
+                ModelCall(
+                    role=e.role,
+                    model=e.model,
+                    input_tokens=e.input_tokens,
+                    output_tokens=e.output_tokens,
+                    cache_write_tokens=e.cache_write_tokens,
+                    cache_read_tokens=e.cache_read_tokens,
+                    called_on=dt.datetime.now(dt.UTC).date(),
+                )
+                for e in self._live_sink.events
+                if e.query_id == query_id
+            )
+        with self._admin.connect() as c:
+            rows = c.execute(
+                text(
+                    "SELECT role, model, input_tokens, output_tokens, cache_write_tokens, "
+                    "cache_read_tokens, occurred_at FROM kb.llm_calls WHERE query_id = :q "
+                    "ORDER BY occurred_at"
+                ),
+                {"q": query_id},
+            ).all()
+        return tuple(
+            ModelCall(
+                role=r.role,
+                model=r.model,
+                input_tokens=r.input_tokens,
+                output_tokens=r.output_tokens,
+                cache_write_tokens=r.cache_write_tokens,
+                cache_read_tokens=r.cache_read_tokens,
+                called_on=r.occurred_at.astimezone(dt.UTC).date(),
+            )
+            for r in rows
         )
 
     # --- M4 circular reading (sos_evals.circulars; FR-CIR-008) ------------------------------
@@ -1926,7 +1976,7 @@ def build(corpus: Mapping[str, Any], items: Iterable[Any]) -> AppFakeAdapter:
 LIVE_ADAPTER: Final = "app-live"
 
 
-def live_gateway(config: Any) -> Any:
+def live_gateway(config: Any, *, sink: Any = None) -> Any:
     """The real gateway on the live providers of ``models.yaml`` (``make eval-live``; docs/06
     §13.7). Settings come from the environment (``SOS_LLM_GCP_*``; ``SOS_ANTHROPIC_API_KEY``
     only for a fallback role); everything else stays local and synthetic (testcontainers
@@ -1947,7 +1997,7 @@ def live_gateway(config: Any) -> Any:
     return build_gateway(
         settings,
         policy=StaticAiPolicy(),
-        sink=RecordingSink(),
+        sink=sink if sink is not None else RecordingSink(),
         ledger=InMemorySpendLedger(),
         counters=InMemoryKV(),
         config=config,

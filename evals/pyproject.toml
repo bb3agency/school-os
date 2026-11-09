@@ -3,9 +3,10 @@ name = "sos-evals"
 version = "0.1.0"
 description = "SchoolOS RAG evaluation harness (docs/06 §13): synthetic datasets, metrics, gates"
 requires-python = ">=3.12,<3.13"
-# Only pydantic, with the same pin as sos-api (already in uv.lock): the harness stays independent
-# of the API package so it scores any implementation through the adapter protocols.
-dependencies = ["pydantic==2.13.5"]
+# Only pydantic and PyYAML, with the same pins as sos-api (already in uv.lock): the harness stays
+# independent of the API package so it scores any implementation through the adapter protocols.
+# PyYAML reads the models.yaml price list for cost per answer (sos_evals.cost; FA-02).
+dependencies = ["pydantic==2.13.5", "pyyaml==6.0.3"]
 
 [build-system]
 requires = ["hatchling==1.32.4"]

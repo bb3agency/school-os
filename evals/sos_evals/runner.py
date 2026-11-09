@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from datetime import date
 from functools import partial
 from statistics import fmean
 
@@ -14,6 +15,7 @@ from sos_evals import (
     circulars,
     contextual,
     conversations,
+    cost,
     due,
     english_first,
     fees,
@@ -137,6 +139,14 @@ class Metrics(_Model):
     authorised_recall_at_10: float | None = None
     authorised_recall_at_10_critical: float | None = None
     authorised_recall_leakage_count: int | None = None
+    # Cost per answer (sos_evals.cost; FA-02, NFR-CST-003): recorded token counts at the
+    # models.yaml price in force on the call date. None when no call was recorded (gate fails).
+    cost_questions: int = 0
+    cost_answers: int = 0
+    cost_calls: int = 0
+    cost_per_answer_usd: float | None = None
+    cost_per_answer_inr: float | None = None
+    cost_per_question_usd: float | None = None
 
 
 def _timed[T](call: Callable[[], T]) -> tuple[T, float]:
@@ -306,6 +316,7 @@ class RunResult(_Model):
     conversation_outcomes: tuple[conversations.StepOutcome, ...] = ()
     english_first_outcomes: tuple[english_first.EnglishFirstOutcome, ...] = ()
     authorised_recall_outcomes: tuple[authorised_recall.RecallOutcome, ...] = ()
+    cost_report: cost.CostReport | None = None
 
 
 def run(
@@ -328,13 +339,17 @@ def run(
     english: english_first.EnglishFirstAdapter | None = None,
     recall: authorised_recall.AuthorisedRecallAdapter | None = None,
     recall_fast: bool = False,
+    prices: cost.PriceBook | None = None,
+    price_date: date | None = None,
 ) -> RunResult:
     """Every pass with the Telugu switch ON (the dormant Telugu gates keep running), then, with
     ``english``, the English-first pass with it OFF (the product default, ADR-0036)."""
     outcomes = []
+    answers: list[AskResult] = []
     for item in items:
         retrieved, retrieval_ms = _timed(partial(retrieval.retrieve, item.question, item.asker, K))
         answer, ask_ms = _timed(partial(ask.ask, item.question, item.asker))
+        answers.append(answer)
         outcomes.append(
             score_item(item, retrieved, answer, corpus, retrieval_ms=retrieval_ms, ask_ms=ask_ms)
         )
@@ -344,6 +359,10 @@ def run(
         if any(o.category == category for o in outcomes)
     }
     overall = aggregate(outcomes)
+    cost_report: cost.CostReport | None = None
+    if prices is not None:
+        spent, cost_report = cost.measure(answers, prices, price_date=price_date)
+        overall = overall.model_copy(update=spent.model_dump())
     circular_outcomes: tuple[circulars.CircularOutcome, ...] = ()
     if circular is not None and circular_cases:
         reading, circular_outcomes = circulars.run(circular_cases, circular)
@@ -388,4 +407,5 @@ def run(
         conversation_outcomes=conversation_outcomes,
         english_first_outcomes=english_outcomes,
         authorised_recall_outcomes=recall_outcomes,
+        cost_report=cost_report,
     )
