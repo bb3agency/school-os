@@ -294,6 +294,7 @@ Status of the requirements M0 touches. **Built** = implemented with tests named 
 | FR-REG-003 | An admission and withdrawal register print view MUST list students in admission-number order with admission number, name, parents' names, date of birth, date and class of admission, date and class of leaving and the TC serial number. *(Proposed; PO to confirm.)* | T |
 | FR-REG-004 | Register views MUST be A4 landscape print pages with bilingual headings, IST dates as DD/MM/YYYY and Telugu text that never clips; they need `register.read`ᴿ (bulk personal data, like an export, FR-EXP-004) and are audited with counts only (`register.viewed`). *(Proposed; PO to confirm.)* Telugu part: **Deferred: hidden while `SOS_TELUGU_ENABLED` is off (ADR-0036).** | T |
 | FR-REG-005 | Register entries MUST be append-only: an issued certificate's number, content and dates are frozen by a trigger, the app role has no `DELETE`, and only workflow columns (status to `cancelled`, cancellation fields, PDF state, document link) change. *(Proposed; PO to confirm.)* | T |
+
 ### 3.14 Circulars, tasks and parent notices (FR-CIR, FR-TASK, FR-NOTICE) (M4; details in 06 §4.10, §10.4-10.5, §13)
 
 Every row below is proposed from the roadmap scope (14 · M4; stories US-1601..US-1606) and waits for the product owner to confirm it.
@@ -553,6 +554,7 @@ A class plan charges what every student of the class pays. Transport by distance
 | FR-FEE-100 | The web MUST offer add-on templates in fee setup, bulk assign and unassign by class, section or picked students with a start (or end) instalment, and a per-add-on student list for the in-charge (without amounts unless `finance.read`); English only (ADR-0036), usable at 1366x768 and by keyboard. | T |
 
 **As built (FM-02, 2026-11-09; `app/fees/addons.py`, `addons_repository.py`, `addon_models.py`, `addons_schemas.py`, `addons_config.py` + `addons.yaml`, `api_addons.py`; ledger and plan-version changes in `ledger.py` (`Bucket.addon`, `plan_charged`), `repository.bucket_sums` and `setup.py`; migration `0088_fee_addons`; permission `fee.addon.read`; tests `apps/api/tests/fees/test_addons.py`, the authz matrix and BOLA through `tests/fees/addon_security_support.py`; web `/[locale]/fees/addons`).** A manual adjustment still names only heads of the account's plan, so correcting an add-on line by hand is a follow-up.
+
 ### 3.20d Accountant and management reports (FR-FEE-061..074) (FM-04; ADR-0042)
 
 Month-end and year-end questions of the accountant, principal, correspondent, trust and their CA (research `docs/research/2026-11-features/money.md` FM-04). Read-only reports over the `fin` ledger; tuition tax certificates are FM-06 (§3.20a).
