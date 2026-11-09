@@ -40,6 +40,7 @@ MessagePurpose = Literal[
     "fee_reminder",
     "fee_receipt",
     "optin_stopped",
+    "school_closure",
 ]
 
 

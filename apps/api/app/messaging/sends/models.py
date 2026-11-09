@@ -66,4 +66,30 @@ class SendRun(Base):
     queued: Mapped[int] = mapped_column(Integer, server_default=text("0"))
 
 
-__all__ = ["SCHEMA", "Broadcast", "SendRun"]
+class Closure(Base):
+    """One urgent closure message the principal sent (FP-02, migration 0088_msg_reach_closure;
+    FR-MSG-047..055). Insert-only; the reason is a config code, never free text."""
+
+    __tablename__ = "closures"
+    __table_args__ = (UniqueConstraint("tenant_id", "id"), {"schema": SCHEMA})
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    whole_school: Mapped[bool] = mapped_column(Boolean)
+    section_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), server_default=text("'{}'")
+    )
+    closed_from: Mapped[dt.date] = mapped_column(Date)
+    closed_to: Mapped[dt.date] = mapped_column(Date)
+    reason_code: Mapped[str] = mapped_column(Text)
+    recipients: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    skipped: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    languages: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    estimated_cost_inr: Mapped[Decimal] = mapped_column(Numeric(12, 2), server_default=text("0"))
+    queued: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    sent_by: Mapped[uuid.UUID]
+    sent_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+
+
+__all__ = ["SCHEMA", "Broadcast", "Closure", "SendRun"]

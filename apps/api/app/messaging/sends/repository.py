@@ -16,7 +16,7 @@ from app.core.record_tables import dump_table
 from app.core.records import RecordTable
 from app.messaging.models import Message
 from app.messaging.repository import current_tenant_id
-from app.messaging.sends.models import Broadcast, SendRun
+from app.messaging.sends.models import Broadcast, Closure, SendRun
 
 # --- broadcasts -------------------------------------------------------------------------------
 
@@ -265,6 +265,54 @@ def messages_of_run(session: Session, purpose: str, day: dt.date) -> dict[str, i
     return {str(s): int(c) for s, c in session.execute(stmt.group_by(Message.status))}
 
 
+# --- FP-02 closures (0088_msg_reach_closure) ----------------------------------------------------
+
+
+def insert_closure(session: Session, **values: Any) -> Closure:
+    row = Closure(tenant_id=current_tenant_id(session), **values)
+    session.add(row)
+    session.flush()
+    return row
+
+
+def get_closure(session: Session, closure_id: uuid.UUID) -> Closure | None:
+    return session.scalars(select(Closure).where(Closure.id == closure_id)).first()
+
+
+def list_closures(session: Session, *, since: dt.datetime, limit: int) -> list[Closure]:
+    stmt = (
+        select(Closure)
+        .where(Closure.sent_at >= since)
+        .order_by(Closure.sent_at.desc(), Closure.id.desc())
+        .limit(limit)
+    )
+    return list(session.scalars(stmt))
+
+
+def count_closures(session: Session, *, since: dt.datetime) -> int:
+    return int(
+        session.scalar(select(func.count()).select_from(Closure).where(Closure.sent_at >= since))
+        or 0
+    )
+
+
+def source_status_counts(
+    session: Session, purpose: str, source_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, dict[str, int]]:
+    """Messages per source (a closure) and status."""
+    if not source_ids:
+        return {}
+    stmt = (
+        select(Message.source_id, Message.status, func.count())
+        .where(Message.purpose == purpose, Message.source_id.in_(list(source_ids)))
+        .group_by(Message.source_id, Message.status)
+    )
+    out: dict[uuid.UUID, dict[str, int]] = {}
+    for sid, status, count in session.execute(stmt):
+        out.setdefault(sid, {})[str(status)] = int(count)
+    return out
+
+
 # --- retention ----------------------------------------------------------------------------------
 
 
@@ -282,6 +330,15 @@ def purge_broadcasts(session: Session, before: dt.datetime) -> int:
     return int(getattr(result, "rowcount", 0) or 0)
 
 
+def purge_closures(session: Session, before: dt.datetime) -> int:
+    """Closures older than ``before`` whose messages are gone (13 months, docs/05 §13)."""
+    has_messages = exists().where(
+        Message.purpose == "school_closure", Message.source_id == Closure.id
+    )
+    result = session.execute(delete(Closure).where(Closure.sent_at < before, ~has_messages))
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 def purge_runs(session: Session, before: dt.date) -> int:
     result = session.execute(delete(SendRun).where(SendRun.run_on < before))
     return int(getattr(result, "rowcount", 0) or 0)
@@ -291,6 +348,7 @@ def export_tables(session: Session) -> list[RecordTable]:
     return [
         dump_table(session, Broadcast.__table__, name="messaging_broadcasts"),
         dump_table(session, SendRun.__table__, name="messaging_send_runs"),
+        dump_table(session, Closure.__table__, name="messaging_closures"),
     ]
 
 
@@ -298,22 +356,28 @@ __all__ = [
     "broadcast_messages",
     "broadcasts_sending",
     "claim_run",
+    "count_closures",
     "due_message_ids",
     "export_tables",
     "finish_run",
     "get_broadcast",
+    "get_closure",
     "get_message",
     "guardians_sent_notice",
     "insert_broadcast",
+    "insert_closure",
     "list_broadcasts",
+    "list_closures",
     "messages_of_run",
     "purge_broadcasts",
+    "purge_closures",
     "purge_previews",
     "purge_runs",
     "queued_count",
     "recent_runs",
     "sent_since",
     "set_message",
+    "source_status_counts",
     "status_counts",
     "update_broadcast",
 ]

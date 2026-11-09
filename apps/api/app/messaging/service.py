@@ -2528,6 +2528,8 @@ _PURGE = purging.PurgeTables(
         # 0061_messaging_sends: messages reference broadcasts
         "msg.send_runs",
         "msg.broadcasts",
+        # 0088_msg_reach_closure: closure messages reference closures by source id only
+        "msg.closures",
         "msg.join_codes",
         "msg.optins",
         "msg.settings",

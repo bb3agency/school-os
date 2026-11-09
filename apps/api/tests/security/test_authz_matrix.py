@@ -9,6 +9,7 @@ route table, so a new route without a matrix entry fails the suite.
 
 from __future__ import annotations
 
+import datetime as dt
 import importlib.util
 import itertools
 import sys
@@ -2487,6 +2488,55 @@ SPECS.update(
 )
 
 
+# --- FP-01 reach follow-up and FP-02 urgent closures (FR-MSG-039..055; D85) ---------------------
+
+
+def _closure_day() -> str:
+    return (dt.datetime.now(dt.UTC) + dt.timedelta(days=1)).date().isoformat()
+
+
+SPECS.update(
+    {
+        ("GET", "/api/v1/messaging/coverage"): lambda w, r, a: (
+            "/api/v1/messaging/coverage",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/sections/{section_id}/optins/not-reached"): lambda w, r, a: (
+            f"/api/v1/sections/{w.a.ids['section_9a']}/optins/not-reached",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/messaging/broadcasts/{broadcast_id}/follow-up"): lambda w, r, a: (
+            f"/api/v1/messaging/broadcasts/{_send_broadcast(w, a)}/follow-up",
+            None,
+            {},
+        ),
+        ("POST", "/api/v1/messaging/closures/preview"): lambda w, r, a: (
+            "/api/v1/messaging/closures/preview",
+            {"whole_school": True, "closed_from": _closure_day(), "reason": "weather"},
+            {},
+        ),
+        # A digest that is not the preview's: the guard passed, the service says 409.
+        ("POST", "/api/v1/messaging/closures"): lambda w, r, a: (
+            "/api/v1/messaging/closures",
+            {
+                "whole_school": True,
+                "closed_from": _closure_day(),
+                "reason": "weather",
+                "preview_token": "cl_" + "0" * 40,
+            },
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
+        ("GET", "/api/v1/messaging/closures"): lambda w, r, a: (
+            "/api/v1/messaging/closures",
+            None,
+            {},
+        ),
+    }
+)
+
+
 # --- R2-3J: manual fee reminders, a receipt on WhatsApp, notice withdrawal ---------------------
 
 # Guard passed; the service refuses: manual fee reminders also need finance.read (FR-MSG-025).
@@ -2784,6 +2834,8 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"),
     ):
         return 409  # guard passed; a stale digest / nobody to send to (R2-3J)
+    if (method, path) == ("POST", "/api/v1/messaging/closures"):
+        return 409  # guard passed; the digest is not the preview's (FP-02)
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
     if method == "POST" and path.startswith("/api/v1/me/invitations/"):

@@ -21,7 +21,8 @@ from app.authz.catalog import system_roles
 # + R3-1B (consent.read, consent.record, privacy.breach.read, privacy.breach.manage)
 # + FC-12 (privacy.hold.manage: owner, principal; ADR-0059)
 # + FT-01 (exam.unlock for the principal; D84)
-PINNED = "398e96c29acb90e317503f2fdabf352a0686b7e0fb7d0a223d691fb5983536c6"
+# + FP-02 (message.closure.send for the principal; D85)
+PINNED = "f8d65fbf177afcd0f0b89bb7835d570a8e46434ff20c8e1828b4b1fc2c4f5827"
 
 
 def fingerprint() -> str:

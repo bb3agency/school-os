@@ -106,7 +106,7 @@ REMINDER_TOKEN_PREFIX: Final = "fr_"  # noqa: S105 - a preview digest prefix, no
 MANUAL_ALLOWED: Final = frozenset({"fee_reminder", "fee_receipt"})
 TOKEN_PREFIX: Final = "bp_"  # noqa: S105 - a preview id prefix, not a secret
 SENDING_PURPOSES: Final = frozenset(
-    {"school_notice", "absence_alert", "fee_reminder", "fee_receipt"}
+    {"school_notice", "absence_alert", "fee_reminder", "fee_receipt", "school_closure"}
 )
 # Parent link kind per purpose (ADR-0046). The target type is the R2-3H pages' contract
 # (app.public.config.PARENT_TARGET_TYPES, applied by public.service.issue_parent_link); the
@@ -121,6 +121,8 @@ _SWITCH: Final = {
     "absence_alert": "absence_alerts_enabled",
     "fee_reminder": "fee_reminders_enabled",
     "fee_receipt": "fee_receipts_enabled",
+    # FP-02: the urgent closure message is a notice to parents (FR-MSG-051).
+    "school_closure": "notices_enabled",
 }
 
 ops.register_outbox_route(SEND_EVENT, SEND_TASK)
@@ -1272,14 +1274,25 @@ def _claim(  # noqa: PLR0911 - one return per outcome
         return _skip(session, message, "too_late")
     quiet_start = settings.quiet_start if settings else dt.time(21, 0)
     quiet_end = settings.quiet_end if settings else dt.time(7, 0)
-    opens = rules.next_open(
-        now,
-        purpose=message.purpose,
-        quiet_start=quiet_start,
-        quiet_end=quiet_end,
-        early_close=cfg.early_close,
-        early_purposes=cfg.early_close_purposes,
-    )
+    if message.purpose == "school_closure":
+        # FP-02 (FR-MSG-050, ADR-0043 amendment, D85): the closure window replaces quiet
+        # hours (06:00-21:30 IST by default); a closure whose last day has passed is too late.
+        closure = repo.get_closure(session, message.source_id)
+        if closure is None or closure.closed_to < rules.ist_today(now):
+            return _skip(session, message, "too_late")
+        window = load_config().closures
+        opens = rules.closure_next_open(
+            now, window_start=window.window_start, window_end=window.window_end
+        )
+    else:
+        opens = rules.next_open(
+            now,
+            purpose=message.purpose,
+            quiet_start=quiet_start,
+            quiet_end=quiet_end,
+            early_close=cfg.early_close,
+            early_purposes=cfg.early_close_purposes,
+        )
     if opens is not None:
         repo.set_message(session, message.id, {"next_attempt_at": opens})
         return "deferred"
@@ -1389,8 +1402,9 @@ def purge_expired(tenant_id: uuid.UUID) -> dict[str, int]:
         )
         old = now - dt.timedelta(days=cfg.retention.messages_days)
         broadcasts = repo.purge_broadcasts(session, old)
+        closures = repo.purge_closures(session, old)
         runs = repo.purge_runs(session, rules.ist_today(old))
-    return {"previews": previews, "broadcasts": broadcasts, "runs": runs}
+    return {"previews": previews, "broadcasts": broadcasts, "closures": closures, "runs": runs}
 
 
 __all__ = [

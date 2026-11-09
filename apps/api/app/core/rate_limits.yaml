@@ -217,6 +217,8 @@ routes:
   POST /api/v1/privacy/notices/whatsapp/preview: [search]
   # R2-3J: a fee reminder preview reads the dues and guardians of every chosen account
   POST /api/v1/fees/reminders/preview: [search]
+  # FP-02: a closure preview reads every guardian of the school
+  POST /api/v1/messaging/closures/preview: [search]
   POST /api/v1/platform/invoice-runs: [platform_emergency]
   # audit-chain verification (R-19)
   POST /api/v1/platform/audit/verify: [platform_audit_verify]
