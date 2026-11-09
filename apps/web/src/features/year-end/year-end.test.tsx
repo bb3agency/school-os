@@ -159,14 +159,12 @@ describe("year-end form helpers (FR-YRE-004, FR-YRE-005)", () => {
     expect(choiceProblem({ result: "passed", reason: "" })).toBeNull();
   });
 
-  it("reads TC suggestions loosely until the client is regenerated (FR-YRE-014)", () => {
+  it("reads TC suggestions from the certificate preview (FR-YRE-014)", () => {
     expect(suggestionsOf(null)).toEqual([]);
+    expect(suggestionsOf({})).toEqual([]);
     expect(
       suggestionsOf({
-        input_suggestions: [
-          { key: "working_days", value: "180", source: "attendance_register" },
-          { bad: true },
-        ],
+        input_suggestions: [{ key: "working_days", value: "180", source: "attendance_register" }],
       }),
     ).toEqual([{ key: "working_days", value: "180", source: "attendance_register" }]);
   });

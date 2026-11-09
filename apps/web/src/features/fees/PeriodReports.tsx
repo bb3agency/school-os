@@ -23,15 +23,11 @@ import {
   PERIOD_KEYS,
   monthStart,
   reportFile,
-  reportGet,
   saveBlob,
   type Ageing,
   type CollectionRegister,
-  type Dcb,
   type DcbRow,
-  type Registers,
   type ReportTab,
-  type Series,
 } from "./period";
 import { financialYears } from "./tax";
 
@@ -221,7 +217,7 @@ function CollectionsReport({ today, canDownload }: { today: string; canDownload:
   const [to, setTo] = useState(today);
   const report = useApiQuery(
     PERIOD_KEYS.collections(from, to),
-    () => reportGet<CollectionRegister>(api, "collections", { from, to }),
+    () => unwrap(api.GET("/api/v1/fees/reports/collections", { params: { query: { from, to } } })),
     { enabled: from !== "" && to !== "" },
   );
   const download = useDownload();
@@ -236,7 +232,13 @@ function CollectionsReport({ today, canDownload }: { today: string; canDownload:
     disabled: download.pending,
     onSelect: () =>
       download.run(() =>
-        reportFile(api, "collections/download", { from, to, part, format }, `fees.${format}`),
+        reportFile(
+          api.GET("/api/v1/fees/reports/collections/download", {
+            params: { query: { from: from || null, to: to || null, part, format } },
+            parseAs: "blob",
+          }),
+          `fees.${format}`,
+        ),
       ),
   });
   const entries: MenuEntry[] = canDownload
@@ -399,7 +401,11 @@ function DcbReport({ canDownload }: { canDownload: boolean }) {
   );
   const [yearId, setYearId] = useState("");
   const report = useApiQuery(PERIOD_KEYS.dcb(yearId), () =>
-    reportGet<Dcb>(api, "dcb", { academic_year_id: yearId || undefined }),
+    unwrap(
+      api.GET("/api/v1/fees/reports/dcb", {
+        params: { query: { academic_year_id: yearId || null } },
+      }),
+    ),
   );
   const download = useDownload();
   const entries: MenuEntry[] = canDownload
@@ -411,9 +417,10 @@ function DcbReport({ canDownload }: { canDownload: boolean }) {
         onSelect: () =>
           download.run(() =>
             reportFile(
-              api,
-              "dcb/download",
-              { academic_year_id: yearId || undefined, format },
+              api.GET("/api/v1/fees/reports/dcb/download", {
+                params: { query: { academic_year_id: yearId || null, format } },
+                parseAs: "blob",
+              }),
               `fee-dcb.${format}`,
             ),
           ),
@@ -543,7 +550,7 @@ function RegistersReport({ today, canDownload }: { today: string; canDownload: b
   const [reasons, setReasons] = useState(false);
   const report = useApiQuery(
     PERIOD_KEYS.registers(from, to),
-    () => reportGet<Registers>(api, "registers", { from, to }),
+    () => unwrap(api.GET("/api/v1/fees/reports/registers", { params: { query: { from, to } } })),
     { enabled: from !== "" && to !== "" },
   );
   const download = useDownload();
@@ -557,9 +564,18 @@ function RegistersReport({ today, canDownload }: { today: string; canDownload: b
         onSelect: () =>
           download.run(() =>
             reportFile(
-              api,
-              "registers/download",
-              { from, to, kind, format: "csv", include_reasons: reasons || undefined },
+              api.GET("/api/v1/fees/reports/registers/download", {
+                params: {
+                  query: {
+                    from: from || null,
+                    to: to || null,
+                    kind,
+                    format: "csv",
+                    ...(reasons ? { include_reasons: true } : {}),
+                  },
+                },
+                parseAs: "blob",
+              }),
               `fee-${kind}.csv`,
             ),
           ),
@@ -705,7 +721,9 @@ function AgeingReport({ canDownload }: { canDownload: boolean }) {
   const tc = useTranslations("common");
   const locale = useLocale() as Locale;
   const api = useBffClient("staff");
-  const report = useApiQuery(PERIOD_KEYS.ageing, () => reportGet<Ageing>(api, "ageing"));
+  const report = useApiQuery(PERIOD_KEYS.ageing, () =>
+    unwrap(api.GET("/api/v1/fees/reports/ageing")),
+  );
   const download = useDownload();
   const entries: MenuEntry[] = canDownload
     ? (["csv", "xlsx"] as const).map((format) => ({
@@ -715,7 +733,13 @@ function AgeingReport({ canDownload }: { canDownload: boolean }) {
         disabled: download.pending,
         onSelect: () =>
           download.run(() =>
-            reportFile(api, "ageing/download", { format }, `fee-ageing.${format}`),
+            reportFile(
+              api.GET("/api/v1/fees/reports/ageing/download", {
+                params: { query: { format } },
+                parseAs: "blob",
+              }),
+              `fee-ageing.${format}`,
+            ),
           ),
       }))
     : [];
@@ -826,7 +850,11 @@ function YearEndReport({
   const api = useBffClient("staff");
   const [fy, setFy] = useState(financialYear);
   const series = useApiQuery(PERIOD_KEYS.series(fy), () =>
-    reportGet<Series>(api, "receipt-series", { financial_year: fy }),
+    unwrap(
+      api.GET("/api/v1/fees/reports/receipt-series", {
+        params: { query: { financial_year: fy } },
+      }),
+    ),
   );
   const download = useDownload();
   return (
@@ -844,7 +872,13 @@ function YearEndReport({
             disabled={download.pending}
             onClick={() =>
               download.run(() =>
-                reportFile(api, "year-end-pack", { financial_year: fy }, `fee-year-end-${fy}.zip`),
+                reportFile(
+                  api.GET("/api/v1/fees/reports/year-end-pack", {
+                    params: { query: { financial_year: fy } },
+                    parseAs: "blob",
+                  }),
+                  `fee-year-end-${fy}.zip`,
+                ),
               )
             }
           >

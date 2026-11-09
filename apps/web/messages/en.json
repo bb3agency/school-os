@@ -9588,6 +9588,7 @@
       "concession_reversal": "Concession undone",
       "correction": "Correction",
       "write_off": "Written off by management",
+      "addon_removal": "Add-on fee taken off",
       "other": "Other reason"
     },
     "approvalKinds": {

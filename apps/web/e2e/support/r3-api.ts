@@ -790,6 +790,7 @@ function draft(): Schemas["DisclosureDraftOut"] {
     inputs: { affiliation_no: "SYN0000001" },
     documents: {},
     missing: [],
+    expired_policy: "warn",
     updated_at: "2026-10-30T05:00:00Z",
     updated_by_name: "Synthetica Principal",
     version: state.draftVersion,

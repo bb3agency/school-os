@@ -76,7 +76,7 @@ function CertificateDialog({
   const kindInfo = register.kinds.find((k) => k.kind === kind);
   const docOptions =
     docs.status === "ready" ? docs.data.data.map((d) => ({ value: d.id, label: d.title })) : [];
-  const ownerOptions = register.owners.map((o) => ({
+  const ownerOptions = (register.owners ?? []).map((o) => ({
     value: o.membership_id,
     label: o.display_name ?? o.membership_id,
   }));

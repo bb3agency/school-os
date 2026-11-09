@@ -36,7 +36,6 @@ import { LoadGate, ProblemList, SectionPicker } from "./parts";
 import { SheetImport } from "./SheetImport";
 import { useUnsavedChangesWarning } from "@/features/sheets/unsaved";
 import { DialogCloseButton } from "@/components/ui/DialogCloseButton";
-import type { CalendarDay } from "@/features/school-calendar/data";
 
 /** One day of the register as a form: every student gets one status (US-1701). */
 function DayForm({
@@ -138,9 +137,8 @@ function DayForm({
     }
   }
 
-  // FT-06 (FR-CAL-010): the day in the school calendar. Not in the generated client yet,
-  // so read through a local type until the lead regenerates it.
-  const dayOff = (day as typeof day & { calendar?: CalendarDay | null }).calendar ?? null;
+  // FT-06 (FR-CAL-010): the day in the school calendar.
+  const dayOff = day.calendar ?? null;
   const changed = day.students.some(
     (row) => statuses[row.student.student_id] !== baseline[row.student.student_id],
   );
