@@ -209,6 +209,13 @@ export function SchoolShell({
           icon: "file",
         },
         {
+          // FC-03: DPDP readiness checklist (not legal advice).
+          href: "/privacy/readiness",
+          label: t("privacy.nav.readiness"),
+          permission: "privacy.read",
+          icon: "checkCircle",
+        },
+        {
           href: "/privacy/breaches",
           label: t("breaches.nav"),
           permission: "privacy.breach.read",
