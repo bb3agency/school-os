@@ -103,6 +103,9 @@ def test_FR_COMP_003_register_lists_expected_kinds_as_missing(api: Any, school: 
     assert reg["counts"]["missing"] == len(reg["rows"])
     assert reg["verified"] is False
     assert {k["kind"] for k in reg["kinds"]} >= {"fire_noc", "other"}
+    owners = {o["membership_id"] for o in reg["owners"]}
+    assert str(school.people["office_staff"].membership_id) in owners
+    assert _register(api, school.people["auditor_readonly"])["owners"] == []
 
 
 def test_FR_COMP_004_record_renew_keeps_history_and_audits(

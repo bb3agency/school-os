@@ -278,6 +278,17 @@ def register(session: Session, ctx: UserContext) -> RegisterOut:
         expiring_days=cat.expiring_days,
         verified=cat.verified,
         today=day,
+        owners=_owner_choices(session) if ctx.has(MANAGE) else [],
+    )
+
+
+def _owner_choices(session: Session) -> list[OwnerOut]:
+    return sorted(
+        (
+            OwnerOut(membership_id=m.membership_id, display_name=m.display_name, active=True)
+            for m in identity.active_members(session)
+        ),
+        key=lambda o: (o.display_name or "").casefold(),
     )
 
 

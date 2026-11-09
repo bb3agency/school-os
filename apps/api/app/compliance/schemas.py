@@ -156,6 +156,10 @@ class RegisterOut(BaseModel):
     expiring_days: int
     verified: bool = Field(description="false: the catalogue is not checked against the rules.")
     today: dt.date
+    owners: list[OwnerOut] = Field(
+        default_factory=list,
+        description="Active members a renewal can be given to (only for compliance.manage).",
+    )
 
 
 class CertificateDetailOut(CertificateOut):
