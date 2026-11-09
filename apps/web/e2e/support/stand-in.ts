@@ -521,6 +521,7 @@ const EXAMS = [
     academic_year_id: YEAR_ID,
     name: "Formative assessment 1",
     held_on: "2026-08-10",
+    locked: false,
     version: 1,
   },
 ] satisfies components["schemas"]["ExamOut"][];

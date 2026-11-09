@@ -136,6 +136,7 @@ const MATCH: AccountSummary = {
   academic_year_id: "0192f3a4-0000-7000-8000-00000000f301",
   balance: "6100.00",
   overdue: "3100.00",
+  earlier_years_due: "0.00",
   status: "open",
 };
 

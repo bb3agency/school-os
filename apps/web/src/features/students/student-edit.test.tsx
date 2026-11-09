@@ -57,6 +57,7 @@ function enrolment(extra: Partial<Schemas["EnrollmentOut"]> = {}): Schemas["Enro
     roll_no: "12",
     status: "active",
     started_on: "2026-06-01",
+    started_on_explicit: true,
     ended_on: null,
     version: 6,
     ...extra,

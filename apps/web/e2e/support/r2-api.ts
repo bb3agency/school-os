@@ -188,6 +188,7 @@ const OTHER_ACCOUNT: Schemas["AccountSummary"] = {
   academic_year_id: YEAR_ID,
   balance: "3000.00",
   overdue: "0.00",
+  earlier_years_due: "0.00",
   status: "open",
 };
 
@@ -201,6 +202,7 @@ function summary(account: Schemas["AccountOut"]): Schemas["AccountSummary"] {
     academic_year_id: account.academic_year_id,
     balance: account.totals.balance,
     overdue: account.totals.overdue,
+    earlier_years_due: "0.00",
     status: account.status,
   };
 }
@@ -231,6 +233,7 @@ const DUES: Schemas["ParentDuesOut"] = {
   child_first_name: "Lakshmi",
   class_name: "Class VII",
   as_of: "2026-10-21",
+  earlier_years: [],
   instalments: [
     {
       instalment_no: 1,
