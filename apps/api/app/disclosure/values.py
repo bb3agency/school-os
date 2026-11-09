@@ -14,6 +14,10 @@ of ``value``, ``table``, ``documents`` or ``link`` per item).
 - Board results are numbers per year and class (no names); a count below
   :data:`SMALL_COUNT` is published as "fewer than 10" and its pass percentage left out
   (FR-DISC-006, owner decision D42).
+- Count tables (format version 2: staff by category and qualification) hold whole numbers per
+  row and column of the format, never names (FR-DISC-016, lead decision D84).
+- A draft saved with an older format version moves to the current one with the items that are
+  the same in both (:func:`carry_over`, FR-DISC-014).
 """
 
 from __future__ import annotations
@@ -21,7 +25,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 import unicodedata
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any, Final
@@ -195,6 +199,31 @@ def _results(raw: object, item: FormatItem) -> list[dict[str, Any]]:
     return sorted(rows, key=lambda r: (r["year"], RESULT_CLASSES.index(r["class_level"])))
 
 
+def _count_table(raw: object, item: FormatItem) -> dict[str, dict[str, int]]:
+    if item.rows is None or item.columns is None:
+        raise Rejected("not_editable")
+    if not isinstance(raw, dict):
+        raise Rejected("invalid")
+    rows = {r.key for r in item.rows}
+    columns = {c.key for c in item.columns}
+    out: dict[str, dict[str, int]] = {}
+    for row_key, cells in raw.items():
+        if row_key not in rows or not isinstance(cells, dict):
+            raise Rejected("invalid")
+        kept: dict[str, int] = {}
+        for col_key, count in cells.items():
+            if col_key not in columns:
+                raise Rejected("invalid")
+            if count is None:
+                continue
+            kept[col_key] = _integer(count, item)
+        if kept:
+            out[row_key] = {c.key: kept[c.key] for c in item.columns if c.key in kept}
+    if not out:
+        raise Rejected("required")
+    return {r.key: out[r.key] for r in item.rows if r.key in out}
+
+
 def _link(raw: object) -> str:
     if not isinstance(raw, str):
         raise Rejected("invalid")
@@ -209,23 +238,33 @@ def _link(raw: object) -> str:
     return text
 
 
+def _yes_no(raw: object, item: FormatItem) -> bool:
+    del item
+    if not isinstance(raw, bool):
+        raise Rejected("invalid")
+    return raw
+
+
+_CHECKS: Final[dict[str, Callable[[object, FormatItem], object]]] = {
+    "text": _text,
+    "email": _text,
+    "phone": _text,
+    "integer": _integer,
+    "number": _number,
+    "yes_no": _yes_no,
+    "results": _results,
+    "count_table": _count_table,
+}
+
+
 def check_value(item: FormatItem, raw: object) -> object:
     """The normalised value of one input or link item, or :class:`Rejected`."""
     if item.fill == "link":
         return _link(raw)
-    if item.type in ("text", "email", "phone"):
-        return _text(raw, item)
-    if item.type == "integer":
-        return _integer(raw, item)
-    if item.type == "number":
-        return _number(raw, item)
-    if item.type == "yes_no":
-        if not isinstance(raw, bool):
-            raise Rejected("invalid")
-        return raw
-    if item.type == "results":
-        return _results(raw, item)
-    raise Rejected("not_editable")
+    check = _CHECKS.get(item.type or "")
+    if check is None:
+        raise Rejected("not_editable")
+    return check(raw, item)
 
 
 def check_inputs(
@@ -243,11 +282,68 @@ def check_inputs(
             continue
         if isinstance(raw, list) and not raw and item.type == "results":
             continue
+        if item.type == "count_table" and _empty_counts(raw):
+            continue
         try:
             out[key] = check_value(item, raw)
         except Rejected as exc:
             problems.add(f"inputs.{key}", exc.code)
     return out, problems
+
+
+def _empty_counts(raw: object) -> bool:
+    if not isinstance(raw, dict):
+        return False
+    return all(
+        isinstance(cells, dict) and all(v is None for v in cells.values()) for cells in raw.values()
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class CarryOver:
+    """A draft moved to another format version (FR-DISC-014): what was kept and the item keys
+    that were left behind (not in the new version, filled differently, or a value it refuses)."""
+
+    inputs: dict[str, object]
+    documents: dict[str, list[str]]
+    dropped: tuple[str, ...]
+
+
+def _same_kind(old: FormatItem, new: FormatItem) -> bool:
+    return old.fill == new.fill and old.type == new.type
+
+
+def carry_over(
+    old: DisclosureFormat,
+    new: DisclosureFormat,
+    inputs: Mapping[str, object],
+    documents: Mapping[str, Sequence[str]],
+) -> CarryOver:
+    """Move a draft's typed values and chosen documents from ``old`` to ``new``: an item is kept
+    when ``new`` has an item with the same key, the same fill and type, and accepts the value
+    (its limits may be narrower); documents are kept for items of ``new`` that take documents.
+    Pure; the same call on the same draft gives the same result."""
+    kept_inputs: dict[str, object] = {}
+    kept_documents: dict[str, list[str]] = {}
+    dropped: set[str] = set()
+    for key, value in inputs.items():
+        before, after = old.item(key), new.item(key)
+        if before is None or after is None or not _same_kind(before, after):
+            dropped.add(key)
+            continue
+        try:
+            kept_inputs[key] = check_value(after, value)
+        except Rejected:
+            dropped.add(key)
+    for key, ids in documents.items():
+        after = new.item(key)
+        if not ids:
+            continue
+        if after is None or not after.takes_documents:
+            dropped.add(key)
+            continue
+        kept_documents[key] = [str(i) for i in ids][:MAX_DOCUMENTS_PER_ITEM]
+    return CarryOver(inputs=kept_inputs, documents=kept_documents, dropped=tuple(sorted(dropped)))
 
 
 def check_document_keys(
@@ -322,11 +418,28 @@ def results_table(rows: Sequence[Mapping[str, Any]]) -> Table:
     return Table(columns=RESULT_COLUMNS, rows=tuple(out))
 
 
+def count_table(item: FormatItem, value: Mapping[str, Any]) -> Table:
+    """A count table as published: one row per filled category in the format's order, the
+    format's columns and a total (staff counts are adults: no small-count suppression)."""
+    columns = item.columns or ()
+    rows: list[tuple[str, ...]] = []
+    for row in item.rows or ():
+        cells = value.get(row.key)
+        if not isinstance(cells, Mapping):
+            continue
+        counts = [cells.get(c.key) for c in columns]
+        total = sum(int(c) for c in counts if isinstance(c, int))
+        rows.append((row.label, *("" if c is None else str(c) for c in counts), str(total)))
+    return Table(columns=("Category", *(c.label for c in columns), "Total"), rows=tuple(rows))
+
+
 def input_display(item: FormatItem, value: object) -> tuple[str | None, Table | None]:
     if item.type == "yes_no":
         return ("Yes" if value else "No"), None
     if item.type == "results" and isinstance(value, list):
         return None, results_table(value)
+    if item.type == "count_table" and isinstance(value, Mapping):
+        return None, count_table(item, value)
     return str(value), None
 
 
@@ -395,16 +508,19 @@ __all__ = [
     "MAX_DOCUMENTS_PER_ITEM",
     "NOT_RECORDED",
     "SMALL_COUNT",
+    "CarryOver",
     "Derived",
     "Problems",
     "PublishedDocument",
     "Rejected",
     "Table",
     "build_content",
+    "carry_over",
     "check_document_keys",
     "check_inputs",
     "check_value",
     "clean_text",
+    "count_table",
     "count_text",
     "format_date",
     "group_indian",

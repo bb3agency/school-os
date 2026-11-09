@@ -36,17 +36,32 @@ class FormatSourceOut(_Out):
     url: str | None
 
 
+class FormatChoiceOut(_Out):
+    """A row or column of a ``count_table`` item."""
+
+    key: str
+    label: str
+
+
 class FormatItemOut(_Out):
     key: str
     label: str
     fill: Literal["school", "derived", "input", "document", "link"]
-    type: Literal["text", "integer", "number", "yes_no", "email", "phone", "results"] | None
+    type: (
+        Literal["text", "integer", "number", "yes_no", "email", "phone", "results", "count_table"]
+        | None
+    ) = Field(
+        description="``count_table`` (format version 2): whole numbers per row and column, sent "
+        "as ``{row_key: {column_key: n}}`` (counts only, never names; FR-DISC-016)."
+    )
     required: bool
     contact: bool
     takes_documents: bool = Field(description="The item accepts school documents (PDFs).")
     max_length: int | None
     max_value: int | None
     max_rows: int | None
+    rows: list[FormatChoiceOut] | None = Field(default=None, description="count_table rows.")
+    columns: list[FormatChoiceOut] | None = Field(default=None, description="count_table columns.")
 
 
 class FormatSectionOut(_Out):
@@ -129,7 +144,17 @@ class DraftDocumentOut(_Out):
 
 class DisclosureDraftOut(_Out):
     format_key: str
-    format_version: int
+    format_version: int = Field(description="The format version the draft is edited in (current).")
+    carried_over_from: int | None = Field(
+        default=None,
+        description="The older format version the draft was last saved with, when its items were "
+        "carried over to the current version (FR-DISC-014); null otherwise.",
+    )
+    dropped: list[str] = Field(
+        default_factory=list,
+        description="Item keys of the older version that were not carried over (saving the "
+        "draft discards them).",
+    )
     inputs: dict[str, Any]
     documents: dict[str, list[DraftDocumentOut]]
     from_schoolos: dict[str, DerivedValueOut] = Field(
@@ -204,6 +229,7 @@ __all__ = [
     "FileFormat",
     "FileLinkOut",
     "FileStatus",
+    "FormatChoiceOut",
     "FormatItemOut",
     "FormatSectionOut",
     "FormatSourceOut",

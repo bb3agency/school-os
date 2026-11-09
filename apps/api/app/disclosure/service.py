@@ -19,8 +19,12 @@ FR-DISC-001..012; SEC-050, PRV-037, NFR-PRV-006). Other modules call only this m
 - **Files (FR-DISC-011).** Rendered by the worker under the school's ``exports/`` prefix (the
   bucket expires them after 7 days; a later download makes them again).
 - **No student data (FR-DISC-006).** The format has no student item; derived values are counts
-  and school-level facts from ``tenancy``, ``identity`` and ``fees`` services; result counts below
-  10 are "fewer than 10".
+  and school-level facts from ``tenancy``, ``identity``, ``students`` (registered students per
+  class, format version 2) and ``fees`` services; counts of students below 10 are "fewer than 10".
+- **Format versions (FR-DISC-013, FR-DISC-014).** New drafts use the current format version
+  (version 2 since FC-02). A draft saved with an older version is shown, saved and published
+  with the items that are the same in both versions (``carried_over_from`` and ``dropped`` say
+  what happened); published snapshots keep their own version and frozen content.
 """
 
 from __future__ import annotations
@@ -211,6 +215,25 @@ def _from_schoolos(session: Session, fmt: formats.DisclosureFormat) -> dict[str,
     return out
 
 
+def _draft_values(
+    draft: DisclosureDraft | None, fmt: formats.DisclosureFormat
+) -> tuple[dict[str, Any], dict[str, list[str]], int | None, list[str]]:
+    """The draft's inputs and documents for ``fmt``: as saved when the draft already uses it,
+    otherwise carried over from the version it was saved with (FR-DISC-014). Also the version
+    it was carried from (``None`` when nothing moved) and the item keys left behind."""
+    if draft is None:
+        return {}, {}, None, []
+    inputs: dict[str, Any] = dict(draft.inputs or {})
+    chosen: dict[str, list[str]] = {
+        k: [str(i) for i in v] for k, v in (draft.documents or {}).items()
+    }
+    if (draft.format_key, draft.format_version) == (fmt.key, fmt.version):
+        return inputs, chosen, None, []
+    old = formats.get(draft.format_key, draft.format_version) or fmt
+    moved = values.carry_over(old, fmt, inputs, chosen)
+    return dict(moved.inputs), moved.documents, draft.format_version, list(moved.dropped)
+
+
 def _draft_documents(
     session: Session, ctx: UserContext, chosen: dict[str, list[str]]
 ) -> dict[str, list[DraftDocumentOut]]:
@@ -233,12 +256,13 @@ def _draft_out(
     session: Session, ctx: UserContext, draft: DisclosureDraft | None
 ) -> DisclosureDraftOut:
     fmt = formats.current()
-    inputs: dict[str, Any] = dict(draft.inputs) if draft else {}
-    chosen: dict[str, list[str]] = dict(draft.documents) if draft else {}
+    inputs, chosen, carried_from, dropped = _draft_values(draft, fmt)
     names = _names(session, [draft.updated_by] if draft else [])
     return DisclosureDraftOut(
         format_key=fmt.key,
         format_version=fmt.version,
+        carried_over_from=carried_from,
+        dropped=dropped,
         inputs=inputs,
         documents=_draft_documents(session, ctx, chosen),
         from_schoolos=_from_schoolos(session, fmt),
@@ -289,6 +313,11 @@ def put_draft(
     current = draft.version if draft else 0
     if expected_version != current:
         raise PreconditionFailed()
+    from_version = (
+        draft.format_version
+        if draft is not None and (draft.format_key, draft.format_version) != (fmt.key, fmt.version)
+        else None
+    )
     if draft is None:
         try:
             with session.begin_nested():
@@ -320,7 +349,12 @@ def put_draft(
         session,
         "disclosure.draft_saved",
         draft.id,
-        {"inputs": sorted(inputs), "documents": sum(len(v) for v in chosen.values())},
+        {
+            "inputs": sorted(inputs),
+            "documents": sum(len(v) for v in chosen.values()),
+            "format_version": fmt.version,
+            **({"from_version": from_version} if from_version is not None else {}),
+        },
         resource_type="disclosure_draft",
     )
     return _draft_out(session, ctx, draft)
@@ -409,7 +443,7 @@ def publish(session: Session, ctx: UserContext, body: PublishIn) -> SnapshotOut:
         )
     fmt = formats.current()
     draft = repo.get_draft(session, lock=True)
-    inputs: dict[str, Any] = dict(draft.inputs) if draft else {}
+    inputs, chosen, _from, _dropped = _draft_values(draft, fmt)
     missing = values.missing_required(fmt, inputs)
     if draft is None or missing:
         raise Incomplete(
@@ -426,7 +460,7 @@ def publish(session: Session, ctx: UserContext, body: PublishIn) -> SnapshotOut:
     published: list[values.PublishedDocument] = []
     n = 0
     for item in fmt.items():
-        for raw in (draft.documents or {}).get(item.key, []):
+        for raw in chosen.get(item.key, []):
             doc_id = uuid.UUID(str(raw))
             found = documents.publishable_version(session, doc_id)
             if found is None or not documents.is_visible(session, ctx, doc_id):
