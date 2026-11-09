@@ -106,8 +106,9 @@ def test_US_2901_AC1_derived_values_come_from_schoolos(api: Any, school: Any) ->
     assert derived["teacher_section_ratio"]["value"] == "0.67"
     assert derived["principal_name"]["value"] == school.people["principal"].display_name
     assert derived["academic_session"]["value"].startswith("2026-27 (01 Jun 2026")
-    roles = dict(map(tuple, derived["staff_by_role"]["table"]["rows"]))
-    assert roles["Principal"] == "1"
+    categories = dict(map(tuple, derived["staff_by_category"]["table"]["rows"]))
+    assert categories["Principal"] == "1"
+    assert "staff_by_role" not in derived  # version 1 only; version 2 has staff by category
     assert derived["fee_structure"] == {"value": None, "table": None}  # fees are off
     assert body["missing"] == [
         "affiliation_no",

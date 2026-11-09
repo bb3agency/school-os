@@ -52,7 +52,7 @@ def test_FR_DISC_002_every_item_declares_a_known_fill() -> None:
 
 def test_FR_DISC_002_an_unknown_fill_or_source_fails_the_load() -> None:
     raw = yaml.safe_load(
-        (Path(formats.FORMATS_DIR) / "cbse-appendix-ix.yaml").read_text(encoding="utf-8")
+        (Path(formats.FORMATS_DIR) / "cbse-appendix-ix.v2.yaml").read_text(encoding="utf-8")
     )
     bad_fill = dict(raw)
     bad_fill["sections"] = [
@@ -74,7 +74,7 @@ def test_FR_DISC_002_an_unknown_fill_or_source_fails_the_load() -> None:
 
 def test_FR_DISC_006_no_item_may_describe_an_individual_child() -> None:
     raw = yaml.safe_load(
-        (Path(formats.FORMATS_DIR) / "cbse-appendix-ix.yaml").read_text(encoding="utf-8")
+        (Path(formats.FORMATS_DIR) / "cbse-appendix-ix.v2.yaml").read_text(encoding="utf-8")
     )
     raw["sections"] = [
         {

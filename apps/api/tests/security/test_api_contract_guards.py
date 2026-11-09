@@ -374,6 +374,7 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.disclosure.schemas.DisclosureFormatOut.key": "disclosure format code",
     "app.disclosure.schemas.FormatSectionOut.key": "disclosure section code",
     "app.disclosure.schemas.FormatItemOut.key": "disclosure item code",
+    "app.disclosure.schemas.FormatChoiceOut.key": "count table row or column code (FC-02)",
     "app.disclosure.schemas.PublicSectionOut.key": "disclosure section code",
     "app.disclosure.schemas.PublicItemOut.key": "disclosure item code",
     "app.disclosure.schemas.DisclosureDraftOut.format_key": "disclosure format code",

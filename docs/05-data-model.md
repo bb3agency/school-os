@@ -1626,7 +1626,9 @@ Offboarding owner `privacy_breach`; the incident tables stay with SchoolOS (no p
 
 **Retention (lead decision D58, `0075_breach_retention`).** The nightly `privacy.breach_purge` (03:15 IST; active, suspended and offboarding schools, each in its own `tenant_session`; one failing school does not stop the others) deletes a breach closed more than `retention.closed_years` ago (`app/privacy/breach_templates.yaml`, 3, at least 3) with its `breach_affected` and `breach_reminders` rows, and writes one audit event `privacy.breach.retention_purged` per school (actor `system`; counts only) when it deleted anything. `sos_app` has DELETE on `ops.breach_records` limited by the restrictive policy `breach_records_delete_expired` (`status = 'closed' AND closed_at < now() - interval '3 years'`). A reopened breach is `open` with `closed_at` NULL (CHECK `breach_records_closed`) and is never deleted; closing it again restarts the clock. The audit events of a deleted breach stay (the audit log is append-only); in-app notifications and M4 notice drafts made from it follow their own retention.
 
-### 16.4 Disclosure (`ops`, `core`; ADR-0051, FR-DISC-001..012; `0065_disclosure`)
+### 16.4 Disclosure (`ops`, `core`; ADR-0051, FR-DISC-001..019; `0065_disclosure`)
+
+Format version 2 (FC-02, 2026-11-09) needs no schema change: `format_version` already allows any version >= 1. A draft keeps the version it was last saved with until the next save (reads and publishing carry its matching items over to the current version, FR-DISC-014); snapshots keep theirs for ever. `inputs` may hold a count table (`{row: {column: n}}`, whole numbers, no names; lead decision D84).
 
 | Table | Class | Key columns and rules |
 |---|---|---|

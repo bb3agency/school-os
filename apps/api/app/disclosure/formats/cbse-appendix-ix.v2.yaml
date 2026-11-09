@@ -1,0 +1,121 @@
+# CBSE "mandatory public disclosure", Appendix IX as revised by CBSE circular 1/2026 (12 Jan 2026)
+# (ADR-0051 decision 1 and its 2026-11-09 amendment; FR-DISC-013..FR-DISC-025; FC-02).
+# Version 2 of cbse-appendix-ix: new drafts use it; version 1 (cbse-appendix-ix.v1.yaml) stays
+# unchanged so that snapshots published with it keep their key, version and frozen content.
+# A draft saved with version 1 moves to version 2 with every item whose key, fill and type are the
+# same in both and whose value version 2 still accepts (FR-DISC-014).
+#
+# Built from public SECONDARY summaries of the revised Appendix IX, NOT from the circular's own
+# annexure (the copy found is a scan that was not read; owner question D3): `verified` stays false
+# until a CBSE school confirms the list. New in version 2, as the summaries name them: the number
+# of registered students, the strength and qualifications of the principal, vice principals,
+# head teachers, PGT/TGT/PRT, special educators and counsellors, CWSN-friendly toilets, the
+# library, and the DEO certificate or self-certification.
+#
+# Staff are published as COUNTS only (lead decision D84, PO to confirm): numbers by category and
+# by qualification, never a list of named teachers (that would publish staff personal data and
+# need the school's notice to staff; ADR-0051 amendment). Registered students are counts per
+# class from the current academic year's active enrolments; a count below 10 is published as
+# "fewer than 10" (NFR-PRV-006, owner decision D42).
+#
+# Fills and types as in version 1 (see cbse-appendix-ix.v1.yaml), plus:
+#   input count_table   counts per row and column (rows and columns listed here); 0 to max_value
+key: cbse-appendix-ix
+version: 2
+board: CBSE
+title: Mandatory public disclosure (CBSE Appendix IX)
+verified: false
+sources:
+  - title: "CBSE schools must publish results, fees and teacher details online by 15 February 2026 (Careers360, secondary summary of circular 1/2026 and the revised Appendix IX)"
+    url: https://news.careers360.com/cbse-schools-class-10-12-results-fees-student-teacher-details-online-by-february-15-2026-affiliation-rules-public-disclosures
+  - title: "CBSE circular 1/2026 as hosted by a school (scanned copy; annexure not read, D3)"
+    url: https://psbbmillenniumschool.org/wp-content/uploads/2026/01/circular-1.pdf
+  - title: "How many schools violate CBSE regulations on mandatory disclosures (Careers360)"
+    url: https://news.careers360.com/how-many-schools-violate-cbse-regulations-on-mandatory-disclosures
+  - title: "CBSE Affiliation Bye-Laws 2018, Appendix IX (official copy not yet checked; D3)"
+
+sections:
+  - key: general
+    title: A. General information
+    items:
+      - {key: school_name, label: "Name of the school", fill: school, source: school.name}
+      - {key: affiliation_no, label: "Affiliation number", fill: input, type: text, max_length: 40, required: true}
+      - {key: school_code, label: "School code", fill: input, type: text, max_length: 40, required: true}
+      - {key: address, label: "Complete address with pin code", fill: school, source: school.address}
+      - {key: principal_name, label: "Principal's name", fill: derived, source: principal}
+      - {key: principal_qualification, label: "Principal's qualification", fill: input, type: text, max_length: 200, required: true}
+      - {key: school_email, label: "School e-mail", fill: input, type: email, max_length: 120, required: true, contact: true}
+      - {key: contact_phone, label: "Contact numbers", fill: input, type: phone, max_length: 60, required: true, contact: true}
+
+  - key: documents
+    title: B. Documents and information
+    items:
+      - {key: affiliation_letter, label: "Copies of the affiliation or upgradation letter and the recent extension of affiliation", fill: document}
+      - {key: trust_registration, label: "Copies of the societies, trust or company registration and renewal certificate", fill: document}
+      - {key: noc, label: "Copy of the no objection certificate (NOC) issued by the state government", fill: document}
+      - {key: rte_recognition, label: "Copy of the recognition certificate under the RTE Act 2009 and its renewal", fill: document}
+      - {key: building_safety, label: "Copy of the valid building safety certificate", fill: document}
+      - {key: fire_safety, label: "Copy of the valid fire safety certificate", fill: document}
+      - {key: deo_certificate, label: "Copy of the DEO certificate or the school's self-certification submitted for affiliation, upgradation or extension", fill: document}
+      - {key: sanitation_certificates, label: "Copies of valid water, health and sanitation certificates", fill: document}
+
+  - key: academics
+    title: C. Results and academics
+    items:
+      - {key: academic_session, label: "Academic session", fill: derived, source: academic_year}
+      - {key: registered_students, label: "Number of registered students in each class (current academic year)", fill: derived, source: registered_students}
+      - {key: fee_structure, label: "Fee structure of the school", fill: derived, source: fee_structure, documents: true}
+      - {key: academic_calendar, label: "Annual academic calendar", fill: document}
+      - {key: smc_list, label: "List of the school management committee (SMC)", fill: document}
+      - {key: pta_list, label: "List of the parents teachers association (PTA) members", fill: document}
+      - {key: board_results, label: "Last three years' results of the board examination (Class X and Class XII)", fill: input, type: results, max_rows: 6}
+
+  - key: staff
+    title: D. Staff
+    items:
+      - {key: principal, label: "Principal", fill: derived, source: principal}
+      - {key: vice_principal_count, label: "Number of vice principals", fill: input, type: integer, max_value: 100}
+      - {key: head_teacher_count, label: "Number of head teachers or headmistresses", fill: input, type: integer, max_value: 100}
+      - {key: teachers_total, label: "Total number of teachers (in SchoolOS)", fill: derived, source: teachers_total}
+      - {key: pgt_count, label: "Number of PGT", fill: input, type: integer, max_value: 1000}
+      - {key: tgt_count, label: "Number of TGT", fill: input, type: integer, max_value: 1000}
+      - {key: prt_count, label: "Number of PRT", fill: input, type: integer, max_value: 1000}
+      - {key: sections_count, label: "Number of sections", fill: derived, source: sections_count}
+      - {key: teacher_section_ratio, label: "Teachers section ratio", fill: derived, source: teacher_section_ratio}
+      - {key: staff_by_category, label: "Staff strength by category (staff in SchoolOS)", fill: derived, source: staff_by_category}
+      - key: staff_qualifications
+        label: "Staff by category and highest qualification (number of staff)"
+        fill: input
+        type: count_table
+        max_value: 1000
+        rows:
+          - {key: principal, label: "Principal"}
+          - {key: vice_principal, label: "Vice principals"}
+          - {key: head_teacher, label: "Head teachers"}
+          - {key: pgt, label: "PGT"}
+          - {key: tgt, label: "TGT"}
+          - {key: prt, label: "PRT"}
+          - {key: special_educator, label: "Special educators"}
+          - {key: counsellor, label: "Counsellors and wellness teachers"}
+        columns:
+          - {key: doctorate, label: "Doctorate"}
+          - {key: postgraduate_bed, label: "Post-graduate with B.Ed."}
+          - {key: graduate_bed, label: "Graduate with B.Ed."}
+          - {key: diploma, label: "D.El.Ed. or equivalent diploma"}
+          - {key: other, label: "Other"}
+      - {key: special_educator, label: "Details of the special educator", fill: input, type: text, max_length: 300}
+      - {key: counsellor, label: "Details of the counsellor and wellness teacher", fill: input, type: text, max_length: 300}
+
+  - key: infrastructure
+    title: E. School infrastructure
+    items:
+      - {key: campus_area, label: "Total campus area of the school (in square metres)", fill: input, type: number, max_value: 10000000}
+      - {key: classrooms, label: "Number and size of the classrooms (in square metres)", fill: input, type: text, max_length: 300}
+      - {key: labs, label: "Number and size of the laboratories including computer labs (in square metres)", fill: input, type: text, max_length: 300}
+      - {key: library_area, label: "Size of the library (in square metres)", fill: input, type: number, max_value: 100000}
+      - {key: library_books, label: "Number of books in the library", fill: input, type: integer, max_value: 10000000}
+      - {key: internet, label: "Internet facility", fill: input, type: yes_no}
+      - {key: girls_toilets, label: "Number of girls' toilets", fill: input, type: integer, max_value: 1000}
+      - {key: boys_toilets, label: "Number of boys' toilets", fill: input, type: integer, max_value: 1000}
+      - {key: cwsn_toilets, label: "Number of CWSN-friendly toilets (for children with special needs)", fill: input, type: integer, max_value: 1000}
+      - {key: infrastructure_video, label: "Link to a video of the school's infrastructure", fill: link}

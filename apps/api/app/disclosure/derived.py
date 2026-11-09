@@ -1,10 +1,13 @@
 """Values the disclosure fills from SchoolOS records (ADR-0051 decision 1; FR-DISC-003).
 
 Computed in the school's ``tenant_session`` through other modules' public services only
-(CLAUDE.md §4): ``tenancy`` (school name and letterhead address, the current academic year and
-its sections), ``identity`` (active staff by role: counts and the principal's display name, no
-contact details) and ``fees`` (the active general fee plans per class: heads and annual amounts,
-only when fees are on). School-level facts and aggregates only: nothing here reads a student.
+(CLAUDE.md §4): ``tenancy`` (school name and letterhead address, the current academic year, its
+classes and sections), ``identity`` (active staff by role and by category: counts and the
+principal's display name, no contact details), ``students`` (format version 2: the number of
+active enrolments per section of the current academic year, summed per class; FR-DISC-015) and
+``fees`` (the active general fee plans per class: heads and annual amounts, only when fees are
+on). School-level facts and aggregates only: no student is named or listed, and a count of
+students below 10 is published as "fewer than 10" (NFR-PRV-006, D42).
 """
 
 from __future__ import annotations
@@ -16,13 +19,21 @@ from typing import Final
 
 from sqlalchemy.orm import Session
 
-from app.disclosure.values import Derived, Table, format_date, rupees
+from app.disclosure.values import Derived, Table, count_text, format_date, rupees
 from app.fees import service as fees
 from app.identity import service as identity
+from app.students import service as students
 from app.tenancy import service as tenancy
 
 PRINCIPAL_ROLE: Final = "principal"
 TEACHER_ROLES: Final = frozenset({"teacher", "class_teacher"})
+# Staff strength by category (FR-DISC-016): each active member counted once, in the first
+# category whose roles they hold. Counts only (lead decision D84).
+CATEGORIES: Final = (
+    ("Principal", frozenset({PRINCIPAL_ROLE})),
+    ("Teachers", TEACHER_ROLES),
+)
+OTHER_STAFF: Final = "Other staff"
 
 
 def school_values(session: Session) -> tuple[str, dict[str, str | None]]:
@@ -73,9 +84,61 @@ def derived_values(session: Session) -> dict[str, Derived]:
                 else None
             )
         ),
+        "staff_by_category": _staff_by_category([set(m.roles) for m in members]),
+        "registered_students": _registered_students(session, year.id if year else None),
         "fee_structure": _fee_structure(session, year.id if year is not None else None),
     }
     return out
+
+
+def _staff_by_category(member_roles: list[set[str]]) -> Derived:
+    counts: Counter[str] = Counter()
+    for roles in member_roles:
+        label = next((name for name, keys in CATEGORIES if keys & roles), OTHER_STAFF)
+        counts[label] += 1
+    order = [name for name, _keys in CATEGORIES] + [OTHER_STAFF]
+    rows = tuple((name, str(counts[name])) for name in order if counts[name] > 0)
+    if not rows:
+        return Derived()
+    total = sum(counts.values())
+    return Derived(table=Table(columns=("Category", "Number"), rows=(*rows, ("Total", str(total)))))
+
+
+def _registered_students(session: Session, year_id: uuid.UUID | None) -> Derived:
+    """Active enrolments of the current academic year per class (FR-DISC-015): classes with at
+    least one, in the school's class order, and the total; below 10 is "fewer than 10"."""
+    if year_id is None:
+        return Derived()
+    placements = students.current_placements(session)
+    if not placements:
+        return Derived()
+    per_section = Counter(placements.values())
+    sections = tenancy.list_sections(session, academic_year_id=year_id, include_archived=True)
+    class_of = {s.id: s.class_id for s in sections}
+    per_class: Counter[uuid.UUID] = Counter()
+    for section_id, count in per_section.items():
+        class_id = class_of.get(section_id)
+        if class_id is not None:
+            per_class[class_id] += count
+    classes = {c.id: c for c in tenancy.list_classes(session, include_archived=True)}
+    ordered = sorted(
+        per_class.items(),
+        key=lambda kv: (
+            classes[kv[0]].sort_order if kv[0] in classes else 10_000,
+            classes[kv[0]].display_en if kv[0] in classes else "",
+        ),
+    )
+    rows = tuple(
+        (classes[cid].display_en if cid in classes else "Other", count_text(n))
+        for cid, n in ordered
+    )
+    total = sum(per_class.values())
+    return Derived(
+        table=Table(
+            columns=("Class", "Registered students"),
+            rows=(*rows, ("Total", count_text(total))),
+        )
+    )
 
 
 def _fee_structure(session: Session, year_id: uuid.UUID | None) -> Derived:

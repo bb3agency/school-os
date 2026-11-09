@@ -112,3 +112,44 @@ describe("draft state and body (FR-DISC-004)", () => {
     expect(liveSnapshot([base, { ...base, id: "s2", live: true }])?.id).toBe("s2");
   });
 });
+
+describe("count tables of format version 2 (FR-DISC-016, D84: numbers only)", () => {
+  const TABLE = item("staff_qualifications", {
+    type: "count_table",
+    max_value: 1000,
+    rows: [
+      { key: "principal", label: "Principal" },
+      { key: "pgt", label: "PGT" },
+    ],
+    columns: [
+      { key: "doctorate", label: "Doctorate" },
+      { key: "postgraduate_bed", label: "Post-graduate with B.Ed." },
+    ],
+  });
+  const V2: DisclosureFormat = {
+    ...FORMAT,
+    version: 2,
+    sections: [{ key: "staff", title: "D", items: [TABLE] }],
+  };
+
+  it("keeps every cell as text and sends only the filled ones as numbers", () => {
+    const state = draftState(V2, {
+      ...DRAFT,
+      format_version: 2,
+      inputs: { staff_qualifications: { pgt: { postgraduate_bed: 10 } } },
+    });
+    expect(state.counts.staff_qualifications).toEqual({
+      principal: { doctorate: "", postgraduate_bed: "" },
+      pgt: { doctorate: "", postgraduate_bed: "10" },
+    });
+    state.counts.staff_qualifications!.principal!.postgraduate_bed = " 1 ";
+    expect(draftBody(V2, state).inputs).toEqual({
+      staff_qualifications: { principal: { postgraduate_bed: 1 }, pgt: { postgraduate_bed: 10 } },
+    });
+  });
+
+  it("leaves an empty table out of the body", () => {
+    const state = draftState(V2, { ...DRAFT, format_version: 2, inputs: {} });
+    expect(draftBody(V2, state).inputs).toEqual({});
+  });
+});

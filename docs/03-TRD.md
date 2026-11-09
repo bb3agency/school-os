@@ -679,7 +679,7 @@ Release R3 of the 2026-27 plan (docs/18 §3 R3; before DPDP's day-to-day duties 
 
 | ID | Requirement | V |
 |---|---|---|
-| FR-DISC-001 | The disclosure MUST be offered only to schools whose `boards` include `CBSE` (FR-TEN-020); others get `404 module_hidden`. Its format is `app/disclosure/formats/cbse-appendix-ix.yaml` (sections and items in CBSE's order, `source` URLs, `verified: false`, D3). | T |
+| FR-DISC-001 | The disclosure MUST be offered only to schools whose `boards` include `CBSE` (FR-TEN-020); others get `404 module_hidden`. Its format is `app/disclosure/formats/cbse-appendix-ix.v{n}.yaml` (version 2 since FC-02, FR-DISC-013; sections and items in CBSE's order, `source` URLs, `verified: false`, D3). | T |
 | FR-DISC-002 | Each item MUST declare its fill: `school` (school settings), `derived`, `input` (type, limits), `document` (one or more school documents), `link` (https only); unknown fills fail format validation at start-up. | T |
 | FR-DISC-003 | Derived items MUST be computed through other modules' services only: number of sections and classes (`tenancy.service`), teacher-section ratio and staff counts by role (`identity`/`authz` services; counts only), the fee structure per class from active fee plans when fees are on (`fees.service`, heads and annual amounts; no account data), the academic year's dates. | T |
 | FR-DISC-004 | The draft (`ops.disclosure_drafts`, one per school, `If-Match`) MUST be editable by `disclosure.edit`; inputs refuse Aadhaar-like numbers everywhere and phone-like numbers outside the two contact items; documents must be the school's documents the editor can read. | T |
@@ -691,6 +691,13 @@ Release R3 of the 2026-27 plan (docs/18 §3 R3; before DPDP's day-to-day duties 
 | FR-DISC-010 | Public disclosure responses MUST carry the FR-PUB-010 headers (`no-referrer`, `private, no-store`, `noindex`, strict CSP) without a cookie exchange; limits `public_ip` and `public_lookup_fail`; unknown, revoked, withdrawn and suspended-school keys give the uniform 404; views counted per day per snapshot (no visitor data). | T |
 | FR-DISC-011 | Each snapshot MUST be downloadable by `disclosure.edit` as a self-contained HTML file (no scripts, no external requests except the hosted document links) and an A4 PDF (`pdf` queue). | T |
 | FR-DISC-012 | Drafts and snapshots MUST be in the full data export and the offboarding purge (handle purged with `public`); snapshots are kept for the life of the school (the record of what was published). | T |
+| FR-DISC-013 | (FC-02, format version 2) Format versions MUST live side by side as `app/disclosure/formats/{key}.v{version}.yaml` (versions 1, 2, ... without gaps, key and version matching the file name); new drafts use the highest version; `cbse-appendix-ix` version 2 follows the revised Appendix IX of CBSE circular 1/2026 from secondary sources, `verified: false` with its sources, until a CBSE school's copy of the annexure is checked (D3). | T |
+| FR-DISC-014 | A draft saved with an older format version MUST be shown, saved and published in the current version with the items whose key, fill and type are the same in both and whose value the current version still accepts; the draft says `carried_over_from` and lists the `dropped` item keys; the save is audited `disclosure.draft_saved` with `format_version` and `from_version`. | T |
+| FR-DISC-015 | Version 2 MUST publish the number of registered students per class: active enrolments of the current academic year counted per section through `students.service` and summed per class (`tenancy.service`), classes with at least one, in class order, with a total; a count below 10 is "fewer than 10" (NFR-PRV-006); no student is named or listed. | T |
+| FR-DISC-016 | Version 2 MUST publish staff as counts only: staff strength by category from SchoolOS members (principal, teachers, other staff; each member once), typed numbers of vice principals and head teachers, and a typed count table of staff by category (principal, vice principals, head teachers, PGT, TGT, PRT, special educators, counsellors) and highest qualification (whole numbers 0..1000; names refused); no item lists named teachers. *(Lead decision D84, PO to confirm.)* | T |
+| FR-DISC-017 | Version 2 MUST add school-entered items for CWSN-friendly toilets (number), the library (size in square metres, number of books) and keep the DEO certificate or self-certification as a document item. | T |
+| FR-DISC-018 | Version 2 snapshots, the public page, the HTML file and the PDF MUST show the new items (count tables as a table with a total per category) through the existing allowlist (no new public field). | T |
+| FR-DISC-019 | Snapshots published with version 1 MUST stay unchanged and readable (history, detail, public page, files) after version 2 is introduced; their content and `format_version` are never rewritten. | T |
 
 ### 3.29 RTE 25% register (FR-RTE) (designed; not scheduled while owner decision D10 stands; ADR-0052)
 
@@ -902,7 +909,7 @@ Cost per answer measured by the eval harness, candidate answer models priced but
 | BO-04 faster certificates (M3) | FR-CERT-*, FR-REG-* |
 | BO-07 repeatable onboarding | FR-TEN-003, FR-IMP-002, FR-PLT-001..005, FR-PLT-020..026 |
 | BRD P5 parents queue at the counter (R2) | FR-FEE-*, FR-PAY-*, FR-MSG-*, FR-PUB-*, FR-LANG-*, FR-CERT-019..024, NFR-PERF-008..011 |
-| BO-05 trust (R3: compliance pack) | FR-DPDP-001..038, FR-DISC-001..012, FR-RTE-001..012 (gated), NFR-PRV-006, NFR-PRV-007, NFR-SEC-008 |
+| BO-05 trust (R3: compliance pack) | FR-DPDP-001..038, FR-DISC-001..019, FR-RTE-001..012 (gated), NFR-PRV-006, NFR-PRV-007, NFR-SEC-008 |
 | BO-05 trust (R2: money and messages) | FR-FEE-006..013, FR-PAY-007..009, FR-PAY-016, FR-MSG-008..011, FR-PUB-005..012, NFR-SEC-007, NFR-PRV-005 |
 
 ## 9. Verification approach
