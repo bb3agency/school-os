@@ -25,6 +25,7 @@ import { Pager, useCursorStack } from "@/features/students/paging";
 import { LoadGate, useAttributeIndex, useAttributes } from "@/features/students/parts";
 import { ProblemAlert } from "@/features/students/ProblemAlert";
 import type { Attribute } from "@/features/students/types";
+import { MatchCell } from "@/features/udise/MatchCell";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { apiFieldErrors } from "@/lib/api-errors";
@@ -372,8 +373,12 @@ function RowsCard({
 }) {
   const t = useTranslations("imports.rows");
   const ts = useTranslations("sheets.import");
+  const tu = useTranslations("udise.match");
   const api = useBffClient("staff");
+  const queryClient = useQueryClient();
   const headingId = useId();
+  // FO-04: a UDISE+ list matches rows by PEN; the office decides the rows left over.
+  const matching = batch.source === "udise_plus";
   const [filter, setFilter] = useState<RowFilterChoice>(initialFilter);
   const pages = useCursorStack();
   const query = {
@@ -429,6 +434,25 @@ function RowsCard({
       header: t("colStatus"),
       cell: (row) => <Pill variant={rowPill[row.status]}>{t(`status.${row.status}`)}</Pill>,
     },
+    ...(matching
+      ? [
+          {
+            key: "match",
+            header: tu("colMatch"),
+            cell: (row: ImportRow) => (
+              <MatchCell
+                importId={batch.id}
+                version={batch.version}
+                row={row}
+                editable={sheetEditable}
+                onChanged={() =>
+                  void queryClient.invalidateQueries({ queryKey: importKey(batch.id) })
+                }
+              />
+            ),
+          } satisfies ColumnV2<ImportRow>,
+        ]
+      : []),
     {
       key: "issues",
       header: t("colIssues"),

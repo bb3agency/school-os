@@ -170,6 +170,13 @@ export function SchoolShell({
           icon: "calendar",
         },
         {
+          // FO-02 (FR-UDI-001..008): UDISE+ correction requests to the MEO office.
+          href: "/findings/udise-corrections",
+          label: t("udise.nav"),
+          permission: "dq.readiness.manage",
+          icon: "file",
+        },
+        {
           href: "/change-requests",
           label: t("changeRequests.nav"),
           permission: ["student.identity_change.request", "student.identity_change.approve"],
