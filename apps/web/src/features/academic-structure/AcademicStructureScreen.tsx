@@ -80,11 +80,16 @@ export function AcademicStructureScreen() {
         description={ts("description")}
         breadcrumb={[{ label: tn("home"), href: "/" }, { label: ts("title") }]}
         actions={
-          manage ? (
-            <ButtonLink href="/settings/structure/promotions" variant="secondary">
-              {tn("promotions")}
+          <span className="flex flex-wrap gap-2">
+            <ButtonLink href="/settings/structure/calendar" variant="secondary">
+              {tn("calendar")}
             </ButtonLink>
-          ) : undefined
+            {manage ? (
+              <ButtonLink href="/settings/structure/promotions" variant="secondary">
+                {tn("promotions")}
+              </ButtonLink>
+            ) : null}
+          </span>
         }
       />
       {!manage && meLoaded ? <Alert tone="info">{t("readOnlyNote")}</Alert> : null}
