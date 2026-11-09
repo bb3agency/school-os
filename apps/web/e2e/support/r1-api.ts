@@ -299,7 +299,7 @@ function detail(key: string, id: string): Schemas["ReadinessStudentDetailOut"] |
   if (!row) return undefined;
   const name = row.student.display_name ?? "Synthetica";
   const aadhaarName = id === R1_IDS.student ? name.replace("Sai Kumar", "Saikumar") : name;
-  const nameItems: Schemas["ReadinessItemOut"][] =
+  const nameItems: Schemas["app__dq__schemas__ReadinessItemOut"][] =
     id === R1_IDS.student
       ? [
           {

@@ -157,14 +157,12 @@ describe("portal calendar (US-3101)", () => {
 
   it("names the school administration and RTE kinds (FR-RDY-011, FO-05)", async () => {
     signedIn(READER);
-    // The generated client learns these kinds when the lead regenerates it.
-    const kind = (k: string) => k as unknown as CalendarEvent["portal"];
     stub.routes["GET /bff/api/v1/dq/calendar"] = () =>
       Response.json(
         calendar([
           event({
             event_key: "ap_psis_recognition_2027",
-            portal: kind("school_admin"),
+            portal: "school_admin",
             label_en: "AP private school recognition renewal (PSIS portal)",
             profile_keys: [],
             boards: [],
@@ -173,7 +171,7 @@ describe("portal calendar (US-3101)", () => {
           }),
           event({
             event_key: "ap_rte_2027_round_1",
-            portal: kind("rte"),
+            portal: "rte",
             label_en: "AP RTE 12(1)(c) admissions 2027-28, round 1 lottery and admissions",
             profile_keys: [],
             boards: [],

@@ -37,15 +37,6 @@ import {
 
 const TEMPLATE_KEYS: readonly TemplateKey[] = ["notice_parents", "notice_staff"];
 
-/**
- * FP-13: a notice record sent on WhatsApp carries its broadcast. LEAD: after `make openapi`
- * `PrivacyNoticeOut` has `broadcast_id`; read it directly then.
- */
-function hasBroadcast(row: PrivacyNotice): boolean {
-  const value = (row as { broadcast_id?: unknown }).broadcast_id;
-  return typeof value === "string" && value.length > 0;
-}
-
 /** The "Record that we issued it" form; the API checks the audience and version again. */
 export function buildNoticeSchema(today = todayInIndia()) {
   return z
@@ -204,7 +195,7 @@ export function NoticesScreen() {
       header: t("colChannel"),
       cell: (row) =>
         // FP-13: a notice sent on WhatsApp from SchoolOS links to who it reached.
-        hasBroadcast(row) ? (
+        row.broadcast_id ? (
           <Link
             href={`/privacy/notices/${row.id}/delivery`}
             className="font-semibold text-primary underline"

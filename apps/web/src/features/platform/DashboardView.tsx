@@ -14,8 +14,8 @@ import { IncidentClockAlerts } from "./incidents/IncidentClockAlerts";
 
 type Counts = Record<string, number> | null | undefined;
 
-/** `plan_limit_alerts` (D57) is not in the generated client yet; matches `DashboardOut`. */
-type DashboardKpis = PlatformDashboard & { plan_limit_alerts?: Counts };
+/** The platform dashboard KPIs, including `plan_limit_alerts` (D57). */
+type DashboardKpis = PlatformDashboard;
 
 function sum(counts: Counts): number | null {
   if (!counts) return null;

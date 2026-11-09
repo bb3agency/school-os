@@ -396,82 +396,37 @@ export const examSchema = z.object({
 });
 
 // --- FT-01 exam lock and marks history (FR-MRK-008..FR-MRK-015) ---------------------------------
-// The lock, unlock and history routes and the lock fields are not in the generated client until
-// the lead regenerates it (`make openapi`). Until then they are called through a loosely typed
-// view of the same BFF client and every answer is checked with the zod schemas below.
+/** The lock state of an exam (the lock fields of ExamOut, absent ones as null). */
+export type ExamLock = {
+  locked: boolean;
+  locked_at: string | null;
+  unlocked_at: string | null;
+  unlock_reason: string | null;
+};
 
-/** The lock state of an exam (fields the API adds to ExamOut). */
-export const examLockSchema = z.object({
-  locked: z.boolean().default(false),
-  locked_at: z.string().nullable().default(null),
-  unlocked_at: z.string().nullable().default(null),
-  unlock_reason: z.string().nullable().default(null),
-});
-export type ExamLock = z.infer<typeof examLockSchema>;
-
-/** Lock fields of an exam from the list or grid; an older API (no fields) reads as unlocked. */
-export function examLock(exam: unknown): ExamLock {
-  const parsed = examLockSchema.safeParse(exam ?? {});
-  return parsed.success
-    ? parsed.data
-    : { locked: false, locked_at: null, unlocked_at: null, unlock_reason: null };
+/** Lock fields of an exam from the list or grid; a missing exam reads as unlocked. */
+export function examLock(exam: Exam | undefined): ExamLock {
+  return {
+    locked: exam?.locked ?? false,
+    locked_at: exam?.locked_at ?? null,
+    unlocked_at: exam?.unlocked_at ?? null,
+    unlock_reason: exam?.unlock_reason ?? null,
+  };
 }
 
 /** Whether a mark of the grid was changed after the exam was first locked (FR-MRK-014). */
-export function changedAfterLock(mark: unknown): boolean {
-  return (
-    typeof mark === "object" &&
-    mark !== null &&
-    (mark as { changed_after_lock?: unknown }).changed_after_lock === true
-  );
+export function changedAfterLock(mark: S["MarkOut"]): boolean {
+  return mark.changed_after_lock === true;
 }
 
-const decimal = z.union([z.string(), z.number()]);
-
-export const markChangeSchema = z.object({
-  student: z.object({
-    student_id: z.string(),
-    full_name: z.string().nullable(),
-    admission_no: z.string().nullable(),
-    roll_no: z.string().nullable(),
-  }),
-  subject: z.string(),
-  previous_max_marks: decimal,
-  previous_marks: decimal.nullable(),
-  previous_absent: z.boolean(),
-  new_max_marks: decimal,
-  new_marks: decimal.nullable(),
-  new_absent: z.boolean(),
-  source: z.enum(["mark", "import"]),
-  after_lock: z.boolean(),
-  reason: z.string().nullable(),
-  changed_by_name: z.string().nullable(),
-  changed_at: z.string(),
-});
-export type MarkChange = z.infer<typeof markChangeSchema>;
-
-export const marksHistorySchema = z.object({ changes: z.array(markChangeSchema) });
-export type MarksHistory = z.infer<typeof marksHistorySchema>;
-
-type LooseResult = { data?: unknown; error?: unknown; response: Response };
-interface LooseClient {
-  GET(path: string, init: { params: { path: Record<string, string> } }): Promise<LooseResult>;
-  POST(
-    path: string,
-    init: { params: { path: Record<string, string> }; body?: unknown },
-  ): Promise<LooseResult>;
-}
-
-function loose(api: ApiClient): LooseClient {
-  return api as unknown as LooseClient;
-}
+export type MarkChange = S["MarkChangeOut"];
+export type MarksHistory = S["MarksHistoryOut"];
 
 /** POST /exams/{id}/lock (exam.manage; FR-MRK-008). */
-export async function lockExam(api: ApiClient, examId: string): Promise<ExamLock> {
-  const out = await unwrap(
-    loose(api).POST("/api/v1/exams/{exam_id}/lock", { params: { path: { exam_id: examId } } }),
+export async function lockExam(api: ApiClient, examId: string): Promise<Exam> {
+  return unwrap(
+    api.POST("/api/v1/exams/{exam_id}/lock", { params: { path: { exam_id: examId } } }),
   );
-  return examLockSchema.parse(out);
 }
 
 /** The reason the principal gives to unlock an exam (FR-MRK-010): 1..500 characters. */
@@ -480,18 +435,13 @@ export const unlockSchema = z.object({
 });
 
 /** POST /exams/{id}/unlock (exam.unlock: principal, step-up; FR-MRK-010). */
-export async function unlockExam(
-  api: ApiClient,
-  examId: string,
-  reason: string,
-): Promise<ExamLock> {
-  const out = await unwrap(
-    loose(api).POST("/api/v1/exams/{exam_id}/unlock", {
+export async function unlockExam(api: ApiClient, examId: string, reason: string): Promise<Exam> {
+  return unwrap(
+    api.POST("/api/v1/exams/{exam_id}/unlock", {
       params: { path: { exam_id: examId } },
       body: { reason },
     }),
   );
-  return examLockSchema.parse(out);
 }
 
 /** GET /sections/{id}/exams/{id}/marks/history (marks.read; FR-MRK-013). */
@@ -503,13 +453,11 @@ export function useMarksHistory(
   const api = useBffClient("staff");
   const query = useQuery({
     queryKey: KEYS.marksHistory(section, exam),
-    queryFn: async () =>
-      marksHistorySchema.parse(
-        await unwrap(
-          loose(api).GET("/api/v1/sections/{section_id}/exams/{exam_id}/marks/history", {
-            params: { path: { section_id: section, exam_id: exam } },
-          }),
-        ),
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/v1/sections/{section_id}/exams/{exam_id}/marks/history", {
+          params: { path: { section_id: section, exam_id: exam } },
+        }),
       ),
     enabled: enabled && section !== "" && exam !== "",
     retry,

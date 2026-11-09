@@ -1,6 +1,5 @@
 "use client";
 
-import type { components } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import * as z from "@/lib/zod";
@@ -741,8 +740,7 @@ function ReopenToldDialog({
         return unwrap(
           api.POST("/api/v1/platform/incidents/{incident_id}/reopen:told", {
             params: { path: { incident_id: incident.id } },
-            // D56: the generated client still lists `note`; the lead regenerates it.
-            body: body as unknown as components["schemas"]["IncidentReopenToldIn"],
+            body,
           }),
         );
       }}

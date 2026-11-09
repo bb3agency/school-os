@@ -1,9 +1,8 @@
 "use client";
 
-import type { ApiClient } from "@schoolos/api-client";
+import type { ApiClient, components } from "@schoolos/api-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
-import * as z from "@/lib/zod";
 import { Alert } from "@/components/ui/Alert";
 import { Card } from "@/components/ui/Card";
 import { Label } from "@/components/ui/Label";
@@ -22,50 +21,8 @@ import { KEYS, type Account } from "./data";
  * WhatsApp account is not billed in rupees before Meta's cutoff. Counts and rupees only.
  */
 
-const line = z.object({
-  pricing_category: z.string(),
-  rate: z.string().nullable(),
-  purpose: z.string(),
-  sent: z.number(),
-  billable: z.number(),
-  free: z.number(),
-  pending: z.number(),
-  estimated_cost_inr: z.string(),
-});
-
-/**
- * GET /api/v1/messaging/spend (MessagingSpendOut). Hand-written until the generated client
- * carries the route; then use `components["schemas"]["MessagingSpendOut"]` and a typed GET.
- */
-export const spendSchema = z.object({
-  months: z.array(
-    z.object({
-      month: z.string(),
-      sent: z.number(),
-      billable: z.number(),
-      pending: z.number(),
-      estimated_cost_inr: z.string(),
-      lines: z.array(line),
-    }),
-  ),
-  gst_percent: z.string(),
-  rates: z.array(
-    z.object({ rate: z.string(), inr: z.string(), verified: z.boolean(), used: z.boolean() }),
-  ),
-  rates_checked_on: z.string(),
-  next_rate_change: z.string(),
-  rates_recheck_due: z.boolean(),
-  service_free_per_month: z.number(),
-  auto_reply_days: z.number(),
-});
-export type Spend = z.infer<typeof spendSchema>;
-
-type UntypedGet = {
-  GET: (
-    path: string,
-    init: { params: { query: Record<string, number> } },
-  ) => Promise<{ data?: unknown; error?: unknown; response: Response }>;
-};
+/** GET /api/v1/messaging/spend. */
+export type Spend = components["schemas"]["MessagingSpendOut"];
 
 export const SPEND_KEY = [...KEYS.all, "spend"] as const;
 
@@ -73,14 +30,7 @@ export function useSpend(enabled = true): Loadable<Spend> {
   const api: ApiClient = useBffClient("staff");
   return useApiQuery(
     SPEND_KEY,
-    async () =>
-      spendSchema.parse(
-        await unwrap(
-          (api as unknown as UntypedGet).GET("/api/v1/messaging/spend", {
-            params: { query: { months: 6 } },
-          }),
-        ),
-      ),
+    () => unwrap(api.GET("/api/v1/messaging/spend", { params: { query: { months: 6 } } })),
     { enabled },
   );
 }
