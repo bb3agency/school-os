@@ -1339,6 +1339,11 @@ Six tenant-owned tables in `ops` (`tenant_id` first, `UNIQUE (tenant_id, id)`, R
 - **Permissions** `tally.device.manage` and `tally.configure` are written into `core.permissions` by the migration; existing schools' system roles get them from the post-migration system-role sync (ADR-0022), which the release must run.
 - **Export and offboarding**: all six tables are in the full data export (`tally_*` records; wrapped keys and code hashes left out) and deleted by the offboarding purge. Sync records are deleted after 400 days (§13).
 - **Downgrade** drops the six tables (lossy: synced Tally data) and removes the two catalog keys when no role holds them. Round trip with rows: `tests/tally/test_migration.py`.
+- **Voucher export** (migration `0088_tally_vouchers`; FM-03, FR-TALLY-011..030; SchoolOS writes a file, never Tally):
+  - **`ops.tally_export_settings`**: one row per school (`UNIQUE (tenant_id)`): `party_mode` (`student` | `receivable`, D85), `receivable_ledger`, `mode_ledgers` and `head_ledgers` (jsonb objects: receipt mode or head id → Tally ledger name), `other_income_ledger`, `include_demand` (default false, D85), `company`, `updated_by` (FK `core.users`), `version`. `sos_app`: SELECT, INSERT and column UPDATE of the mapping; never DELETE.
+  - **`ops.tally_voucher_exports`**: one row per downloaded file: period, `include_exported`, `include_demand`, `party_mode`, `vouchers`, `new_vouchers`, `cash_total`, `file_sha256` (the file itself is never stored), `created_by`. Insert-only for `sos_app`.
+  - **`ops.tally_exported_vouchers`**: the first export of each source record: `voucher_key` (`receipt:`, `cancellation:`, `refund:` or `demand:` + uuid; `UNIQUE (tenant_id, voucher_key)`), `kind`, composite FK `(tenant_id, export_id)`. Insert-only (`ON CONFLICT DO NOTHING` keeps the first export).
+  - All three: RLS ENABLE + FORCE with `tenant_isolation`, `offboarding_purge` for `sos_purger`, in the full data export and the offboarding purge; record class "Tally ledgers" (C2: ledger names may name a family; no student names are stored). Downgrade drops them (lossy: the mapping and the export history). Round trip: `tests/tally/test_vouchers_migration.py`.
 
 ## 8. Data classification
 
