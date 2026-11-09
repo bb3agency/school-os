@@ -482,6 +482,29 @@ export function r2Answer(
     );
     return [200, rows];
   }
+  // FM-01 (FR-FEE-036): one open account this year, so the counter shows no "Earlier years" panel.
+  if (path === `/api/v1/fees/students/${state.account.student_id}/years` && get) {
+    const years: Schemas["StudentYearsOut"] = {
+      student_id: state.account.student_id,
+      as_of: "2026-10-21",
+      earlier_years_due: "0.00",
+      total_collectable: state.account.totals.balance,
+      split: null,
+      years: [
+        {
+          account_id: state.account.id,
+          academic_year_id: state.account.academic_year_id,
+          academic_year_label: "2026-27",
+          balance: state.account.totals.balance,
+          collectable: state.account.totals.balance,
+          overdue: state.account.totals.overdue,
+          oldest_due_on: null,
+          earlier_year: false,
+        },
+      ],
+    };
+    return [200, years];
+  }
   if (path === `/api/v1/fees/accounts/${state.account.id}` && get) return [200, state.account];
   if (path.startsWith("/api/v1/fees/accounts/") && get) return notFound;
   if (path === "/api/v1/fees/receipts" && post) return saveReceipt(body);
