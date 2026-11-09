@@ -130,6 +130,8 @@ TASK_MODULES: list[str] = [
     "app.fees.upi_tasks",
     # R2-2D online payments: webhook inbox, online refunds, link cancels, reconciliation.
     "app.fees.tasks_online",
+    # FM-06 tuition fee certificates: the A4 PDF of an issued certificate (queue pdf).
+    "app.fees.tax_tasks",
     # R3-1B breach register: SchoolOS notice pull and duty reminders (every minute).
     "app.privacy.breach_tasks",
     # R3-1C CBSE disclosure (ADR-0051): the HTML file and A4 PDF of a snapshot (queue pdf).
@@ -206,6 +208,7 @@ def create_celery() -> Celery:
             "certificates.render": {"queue": "pdf"},
             # FR-FEE-011: receipt PDFs on the Chromium workers; FR-FEE-009 late fees nightly.
             "fees.render_receipt": {"queue": "pdf"},
+            "fees.render_tax_certificate": {"queue": "pdf"},  # FM-06 (FR-FEE-053)
             "fees.post_late_fees": {"queue": "maintenance"},
             "fees.upi_morning": {"queue": "maintenance"},
             # FR-PAY-008..012 (R2-2D): inbox, refunds, link cancels and the daily jobs.

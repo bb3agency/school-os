@@ -1274,6 +1274,19 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
             m=ids["m1"],
         )
+        # FM-06 (0083_fee_tax_cert): a tuition fee certificate.
+        _run(
+            c,
+            "INSERT INTO fin.tax_certificates (id, tenant_id, student_id, financial_year, "
+            "serial_no, serial_number, as_of, amount, receipt_count, content, content_sha256, "
+            "basis_sha256, issued_by) VALUES (:i, :t, :s, '2026-27', 1, 'FTC/2026-27/00001', "
+            "'2026-09-01', 50, 1, '{}'::jsonb, :h, :h, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            s=ids["student"],
+            h=b"\x00" * 32,
+            m=ids["m1"],
+        )
         # --- R2-2D online payments (0059_payments_online): one row in every online table ------
         o = {k: uuid.uuid4() for k in ("handle", "conn", "intent", "run")}
         _run(

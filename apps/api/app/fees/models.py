@@ -56,6 +56,8 @@ class FeeHead(Base):
     gst_exempt: Mapped[bool] = mapped_column(Boolean, server_default=sql_text("true"))
     active: Mapped[bool] = mapped_column(Boolean, server_default=sql_text("true"))
     sort_order: Mapped[int] = mapped_column(Integer, server_default=sql_text("100"))
+    # FM-06 (0083_fee_tax_cert): "counts as tuition for tax" (FR-FEE-047).
+    tax_tuition: Mapped[bool] = mapped_column(Boolean, server_default=sql_text("false"))
     created_by: Mapped[uuid.UUID]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())

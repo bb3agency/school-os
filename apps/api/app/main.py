@@ -31,6 +31,7 @@ from app.fees import webhook as payments_webhook
 from app.fees.api import router as fees_router
 from app.fees.api_online import router as payments_router
 from app.fees.api_online import webhook_router as payments_webhook_router
+from app.fees.api_tax import router as fees_tax_router
 from app.fees.api_upi import router as fees_upi_router
 from app.identity.api import router as identity_router
 from app.imports.api import router as imports_router
@@ -113,6 +114,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(fees_router)
     # R2-2E UPI and bank statements (ADR-0042 decision 9).
     app.include_router(fees_upi_router)
+    app.include_router(fees_tax_router)  # FM-06 tuition fee certificates
     # R2-2D online payments (ADR-0042): the school's Razorpay account, payment links, the
     # Razorpay webhook (require_webhook_signature("razorpay")) and online reconciliation.
     app.include_router(payments_router)

@@ -1,0 +1,64 @@
+# Annual tuition fee certificate for income tax (FM-06; FR-FEE-046..060; ADR-0042 follow-up;
+# lead decision D84). Versioned configuration shipped inside the package (invariant 13). Read by
+# app/fees/tax_config.py.
+version: 1
+
+# Serial numbers: one gap-free fees certificate series per school and financial year, kept in
+# fin.receipt_counters next to the receipt (RCT) and refund (RFD) series. Placeholders: {series}
+# {fy} {no}. The result must match tax_certificates_number_shape (<= 40 chars).
+numbering:
+  series: FTC
+  format: "{series}/{fy}/{no:05d}"
+
+# What counts: tuition allocations of issued, not cancelled receipts dated in the financial year
+# (1 April - 31 March, IST), less refunds of those lines. A head counts when its setting
+# "counts as tuition for tax" is on; new heads of kind `tuition` default to on (FR-FEE-047).
+counting:
+  default_on_for_kinds: [tuition]
+
+# Limits of one request.
+limits:
+  # Students of one bulk request (one class or section; one transaction).
+  max_bulk_students: 300
+  # Receipts listed on one certificate (a monthly payer has 12; leaves room for split payments).
+  max_receipts: 60
+  # Financial years back a certificate can be issued for (the receipts are kept 8 years, D21).
+  max_years_back: 8
+
+# Printed certificate (A4 portrait).
+print:
+  template_version: v1
+  title: "TUITION FEE CERTIFICATE"
+  # Who signs. The school prints its seal next to the signature.
+  signatory_label: "Principal"
+
+# The parent link (ADR-0046/0047): the receipt and dues pages show "Tax certificate FY <fy>" for
+# the current financial year from this day of its last quarter (1 January), and for the previous
+# year until the "until" day after it ended (30 September: income tax returns are filed by then;
+# lead default D84, PO to confirm). Between those days (October-December) no button shows. The
+# button opens the latest certificate the school issued for the child; it never issues one (a
+# read, not a write).
+parent_link:
+  visible_from_month: 1
+  visible_from_day: 1
+  visible_until_month: 9
+  visible_until_day: 30
+
+# Legal wording. UNVERIFIED: the Income-tax Act 2025 (in force 1 April 2026) moved the tuition fee
+# deduction formerly in section 80C of the 1961 Act to Section 123 / Schedule XV; secondary
+# sources agree but the official Schedule XV text was not checked (research 2026-11-09, money.md
+# §2). A chartered accountant must review the wording before a school relies on it (FM-06).
+legal:
+  verified: false
+  source: "docs/research/2026-11-features/money.md §2 (secondary sources, 2026-11-09)"
+  section_reference: >-
+    Section 123 read with Schedule XV of the Income-tax Act, 2025 (formerly section 80C of the
+    Income-tax Act, 1961)
+  certifies: >-
+    This is to certify that the tuition fees shown below were received by the school for the
+    student named above during the financial year stated. Only fee heads the school marks as
+    tuition are included; admission, examination, transport, books and other fees are not.
+  disclaimer: >-
+    This certificate is not tax advice. The school certifies the amounts paid, not eligibility
+    for any deduction; eligibility, limits and the tax regime are for the taxpayer and their
+    adviser to decide.

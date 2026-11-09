@@ -589,6 +589,11 @@ IDEMPOTENCY_EXEMPT = {
     "intent_closed on repeat)",
     ("POST", "/api/v1/fees/reconciliation/online/items/{recon_item_id}/explain"): "a state "
     "transition (409 item_closed on repeat)",
+    # FM-06 tuition fee certificates (FR-FEE-052).
+    ("POST", "/api/v1/fees/tax-certificates"): "idempotent by design: one issued certificate per "
+    "student and year, a repeat with the same receipts answers it unchanged (no new serial)",
+    ("POST", "/api/v1/fees/tax-certificates/bulk"): "idempotent by design: as one certificate, a "
+    "repeat issues nothing new",
 }
 
 
