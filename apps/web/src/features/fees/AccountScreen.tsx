@@ -76,10 +76,23 @@ export function concessionSchema() {
     });
 }
 
+/** The adjustment reasons in the order the form offers them. */
+export const ADJUSTMENT_REASONS = [
+  "correction",
+  "late_fee_waiver",
+  "write_off",
+  "concession_reversal",
+  "plan_change",
+  "other",
+] as const;
+
 /**
  * An adjustment request, checked like the API (FR-FEE-009): the late-fee line takes only a
  * late-fee waiver, a waiver reduces (negative amount) and is at most the late fee left
- * (late fee plus waivers already approved on that line; 422 above_late_fee).
+ * (late fee plus waivers already approved on that line; 422 above_late_fee). A write-off
+ * ("Written off by management", FM-01, FR-FEE-041) is a negative amount on a fee head of the
+ * plan (422 write_off_reduces_due) and never more than the line's due (409
+ * adjustment_exceeds_due).
  */
 export function adjustmentSchema(lines: readonly DueLine[]) {
   return z
@@ -89,13 +102,7 @@ export function adjustmentSchema(lines: readonly DueLine[]) {
         .string()
         .trim()
         .refine((v) => (toPaise(v) ?? 0) !== 0, { error: "invalidAmount" }),
-      reason_code: z.enum([
-        "late_fee_waiver",
-        "plan_change",
-        "concession_reversal",
-        "correction",
-        "other",
-      ]),
+      reason_code: z.enum(ADJUSTMENT_REASONS),
       reason,
     })
     .superRefine((data, context) => {
@@ -103,6 +110,20 @@ export function adjustmentSchema(lines: readonly DueLine[]) {
       const waiver = data.reason_code === "late_fee_waiver";
       if (target.head_id === null && !waiver) {
         context.addIssue({ code: "custom", path: ["reason_code"], message: "lateFeeWaiverOnly" });
+        return;
+      }
+      if (data.reason_code === "write_off") {
+        const amount = toPaise(data.amount) ?? 0;
+        if (amount >= 0) {
+          context.addIssue({ code: "custom", path: ["amount"], message: "writeOffReducesDue" });
+          return;
+        }
+        const line = lines.find(
+          (l) => l.head_id === target.head_id && l.instalment_no === target.instalment_no,
+        );
+        if (line && -amount > (toPaise(line.due) ?? 0)) {
+          context.addIssue({ code: "custom", path: ["amount"], message: "writeOffAboveDue" });
+        }
         return;
       }
       if (!waiver) return;
@@ -138,6 +159,7 @@ const HEAD_CELL = "sticky top-0 z-[1] bg-surface-muted";
 function Statement({ accountId }: { accountId: string }) {
   const t = useTranslations("fees.account");
   const tk = useTranslations("fees.entryKinds");
+  const tr = useTranslations("fees.adjustmentReasons");
   const locale = useLocale() as Locale;
   const api = useBffClient("staff");
   const data = useApiQuery(KEYS.statement(accountId), () =>
@@ -173,7 +195,13 @@ function Statement({ accountId }: { accountId: string }) {
                 {st.entries.map((e) => (
                   <Tr key={e.id}>
                     <Td className="num whitespace-nowrap">{formatDate(e.entry_date)}</Td>
-                    <Td>{tk(e.entry_kind)}</Td>
+                    <Td>
+                      {tk(e.entry_kind)}
+                      {/* FR-FEE-042: a write-off reads "Written off by management". */}
+                      {e.entry_kind === "adjustment" && e.reason_code ? (
+                        <span className="block text-xs text-ink-muted">{tr(e.reason_code)}</span>
+                      ) : null}
+                    </Td>
                     <Td className="whitespace-nowrap">
                       {t("instalmentShort", { no: e.instalment_no })} {e.head_code ?? t("lateFee")}
                     </Td>
@@ -415,19 +443,12 @@ function AdjustmentDialog({ account, control }: { account: Account; control: Dia
             name="reason_code"
             label={t("reasonCode")}
             error={errors.reason_code}
-            options={(
-              [
-                "correction",
-                "late_fee_waiver",
-                "concession_reversal",
-                "plan_change",
-                "other",
-              ] as const
-            ).map((v) => ({
+            options={ADJUSTMENT_REASONS.map((v) => ({
               value: v,
               label: tf(`adjustmentReasons.${v}`),
             }))}
           />
+          <p className="text-sm text-ink-muted">{t("writeOffNote")}</p>
           <TextAreaField
             name="reason"
             label={t("reason")}

@@ -42,7 +42,7 @@ import { Amount, FeesGate, ModeText, NoAccess, PrintLink, ReceiptStatusPill } fr
  * Download a CSV through the API client from a "More" menu item: a stale sign-in first gets
  * the step-up prompt, then the file is saved; nothing is kept in browser storage.
  */
-function useCsvDownload(load: () => Promise<{ name: string; text: string }>) {
+export function useCsvDownload(load: () => Promise<{ name: string; text: string }>) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
   const run = () => {
@@ -56,7 +56,7 @@ function useCsvDownload(load: () => Promise<{ name: string; text: string }>) {
   return { pending, error, run };
 }
 
-function mapLoadable<T, U>(value: Loadable<T>, map: (data: T) => U): Loadable<U> {
+export function mapLoadable<T, U>(value: Loadable<T>, map: (data: T) => U): Loadable<U> {
   return value.status === "ready" ? { status: "ready", data: map(value.data) } : value;
 }
 
@@ -420,17 +420,12 @@ export function DailyScreen() {
 
 /**
  * FM-01 (FR-FEE-031/032): every open account of the current and earlier years, one row per
- * account with its year, and the arrears tiles. Optional here until the generated client
- * carries the fields (`make openapi`).
+ * account with its year (`academic_year_label`, `earlier_year`), and the arrears tiles.
  */
-type DuesRow = Dues["rows"][number] & {
-  academic_year_label?: string | null;
-  earlier_year?: boolean;
-};
-type DuesTotals = Dues & { arrears_students?: number; arrears_total?: string };
+type DuesRow = Dues["rows"][number];
 type DuesQuery = { class_id?: string; arrears_only?: boolean };
 
-/** This year's accounts of a selection: reminders never carry earlier years by default. */
+/** This year's accounts of a selection: payment links never carry earlier years. */
 function thisYear(rows: readonly DuesRow[]): string[] {
   return rows.filter((row) => !row.earlier_year).map((row) => row.account_id);
 }
@@ -438,7 +433,9 @@ function thisYear(rows: readonly DuesRow[]): string[] {
 /**
  * Dues list (FR-FEE-020, FR-FEE-031): accounts with overdue amounts, oldest first, earlier
  * years included with a year column and an "earlier years only" filter; CSV with step-up.
- * Reminders from a row or the selection cover this year's accounts only (FR-FEE-034/035).
+ * A reminder about an earlier-year row needs the dialog's explicit "Include earlier-year
+ * dues" option (FR-FEE-035; the API answers 422 `earlier_year` otherwise and the dialog says
+ * so); payment links cover this year's accounts only (FR-FEE-034, FR-FEE-039).
  */
 export function DuesScreen() {
   const t = useTranslations("fees.dues");
@@ -474,7 +471,7 @@ export function DuesScreen() {
   const duesKey = [...KEYS.dues("", classId), years] as const;
   const dues = useApiQuery(
     duesKey,
-    async (): Promise<DuesTotals> => unwrap(api.GET("/api/v1/fees/dues", { params: { query } })),
+    () => unwrap(api.GET("/api/v1/fees/dues", { params: { query } })),
     { enabled: me !== undefined && allowed },
   );
   const csv = useCsvDownload(async () => ({
@@ -557,31 +554,32 @@ export function DuesScreen() {
               header: <span className="sr-only">{t("columns.actions")}</span>,
               hideable: false,
               cell: (row: DuesRow) => {
-                // Earlier-year dues are reminded only with the explicit option (FR-FEE-035).
-                if (row.earlier_year) return null;
                 const name = row.display_name ?? t("noName");
                 const one = (kind: "reminder" | "payment_link") =>
                   openReminders({ account_ids: [row.account_id], all_matching: false, kind });
-                return (
-                  <span className="relative z-[1] flex justify-end">
-                    <Menu
-                      label={t("rowActions", { name })}
-                      align="end"
-                      entries={[
-                        {
-                          id: "remind",
-                          label: t("sendReminder"),
-                          icon: "megaphone",
-                          onSelect: () => one("reminder"),
-                        },
+                // An earlier-year row: a reminder with the explicit option only (FR-FEE-035),
+                // never a payment link (earlier years are paid at the office, FR-FEE-039).
+                const entries: MenuEntry[] = [
+                  {
+                    id: "remind",
+                    label: t("sendReminder"),
+                    icon: "megaphone",
+                    onSelect: () => one("reminder"),
+                  },
+                  ...(row.earlier_year
+                    ? []
+                    : [
                         {
                           id: "pay-link",
                           label: t("sendPaymentLink"),
-                          icon: "creditCard",
+                          icon: "creditCard" as const,
                           onSelect: () => one("payment_link"),
                         },
-                      ]}
-                    />
+                      ]),
+                ];
+                return (
+                  <span className="relative z-[1] flex justify-end">
+                    <Menu label={t("rowActions", { name })} align="end" entries={entries} />
                   </span>
                 );
               },
@@ -690,13 +688,12 @@ export function DuesScreen() {
                 value={formatInr(dues.data.total_overdue, locale)}
                 unavailableLabel={tc("notAvailable")}
               />
-              {dues.data.arrears_total !== undefined ? (
-                <StatCard
-                  label={t("arrearsTotal")}
-                  value={formatInr(dues.data.arrears_total, locale)}
-                  unavailableLabel={tc("notAvailable")}
-                />
-              ) : null}
+              <StatCard
+                label={t("arrearsTotal")}
+                value={formatInr(dues.data.arrears_total, locale)}
+                unavailableLabel={tc("notAvailable")}
+                hint={t("arrearsStudents", { count: dues.data.arrears_students })}
+              />
             </dl>
           ) : null}
           <DataTableV2
@@ -753,7 +750,7 @@ export function DuesScreen() {
                           size="sm"
                           onClick={() =>
                             openReminders({
-                              account_ids: thisYear(selected),
+                              account_ids: selected.map((row) => row.account_id),
                               all_matching: false,
                               kind: "reminder",
                             })
@@ -764,6 +761,7 @@ export function DuesScreen() {
                         <Button
                           variant="secondary"
                           size="sm"
+                          disabled={thisYear(selected).length === 0}
                           onClick={() =>
                             openReminders({
                               account_ids: thisYear(selected),

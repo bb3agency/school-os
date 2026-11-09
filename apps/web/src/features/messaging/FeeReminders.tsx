@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Value } from "@/components/ui/Value";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
-import { unwrap, useBffClient } from "@/lib/bff/query";
+import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan } from "@/lib/bff/staff-me";
 import { formatCount, formatInr } from "@/lib/format";
 import {
@@ -34,6 +34,18 @@ const GUARDIAN_REASONS = [
 ] as const;
 
 const NO_FIELDS = z.object({});
+
+/**
+ * True when the API refused rows of earlier academic years because the option was off
+ * (422 `account_ids` `earlier_year`; FM-01, FR-FEE-035).
+ */
+export function isEarlierYearRefusal(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.status === 422 &&
+    (error.problem.errors ?? []).some((e) => e.code === "earlier_year")
+  );
+}
 
 /**
  * Whether this person may send fee reminders from the dues list here: `message.send` (the
@@ -141,6 +153,11 @@ function Preview({ preview, kind }: { preview: FeeReminderPreview; kind: FeeMess
  * page offers "Pay online"; it needs online payments connected. It asks the API who would get a
  * reminder (no state is kept on the server), shows the counts, who is left out and why and the
  * estimated Meta cost, then sends with the consequence line. One Idempotency-Key per dialog.
+ *
+ * FM-01 (FR-FEE-035; D84): a reminder may include earlier-year dues only when the clerk ticks
+ * "Include earlier-year dues" (off for every new opening); each parent then gets one message
+ * with the student's total overdue across years. Payment links never carry earlier years (those
+ * are paid at the school office, FR-FEE-039), so the option is not offered for them.
  */
 export function FeeRemindersDialog({
   selection,
@@ -155,9 +172,14 @@ export function FeeRemindersDialog({
   const kind: FeeMessageKind = selection?.kind ?? "reminder";
   const tk = useKindText(kind);
   const api = useBffClient("staff");
-  // The answer belongs to the selection it was asked for (each opening passes a new one).
+  // The option belongs to the selection it was ticked for: every new opening starts unticked.
+  const [earlierFor, setEarlierFor] = useState<FeeReminderSelection | null>(null);
+  const earlier = kind === "reminder" && selection !== null && earlierFor === selection;
+  // The answer belongs to the selection and option it was asked for (each opening passes a
+  // new selection).
   const [answer, setAnswer] = useState<{
     for: FeeReminderSelection;
+    earlier: boolean;
     preview: FeeReminderPreview | null;
     error: unknown;
   } | null>(null);
@@ -165,19 +187,21 @@ export function FeeRemindersDialog({
   useEffect(() => {
     if (!open || !selection) return;
     let current = true;
-    unwrap(api.POST("/api/v1/fees/reminders/preview", { body: selection }))
+    const body = { ...selection, include_earlier_years: earlier };
+    unwrap(api.POST("/api/v1/fees/reminders/preview", { body }))
       .then((out) => {
-        if (current) setAnswer({ for: selection, preview: out, error: undefined });
+        if (current) setAnswer({ for: selection, earlier, preview: out, error: undefined });
       })
       .catch((failure: unknown) => {
-        if (current) setAnswer({ for: selection, preview: null, error: failure });
+        if (current) setAnswer({ for: selection, earlier, preview: null, error: failure });
       });
     return () => {
       current = false;
     };
-  }, [api, open, selection]);
+  }, [api, open, selection, earlier]);
 
-  const mine = answer !== null && answer.for === selection ? answer : null;
+  const mine =
+    answer !== null && answer.for === selection && answer.earlier === earlier ? answer : null;
   const preview = mine?.preview ?? null;
   const error = mine?.error;
 
@@ -202,7 +226,11 @@ export function FeeRemindersDialog({
         return unwrap(
           api.POST("/api/v1/fees/reminders", {
             headers: { "Idempotency-Key": idempotencyKey },
-            body: { ...selection, preview_token: preview.preview_token },
+            body: {
+              ...selection,
+              include_earlier_years: earlier,
+              preview_token: preview.preview_token,
+            },
           }),
         );
       }}
@@ -219,7 +247,27 @@ export function FeeRemindersDialog({
     >
       {() => (
         <>
-          <ApiErrorAlert error={error} namespace="messaging" />
+          {kind === "reminder" ? (
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1 size-4 accent-primary"
+                checked={earlier}
+                onChange={(event) => setEarlierFor(event.target.checked ? selection : null)}
+              />
+              <span>
+                {t("includeEarlier")}
+                <span className="block text-ink-muted">{t("includeEarlierHint")}</span>
+              </span>
+            </label>
+          ) : null}
+          {isEarlierYearRefusal(error) ? (
+            <Alert tone="warning" live title={t("earlierYearTitle")}>
+              {kind === "reminder" ? t("earlierYearBody") : t("earlierYearLinkBody")}
+            </Alert>
+          ) : (
+            <ApiErrorAlert error={error} namespace="messaging" />
+          )}
           {preview ? (
             <Preview preview={preview} kind={kind} />
           ) : error === undefined ? (

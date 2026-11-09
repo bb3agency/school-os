@@ -203,6 +203,8 @@ function dues(): Dues {
     as_of: "2026-10-21",
     students: 2,
     total_overdue: "7000.00",
+    arrears_students: 0,
+    arrears_total: "0.00",
     rows: [
       {
         account_id: ACCOUNT_A,
@@ -214,6 +216,9 @@ function dues(): Dues {
         oldest_due_on: "2026-09-21",
         balance: "7000.00",
         last_payment_on: null,
+        academic_year_id: "0192f3a4-0000-7000-8000-00000000c101",
+        academic_year_label: "2026-27",
+        earlier_year: false,
       },
       {
         account_id: ACCOUNT_B,
@@ -225,6 +230,9 @@ function dues(): Dues {
         oldest_due_on: "2026-09-21",
         balance: "7000.00",
         last_payment_on: null,
+        academic_year_id: "0192f3a4-0000-7000-8000-00000000c101",
+        academic_year_label: "2026-27",
+        earlier_year: false,
       },
     ],
   };
@@ -271,7 +279,12 @@ describe("Send reminder from the dues list (FR-MSG-025)", () => {
     expect(within(dialog).getByText("₹0.14")).toBeInTheDocument();
     expect(
       JSON.parse(stub.callsTo("POST /bff/api/v1/fees/reminders/preview")[0]?.body ?? "{}"),
-    ).toEqual({ account_ids: [ACCOUNT_A], all_matching: false, kind: "reminder" });
+    ).toEqual({
+      account_ids: [ACCOUNT_A],
+      all_matching: false,
+      kind: "reminder",
+      include_earlier_years: false,
+    });
     const confirm = within(dialog).getByRole("button", { name: "Send 1 reminder" });
     expect(confirm).toHaveAccessibleDescription(en.messaging.feeReminders.consequence);
     await userEvent.click(confirm);
@@ -285,6 +298,7 @@ describe("Send reminder from the dues list (FR-MSG-025)", () => {
       account_ids: [ACCOUNT_A],
       all_matching: false,
       kind: "reminder",
+      include_earlier_years: false,
       preview_token: reminderPreview().preview_token,
     });
   });

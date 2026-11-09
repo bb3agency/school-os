@@ -51,6 +51,7 @@ import {
   type Receipt,
 } from "./data";
 import { ReceiptWhatsApp } from "@/features/messaging/ReceiptWhatsApp";
+import { EarlierYearsPanel, type PlannedPart, type SplitPlan } from "./CounterYears";
 import { Amount, FeesGate, NoAccess } from "./parts";
 import { UpiCounterHelp } from "./UpiCounter";
 
@@ -246,6 +247,11 @@ function StudentSearch({
             </span>{" "}
             <span className="text-sm whitespace-nowrap">
               {t("balance")} <Amount value={m.balance} />
+              {(toPaise(m.earlier_years_due) ?? 0) > 0 ? (
+                <span className="block text-end text-xs text-ink-muted">
+                  {t("earlierYearsDue")} <Amount value={m.earlier_years_due} />
+                </span>
+              ) : null}
             </span>
           </div>
         ))}
@@ -405,10 +411,13 @@ function check(
 function PaymentForm({
   account,
   today,
+  initialAmount,
   onSaved,
 }: {
   account: Account;
   today: string;
+  /** A part of an "oldest first" split (FR-FEE-037); otherwise what is due now. */
+  initialAmount?: string | undefined;
   onSaved: (receipt: Receipt) => void;
 }) {
   const t = useTranslations("fees.counter");
@@ -420,7 +429,7 @@ function PaymentForm({
   const formRef = useRef<HTMLFormElement | null>(null);
   const collectable = toPaise(account.totals.collectable) ?? 0;
   const [form, setForm] = useState<Form>({
-    amount: account.totals.collectable,
+    amount: initialAmount ?? account.totals.collectable,
     mode: "cash",
     chequeNumber: "",
     bankName: "",
@@ -759,10 +768,15 @@ function SavedPanel({
   saved,
   printRef,
   onNext,
+  nextPart,
+  onNextPart,
 }: {
   saved: Receipt;
   printRef: RefObject<HTMLAnchorElement | null>;
   onNext: () => void;
+  /** The next part of an "oldest first" split still without a receipt (FR-FEE-037). */
+  nextPart?: PlannedPart | null;
+  onNextPart?: (part: PlannedPart) => void;
 }) {
   const t = useTranslations("fees.counter");
   const tf = useTranslations("fees");
@@ -791,6 +805,11 @@ function SavedPanel({
           {t("print")} <Kbd>P</Kbd>
           <span className="sr-only"> ({tf("newTab")})</span>
         </a>
+        {nextPart && onNextPart ? (
+          <Button variant="secondary" size="lg" onClick={() => onNextPart(nextPart)}>
+            {t("years.nextPart", { year: nextPart.label })}
+          </Button>
+        ) : null}
         <Button variant="secondary" size="lg" onClick={onNext} aria-keyshortcuts="N">
           {t("next")} <Kbd>N</Kbd>
         </Button>
@@ -833,6 +852,29 @@ export function CounterScreen({ initialAccountId = null }: { initialAccountId?: 
   const account = useAccount(accountId);
   const [saved, setSaved] = useState<Receipt | null>(null);
   const loaded = account.status === "ready" ? account.data : null;
+  // FM-01 (FR-FEE-037): the clerk's "oldest first" split and the part on the form now.
+  const [plan, setPlan] = useState<SplitPlan | null>(null);
+  const [preset, setPreset] = useState<{ accountId: string; amount: string } | null>(null);
+  const nextPart = plan?.parts.find((part) => !plan.done.includes(part.account_id)) ?? null;
+  const presetAmount = loaded && preset?.accountId === loaded.id ? preset.amount : undefined;
+
+  const takePart = useCallback((part: PlannedPart) => {
+    setSaved(null);
+    setAccountId(part.account_id);
+    setPreset({ accountId: part.account_id, amount: part.amount });
+  }, []);
+  const onSaved = useCallback(
+    (receipt: Receipt) => {
+      if (preset?.accountId === receipt.account_id) {
+        setPlan((current) =>
+          current ? { ...current, done: [...current.done, receipt.account_id] } : current,
+        );
+      }
+      setPreset(null);
+      setSaved(receipt);
+    },
+    [preset],
+  );
 
   useEffect(() => {
     if (saved) printRef.current?.focus();
@@ -842,6 +884,8 @@ export function CounterScreen({ initialAccountId = null }: { initialAccountId?: 
   const nextStudent = useCallback(() => {
     setSaved(null);
     setAccountId(null);
+    setPlan(null);
+    setPreset(null);
   }, []);
 
   // `/` or F2 focuses the search from anywhere on the counter; P and N after saving.
@@ -903,7 +947,13 @@ export function CounterScreen({ initialAccountId = null }: { initialAccountId?: 
               {t("dayClosedBody")}
             </Alert>
           ) : saved ? (
-            <SavedPanel saved={saved} printRef={printRef} onNext={nextStudent} />
+            <SavedPanel
+              saved={saved}
+              printRef={printRef}
+              onNext={nextStudent}
+              nextPart={nextPart}
+              onNextPart={takePart}
+            />
           ) : (
             <>
               <ShortcutHints />
@@ -912,13 +962,30 @@ export function CounterScreen({ initialAccountId = null }: { initialAccountId?: 
                   <Card padding="sm">
                     <StudentSearch
                       inputRef={searchRef}
-                      onPick={(m) => setAccountId(m.account_id)}
+                      onPick={(m) => {
+                        setAccountId(m.account_id);
+                        setPreset(null);
+                        if (plan?.studentId !== m.student_id) setPlan(null);
+                      }}
                     />
                   </Card>
                   {accountId === null ? null : account.status === "loading" ? (
                     <LoadingState label={tc("loading")} />
                   ) : loaded ? (
-                    <DuesPanel account={loaded} />
+                    <>
+                      <DuesPanel account={loaded} />
+                      <EarlierYearsPanel
+                        studentId={loaded.student_id}
+                        currentAccountId={loaded.id}
+                        plan={plan}
+                        onCollect={(id) => {
+                          setAccountId(id);
+                          setPreset(null);
+                        }}
+                        onSplit={setPlan}
+                        onTakePart={takePart}
+                      />
+                    </>
                   ) : (
                     <FeesGate data={account}>{() => null}</FeesGate>
                   )}
@@ -926,10 +993,11 @@ export function CounterScreen({ initialAccountId = null }: { initialAccountId?: 
                 {loaded ? (
                   <div className="min-w-0">
                     <PaymentForm
-                      key={`${loaded.id}:${loaded.version}`}
+                      key={`${loaded.id}:${loaded.version}:${presetAmount ?? ""}`}
                       account={loaded}
                       today={info.today}
-                      onSaved={setSaved}
+                      initialAmount={presetAmount}
+                      onSaved={onSaved}
                     />
                   </div>
                 ) : null}

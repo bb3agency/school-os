@@ -328,6 +328,14 @@ export function SchoolShell({
           icon: "chart",
         },
         {
+          // FM-01 (FR-FEE-038): students who left with fees still open.
+          href: "/fees/left-with-dues",
+          label: t("fees.nav.leftWithDues"),
+          permission: "finance.read",
+          feature: "fees",
+          icon: "chart",
+        },
+        {
           // R2-2E (US-2109): bank statements, UPI confirmations and exceptions.
           href: "/fees/reconcile",
           label: t("fees.nav.reconcile"),

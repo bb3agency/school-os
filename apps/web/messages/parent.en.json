@@ -66,7 +66,11 @@
       "limit": "Too many payment tries from this link today. Try again tomorrow or ask the school office.",
       "failed": "The payment page could not be opened. Try again in a few minutes.",
       "expired": "This link has expired. Ask the school office for a new one."
-    }
+    },
+    "earlierTitle": "Earlier years",
+    "earlierPayAtOffice": "Pay at the school office",
+    "earlierNote": "These fees are from earlier school years. Pay them at the school office. Online payment and the total below are for this year's fees only.",
+    "nothingDueThisYear": "Nothing is due for this year now."
   },
   "paid": {
     "title": "Payment",
