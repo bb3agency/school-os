@@ -60,6 +60,7 @@ from app.core.pdf import PrintDocument
 from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
 from app.dq import engine, readiness
+from app.dq import followup_repository as followup_repo
 from app.dq import repository as repo
 from app.dq.explanations import Language, load_explanations
 from app.dq.masking import FULL_MASK
@@ -1320,7 +1321,7 @@ def export_records(session: Session) -> list[RecordTable]:
     """Worker only: every data-quality run and finding of the current school for its full data
     export (``app.admin``; the caller checked ``tenant.export_all`` and audits the export).
     Findings carry the masked values the engine stored (FR-DQ-006), never C3 values."""
-    return repo.export_record_tables(session)
+    return [*repo.export_record_tables(session), *followup_repo.export_record_tables(session)]
 
 
 __all__ = [
@@ -1370,6 +1371,9 @@ _PURGE = purging.PurgeTables(
     # R3-1D portal calendar (ops; migration 0067): reminders reference ops.tasks, so dq is
     # purged before circulars (app/tenancy/offboarding.yaml).
     deleted=(
+        # FO-01/FO-03 (0088_udise_followup): the follow-up log and the UDISE+ to-do ticks.
+        "sis.dq_followups",
+        "sis.udise_movement_marks",
         "ops.portal_reminders",
         "ops.portal_calendar_dates",
         "sis.dq_findings",

@@ -1,0 +1,69 @@
+# Follow-ups on fixes outside the school (FO-01) and the UDISE+ to-do list (FO-03)
+# (FR-UDI-021..FR-UDI-040; docs/research/2026-11-features/office-portals.md).
+# Loaded and validated by app.dq.followup_config.load_followup_config() at import time.
+#
+# These are the school office's working rules, not portal facts. The day counts are lead
+# defaults (D85, product owner to confirm); `verified: false` marks the UDISE+ steps, which
+# come from secondary sources (unverified, owner decision D3).
+version: 1
+
+followups:
+  # Fix owners (app/dq/config/readiness.yaml) whose differences are fixed outside the school
+  # and get a follow-up log. school_register is fixed inside the school (change requests).
+  owners:
+    parent_aadhaar:
+      label: {en: "Parent (Aadhaar update)"}
+      events: [slip_given, parent_contacted, promised_by, update_reported]
+    school_udise:
+      label: {en: "MEO / MIS coordinator (UDISE+)"}
+      events: [request_sent, followed_up, update_reported]
+  # A follow-up is overdue when nothing was recorded for this many days, or the date the
+  # parent promised has passed (D85, PO to confirm).
+  overdue_after_days: 14
+  # A step may be recorded up to this many days after it happened (no future dates).
+  max_backdate_days: 90
+  # A promised date may lie at most this many days after the step.
+  max_promise_days: 120
+  events:
+    slip_given: {en: "Verification slip given", channels: []}
+    parent_contacted:
+      en: "Parent contacted"
+      channels: [in_person, phone, whatsapp, letter]
+    promised_by: {en: "Parent promised an update by", channels: []}
+    update_reported: {en: "Update reported done", channels: []}
+    request_sent:
+      en: "Correction request sent"
+      channels: [in_person, email, letter, phone]
+    followed_up:
+      en: "Followed up with the office"
+      channels: [in_person, email, letter, phone]
+  channels:
+    in_person: {en: "In person"}
+    phone: {en: "Phone call"}
+    whatsapp: {en: "WhatsApp"}
+    letter: {en: "Letter or diary note"}
+    email: {en: "E-mail"}
+
+movements:
+  verified: false
+  source:
+    - "https://educationforallinindia.com/?p=25804 (secondary: duplicate active records)"
+    - "https://schoolites.com/udise/student-transfer (unverified: Transfer-In needs the TC marked first)"
+    - "https://www.edudel.nic.in/ (Delhi circular 24 Jul 2026: finish progression before new entries)"
+  # Events from this many days before the current academic year starts are listed (the
+  # leavers and TCs of the year-end belong to this year's UDISE+ work).
+  window_days_before_year: 90
+  # An item still open after this many days is "waiting long" (home screen and the UDISE+
+  # reminder; D85, PO to confirm).
+  overdue_after_days: 14
+  kinds:
+    transfer_out:
+      en: "Transfer certificate issued: mark the child as transferred in UDISE+"
+    left_without_tc:
+      en: "Left without a transfer certificate: move the child to the UDISE+ dropbox"
+    admission_without_pen:
+      en: "New admission without a PEN: search UDISE+ by name and date of birth, create the child only if not found, then record the PEN here"
+    admission_with_pen:
+      en: "Admission with a PEN: import the child in UDISE+ by PEN (do not create a new record)"
+    progression:
+      en: "Promotion done: finish the progression in UDISE+ for the new year"

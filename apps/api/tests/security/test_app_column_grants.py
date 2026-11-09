@@ -38,6 +38,15 @@ EXPECTED_UPDATE: dict[str, set[str]] = {
         "updated_at",
     },
     "audit.chain_heads": {"last_seq", "last_hash", "updated_at"},
+    # FO-03 (0088_udise_followup): the clerk's tick on a UDISE+ to-do item.
+    "sis.udise_movement_marks": {
+        "state",
+        "marked_by",
+        "marked_by_membership",
+        "marked_at",
+        "updated_at",
+        "version",
+    },
     "audit.chain_verifications": {
         "verified_at",
         "mode",

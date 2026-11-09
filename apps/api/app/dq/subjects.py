@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.report_format import cap_rows, fmt_count, fmt_date, humanise
 from app.core.subjects import ReportSection, Subject
+from app.dq import followup_repository as followup_repo
 from app.dq import repository as repo
 from app.dq.models import ACTIVE_STATUSES
 
@@ -23,9 +24,10 @@ def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
     """Counts of the student's data-quality findings ([] for other kinds or none)."""
     if subject.kind != "student":
         return []
+    sections = _followup_section(session, subject)
     counts = repo.subject_finding_counts(session, subject.id)
     if not counts:
-        return []
+        return sections
     active = sum(int(r["n"]) for r in counts if r["status"] in ACTIVE_STATUSES)
     closed = sum(int(r["n"]) for r in counts) - active
     rows = [
@@ -47,6 +49,33 @@ def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
             columns=("Check", "Severity", "Status", "Findings", "Last checked"),
             rows=tuple(kept),
             note=f"{summary} {note}" if note else summary,
+        ),
+        *sections,
+    ]
+
+
+def _followup_section(session: Session, subject: Subject) -> list[ReportSection]:
+    """FO-01: the follow-up steps recorded for the student (counts and dates only)."""
+    counts = followup_repo.subject_followup_counts(session, subject.id)
+    if not counts:
+        return []
+    rows = [
+        (
+            humanise(str(r["fix_owner"])),
+            humanise(str(r["event"])),
+            fmt_count(int(r["n"])),
+            fmt_date(r["last_on"]),
+        )
+        for r in counts
+    ]
+    kept, note = cap_rows(rows)
+    return [
+        ReportSection(
+            class_key=CLASS_KEY,
+            title="Follow-ups on fixes outside the school",
+            columns=("Who fixes it", "Step", "Times", "Last on"),
+            rows=tuple(kept),
+            note=note or None,
         )
     ]
 

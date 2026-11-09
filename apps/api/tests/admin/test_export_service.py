@@ -162,6 +162,9 @@ EXPECTED_TABLES = {
     # R3-1D (0064_portal_calendar, ADR-0053): confirmed portal dates and reminders sent.
     "portal_calendar_dates",
     "portal_reminders",
+    # FO-01/FO-03 (0088_udise_followup): follow-up log and UDISE+ to-do ticks.
+    "dq_followups",
+    "udise_movement_marks",
     "import_batches",
     "import_mapping_templates",
     "documents",

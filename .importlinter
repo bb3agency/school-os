@@ -352,6 +352,8 @@ source_modules =
 forbidden_modules =
     app.dq.repository
     app.dq.models
+    app.dq.followup_repository
+    app.dq.followup_models
 allow_indirect_imports = True
 
 [importlinter:contract:students-internals]
@@ -527,6 +529,8 @@ source_modules =
     app.dq.slip
     # R3-1D portal calendar file, windows and lead days (ADR-0053)
     app.dq.calendar
+    # FO-01/FO-03 follow-up and UDISE+ to-do rules (FR-UDI-021..040)
+    app.dq.followup_config
 forbidden_modules =
     sqlalchemy
     fastapi
