@@ -51,6 +51,17 @@ classes:
     erasure: no_personal_data
     source: SchoolOS defaults and the school's settings
 
+  school_calendar:
+    label: School calendar (working days and holidays)
+    owner: academics
+    tables: [sis.school_calendars, sis.calendar_entries]
+    classification: C1
+    docs_row: School structure, settings and keys
+    retention: Life of the school
+    basis: Which days the school works; nothing about one person.
+    erasure: no_personal_data
+    source: Set up by the school
+
   school_structure:
     label: Academic years, classes, sections and school keys
     owner: tenancy

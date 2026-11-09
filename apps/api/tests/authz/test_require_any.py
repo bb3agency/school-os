@@ -340,6 +340,16 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         # R2-1B fees (ADR-0042): reads shared by collectors, readers and approvers; every fee
         # permission is school-wide, re-checked by the service (FR-FEE-024).
         ("GET", "/api/v1/fees/status"): ("finance.read", (*FEE_ALL[1:], "fee.reconcile"), False),
+        # FM-02 (FR-FEE-097): the add-on lists for the in-charge, finance readers and setup.
+        ("GET", "/api/v1/fees/addons"): ("fee.addon.read", ("finance.read", "fee.manage"), False),
+        ("GET", "/api/v1/fees/addons/{addon_id}/students"): (
+            "fee.addon.read",
+            ("finance.read", "fee.manage"),
+            False,
+        ),
+        # FM-03 (FR-TALLY-011, FR-TALLY-021): voucher settings and export history.
+        ("GET", "/api/v1/tally/vouchers/settings"): ("tally.configure", ("fee.report",), False),
+        ("GET", "/api/v1/tally/vouchers/exports"): ("fee.report", ("finance.read",), False),
         # FM-06 (FR-FEE-053) and FM-01 (FR-FEE-036): the counter and finance readers.
         ("GET", "/api/v1/fees/tax-certificates"): ("fee.collect", ("finance.read",), False),
         ("GET", "/api/v1/fees/tax-certificates/{tax_certificate_id}"): (

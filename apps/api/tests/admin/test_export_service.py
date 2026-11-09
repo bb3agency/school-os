@@ -249,6 +249,13 @@ EXPECTED_TABLES = {
     "fees_receipt_allocations",
     # FM-06 (0083_fee_tax_cert): tuition fee certificates for income tax.
     "fees_tax_certificates",
+    # FM-02 (0088_fee_addons): add-on fee templates and assignments.
+    "fees_addons",
+    "fees_addon_assignments",
+    # FP-02 (0093_msg_reach_closure): urgent closure messages.
+    "messaging_closures",
+    # FC-01 (0096_compliance_register): the school's certificate register.
+    "compliance_certificates",
     "fees_receipt_cancellations",
     "fees_refunds",
     "fees_day_closes",

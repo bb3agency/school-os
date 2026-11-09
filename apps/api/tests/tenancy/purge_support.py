@@ -1132,6 +1132,19 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             sec=ids["section"],
             u=u["user"],
         )
+        # FT-08 (0090_year_end): the student's confirmed annual result.
+        _run(
+            c,
+            "INSERT INTO sis.year_results (id, tenant_id, academic_year_id, student_id, "
+            "section_id, result, rule_version, confirmed_by) VALUES (:i, :t, :y, :s, :sec, "
+            "'promoted', 1, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            y=ids["year1"],
+            s=ids["student"],
+            sec=ids["section"],
+            u=u["user"],
+        )
         _run(
             c,
             "INSERT INTO sis.behaviour_notes (id, tenant_id, student_id, section_id, category, "
