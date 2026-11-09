@@ -9225,7 +9225,8 @@
       "upiSettings": "UPI QR",
       "feeSettings": "Fee settings",
       "taxCertificates": "Tax certificates",
-      "leftWithDues": "Left with dues"
+      "leftWithDues": "Left with dues",
+      "reports": "Fee reports"
     },
     "modes": {
       "cash": "Cash",
@@ -10191,6 +10192,139 @@
       },
       "emptyTitle": "No student left with dues",
       "emptyBody": "No student who left or graduated has fees still open."
+    },
+    "periodReports": {
+      "title": "Fee reports",
+      "description": "Collections for a period, demand and balance by class, registers, ageing and the year-end pack for the auditor.",
+      "tabsLabel": "Fee reports",
+      "tabs": {
+        "collections": "Collections",
+        "dcb": "Demand and balance",
+        "registers": "Registers",
+        "ageing": "Ageing",
+        "yearEnd": "Year-end pack"
+      },
+      "periodLabel": "Report period",
+      "from": "From",
+      "to": "To",
+      "periodHint": "Dates are Indian time; at most one year.",
+      "none": "None in this period.",
+      "downloads": "Download",
+      "files": {
+        "receipts": {
+          "csv": "Receipts register (CSV)",
+          "xlsx": "Receipts register (Excel)"
+        },
+        "heads": {
+          "csv": "Collected by head (CSV)"
+        },
+        "dcb": {
+          "csv": "Demand and balance (CSV)",
+          "xlsx": "Demand and balance (Excel)"
+        },
+        "concessions": {
+          "csv": "Concessions register (CSV)"
+        },
+        "adjustments": {
+          "csv": "Adjustments and write-offs (CSV)"
+        },
+        "cancellations": {
+          "csv": "Cancelled receipts (CSV)"
+        },
+        "refunds": {
+          "csv": "Refunds register (CSV)"
+        },
+        "ageing": {
+          "csv": "Ageing by student (CSV)",
+          "xlsx": "Ageing by student (Excel)"
+        }
+      },
+      "print": "Print (A4)",
+      "totalsLabel": "Report totals",
+      "gross": "Receipts issued",
+      "receiptsCount": "{count, plural, one {# receipt} other {# receipts}}",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded",
+      "net": "Net collected",
+      "byHead": "By fee head",
+      "byMode": "By mode",
+      "byCollector": "By collector",
+      "byDay": "By day",
+      "online": "Online",
+      "cancelledReceipts": "Cancelled receipts",
+      "cancelledReceiptsHint": "Cancelled receipts keep their numbers. They are taken off on the day the cancellation was approved.",
+      "columns": {
+        "head": "Head",
+        "collectedInr": "Collected (₹)",
+        "netInr": "Net (₹)",
+        "mode": "Mode",
+        "receipts": "Receipts",
+        "collector": "Collected by",
+        "grossInr": "Issued (₹)",
+        "date": "Date",
+        "receipt": "Receipt",
+        "receiptDate": "Receipt date",
+        "cancelledOn": "Cancelled on",
+        "reason": "Reason",
+        "amountInr": "Amount (₹)",
+        "classSection": "Class and section",
+        "accounts": "Accounts",
+        "demandInr": "Demand (₹)",
+        "concessionsInr": "Concessions (₹)",
+        "writtenOffInr": "Written off (₹)",
+        "netDemandInr": "Net demand (₹)",
+        "balanceInr": "Balance (₹)",
+        "year": "School year",
+        "student": "Student",
+        "type": "Type",
+        "approvedBy": "Approved by",
+        "voucher": "Voucher",
+        "students": "Students",
+        "overdueInr": "Overdue (₹)",
+        "oldest": "Oldest due date",
+        "series": "Series",
+        "first": "First number",
+        "last": "Last number",
+        "used": "Used",
+        "cancelledCount": "Cancelled",
+        "missing": "Missing numbers"
+      },
+      "year": "School year",
+      "currentYear": "Current school year",
+      "netDemand": "Net demand",
+      "collected": "Collected",
+      "balance": "Balance",
+      "earlierYears": "Earlier years",
+      "earlierYearsHint": "Dues of earlier school years still open, with what management wrote off.",
+      "dcbTitle": "Demand, collection and balance, {year}",
+      "notEnrolled": "not enrolled (left or moved)",
+      "allClasses": "All classes",
+      "includeReasons": "Include typed reasons",
+      "truncatedTitle": "Only the first rows are shown",
+      "truncatedBody": "The totals cover every row. Download the report for the full list.",
+      "concessions": "Concessions",
+      "writtenOff": "Written off by management",
+      "adjustments": "Adjustments and write-offs",
+      "refunds": "Refunds paid",
+      "noName": "Name not shown",
+      "bucketOver": "Over {days} days",
+      "bucketRange": "{from} to {to} days",
+      "ageingNote": "Overdue as of {date}. Not yet due: {notDue}.",
+      "byClass": "By class",
+      "noClass": "No current class",
+      "byStudent": "By student",
+      "financialYear": "Financial year",
+      "pack": "Download year-end pack (ZIP)",
+      "packHint": "One ZIP for the auditor or the trust's CA: collections, registers, demand and balance, ageing and the receipt number check. It needs a fresh sign-in and is recorded.",
+      "gapFreeTitle": "No receipt numbers missing",
+      "gapFreeBody": "Every receipt and refund voucher number of this year is accounted for.",
+      "gapsTitle": "Some numbers are missing",
+      "gapsBody": "Numbers were taken but no receipt or voucher has them. Ask SchoolOS support before the audit.",
+      "seriesTitle": "Receipt numbers, {year}",
+      "series": {
+        "receipt": "Receipts",
+        "refund": "Refund vouchers"
+      }
     }
   },
   "payments": {
