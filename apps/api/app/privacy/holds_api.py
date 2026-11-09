@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, Response
 
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require
-from app.authz.http import IfMatch, etag
+from app.authz.http import IdempotencyDep, IfMatch, etag
 from app.privacy import holds_service as service
 from app.privacy.holds_schemas import HoldCreate, HoldListOut, HoldOut
 
@@ -39,16 +39,24 @@ def list_holds(ctx: Reader, db: TenantDB) -> HoldListOut:
 
 
 @router.post("/holds", response_model=HoldOut, status_code=201)
-def place_hold(ctx: Manager, db: TenantDB, body: HoldCreate, response: Response) -> HoldOut:
+def place_hold(ctx: Manager, db: TenantDB, body: HoldCreate, idem: IdempotencyDep) -> Response:
     """Ask to place a hold on one student or on a record class (permission
     ``privacy.hold.manage``, MFA within 5 minutes). It takes effect when another person with
     the permission approves it. The reference is encrypted and never logged. Errors:
     ``unknown_reason_code``, ``unknown_record_class``, ``student_required``,
     ``record_class_required``, ``not_found``, ``date_in_past``, ``review_too_far``,
-    ``aadhaar_full_number_rejected`` (422)."""
-    out = service.place(db, ctx, body)
-    response.headers["Location"] = f"/api/v1/privacy/holds/{out.id}"
-    return _etag(response, out)
+    ``aadhaar_full_number_rejected`` (422). Accepts ``Idempotency-Key``."""
+    return idem.run(
+        db,
+        body,
+        lambda: service.place(db, ctx, body),
+        headers=lambda item: {
+            "Location": f"/api/v1/privacy/holds/{item.id}",
+            "ETag": etag(item.version),
+        },
+        # C3 reference: no body kept in Valkey (as breaches, H-01).
+        refetch=lambda hold_id: service.get_hold(db, ctx, hold_id),
+    )
 
 
 @router.get("/holds/{hold_id}", response_model=HoldOut)

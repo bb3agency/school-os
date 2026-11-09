@@ -4,6 +4,7 @@ with the admin engine so builders need no API client."""
 
 from __future__ import annotations
 
+import datetime as dt
 import importlib.util
 import sys
 import uuid
@@ -90,6 +91,56 @@ def breach(admin: Engine, school: Any) -> uuid.UUID:
     return bid
 
 
+def hold(admin: Engine, school: Any) -> uuid.UUID:
+    """A pending record-class legal hold of ``school`` (FC-12, ADR-0059), version 1."""
+    hid = uuid.uuid4()
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.legal_holds (id, tenant_id, scope, record_class, reason_code, "
+                "review_on, placed_by) VALUES (:i, :t, 'record_class', 'exports', "
+                "'court_case', current_date + 30, :u)"
+            ),
+            {"i": hid, "t": school.tenant_id, "u": school.people["owner"].user_id},
+        )
+    return hid
+
+
+def hold_in_state(admin: Engine, school: Any, status: str) -> uuid.UUID:
+    """A record-class legal hold of ``school`` asked (and, past ``pending``, approved and asked
+    to lift) by the office admin, so the owner and the principal may take the next step."""
+    hid = uuid.uuid4()
+    asker = school.people["office_admin"].user_id
+    approver = school.people["accountant"].user_id
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.legal_holds (id, tenant_id, scope, record_class, reason_code, "
+                "review_on, status, placed_by, approved_by, approved_at, lift_requested_by, "
+                "lift_requested_at) VALUES (:i, :t, 'record_class', 'exports', 'court_case', "
+                "current_date + 30, :s, :p, :a, "
+                "CASE WHEN CAST(:s AS text) = 'pending' THEN NULL ELSE now() END, :l, "
+                "CASE WHEN CAST(:s AS text) = 'lift_pending' THEN now() END)"
+            ),
+            {
+                "i": hid,
+                "t": school.tenant_id,
+                "s": status,
+                "p": asker,
+                "a": None if status == "pending" else approver,
+                "l": asker if status == "lift_pending" else None,
+            },
+        )
+    return hid
+
+
+def b_hold(admin: Engine, w: Any) -> uuid.UUID:
+    if "bola_hold" not in w.b.ids:
+        w.b.ids["bola_hold"] = hold(admin, w.b)
+    value: uuid.UUID = w.b.ids["bola_hold"]
+    return value
+
+
 def _student(w: Any, role: str) -> uuid.UUID:
     ids = SW.ensure_students(w)
     value: uuid.UUID = ids["s10a"] if role == "teacher" else ids["s9a"]
@@ -154,6 +205,13 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
 
         return build
 
+    def on_hold(status: str, suffix: str) -> Builder:
+        def build(w: Any, r: str, a: Engine) -> Request:
+            hid = hold_in_state(a, w.a, status)
+            return f"/api/v1/privacy/holds/{hid}{suffix}", None, {"If-Match": 'W/"1"'}
+
+        return build
+
     def withdraw(w: Any, r: str, a: Engine) -> Request:
         rid = PS.log_request(w.a, "consent_withdrawal")
         body = {
@@ -201,6 +259,30 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
             "/affected:count", {"all_staff": True}
         ),
         ("POST", "/api/v1/privacy/requests/{request_id}/consent-withdrawal"): withdraw,
+        # FC-12 legal holds (ADR-0059): owner and principal only, writes with step-up.
+        ("GET", "/api/v1/privacy/holds"): lambda w, r, a: ("/api/v1/privacy/holds", None, {}),
+        ("POST", "/api/v1/privacy/holds"): lambda w, r, a: (
+            "/api/v1/privacy/holds",
+            {
+                "scope": "record_class",
+                "record_class": "exports",
+                "reason_code": "court_case",
+                "review_on": (dt.date.today() + dt.timedelta(days=30)).isoformat(),  # noqa: DTZ011
+            },
+            {},
+        ),
+        ("GET", "/api/v1/privacy/holds/{hold_id}"): on_hold("pending", ""),
+        ("POST", "/api/v1/privacy/holds/{hold_id}:approve"): on_hold("pending", ":approve"),
+        ("POST", "/api/v1/privacy/holds/{hold_id}:reject"): on_hold("pending", ":reject"),
+        ("POST", "/api/v1/privacy/holds/{hold_id}:request-lift"): on_hold(
+            "active", ":request-lift"
+        ),
+        ("POST", "/api/v1/privacy/holds/{hold_id}:approve-lift"): on_hold(
+            "lift_pending", ":approve-lift"
+        ),
+        ("POST", "/api/v1/privacy/holds/{hold_id}:cancel-lift"): on_hold(
+            "lift_pending", ":cancel-lift"
+        ),
     }
 
 
@@ -210,6 +292,7 @@ MATRIX_CREATES = frozenset(
         "/api/v1/students/{student_id}/consents",
         "/api/v1/privacy/breaches",
         "/api/v1/privacy/breaches/{breach_id}/notice-draft",
+        "/api/v1/privacy/holds",
     }
 )
 MATRIX_ACCEPTED = frozenset({"/api/v1/exports/consent-forms"})
@@ -235,6 +318,12 @@ BOLA_BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/privacy/breaches/{breach_id}"): {"approx_staff": 1},
     ("PUT", "/api/v1/privacy/breaches/{breach_id}/affected"): {"student_ids": []},
     ("POST", "/api/v1/privacy/breaches/{breach_id}/notice-draft"): None,
+    # FC-12 legal holds (ADR-0059): the maker-checker steps take no body.
+    ("POST", "/api/v1/privacy/holds/{hold_id}:approve"): None,
+    ("POST", "/api/v1/privacy/holds/{hold_id}:reject"): None,
+    ("POST", "/api/v1/privacy/holds/{hold_id}:request-lift"): None,
+    ("POST", "/api/v1/privacy/holds/{hold_id}:approve-lift"): None,
+    ("POST", "/api/v1/privacy/holds/{hold_id}:cancel-lift"): None,
     ("POST", "/api/v1/privacy/breaches/{breach_id}/affected:count"): {"all_staff": True},
     ("POST", "/api/v1/privacy/requests/{request_id}/consent-withdrawal"): {
         "purpose_id": "0192f3a4-0000-7000-8000-000000000b01",

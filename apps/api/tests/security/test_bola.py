@@ -954,6 +954,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     # R3-1B (ADR-0049, ADR-0050): a consent purpose and a breach record of school B.
     "purpose_id": lambda w: _consents().b_purpose(_ADMIN[0], w),
     "breach_id": lambda w: _consents().b_breach(_ADMIN[0], w),
+    # FC-12 (ADR-0059): a legal hold of school B.
+    "hold_id": lambda w: _consents().b_hold(_ADMIN[0], w),
 }
 
 
