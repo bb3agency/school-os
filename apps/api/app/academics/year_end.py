@@ -198,6 +198,10 @@ def figures_for(
             continue
         papers.setdefault(mark.student_id, []).append((mark.marks, mark.max_marks, mark.absent))
         exams.setdefault(mark.student_id, set()).add(exam.id)
+    # TODO(FT-06 attendance_summary): when the school calendar merges, take days attended and
+    # working days from ``service.attendance_summary(session, ids, year.id, until=last)`` (its
+    # working days are null without a calendar: keep this register-based count as the
+    # fallback) instead of the two register reads below. Lead wires it after both merge.
     attended = yrepo.attended_days(session, ids, year.starts_on, last, rules().attended_statuses)
     histories = students.enrolment_histories(session, ids)
     in_year = {
