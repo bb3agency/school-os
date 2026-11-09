@@ -1,6 +1,6 @@
 "use client";
 
-import type { ApiClient } from "@schoolos/api-client";
+import type { ApiClient, components } from "@schoolos/api-client";
 import { unwrap } from "@/lib/bff/query";
 
 /**
@@ -9,87 +9,23 @@ import { unwrap } from "@/lib/bff/query";
  * (a transport in-charge), `finance.read` or `fee.manage`, and amounts come back `null` unless
  * the caller holds `finance.read` or `fee.manage` (`amounts_shown`). Only ids travel in URLs;
  * whom to assign is a POST body.
- *
- * LEAD: these routes are new in FM-02 and not in the generated client yet. The types below and
- * `addonApi` are a small locally typed wrapper; after `make openapi` swap them for
- * `components["schemas"]["AddonOut" | "AddonsOut" | ...]` and the typed `api.GET/POST/PATCH`.
  */
 
 export const ADDON_READ = "fee.addon.read";
 
-export interface Addon {
-  id: string;
-  academic_year_id: string;
-  head_id: string;
-  head_code: string;
-  head_name: string;
-  head_kind: string;
-  label: string;
-  active: boolean;
-  assigned: number;
-  amounts: Record<string, string> | null;
-  total: string | null;
-  version: number;
-}
-
-export interface AddonList {
-  items: Addon[];
-  amounts_shown: boolean;
-  gst_note: string;
-}
-
-export interface AddonStudent {
-  assignment_id: string;
-  student_id: string;
-  display_name: string | null;
-  admission_no: string | null;
-  class_section: string | null;
-  start_instalment: number;
-  end_instalment: number | null;
-  status: "active" | "ended";
-  charged: string | null;
-}
-
-export interface AddonStudents {
-  addon_id: string;
-  label: string;
-  head_name: string;
-  amounts_shown: boolean;
-  items: AddonStudent[];
-}
-
-export type AddonSkipReason =
-  "no_fee_account" | "account_closed" | "head_taken" | "already_assigned" | "no_instalments_left";
-
-export interface AddonAssignResult {
-  dry_run: boolean;
-  students: number;
-  assigned: number;
-  charges_posted: number;
-  replaced: number;
-  credits_proposed: number;
-  skipped: { student_id: string; reason: AddonSkipReason }[];
-}
-
-export interface AddonUnassignResult {
-  dry_run: boolean;
-  students: number;
-  ended: number;
-  not_assigned: number;
-  credits_proposed: number;
-  credit_total: string;
-}
+type S = components["schemas"];
+export type Addon = S["AddonOut"];
+export type AddonList = S["AddonsOut"];
+export type AddonStudent = S["AddonStudentOut"];
+export type AddonStudents = S["AddonStudentsOut"];
+export type AddonSkipReason = S["AddonSkipped"]["reason"];
+export type AddonAssignResult = S["AddonAssignOut"];
+export type AddonUnassignResult = S["AddonUnassignOut"];
+export type AddonCreateBody = S["AddonCreate"];
 
 /** Exactly one of a class, some sections or picked students (FR-FEE-084). */
 export type AddonTarget =
   { class_id: string } | { section_ids: string[] } | { student_ids: string[] };
-
-export interface AddonCreateBody {
-  academic_year_id: string;
-  head_id: string;
-  label: string;
-  amounts: Record<string, string>;
-}
 
 /** Head kinds an add-on may charge (config `addons.yaml` `head_kinds`). */
 export const ADDON_HEAD_KINDS: readonly string[] = ["transport", "books", "other"];
@@ -100,47 +36,50 @@ export const ADDON_KEYS = {
   students: (id: string) => ["staff", "fees", "addons", "students", id] as const,
 } as const;
 
-type Result<T> = Promise<{ data?: T; error?: unknown; response: Response }>;
-interface Loose {
-  GET<T>(path: string, init?: object): Result<T>;
-  POST<T>(path: string, init?: object): Result<T>;
-  PATCH<T>(path: string, init?: object): Result<T>;
-}
+/**
+ * openapi-typescript types request fields that have a server default (`dry_run`, `replace`) as
+ * required; the API fills them in, so the screen may leave them out of the body.
+ */
+type WithServerDefaults<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+type TargetKeys = "class_id" | "section_ids" | "student_ids";
+export type AddonAssignBody = AddonTarget &
+  WithServerDefaults<Omit<S["AddonAssignIn"], TargetKeys>, "dry_run" | "replace">;
+export type AddonUnassignBody = AddonTarget &
+  WithServerDefaults<Omit<S["AddonUnassignIn"], TargetKeys>, "dry_run">;
 
-/** Locally typed calls of the FM-02 routes through the same BFF client (see LEAD above). */
+/** The FM-02 add-on routes through the typed BFF client. */
 export function addonApi(api: ApiClient) {
-  const loose = api as unknown as Loose;
-  const base = "/api/v1/fees/addons";
+  const path = (addon_id: string) => ({ path: { addon_id } });
   return {
-    list: () => unwrap(loose.GET<AddonList>(base)),
+    list: () => unwrap(api.GET("/api/v1/fees/addons")),
     create: (body: AddonCreateBody, idempotencyKey: string) =>
-      unwrap(loose.POST<Addon>(base, { body, headers: { "Idempotency-Key": idempotencyKey } })),
+      unwrap(
+        api.POST("/api/v1/fees/addons", { body, headers: { "Idempotency-Key": idempotencyKey } }),
+      ),
     patch: (addon: Addon, body: { label?: string; active?: boolean }) =>
       unwrap(
-        loose.PATCH<Addon>(`${base}/${encodeURIComponent(addon.id)}`, {
+        api.PATCH("/api/v1/fees/addons/{addon_id}", {
+          params: path(addon.id),
           body,
           headers: { "If-Match": `W/"${addon.version}"` },
         }),
       ),
-    assign: (
-      id: string,
-      body: AddonTarget & {
-        start_instalment: number;
-        replace?: boolean;
-        reason?: string;
-        dry_run?: boolean;
-      },
-    ) =>
-      unwrap(loose.POST<AddonAssignResult>(`${base}/${encodeURIComponent(id)}/assign`, { body })),
-    unassign: (
-      id: string,
-      body: AddonTarget & { from_instalment: number; reason: string; dry_run?: boolean },
-    ) =>
+    assign: (id: string, body: AddonAssignBody) =>
       unwrap(
-        loose.POST<AddonUnassignResult>(`${base}/${encodeURIComponent(id)}/unassign`, { body }),
+        api.POST("/api/v1/fees/addons/{addon_id}/assign", {
+          params: path(id),
+          body: body as S["AddonAssignIn"],
+        }),
+      ),
+    unassign: (id: string, body: AddonUnassignBody) =>
+      unwrap(
+        api.POST("/api/v1/fees/addons/{addon_id}/unassign", {
+          params: path(id),
+          body: body as S["AddonUnassignIn"],
+        }),
       ),
     students: (id: string) =>
-      unwrap(loose.GET<AddonStudents>(`${base}/${encodeURIComponent(id)}/students`)),
+      unwrap(api.GET("/api/v1/fees/addons/{addon_id}/students", { params: path(id) })),
   };
 }
 

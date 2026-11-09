@@ -40,7 +40,7 @@ describe("compliance certificate form (FC-01, FR-COMP-004, FR-COMP-008)", () => 
 describe("register certificates on the CBSE disclosure draft (FR-COMP-020, FR-COMP-021)", () => {
   it("reads them when present and is empty before the client knows them", () => {
     expect(registerCertificates({})).toEqual({});
-    const draft = {
+    const draft: Parameters<typeof registerCertificates>[0] = {
       certificates: {
         fire_safety: [
           {

@@ -1,5 +1,6 @@
 "use client";
 
+import type { components } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import { useId, useState } from "react";
 import { ActionDialog } from "@/components/ui/ActionDialog";
@@ -12,15 +13,15 @@ import * as z from "@/lib/zod";
 import { needsReview, udiseApi, type MatchDecision } from "./api";
 
 /** How a UDISE+ row found its student (FR-UDI-012); `match_basis` of ImportRowOut. */
-export const MATCH_BASES = [
+export const MATCH_BASES: readonly MatchBasis[] = [
   "admission_no",
   "picked",
   "pen_verified",
   "pen",
   "name_dob_class",
   "skipped",
-] as const;
-export type MatchBasis = (typeof MATCH_BASES)[number];
+];
+export type MatchBasis = NonNullable<components["schemas"]["ImportRowOut"]["match_basis"]>;
 
 const BASIS_VARIANTS: Record<MatchBasis, PillVariant> = {
   admission_no: "done",
@@ -31,18 +32,14 @@ const BASIS_VARIANTS: Record<MatchBasis, PillVariant> = {
   skipped: "tag",
 };
 
-/** The row fields this cell reads (the generated ImportRowOut gains `match_basis` later). */
-export interface MatchRow {
-  row_no: number;
-  status: string;
-  errors: readonly { code: string }[];
-  values: Record<string, string>;
-  match_basis?: string | null;
-}
+/** The row fields this cell reads. */
+export type MatchRow = Pick<
+  components["schemas"]["ImportRowOut"],
+  "row_no" | "status" | "errors" | "values" | "match_basis"
+>;
 
 function basisOf(row: MatchRow): MatchBasis | null {
-  const value = row.match_basis;
-  return MATCH_BASES.find((b) => b === value) ?? null;
+  return row.match_basis ?? null;
 }
 
 /**

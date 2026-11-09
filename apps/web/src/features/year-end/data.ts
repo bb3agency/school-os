@@ -1,6 +1,6 @@
 "use client";
 
-import type { ApiClient } from "@schoolos/api-client";
+import type { ApiClient, components } from "@schoolos/api-client";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { Loadable } from "@/lib/loadable";
 
@@ -8,12 +8,6 @@ import type { Loadable } from "@/lib/loadable";
  * FT-08 year-end progression pack (FR-YRE-001..FR-YRE-020) through the BFF: a section's
  * proposed and confirmed annual results, confirming them (the principal), the held-back
  * suggestions for the promotion screen and the UDISE+ progression check sheet.
- *
- * LEAD: these routes are not in the generated client until `make openapi` runs. Until then
- * they are called through a loosely typed view of the same BFF client with the hand-written
- * types below; after regeneration switch to `api.GET/POST` with `components["schemas"]`
- * (`YearResultsOut`, `YearResultsWrite`, `YearResultsWriteOut`, `HeldBackOut`,
- * `ProgressionOut`) and drop `loose()`.
  */
 
 export const YEAR_END_PERM = {
@@ -22,117 +16,26 @@ export const YEAR_END_PERM = {
   portal: "export.portal",
 } as const;
 
-export type YearResultCode = "passed" | "promoted" | "detained" | "not_appeared";
+type S = components["schemas"];
+export type YearResultCode = S["YearResultIn"]["result"];
 export const YEAR_RESULTS: readonly YearResultCode[] = [
   "passed",
   "promoted",
   "detained",
   "not_appeared",
 ];
-export type YearEndWarning = "no_detention_class";
-export type ProgressionBlank = "result" | "percent" | "days_attended" | "udise_pen";
-
-export interface YearEndRules {
-  rule_version: number;
-  pass_percent: number;
-  pass_percent_verified: boolean;
-  no_detention_class_codes: string[];
-  no_detention_verified: boolean;
-}
-
-export interface YearProposal {
-  result: YearResultCode | null;
-  percent: number | null;
-  exams_counted: number;
-  days_attended: number | null;
-  working_days: number | null;
-}
-
-export interface YearConfirmed {
-  result: YearResultCode;
-  proposed_result: YearResultCode | null;
-  reason: string | null;
-  percent: number | null;
-  days_attended: number | null;
-  working_days: number | null;
-  rule_version: number;
-  confirmed_by_name: string | null;
-  confirmed_at: string;
-  version: number;
-}
-
-export interface YearResultStudent {
-  student: {
-    student_id: string;
-    full_name: string | null;
-    admission_no: string | null;
-    roll_no: string | null;
-  };
-  proposal: YearProposal;
-  confirmed: YearConfirmed | null;
-  warnings: YearEndWarning[];
-}
-
-export interface YearResults {
-  section: { id: string; class_id: string; academic_year_id: string; label: string };
-  academic_year_label: string;
-  no_detention_class: boolean;
-  rules: YearEndRules;
-  counts: {
-    students: number;
-    confirmed: number;
-    unconfirmed: number;
-    passed: number;
-    promoted: number;
-    detained: number;
-    not_appeared: number;
-  };
-  students: YearResultStudent[];
-}
-
-export interface YearResultEntry {
-  student_id: string;
-  result: YearResultCode;
-  reason?: string | null;
-  expected_version?: number;
-}
-
-export interface YearResultsWriteOut {
-  written: number;
-  unchanged: number;
-  warnings: Array<{ code: YearEndWarning; student_id: string }>;
-}
-
-export interface HeldBack {
-  academic_year_id: string;
-  held_back_student_ids: string[];
-  no_detention_student_ids: string[];
-  confirmed: number;
-  unconfirmed: number;
-  no_detention_verified: boolean;
-}
-
-export interface ProgressionRow {
-  student_id: string;
-  admission_no: string | null;
-  full_name: string | null;
-  udise_pen: string | null;
-  class_code: string;
-  section_label: string;
-  result: YearResultCode | null;
-  percent: number | null;
-  days_attended: number | null;
-  working_days: number | null;
-  blanks: ProgressionBlank[];
-}
-
-export interface Progression {
-  academic_year_id: string;
-  academic_year_label: string;
-  students: number;
-  blank_counts: Record<string, number>;
-  rows: ProgressionRow[];
-}
+export type YearEndWarning = S["YearEndWarningOut"]["code"];
+export type ProgressionBlank = S["ProgressionRowOut"]["blanks"][number];
+export type YearEndRules = S["YearEndRulesOut"];
+export type YearProposal = S["YearProposalOut"];
+export type YearConfirmed = S["YearConfirmedOut"];
+export type YearResultStudent = S["YearResultStudentOut"];
+export type YearResults = S["YearResultsOut"];
+export type YearResultEntry = S["YearResultIn"];
+export type YearResultsWriteOut = S["YearResultsWriteOut"];
+export type HeldBack = S["HeldBackOut"];
+export type ProgressionRow = S["ProgressionRowOut"];
+export type Progression = S["ProgressionOut"];
 
 export const YEAR_END_KEYS = {
   all: ["staff", "year-end"] as const,
@@ -141,26 +44,9 @@ export const YEAR_END_KEYS = {
   progression: (yearId: string) => ["staff", "year-end", "progression", yearId] as const,
 };
 
-type LooseResult = { data?: unknown; error?: unknown; response: Response };
-interface LooseClient {
-  GET(path: string, init: { params: { path: Record<string, string> } }): Promise<LooseResult>;
-  POST(
-    path: string,
-    init: { params: { path: Record<string, string> }; body?: unknown },
-  ): Promise<LooseResult>;
-}
-
-function loose(api: ApiClient): LooseClient {
-  return api as unknown as LooseClient;
-}
-
-async function read<T>(pending: Promise<LooseResult>): Promise<T> {
-  return (await unwrap(pending as never)) as T;
-}
-
 export function fetchYearResults(api: ApiClient, sectionId: string): Promise<YearResults> {
-  return read<YearResults>(
-    loose(api).GET("/api/v1/sections/{section_id}/year-results", {
+  return unwrap(
+    api.GET("/api/v1/sections/{section_id}/year-results", {
       params: { path: { section_id: sectionId } },
     }),
   );
@@ -179,10 +65,10 @@ export function confirmYearResults(
   sectionId: string,
   entries: readonly YearResultEntry[],
 ): Promise<YearResultsWriteOut> {
-  return read<YearResultsWriteOut>(
-    loose(api).POST("/api/v1/sections/{section_id}/year-results", {
+  return unwrap(
+    api.POST("/api/v1/sections/{section_id}/year-results", {
       params: { path: { section_id: sectionId } },
-      body: { entries },
+      body: { entries: [...entries] },
     }),
   );
 }
@@ -192,8 +78,8 @@ export function useHeldBack(yearId: string, enabled: boolean): Loadable<HeldBack
   return useApiQuery(
     YEAR_END_KEYS.heldBack(yearId),
     () =>
-      read<HeldBack>(
-        loose(api).GET("/api/v1/academic-years/{year_id}/year-results/held-back", {
+      unwrap(
+        api.GET("/api/v1/academic-years/{year_id}/year-results/held-back", {
           params: { path: { year_id: yearId } },
         }),
       ),
@@ -206,8 +92,8 @@ export function useProgression(yearId: string, enabled: boolean): Loadable<Progr
   return useApiQuery(
     YEAR_END_KEYS.progression(yearId),
     () =>
-      read<Progression>(
-        loose(api).GET("/api/v1/academic-years/{year_id}/udise-progression", {
+      unwrap(
+        api.GET("/api/v1/academic-years/{year_id}/udise-progression", {
           params: { path: { year_id: yearId } },
         }),
       ),

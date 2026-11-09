@@ -86,16 +86,15 @@ describe("FR-BRF-009 small cells", () => {
 });
 
 describe("FR-BRF-001 API calls", () => {
-  it("reads the newest week or one week by id, checking the answer", async () => {
-    const calls: { method: string; path: string }[] = [];
+  it("reads the newest week or one week by id", async () => {
+    const calls: { method: string; path: string; init?: unknown }[] = [];
     const api = fakeApi(calls, BRIEF);
     expect((await fetchBrief(api, null)).readiness?.[0]?.ready_change).toBe(18);
     await fetchBrief(api, ID);
-    expect(calls.map((c) => c.path)).toEqual([
-      "/api/v1/brief/weekly",
-      `/api/v1/brief/weekly/${ID}`,
+    expect(calls.map((c) => [c.path, c.init])).toEqual([
+      ["/api/v1/brief/weekly", undefined],
+      ["/api/v1/brief/weekly/{brief_id}", { params: { path: { brief_id: ID } } }],
     ]);
-    await expect(fetchBrief(fakeApi([], { id: 3 }), null)).rejects.toThrow();
   });
 
   it("saves the member's own choice with If-Match", async () => {

@@ -1,33 +1,24 @@
 "use client";
 
+import type { components } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/format";
 import { StatePill } from "./ComplianceScreen";
-import type { CertificateState } from "./data";
 
 /**
  * FC-01 (FR-COMP-020, FR-COMP-021) on the CBSE Appendix IX draft: the compliance register's
  * current certificate for a document item and its state, with a button to use its copy.
- *
- * LOCAL TYPE: `DisclosureDraftOut.certificates` is new in this wave; until the client is
- * regenerated the draft is read through {@link registerCertificates}.
  */
-export interface RegisterCertificate {
-  certificate_id: string;
-  kind: string;
-  kind_label: string;
-  valid_until: string | null;
-  state: Exclude<CertificateState, "missing">;
-  document_id: string | null;
-  publishable: boolean;
-}
+export type RegisterCertificate = components["schemas"]["RegisterCertificateOut"];
+type DisclosureDraft = components["schemas"]["DisclosureDraftOut"];
 
-/** The register's certificates by item key from a draft answer (empty before regeneration). */
-export function registerCertificates(draft: object): Record<string, RegisterCertificate[]> {
-  const value = (draft as { certificates?: unknown }).certificates;
-  return value && typeof value === "object" ? (value as Record<string, RegisterCertificate[]>) : {};
+/** The register's certificates by item key from a draft answer (empty when it has none). */
+export function registerCertificates(
+  draft: Pick<DisclosureDraft, "certificates">,
+): Record<string, RegisterCertificate[]> {
+  return draft.certificates ?? {};
 }
 
 export function hasExpired(certificates: Record<string, RegisterCertificate[]>): boolean {

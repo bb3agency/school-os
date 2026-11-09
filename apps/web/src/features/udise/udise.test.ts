@@ -32,12 +32,16 @@ describe("UDISE+ corrections (FO-02, FO-04)", () => {
   it("sends If-Match and the decision for a row match (FR-UDI-014)", async () => {
     const { client, api } = fakeClient();
     await udiseApi.matchRow(api, "imp-1", 3, 7, "student", "stu-1");
-    expect(client.PUT).toHaveBeenCalledWith("/api/v1/imports/imp-1/rows/3/match", {
+    const path = "/api/v1/imports/{import_id}/rows/{row_no}/match";
+    const params = { path: { import_id: "imp-1", row_no: 3 } };
+    expect(client.PUT).toHaveBeenCalledWith(path, {
+      params,
       body: { decision: "student", student_id: "stu-1" },
       headers: { "If-Match": ifMatch(7) },
     });
     await udiseApi.matchRow(api, "imp-1", 3, 8, "skip");
-    expect(client.PUT).toHaveBeenLastCalledWith("/api/v1/imports/imp-1/rows/3/match", {
+    expect(client.PUT).toHaveBeenLastCalledWith(path, {
+      params,
       body: { decision: "skip" },
       headers: { "If-Match": 'W/"8"' },
     });
@@ -52,10 +56,14 @@ describe("UDISE+ corrections (FO-02, FO-04)", () => {
     });
     const request = { id: "req-1", version: 2 } as Parameters<typeof udiseApi.markSent>[1];
     await udiseApi.markSent(api, request, "2026-11-05", "meo");
-    expect(client.POST).toHaveBeenLastCalledWith("/api/v1/dq/udise-corrections/req-1/sent", {
-      body: { sent_on: "2026-11-05", sent_to: "meo" },
-      headers: { "If-Match": 'W/"2"' },
-    });
+    expect(client.POST).toHaveBeenLastCalledWith(
+      "/api/v1/dq/udise-corrections/{correction_id}/sent",
+      {
+        params: { path: { correction_id: "req-1" } },
+        body: { sent_on: "2026-11-05", sent_to: "meo" },
+        headers: { "If-Match": 'W/"2"' },
+      },
+    );
   });
 
   it("has an English label for every match basis", () => {

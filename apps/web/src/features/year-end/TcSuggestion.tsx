@@ -1,5 +1,6 @@
 "use client";
 
+import type { components } from "@schoolos/api-client";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 
@@ -8,28 +9,14 @@ import { Button } from "@/components/ui/Button";
  * promotion, working days, days attended), shown under the input with a "Use" button. The
  * value goes into the input only when the person clicks; they may change it afterwards, and
  * the certificate keeps what the form sends.
- *
- * LEAD: `input_suggestions` is not on the generated `CertificatePreview` until `make openapi`
- * runs; `suggestionsOf` reads it loosely until then.
  */
-export interface TcInputSuggestion {
-  key: "promotion" | "working_days" | "days_attended";
-  value: string;
-  source: "year_result" | "attendance_register";
-}
+export type TcInputSuggestion = components["schemas"]["TcInputSuggestion"];
 
-export function suggestionsOf(preview: unknown): TcInputSuggestion[] {
-  if (typeof preview !== "object" || preview === null) return [];
-  const list = (preview as { input_suggestions?: unknown }).input_suggestions;
-  if (!Array.isArray(list)) return [];
-  return list.filter(
-    (item): item is TcInputSuggestion =>
-      typeof item === "object" &&
-      item !== null &&
-      typeof (item as TcInputSuggestion).key === "string" &&
-      typeof (item as TcInputSuggestion).value === "string" &&
-      typeof (item as TcInputSuggestion).source === "string",
-  );
+/** The "From SchoolOS" values on a certificate preview (none without a preview). */
+export function suggestionsOf(
+  preview: Pick<components["schemas"]["CertificatePreview"], "input_suggestions"> | null,
+): TcInputSuggestion[] {
+  return preview?.input_suggestions ?? [];
 }
 
 /** Put ``value`` into the form control ``id`` as if typed, so the form sees the change. */

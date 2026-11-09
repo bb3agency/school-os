@@ -1,13 +1,10 @@
-import type { ApiClient } from "@schoolos/api-client";
+import type { ApiClient, components } from "@schoolos/api-client";
 import { unwrap } from "@/lib/bff/query";
 import * as z from "@/lib/zod";
 
 /**
  * Follow-ups on fixes outside the school (FO-01) and the UDISE+ to-do list (FO-03),
- * FR-UDI-021..FR-UDI-040. The routes are new in this release, so the generated client does not
- * know them yet: the shapes below mirror `app/dq/followup_schemas.py` and every answer is
- * checked with zod. After the lead regenerates `packages/api-client`, swap `loose()` for the
- * typed client.
+ * FR-UDI-021..FR-UDI-040.
  */
 
 export const READINESS_MANAGE = "dq.readiness.manage";
@@ -50,62 +47,12 @@ export const CHANNELS_BY_EVENT: Record<FollowupEvent, readonly FollowupChannel[]
   followed_up: ["in_person", "email", "letter", "phone"],
 };
 
-const studentRef = z.object({
-  id: z.string(),
-  display_name: z.string().nullable(),
-  admission_no: z.string().nullable(),
-});
-
-const countsSchema = z.object({
-  open: z.number(),
-  not_started: z.number(),
-  waiting: z.number(),
-  overdue: z.number(),
-  update_reported: z.number(),
-});
-export type FollowupCounts = z.infer<typeof countsSchema>;
-
-const itemSchema = z.object({
-  student: studentRef,
-  section_id: z.string().nullable(),
-  readiness_status: z.string(),
-  fix_owner: z.enum(FOLLOWUP_OWNERS),
-  state: z.enum(FOLLOWUP_STATES),
-  overdue_reason: z.enum(["no_contact", "promise_passed"]).nullable(),
-  last_event: z.enum(FOLLOWUP_EVENTS).nullable(),
-  last_on: z.string().nullable(),
-  promised_on: z.string().nullable(),
-  steps: z.number(),
-});
-export type FollowupItem = z.infer<typeof itemSchema>;
-
-const listSchema = z.object({
-  profile_key: z.string(),
-  today: z.string(),
-  overdue_after_days: z.number(),
-  totals: z.array(z.object({ fix_owner: z.enum(FOLLOWUP_OWNERS), counts: countsSchema })),
-  items: z.array(itemSchema),
-});
-export type FollowupList = z.infer<typeof listSchema>;
-
-const stepSchema = z.object({
-  id: z.string(),
-  fix_owner: z.enum(FOLLOWUP_OWNERS),
-  event: z.enum(FOLLOWUP_EVENTS),
-  channel: z.enum(FOLLOWUP_CHANNELS).nullable(),
-  occurred_on: z.string(),
-  promised_on: z.string().nullable(),
-  recorded_at: z.string(),
-});
-export type FollowupStep = z.infer<typeof stepSchema>;
-
-const historySchema = z.object({
-  student_id: z.string(),
-  profile_key: z.string(),
-  open: z.array(itemSchema),
-  steps: z.array(stepSchema),
-});
-export type FollowupHistory = z.infer<typeof historySchema>;
+type S = components["schemas"];
+export type FollowupCounts = S["FollowupCounts"];
+export type FollowupItem = S["FollowupItemOut"];
+export type FollowupList = S["FollowupListOut"];
+export type FollowupStep = S["FollowupStepOut"];
+export type FollowupHistory = S["FollowupHistoryOut"];
 
 /** The record dialog's fields (the API checks them again: FR-UDI-027). */
 export const stepFormSchema = z.object({
@@ -125,14 +72,20 @@ export interface StepInput {
   promisedOn?: string | undefined;
 }
 
+function isChannel(value: string | undefined): value is FollowupChannel {
+  return (FOLLOWUP_CHANNELS as readonly string[]).includes(value ?? "");
+}
+
 /** The body the API takes: no empty channel or dates. */
-export function stepBody(input: StepInput): Record<string, unknown> {
-  const body: Record<string, unknown> = {
+export function stepBody(input: StepInput): S["FollowupIn"] {
+  const body: S["FollowupIn"] = {
     student_ids: input.studentIds,
     fix_owner: input.owner,
     event: input.event,
   };
-  if (input.channel && CHANNELS_BY_EVENT[input.event].length > 0) body.channel = input.channel;
+  if (isChannel(input.channel) && CHANNELS_BY_EVENT[input.event].length > 0) {
+    body.channel = input.channel;
+  }
   if (input.occurredOn) body.occurred_on = input.occurredOn;
   if (input.event === "promised_by" && input.promisedOn) body.promised_on = input.promisedOn;
   return body;
@@ -152,55 +105,8 @@ export type TodoAction = (typeof TODO_ACTIONS)[number];
 export const TODO_STATES = ["open", "done", "not_needed"] as const;
 export type TodoState = (typeof TODO_STATES)[number];
 
-const todoItemSchema = z.object({
-  item_key: z.string(),
-  kind: z.enum(TODO_KINDS),
-  action: z.enum(TODO_ACTIONS),
-  student: studentRef.nullable(),
-  class_section: z.string().nullable(),
-  event_on: z.string(),
-  certificate_serial: z.string().nullable(),
-  progression: z
-    .object({ promoted: z.number(), held_back: z.number(), graduated: z.number() })
-    .nullable(),
-  state: z.enum(TODO_STATES),
-  overdue: z.boolean(),
-  marked_at: z.string().nullable(),
-  version: z.number().nullable(),
-});
-export type TodoItem = z.infer<typeof todoItemSchema>;
-
-const todoListSchema = z.object({
-  verified: z.boolean(),
-  source: z.array(z.string()),
-  since: z.string().nullable(),
-  today: z.string(),
-  overdue_after_days: z.number(),
-  totals: z.object({
-    open: z.number(),
-    overdue: z.number(),
-    done: z.number(),
-    not_needed: z.number(),
-  }),
-  items: z.array(todoItemSchema),
-});
-export type TodoList = z.infer<typeof todoListSchema>;
-
-type Result = { data?: unknown; error?: unknown; response: Response };
-interface LooseClient {
-  GET(path: string, init?: { params?: { query?: Record<string, unknown> } }): Promise<Result>;
-  POST(path: string, init?: { body?: unknown; headers?: Record<string, string> }): Promise<Result>;
-  PUT(path: string, init?: { body?: unknown; headers?: Record<string, string> }): Promise<Result>;
-  DELETE(path: string, init?: { headers?: Record<string, string> }): Promise<Result>;
-}
-
-function loose(api: ApiClient): LooseClient {
-  return api as unknown as LooseClient;
-}
-
-function base(profile: string): string {
-  return `/api/v1/dq/readiness/${encodeURIComponent(profile)}/follow-ups`;
-}
+export type TodoItem = S["MovementItemOut"];
+export type TodoList = S["MovementListOut"];
 
 export function ifMatch(version: number): string {
   return `W/"${version}"`;
@@ -212,7 +118,11 @@ export async function fetchFollowups(
   sectionId: string | null,
 ): Promise<FollowupList> {
   const query = sectionId ? { section_id: sectionId } : {};
-  return listSchema.parse(await unwrap(loose(api).GET(base(profile), { params: { query } })));
+  return unwrap(
+    api.GET("/api/v1/dq/readiness/{profile_key}/follow-ups", {
+      params: { path: { profile_key: profile }, query },
+    }),
+  );
 }
 
 export async function fetchFollowupHistory(
@@ -220,8 +130,11 @@ export async function fetchFollowupHistory(
   profile: string,
   studentId: string,
 ): Promise<FollowupHistory> {
-  const path = `${base(profile)}/${encodeURIComponent(studentId)}`;
-  return historySchema.parse(await unwrap(loose(api).GET(path)));
+  return unwrap(
+    api.GET("/api/v1/dq/readiness/{profile_key}/follow-ups/{student_id}", {
+      params: { path: { profile_key: profile, student_id: studentId } },
+    }),
+  );
 }
 
 export async function recordStep(
@@ -230,17 +143,17 @@ export async function recordStep(
   input: StepInput,
   idempotencyKey: string,
 ): Promise<{ recorded: number }> {
-  const body = await unwrap(
-    loose(api).POST(base(profile), {
+  return unwrap(
+    api.POST("/api/v1/dq/readiness/{profile_key}/follow-ups", {
+      params: { path: { profile_key: profile } },
       body: stepBody(input),
       headers: { "Idempotency-Key": idempotencyKey },
     }),
   );
-  return z.object({ recorded: z.number() }).parse(body);
 }
 
 export async function fetchTodo(api: ApiClient): Promise<TodoList> {
-  return todoListSchema.parse(await unwrap(loose(api).GET("/api/v1/dq/udise-todo")));
+  return unwrap(api.GET("/api/v1/dq/udise-todo"));
 }
 
 export async function markTodo(
@@ -248,16 +161,25 @@ export async function markTodo(
   item: TodoItem,
   state: Exclude<TodoState, "open">,
 ): Promise<TodoItem> {
-  const path = `/api/v1/dq/udise-todo/${encodeURIComponent(item.item_key)}`;
   const headers: Record<string, string> =
     item.version !== null ? { "If-Match": ifMatch(item.version) } : {};
-  return todoItemSchema.parse(await unwrap(loose(api).PUT(path, { body: { state }, headers })));
+  return unwrap(
+    api.PUT("/api/v1/dq/udise-todo/{item_key}", {
+      params: { path: { item_key: item.item_key } },
+      body: { state },
+      headers,
+    }),
+  );
 }
 
 export async function reopenTodo(api: ApiClient, item: TodoItem): Promise<void> {
   if (item.version === null) return;
-  const path = `/api/v1/dq/udise-todo/${encodeURIComponent(item.item_key)}`;
-  await unwrap(loose(api).DELETE(path, { headers: { "If-Match": ifMatch(item.version) } }));
+  await unwrap(
+    api.DELETE("/api/v1/dq/udise-todo/{item_key}", {
+      params: { path: { item_key: item.item_key } },
+      headers: { "If-Match": ifMatch(item.version) },
+    }),
+  );
 }
 
 /** Overdue and open counts of one fix owner ("Waiting on parents: 18 (7 overdue)"). */
