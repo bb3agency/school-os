@@ -32,6 +32,15 @@
 
 R3-1D, branch `wip/r3-portal-calendar`, migration `0064_portal_calendar`, 2026-10-21: as decided, with these refinements (docs/03 §3.30, docs/05 §16.6): an expected window is never shown as "open now"; a missed morning sends the missed step once; without an owner (or with one who left) the holders of `readiness.calendar.manage` are told and no task is made; the reminder counts are school-wide for the event's first linked profile with a readiness check; `GET /dq/calendar/assignees` lets calendar managers who do not hold `task.manage` choose owners. Decision 5: "Link to a portal window" on a circular task in the task list.
 
+### Amendment A1 (FO-05, 2026-11-09): two more portal kinds
+
+The calendar also carries deadlines that are not student-data submissions, within this design (no new table, no migration: the portal kind is not stored in the database):
+
+- `school_admin`: the school's own administrative deadlines that concern no student record (AP PSIS recognition renewal, CBSE SARAS and OASIS, the CBSE mandatory disclosure update, "DPDP duties begin (13 May 2027)").
+- `rte`: RTE 12(1)(c) lottery and admission rounds (dates only; the RTE register of ADR-0052 stays unscheduled, D10).
+
+They apply by boards and classes like any event; AP-only events name no board because the calendar has no state dimension yet. An event may link a readiness profile to warn before a step that depends on clean data: the AP SSC exam fee links `bseap-ssc-2027` and its label says to check readiness before paying the fee. The billing protected windows (ADR-0057) copy the board-portal events only, not `school_admin` events. The yearly refresh follows `docs/ops/portal-calendar-refresh.md`. Requirements FR-RDY-011..020 (lead decision D84 for the defaults marked in docs/03).
+
 ## Alternatives considered
 
 | Option | Why not chosen |
@@ -42,4 +51,4 @@ R3-1D, branch `wip/r3-portal-calendar`, migration `0064_portal_calendar`, 2026-1
 
 ## Related requirements
 
-FR-RDY-001..010, FR-TASK-001..007, FR-DQ-040..048; docs/02 C31; docs/03 §3.30; docs/05 §16.6; docs/07 §6.8; docs/09 "R3 planned endpoints"; docs/17 §5.10.
+FR-RDY-001..020, FR-TASK-001..007, FR-DQ-040..048; docs/02 C31; docs/03 §3.30; docs/05 §16.6; docs/07 §6.8; docs/09 "R3 planned endpoints"; docs/17 §5.10.

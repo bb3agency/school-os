@@ -34,6 +34,10 @@ Board codes (`CBSE`, `BSEAP`, `CISCE`, ...) are school-level configuration, not 
 - Bad / costs: two files carry the same dates (kept equal by a test); board exam sittings themselves (February to April) are not in the portal calendar, so they are not protected until the calendar (or a later release of `billing.yaml` with a sourced, separately marked window) adds them; dedicated schools are not synced.
 - Follow-up work: add board codes to the dedicated heartbeat and sync them in `fleet.ingest`; add exam sitting windows to the calendar with sources; a future automatic dunning step (none exists today: suspension is always manual, docs/16 §9) MUST check `billing.protected_window` too.
 
+### Amendment A1 (FO-05, 2026-11-09)
+
+Decision 3 copies the board-portal events only: `bseap`, `cbse` and `cisce` events that name boards (registration, list of candidates, nominal roll, and now the AP SSC exam fee windows and the CBSE Class X second exam LOC). Events of the new `school_admin` kind (CBSE SARAS, OASIS and the disclosure update, ADR-0053 amendment A1) name the CBSE board but are not copied: they run for weeks and submit no student data, so protecting them would block CBSE suspensions for most of January to March. The test filters by portal kind (FR-RDY-018; lead decision D84).
+
 ## Alternatives considered
 
 | Option | Why not chosen |
