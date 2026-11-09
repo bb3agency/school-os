@@ -183,13 +183,13 @@ def test_FR_RDY_017_reminder_names_every_portal_kind() -> None:
     for portal in cal.PORTALS:
         message = templates.render(
             "portal_calendar.reminder",
-            {"portal": portal, "days": 3, "ready": 1, "students": 2},
+            {"portal": portal, "days": 3, "ready": 1, "students": 2, "overdue": 0, "todo": 0},
             "en",
         )
         assert not message.title.startswith("Portal "), portal
     admin = templates.render(
         "portal_calendar.reminder",
-        {"portal": "school_admin", "days": 3, "ready": 0, "students": 0},
+        {"portal": "school_admin", "days": 3, "ready": 0, "students": 0, "overdue": 0, "todo": 0},
         "en",
     )
     assert admin.title.startswith("School administration")

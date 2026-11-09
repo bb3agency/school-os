@@ -2769,6 +2769,50 @@ def record_statuses(session: Session, student_ids: Collection[uuid.UUID]) -> dic
 LIVE_STATUSES: tuple[str, ...] = repo.LIVE_STATUSES
 
 
+def leaving_dates(session: Session, student_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, dt.date]:
+    """Students -> when they left: the last end date of their enrolments, else the day the
+    record last changed (a status set to ``left`` without ending the enrolment). System read
+    for the UDISE+ to-do list (``app.dq``, FO-03, FR-UDI-032); ``student_ids`` MUST come from
+    the caller's own scoped reads. Ids and dates only."""
+    ids = list(student_ids)
+    ended: dict[uuid.UUID, dt.date] = {}
+    for row in repo.enrollments_of_many(session, ids):
+        if row.ended_on is not None and (
+            row.student_id not in ended or row.ended_on > ended[row.student_id]
+        ):
+            ended[row.student_id] = row.ended_on
+    changed = repo.last_changed_on(session, [sid for sid in ids if sid not in ended])
+    for sid, when in changed.items():
+        ended[sid] = when.astimezone(IST).date()
+    return ended
+
+
+@dataclass(frozen=True, slots=True)
+class PromotionFact:
+    """A committed promotion: id, date and counts only (FO-03 progression item)."""
+
+    run_id: uuid.UUID
+    committed_at: dt.datetime
+    promoted: int
+    held_back: int
+    graduated: int
+
+
+def promotions_into(session: Session, academic_year_id: uuid.UUID) -> list[PromotionFact]:
+    """Committed (not undone) promotions into ``academic_year_id``, newest first (system read
+    for the UDISE+ progression item, FR-UDI-032). Counts only."""
+    return [
+        PromotionFact(
+            run_id=r.id,
+            committed_at=r.committed_at,
+            promoted=r.promoted_count,
+            held_back=r.held_back_count,
+            graduated=r.graduated_count,
+        )
+        for r in repo.promotions_into(session, academic_year_id)
+    ]
+
+
 def active_students_added_since(
     session: Session, since: dt.datetime
 ) -> dict[uuid.UUID, dt.datetime]:

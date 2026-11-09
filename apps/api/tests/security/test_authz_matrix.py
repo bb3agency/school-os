@@ -1170,6 +1170,78 @@ def _calendar_own_event(w: Any, a: Engine) -> str:
     return key
 
 
+def _parent_fix_student(w: Any) -> uuid.UUID:
+    """FO-01: a fresh Class IX student in 9A whose Aadhaar-as-printed name differs."""
+    from app.students.schemas import ValueIn
+
+    name = f"Kommineni Matrix {uuid.uuid4().hex[:8].capitalize()} Sai Kumar"
+    extra = [
+        ValueIn(
+            attribute_key="aadhaar_name_as_printed",
+            source="aadhaar_as_printed",
+            value=name.replace(" Sai Kumar", " Saikumar"),
+        ),
+        ValueIn(
+            attribute_key="aadhaar_dob_as_printed", source="aadhaar_as_printed", value="2012-03-14"
+        ),
+        ValueIn(
+            attribute_key="aadhaar_gender_as_printed", source="aadhaar_as_printed", value="male"
+        ),
+        ValueIn(attribute_key="full_name", source="udise_plus", value=name),
+        ValueIn(attribute_key="dob", source="udise_plus", value="2012-03-14"),
+        ValueIn(attribute_key="gender", source="udise_plus", value="male"),
+    ]
+    sid: uuid.UUID = SW.create(w.a, name=name, section_key="section_9a", extra=extra)
+    return sid
+
+
+def _followup_record(w: Any, r: str, a: Engine) -> Request:
+    body = {
+        "student_ids": [str(_parent_fix_student(w))],
+        "fix_owner": "parent_aadhaar",
+        "event": "slip_given",
+    }
+    return "/api/v1/dq/readiness/bseap-ssc-2027/follow-ups", body, {}
+
+
+def _todo_student(w: Any) -> uuid.UUID:
+    """FO-03: a fresh admission in 9A (admission date in the current year's window)."""
+    from app.students.schemas import ValueIn
+
+    extra = [
+        ValueIn(attribute_key="admission_date", source="admission_register", value="2026-10-30")
+    ]
+    name = f"Kommineni Todo {uuid.uuid4().hex[:8].capitalize()}"
+    sid: uuid.UUID = SW.create(w.a, name=name, section_key="section_9a", extra=extra)
+    return sid
+
+
+def _todo_mark(w: Any, r: str, a: Engine) -> Request:
+    return f"/api/v1/dq/udise-todo/admission:{_todo_student(w)}", {"state": "done"}, {}
+
+
+def _todo_reopen(w: Any, r: str, a: Engine) -> Request:
+    sid = _todo_student(w)
+    owner = w.person("owner")
+    with a.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO sis.udise_movement_marks (id, tenant_id, item_key, kind, student_id, "
+                "state, marked_by, marked_by_membership) VALUES (:i, :t, :k, 'admission', :s, "
+                "'done', :u, :m)"
+            ),
+            {
+                "i": uuid.uuid4(),
+                "t": w.a.tenant_id,
+                "k": f"admission:{sid}",
+                "s": sid,
+                "u": owner.user_id,
+                "m": owner.membership_id,
+            },
+        )
+    return f"/api/v1/dq/udise-todo/admission:{sid}", None, {"If-Match": 'W/"1"'}
+
+
 def _calendar_confirm(w: Any, r: str, a: Engine) -> Request:
     return (
         f"/api/v1/dq/calendar/{_calendar_own_event(w, a)}",
@@ -1686,6 +1758,22 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # FO-01/FO-03 (FR-UDI-029, FR-UDI-039): read with dq.readiness.read, record and tick with
+    # dq.readiness.manage; each write works on its own fresh student.
+    ("GET", "/api/v1/dq/readiness/{profile_key}/follow-ups"): lambda w, r, a: (
+        "/api/v1/dq/readiness/bseap-ssc-2027/follow-ups",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/follow-ups/{student_id}"): lambda w, r, a: (
+        f"/api/v1/dq/readiness/bseap-ssc-2027/follow-ups/{_student(w, r)}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/dq/readiness/{profile_key}/follow-ups"): _followup_record,
+    ("GET", "/api/v1/dq/udise-todo"): lambda w, r, a: ("/api/v1/dq/udise-todo", None, {}),
+    ("PUT", "/api/v1/dq/udise-todo/{item_key}"): _todo_mark,
+    ("DELETE", "/api/v1/dq/udise-todo/{item_key}"): _todo_reopen,
     # R3-1D portal calendar (ADR-0053): read with dq.readiness.read, change with
     # readiness.calendar.manage; each write works on its own fresh own event.
     ("GET", "/api/v1/dq/calendar"): lambda w, r, a: ("/api/v1/dq/calendar", None, {}),
@@ -2731,6 +2819,8 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         "/api/v1/guardians/{guardian_id}/optins",
         # R3-1D portal calendar (FR-RDY-005): the school's own event
         "/api/v1/dq/calendar",
+        # FO-01 (FR-UDI-025): a follow-up step
+        "/api/v1/dq/readiness/{profile_key}/follow-ups",
     }
     accepted = {
         "/api/v1/documents",
@@ -2797,6 +2887,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         "/api/v1/tally/parties/{party_id}/links/{student_id}",
         "/api/v1/messaging/account",
         "/api/v1/dq/calendar/{event_key}",
+        "/api/v1/dq/udise-todo/{item_key}",
     ):
         return 204
     return 201 if method == "POST" and path in creates else 200
