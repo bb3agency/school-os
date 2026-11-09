@@ -111,7 +111,7 @@ NEW_PERMISSIONS: tuple[dict[str, object], ...] = (
     {
         "key": "privacy.hold.manage",
         "description": (
-            "See the school's legal holds, and place or lift one (two different people: one "
+            "See the school's legal holds, and place or lift one (two different people, one "
             "asks, another approves)"
         ),
         "sensitivity": "critical",
