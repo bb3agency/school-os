@@ -20,7 +20,7 @@ test = ["pytest==9.1.1", "pytest-timeout==2.4.0"]
 sos-tally-agent = "sos_edge_agent.cli:main"
 
 [build-system]
-requires = ["hatchling==1.32.4"]
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
