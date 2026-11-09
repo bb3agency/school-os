@@ -207,6 +207,45 @@ describe("receipt page (US-2402)", () => {
   });
 });
 
+describe("tax certificate button (FM-06, FR-FEE-057)", () => {
+  const issued = {
+    ...receipt.receipt!,
+    tax_certificate: { financial_year: "2026-27", issued: true },
+  };
+
+  it("links to the issued certificate from the receipt page", () => {
+    render(<LinkFrame envelope={{ ...receipt, receipt: issued }} />);
+    const link = screen.getByRole("link", { name: "Tax certificate FY 2026-27" });
+    expect(link).toHaveAttribute("href", "/p/tax-certificate");
+  });
+
+  it("asks the parent to request it from the office while it is not issued", () => {
+    const pending = { ...issued, tax_certificate: { financial_year: "2026-27", issued: false } };
+    const { container } = render(<LinkFrame envelope={{ ...receipt, receipt: pending }} />);
+    expect(screen.queryByRole("link", { name: /Tax certificate/ })).toBeNull();
+    expect(container.textContent).toContain("Ask the school office for it");
+  });
+
+  it("shows no button outside the window and says when the PDF is being made", () => {
+    const { container, unmount } = render(<LinkFrame envelope={receipt} />);
+    expect(container.textContent).not.toContain("Tax certificate");
+    unmount();
+    render(
+      <LinkFrame envelope={{ ...receipt, receipt: issued }} notice={{ kind: "taxPreparing" }} />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("The PDF is being prepared");
+  });
+
+  it("appears on the dues page too", () => {
+    const withButton = {
+      ...dues,
+      dues: { ...dues.dues!, tax_certificate: { financial_year: "2026-27", issued: true } },
+    };
+    render(<LinkFrame envelope={withButton} csrf="c" />);
+    expect(screen.getByRole("link", { name: "Tax certificate FY 2026-27" })).toBeInTheDocument();
+  });
+});
+
 describe("dues page (US-2403)", () => {
   it("shows first name, class, instalments, totals, the pay form with CSRF and the UPI QR", () => {
     const { container } = render(<LinkFrame envelope={dues} csrf="csrf-token-value" />);

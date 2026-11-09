@@ -58,6 +58,15 @@ class ParentReceiptLineOut(_Out):
     amount: Rupees
 
 
+class ParentTaxCertificateOut(_Out):
+    """FM-06 (FR-FEE-057): the "Tax certificate FY <financial_year>" button, shown from 1 January
+    of the year's last quarter. ``issued``: the school has issued it (the button opens the PDF);
+    otherwise the page asks the parent to request it from the office."""
+
+    financial_year: str
+    issued: bool
+
+
 class ParentReceiptOut(_Out):
     """ADR-0046 decision 2 "Receipt" (owner decision D22): the receipt card as printed."""
 
@@ -72,6 +81,7 @@ class ParentReceiptOut(_Out):
     mode: str
     cancelled_on: dt.date | None
     has_pdf: bool
+    tax_certificate: ParentTaxCertificateOut | None = None
 
 
 class ParentDueInstalmentOut(_Out):
@@ -105,6 +115,7 @@ class ParentDuesOut(_Out):
     pay_online: bool
     upi: ParentUpiOut | None
     office_phone: str | None
+    tax_certificate: ParentTaxCertificateOut | None = None
 
 
 class ParentOptinCategoryOut(_Out):
@@ -200,5 +211,6 @@ __all__ = [
     "ParentPaymentStatusOut",
     "ParentReceiptLineOut",
     "ParentReceiptOut",
+    "ParentTaxCertificateOut",
     "ParentUpiOut",
 ]

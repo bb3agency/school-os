@@ -15,6 +15,9 @@ import { parentToken } from "./view";
  *   5 minutes) and this answers 303 to it; without one, back to the page saying so. A notice
  *   PDF whose stored render expired is made again by the worker (API 202, D71): back to the
  *   page saying it is being prepared (`?pdf=preparing`).
+ * - `GET /p/tax-certificate` (FM-06; FR-FEE-058): the child's tuition fee certificate PDF from a
+ *   receipt or dues link, the same way (`?tax=0` / `?tax=preparing` back on the page). A read:
+ *   the API opens the certificate the school issued and never issues one.
  * - `POST /p/pay`: "Pay online". The ticked instalments go to the API, which makes or reuses
  *   the payment link on the school's own Razorpay account; this answers 303 to Razorpay's page
  *   (https on rzp.io / razorpay.com only). Any refusal goes back to the page with a reason code.
@@ -25,6 +28,7 @@ import { parentToken } from "./view";
  */
 
 const DOCUMENT_PATH = "/api/v1/public/links/current/document";
+const TAX_CERTIFICATE_PATH = "/api/v1/public/links/current/tax-certificate";
 const PAY_PATH = "/api/v1/public/links/current/pay";
 const PAYMENT_PATH = "/api/v1/public/links/current/payment";
 const OPTIN_PATH = "/api/v1/public/links/current/optin";
@@ -96,19 +100,40 @@ export async function documentRedirect(
   runtime: PublicRuntime,
   request: Request,
 ): Promise<Response> {
+  return fileRedirect(runtime, request, DOCUMENT_PATH, "pdf");
+}
+
+/** FM-06 (FR-FEE-058): the tuition fee certificate PDF of a receipt or dues link. */
+export async function taxCertificateRedirect(
+  runtime: PublicRuntime,
+  request: Request,
+): Promise<Response> {
+  return fileRedirect(runtime, request, TAX_CERTIFICATE_PATH, "tax");
+}
+
+async function fileRedirect(
+  runtime: PublicRuntime,
+  request: Request,
+  path: string,
+  flag: "pdf" | "tax",
+): Promise<Response> {
   const token = parentToken(request.headers);
   if (!token) return see(PUBLIC_EXPIRED_PATH);
   let upstream: Response;
   try {
     upstream = await callPublicApi(runtime, {
       method: "GET",
-      path: DOCUMENT_PATH,
+      path,
       token,
       incomingHeaders: request.headers,
     });
   } catch {
-    logEvent("public_api_unreachable_document", {}, "error");
-    return see(`${PUBLIC_VIEW_PATH}?pdf=0`);
+    logEvent(
+      flag === "pdf" ? "public_api_unreachable_document" : "public_api_unreachable_tax_certificate",
+      {},
+      "error",
+    );
+    return see(`${PUBLIC_VIEW_PATH}?${flag}=0`);
   }
   if (upstream.status === 202) {
     // D71: the notice's PDF expired and the worker is making it again; the page says so.
@@ -116,15 +141,15 @@ export async function documentRedirect(
     // the page names that wait so the parent does not tap again every minute.
     const minutes = retryMinutes(upstream.headers.get("retry-after"));
     await upstream.body?.cancel();
-    return see(`${PUBLIC_VIEW_PATH}?pdf=preparing${minutes > 1 ? `&wait=${minutes}` : ""}`);
+    return see(`${PUBLIC_VIEW_PATH}?${flag}=preparing${minutes > 1 ? `&wait=${minutes}` : ""}`);
   }
   if (upstream.status !== 200) {
     await upstream.body?.cancel();
-    return see(`${PUBLIC_VIEW_PATH}?pdf=0`);
+    return see(`${PUBLIC_VIEW_PATH}?${flag}=0`);
   }
   const body = (await upstream.json().catch(() => null)) as { url?: unknown } | null;
   const url = body?.url;
-  return isFileUrl(url) ? see(url) : see(`${PUBLIC_VIEW_PATH}?pdf=0`);
+  return isFileUrl(url) ? see(url) : see(`${PUBLIC_VIEW_PATH}?${flag}=0`);
 }
 
 interface CheckedPost {

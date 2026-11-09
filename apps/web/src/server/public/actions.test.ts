@@ -2,7 +2,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadAuthConfig } from "@/server/config";
 import { testEnv } from "@/test/server-env";
-import { documentRedirect, loadPayment, optinFromForm, payFromForm } from "./actions";
+import {
+  documentRedirect,
+  loadPayment,
+  optinFromForm,
+  payFromForm,
+  taxCertificateRedirect,
+} from "./actions";
 import { PUBLIC_TOKEN_HEADER, type PublicRuntime } from "./client";
 import { parentCsrf } from "./csrf";
 
@@ -283,6 +289,34 @@ describe("GET /p/document and the payment status", () => {
         `http://${host}/x.pdf?sig=1`,
       );
     }
+  });
+
+  it("opens the tuition fee certificate PDF or comes back with ?tax= (FM-06, FR-FEE-058)", async () => {
+    const rt = runtime();
+    const request = new Request(`${PUBLIC}/p/tax-certificate`, {
+      headers: { cookie: `__Host-sos_parent=${TOKEN}` },
+    });
+    answer = () => json({ url: "https://files.example/t.pdf?sig=1", expires_at: "x" });
+    expect((await taxCertificateRedirect(rt, request)).headers.get("location")).toBe(
+      "https://files.example/t.pdf?sig=1",
+    );
+    expect(new URL(calls.at(-1)!.url).pathname).toBe(
+      "/api/v1/public/links/current/tax-certificate",
+    );
+    answer = () => json({ code: "not_found" }, 404);
+    expect((await taxCertificateRedirect(rt, request)).headers.get("location")).toBe(
+      "/p/view?tax=0",
+    );
+    answer = () =>
+      new Response(JSON.stringify({ status: "preparing", retry_after_s: 60 }), {
+        status: 202,
+        headers: { "content-type": "application/json", "retry-after": "60" },
+      });
+    expect((await taxCertificateRedirect(rt, request)).headers.get("location")).toBe(
+      "/p/view?tax=preparing",
+    );
+    const noCookie = new Request(`${PUBLIC}/p/tax-certificate`);
+    expect((await taxCertificateRedirect(rt, noCookie)).headers.get("location")).toBe("/p/expired");
   });
 
   it("asks for the named intent only when it is 32 hex characters", async () => {
