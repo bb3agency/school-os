@@ -4,6 +4,7 @@ Pure: no database."""
 from __future__ import annotations
 
 import datetime as dt
+from importlib import resources
 from typing import Any
 
 import pytest
@@ -59,15 +60,11 @@ def test_FR_COMP_020_disclosure_items_exist_in_appendix_ix() -> None:
 
 
 def test_FR_COMP_001_bad_catalogue_is_refused() -> None:
-    raw = yaml.safe_load(
-        (cfg.resources.files("app.compliance") / "catalogue.yaml").read_text("utf-8")
-    )
+    raw = yaml.safe_load((resources.files("app.compliance") / "catalogue.yaml").read_text("utf-8"))
     raw["kinds"].pop("other")
     with pytest.raises(ValueError, match="other"):
         cfg.parse(raw)
-    raw = yaml.safe_load(
-        (cfg.resources.files("app.compliance") / "catalogue.yaml").read_text("utf-8")
-    )
+    raw = yaml.safe_load((resources.files("app.compliance") / "catalogue.yaml").read_text("utf-8"))
     raw["kinds"]["fire_noc"]["boards"] = ["ICSE"]
     with pytest.raises(ValueError, match="boards"):
         cfg.parse(raw)

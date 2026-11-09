@@ -45,7 +45,8 @@ def _register(api: Any, who: Any) -> dict[str, Any]:
 
 def _row(register: dict[str, Any], kind: str) -> dict[str, Any]:
     (row,) = [r for r in register["rows"] if r["kind"] == kind]
-    return row
+    out: dict[str, Any] = row
+    return out
 
 
 def _codes(res: Any) -> set[str]:
