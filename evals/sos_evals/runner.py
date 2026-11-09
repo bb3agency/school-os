@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from datetime import date
+from datetime import UTC, date, datetime
 from functools import partial
 from statistics import fmean
 
@@ -18,7 +18,9 @@ from sos_evals import (
     cost,
     due,
     english_first,
+    extraction,
     fees,
+    judge,
     metrics,
     sentences,
 )
@@ -147,6 +149,25 @@ class Metrics(_Model):
     cost_per_answer_usd: float | None = None
     cost_per_answer_inr: float | None = None
     cost_per_question_usd: float | None = None
+    # Faithfulness and answer correctness (sos_evals.judge; FA-07, FR-KB-051..057): the judge is
+    # calibrated first; below calibration.min_agreement both stay None (their gates fail).
+    judge_calibration_items: int = 0
+    judge_agreement: float | None = None
+    judge_kappa: float | None = None
+    faithfulness: float | None = None
+    faithfulness_claims: int = 0
+    answer_correctness: float | None = None
+    answer_correctness_items: int = 0
+    # Register-photo extraction (sos_evals.extraction; FA-07, FR-KB-058..062). None when not
+    # measured (their gates fail).
+    extraction_items: int = 0
+    extraction_planted: int = 0
+    extraction_field_accuracy: float | None = None
+    extraction_row_recall: float | None = None
+    extraction_aadhaar_redaction_recall: float | None = None
+    extraction_unmasked_aadhaar_count: int | None = None
+    extraction_images_withheld: int = 0
+    extraction_needless_redactions: int = 0
 
 
 def _timed[T](call: Callable[[], T]) -> tuple[T, float]:
@@ -317,6 +338,40 @@ class RunResult(_Model):
     english_first_outcomes: tuple[english_first.EnglishFirstOutcome, ...] = ()
     authorised_recall_outcomes: tuple[authorised_recall.RecallOutcome, ...] = ()
     cost_report: cost.CostReport | None = None
+    judge_name: str | None = None
+    judge_outcomes: tuple[judge.CalibrationOutcome, ...] = ()
+    judge_cost_usd: float | None = None
+    """What the judge's own model calls cost (eval spend, not part of cost per answer)."""
+    extraction_outcomes: tuple[extraction.ExtractionOutcome, ...] = ()
+
+
+def _judge_pass(
+    answer_judge: judge.Judge,
+    calibration: Sequence[judge.CalibrationItem],
+    judged: Sequence[tuple[EvalItem, AskResult]],
+    corpus: Mapping[str, CorpusItem],
+    *,
+    min_agreement: float,
+    prices: cost.PriceBook | None,
+    price_date: date | None,
+) -> tuple[judge.JudgeMetrics, tuple[judge.CalibrationOutcome, ...], float | None]:
+    """Calibrate the judge, then faithfulness and correctness (FA-07), and the judge's spend."""
+    found, outcomes = judge.measure(
+        answer_judge, calibration, judged, corpus, min_agreement=min_agreement
+    )
+    spent: float | None = None
+    if prices is not None and answer_judge.calls:
+        today = datetime.now(UTC).date()
+        spent = round(
+            float(
+                sum(
+                    prices.call_cost(c, price_date or c.called_on or today)
+                    for c in answer_judge.calls
+                )
+            ),
+            6,
+        )
+    return found, outcomes, spent
 
 
 def run(
@@ -341,6 +396,11 @@ def run(
     recall_fast: bool = False,
     prices: cost.PriceBook | None = None,
     price_date: date | None = None,
+    answer_judge: judge.Judge | None = None,
+    judge_calibration: Sequence[judge.CalibrationItem] = (),
+    judge_min_agreement: float = 1.0,
+    extraction_adapter: extraction.ExtractionAdapter | None = None,
+    extraction_cases: Sequence[extraction.ExtractionCase] = (),
 ) -> RunResult:
     """Every pass with the Telugu switch ON (the dormant Telugu gates keep running), then, with
     ``english``, the English-first pass with it OFF (the product default, ADR-0036)."""
@@ -387,6 +447,23 @@ def run(
     if recall is not None:
         found, recall_outcomes = authorised_recall.run(recall, fast=recall_fast)
         overall = overall.model_copy(update=found.model_dump())
+    judge_outcomes: tuple[judge.CalibrationOutcome, ...] = ()
+    judge_cost: float | None = None
+    if answer_judge is not None:
+        judged, judge_outcomes, judge_cost = _judge_pass(
+            answer_judge,
+            judge_calibration,
+            list(zip(items, answers, strict=True)),
+            corpus,
+            min_agreement=judge_min_agreement,
+            prices=prices,
+            price_date=price_date,
+        )
+        overall = overall.model_copy(update=judged.model_dump())
+    extraction_outcomes: tuple[extraction.ExtractionOutcome, ...] = ()
+    if extraction_adapter is not None and extraction_cases:
+        pages, extraction_outcomes = extraction.run(extraction_cases, extraction_adapter)
+        overall = overall.model_copy(update=pages.model_dump())
     english_outcomes: tuple[english_first.EnglishFirstOutcome, ...] = ()
     if english is not None:
         first, english_outcomes = english_first.run(
@@ -408,4 +485,8 @@ def run(
         english_first_outcomes=english_outcomes,
         authorised_recall_outcomes=recall_outcomes,
         cost_report=cost_report,
+        judge_name=answer_judge.name if answer_judge is not None else None,
+        judge_outcomes=judge_outcomes,
+        judge_cost_usd=judge_cost,
+        extraction_outcomes=extraction_outcomes,
     )

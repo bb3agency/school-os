@@ -79,6 +79,19 @@ PERFECT = Metrics(
     cost_per_answer_usd=0.05,
     cost_per_answer_inr=4.8,
     cost_per_question_usd=0.045,
+    judge_calibration_items=117,
+    judge_agreement=1.0,
+    judge_kappa=1.0,
+    faithfulness=1.0,
+    faithfulness_claims=200,
+    answer_correctness=1.0,
+    answer_correctness_items=150,
+    extraction_items=24,
+    extraction_planted=21,
+    extraction_field_accuracy=0.98,
+    extraction_row_recall=1.0,
+    extraction_aadhaar_redaction_recall=1.0,
+    extraction_unmasked_aadhaar_count=0,
 )
 
 
@@ -116,6 +129,10 @@ def test_FR_KB_010_SEC_018_SEC_019_hard_gates_are_exactly_the_documented_ones() 
         # English first (ADR-0036): with Telugu hidden nothing shown is Telugu, answers are English.
         ("english_first_telugu_outputs", "==", 0),
         ("english_first_english_answer_rate", ">=", 1.0),
+        # Register-photo extraction (FA-07; invariant 4): no unmasked Aadhaar-like number in
+        # anything kept of a page, and every planted number masked or blacked out.
+        ("extraction_unmasked_aadhaar_count", "==", 0),
+        ("extraction_aadhaar_redaction_recall", ">=", 1.0),
     }
 
 
@@ -138,6 +155,13 @@ def test_soft_gates_match_docs_06_section_13() -> None:
         ("ctx_recall_at_5_contextual_rerank", ">=", 0.90),
         # FA-02 (NFR-CST-003): cost per answer within the bundle budget estimate.
         ("cost_per_answer_usd", "<=", 0.06),
+        # FA-07 (docs/06 §13.2, §13.11, §13.12): calibrated judge, then faithfulness and
+        # correctness; extraction quality until a live provider is chosen.
+        ("judge_agreement", ">=", 0.90),
+        ("faithfulness", ">=", 0.95),
+        ("answer_correctness", ">=", 0.85),
+        ("extraction_field_accuracy", ">=", 0.90),
+        ("extraction_row_recall", ">=", 0.95),
     } <= soft
 
 
@@ -179,6 +203,10 @@ def test_perfect_metrics_pass_every_gate() -> None:
         ({"english_first_telugu_outputs": None}, "english_first_telugu_outputs"),
         ({"english_first_english_answer_rate": 0.99}, "english_first_english_answer_rate"),
         ({"english_first_english_answer_rate": None}, "english_first_english_answer_rate"),
+        ({"extraction_unmasked_aadhaar_count": 1}, "extraction_unmasked_aadhaar_count"),
+        ({"extraction_unmasked_aadhaar_count": None}, "extraction_unmasked_aadhaar_count"),
+        ({"extraction_aadhaar_redaction_recall": 0.99}, "extraction_aadhaar_redaction_recall"),
+        ({"extraction_aadhaar_redaction_recall": None}, "extraction_aadhaar_redaction_recall"),
     ],
 )
 def test_a_failing_hard_gate_exits_1(change: dict[str, object], failed: str) -> None:
@@ -201,6 +229,13 @@ def test_boundary_values_pass() -> None:
         {"unsupported_sentence_rate": None},
         {"cost_per_answer_usd": 0.0601},
         {"cost_per_answer_usd": None},
+        {"judge_agreement": 0.8999},
+        {"faithfulness": 0.9499},
+        {"faithfulness": None},
+        {"answer_correctness": 0.8499},
+        {"answer_correctness": None},
+        {"extraction_field_accuracy": 0.8999},
+        {"extraction_row_recall": None},
     ],
 )
 def test_per_sentence_release_gates_fail_only_with_fail_on_soft(change: dict[str, object]) -> None:

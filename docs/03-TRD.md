@@ -863,6 +863,27 @@ Cost per answer measured by the eval harness, candidate answer models priced but
 
 *As built (wave F1, FA-02, 2026-11-09):* FR-KB-046..049 are built and tested (`evals/tests/test_cost.py`, `apps/api/tests/knowledge/test_unit_economics.py`, `test_eval_bridge.py::test_FR_KB_046_*`). Routing is decided but not wired into the ask path; FR-KB-050 binds the wiring that lands with the live run that justifies switching it on.
 
+### 3.32 Evaluation gaps closed before live AI (FR-KB-051..062) (FA-07, wave F2)
+
+Faithfulness and answer correctness from a calibrated judge, and a register-photo extraction eval with an Aadhaar hard gate (docs/research/2026-11-features/ai-platform.md FA-07; docs/06 §13.11, §13.12). Cost per answer is FA-02 (FR-KB-046, NFR-CST-003); the judge's own spend is reported with it. Synthetic data only (invariant 11).
+
+| ID | Requirement | Verify |
+|---|---|---|
+| FR-KB-051 | `make eval` MUST report `faithfulness`: factual sentences of written answers (the harness's own split) that the calibrated judge finds supported by the passages they validly cite / factual sentences; a factual sentence without a valid citation counts as unsupported without a judge call. Soft gate ≥ 0.95. | T |
+| FR-KB-052 | `make eval` MUST report `answer_correctness`: answerable questions with a reference answer that the judge finds correct (every reference date, time, amount and number present; a refusal or search-only answer is incorrect) / such questions. Soft gate ≥ 0.85. | T |
+| FR-KB-053 | Before it scores, the judge MUST label a calibration set of ≥ 100 synthetic items with known labels (`evals/datasets/judge_calibration.jsonl`, both kinds and both labels, generated and checked by `generate --check`); `judge_agreement` and Cohen's kappa MUST be reported. Soft gate `judge_agreement` ≥ 0.90. *(Lead decision D85, PO to confirm.)* | T |
+| FR-KB-054 | Below `evals/judge.toml` `calibration.min_agreement` (pinned equal to the `judge_agreement` gate) faithfulness and correctness MUST NOT be reported, so their gates fail (an uncalibrated judge is no evidence). | T |
+| FR-KB-055 | Offline runs (CI, `make eval`, `app-fake`) MUST use the deterministic stub judge (word overlap plus an exact figure check, thresholds in `judge.toml`); `make eval-live` MUST use the `eval_judge` role of `models.yaml` through the gateway (metering feature `eval`, strict JSON verdict, prompts versioned in `judge.toml`), and its metered calls MUST be priced and reported as eval spend, separate from cost per answer. | T |
+| FR-KB-056 | Judge thresholds and prompts MUST live in `evals/judge.toml` (invariant 13); the judge model stays the `eval_judge` role (offline only). | T |
+| FR-KB-057 | Before the live judge's numbers are trusted, a person SHOULD label a random 30 calibration items blind and the agreement with the constructed labels SHOULD be recorded with the live run (docs/06 §13.11 runbook), and the calibration SHOULD be repeated once with the cross-family fallback judge (ADR-0033 §8). *(Lead decision D85, PO to confirm.)* | I |
+| FR-KB-058 | The harness MUST include a register-photo extraction set of synthetic pages (printed and handwritten; English, Telugu and code-mixed) planting Aadhaar-like numbers in a not-kept column, split across OCR words, hyphenated, plain, in Telugu digits, inside a kept cell, without a position on the image, and decoys that fail the checksum; planted numbers MUST exist only in memory (placeholders in the files). | T |
+| FR-KB-059 | The extraction eval MUST report field accuracy over the kept register fields and row recall. Soft gates ≥ 0.90 and ≥ 0.95 until a live provider is chosen by this eval (FA-01). *(Lead decision D85, PO to confirm.)* | T |
+| FR-KB-060 | Any Verhoeff-valid 12-digit number, planted or not, in what the system keeps of a page (stored candidate values, or the stored page image read back) MUST fail the run: hard gates `extraction_unmasked_aadhaar_count` = 0 and `extraction_aadhaar_redaction_recall` = 1.0 (invariant 4, PRV-015, PRV-016). Reports MUST NOT print a value from a page. | T |
+| FR-KB-061 | The app adapters MUST score the worker's own code: `extraction.service.read_page` (provider, masking and validation, image black-out and re-read; DB-free, also used by `process_batch`), with the redacted copy read back from its pixels; the harness's kept fields MUST equal `app/extraction/config.yaml` `fields`. | T |
+| FR-KB-062 | A new extraction provider adapter (FA-01) MUST pass the extraction hard gates on this set before it is selectable outside local/ci. | I |
+
+*As built (wave F2, FA-07, 2026-11-09):* FR-KB-051..056 and 058..061 are built and tested (`evals/tests/test_judge.py`, `evals/tests/test_extraction.py`, `evals/tests/test_gates.py`, `apps/api/tests/knowledge/test_eval_bridge.py::test_FR_KB_06*`/`_055_*`, `apps/api/tests/extraction/test_read_page.py`). Stub-perfect: agreement 1.0, faithfulness 1.0, correctness 1.0; extraction unmasked 0, redaction recall 1.0, field accuracy 0.981, row recall 1.0. The live judge (057) and provider selection (062) wait for D2 and FA-01. Not built here: the notice-draft faithfulness eval and the scanned-circular OCR set of FA-07 items 3 and 5. FR-KB-063..065 are reserved for them.
+
 ---
 
 ## 4. Non-functional requirements

@@ -428,6 +428,50 @@ def _redact(
         return _Redaction(None, exc.code)
 
 
+@dataclass(frozen=True, slots=True)
+class PageReading:
+    """What the pipeline keeps of one page image, before anything is stored: the masked rows
+    and, for a page that showed a full Aadhaar number, the redacted copy or why there is none."""
+
+    clean: sanitize.CleanPage
+    redaction: _Redaction | None
+
+    @property
+    def image(self) -> str:
+        """``original`` (kept as is), ``redacted`` (the copy replaces it) or ``withheld``."""
+        if not self.clean.aadhaar_detected:
+            return "original"
+        if self.redaction is not None and self.redaction.image is not None:
+            return "redacted"
+        return "withheld"
+
+    @property
+    def redacted_image(self) -> bytes | None:
+        if self.redaction is None or self.redaction.image is None:
+            return None
+        return self.redaction.image.data
+
+
+def read_page(
+    image: bytes, provider: ExtractionProvider, *, settings: Settings | None = None
+) -> PageReading:
+    """Read one page and make the result safe to keep, in memory and without a database: extract,
+    mask and validate (FR-IMP-022, PRV-015), then black out and re-read a page that showed a full
+    Aadhaar number (PRV-016). The worker stores the outcome; the register-extraction eval
+    (docs/06 §13.12, FA-07) scores it. Provider errors propagate."""
+    settings = settings or get_settings()
+    cfg = extraction_config()
+    result = provider.extract(image, language_hints=cfg.language_hints)
+    # Masking happens here, in memory, before the first write (FR-IMP-022, PRV-015).
+    clean = sanitize.clean_page(result, cfg, threshold=settings.extraction_low_confidence_threshold)
+    # PRV-016: black the number out and read the copy again (same provider).
+    redaction = (
+        _redact(image, result, provider, cfg.language_hints) if clean.aadhaar_detected else None
+    )
+    del result
+    return PageReading(clean, redaction)
+
+
 def _replace_with_redacted(s: Session, page: _PageRef, copy: imaging.RedactedImage) -> int | None:
     """Store the redacted copy as the page's new version; None if it cannot be used."""
     try:
@@ -656,7 +700,6 @@ def process_batch(
     A missing or refused provider fails the batch with an operator-facing code and re-raises.
     """
     settings = settings or get_settings()
-    cfg = extraction_config()
     state, pages = _start(tenant_id, batch_id)
     if state != "processing":
         return state
@@ -671,25 +714,15 @@ def process_batch(
             _page_failed(tenant_id, batch_id, page.id, "document_unavailable")
             continue
         try:
-            result = chosen.extract(image, language_hints=cfg.language_hints)
-            # Masking happens here, in memory, before the first write (FR-IMP-022, PRV-015).
-            clean = sanitize.clean_page(
-                result, cfg, threshold=settings.extraction_low_confidence_threshold
-            )
-            # PRV-016: black the number out and read the copy again (same provider).
-            redaction = (
-                _redact(image, result, chosen, cfg.language_hints)
-                if clean.aadhaar_detected
-                else None
-            )
+            reading = read_page(image, chosen, settings=settings)
         except (ProviderNotConfigured, ProviderRefused) as exc:
             fail_batch(tenant_id, batch_id, exc.code)
             raise
         except ExtractionFailed as exc:
             _page_failed(tenant_id, batch_id, page.id, exc.code)
             continue
-        del result, image
-        _store_page(tenant_id, batch_id, page, clean, redaction)
+        del image
+        _store_page(tenant_id, batch_id, page, reading.clean, reading.redaction)
     return _finish(tenant_id, batch_id)
 
 
@@ -1032,6 +1065,7 @@ __all__ = [
     "PROCESS_TASK",
     "READY_TEMPLATE",
     "RUN",
+    "PageReading",
     "confirm_item",
     "create_batch",
     "fail_batch",
@@ -1041,6 +1075,7 @@ __all__ = [
     "list_items",
     "process_batch",
     "purge_tenant_data",
+    "read_page",
     "reject_item",
     "subject_report",
     "tenant_data_counts",

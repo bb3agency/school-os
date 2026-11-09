@@ -44,7 +44,13 @@ What is fake (offline, deterministic; SOS_KB_PROVIDER_MODE=fake):
   sentence per kept result. Telugu-script questions get a Telugu prefix. Requests for Aadhaar
   numbers are refused (system prompt rule 5, invariant 4). Refusal, recall and language numbers
   therefore measure this stand-in plus the application's controls, never Claude's judgement;
-  faithfulness and correctness need the calibrated judge and the live gateway (docs/06 §13.2).
+  faithfulness and correctness are scored by the harness's deterministic stub judge offline and
+  by :class:`GatewayJudge` (the ``eval_judge`` role) on ``make eval-live`` (docs/06 §13.11).
+
+Register-photo extraction (FA-07, ``sos_evals.extraction``; docs/06 §13.12): each synthetic page
+is laid out as a real image for the fake provider (:func:`register_script`) and read by
+``extraction.service.read_page``, the worker's own code (masking, PRV-016 black-out and re-read),
+without a database; the stored image is read back by :class:`EvalRegisterOcr` from its pixels.
 - ``retrieve`` (Recall@10/MRR): the same deterministic record lookup through the real record
   tools (when the question names a student and a field), then ``search_documents``.
 
@@ -624,6 +630,7 @@ class AppFakeAdapter:
         self._live = live
         self._live_sink: Any = None
         """The live gateway's RecordingSink (its metering events never reach kb.llm_calls)."""
+        self._judge: GatewayJudge | None = None
         self._relaxed = relaxed
         self._wire = GeminiWireFake
         # ADR-0036: the main passes run with Telugu switched ON (the dormant Telugu gates);
@@ -1745,6 +1752,26 @@ class AppFakeAdapter:
         """One scripted conversation in its own school (see :class:`_ConversationRunner`)."""
         return _run_conversation(self, case)
 
+    # --- register-photo extraction and the judge (FA-07; docs/06 §13.11, §13.12) -------------
+
+    def extract_register_page(self, page: Any) -> Any:
+        """The real extraction pipeline on one synthetic page (:func:`extract_register_page`)."""
+        return extract_register_page(page)
+
+    @property
+    def judge(self) -> Any:
+        """The live ``eval_judge`` on ``make eval-live``; None offline (the harness then uses
+        its deterministic stub judge)."""
+        if not self._live:
+            return None
+        if self._judge is None:
+            from app.knowledge.gateway.metering import RecordingSink
+
+            sink = RecordingSink()
+            tenant_id = next(iter(self._schools.values())).tenant_id
+            self._judge = GatewayJudge(live_gateway(self._relaxed, sink=sink), tenant_id, sink)
+        return self._judge
+
 
 class _ConversationRunner:
     """One scripted conversation case (``sos_evals.conversations``) in its own school, every
@@ -1971,6 +1998,172 @@ def _run_conversation(adapter: AppFakeAdapter, case: Any) -> Any:
 
 def build(corpus: Mapping[str, Any], items: Iterable[Any]) -> AppFakeAdapter:
     return AppFakeAdapter(corpus, items)
+
+
+# --- register-photo extraction (FA-07; sos_evals.extraction; docs/06 §13.12) -------------------
+
+PAGE_WIDTH: Final = 1200
+ROW_HEIGHT: Final = 40
+BOX_HEIGHT: Final = 24
+CELL_GAP: Final = 12
+"""Wider than the redaction padding (max(3 px, 15 % of 24 px) = 4 px), so blacking out one box
+never touches its neighbour."""
+
+
+def register_script(page: Any) -> dict[str, Any]:
+    """The fake provider's script for a harness page: a real image with every cell and margin
+    note drawn as a box (rows top-down, then the margin notes left to right), the cells as the
+    provider's rows and every piece of text as a span in the harness's reading order. A margin
+    note the OCR cannot place has no box."""
+    margin_rows = max(1, math.ceil(len(page.margin) / 4))
+    height = ROW_HEIGHT * (len(page.rows) + margin_rows + 1)
+    rows: list[dict[str, Any]] = []
+    spans: list[dict[str, Any]] = []
+    for r, row in enumerate(page.rows):
+        width = PAGE_WIDTH // len(row)
+        top = ROW_HEIGHT * (r + 1)
+        cells: dict[str, Any] = {}
+        for c, cell in enumerate(row):
+            box = [c * width, top, (c + 1) * width - CELL_GAP, top + BOX_HEIGHT]
+            cells[cell.column] = {
+                "value": cell.text,
+                "confidence": 0.95,
+                "bbox": [
+                    box[0] / PAGE_WIDTH,
+                    box[1] / height,
+                    (box[2] - box[0]) / PAGE_WIDTH,
+                    (box[3] - box[1]) / height,
+                ],
+            }
+            spans.append({"text": cell.text, "box": box})
+        rows.append(cells)
+    width = PAGE_WIDTH // 4
+    for n, note in enumerate(page.margin):
+        top = ROW_HEIGHT * (len(page.rows) + 1 + n // 4)
+        box = [(n % 4) * width, top, (n % 4 + 1) * width - CELL_GAP, top + BOX_HEIGHT]
+        spans.append({"text": note.text, "box": box if note.placed else None})
+    return {"size": [PAGE_WIDTH, height], "rows": rows, "spans": spans, "page": page.id}
+
+
+class EvalRegisterOcr:
+    """The fake extraction provider, able to read the redacted copy too.
+
+    The pipeline re-encodes a redacted copy from pixels only (no script chunk), which the plain
+    fake would read as a fresh random page. This reader keeps the page's script and reads any
+    image without one through the fake's own pixel check: a box that is entirely black is not
+    read, everything else is. So the copy is read back exactly as an OCR engine would read it."""
+
+    name = "fake"
+
+    def __init__(self, script: Mapping[str, Any]) -> None:
+        from app.core.config import Environment, Settings
+        from app.extraction.providers import FakeExtractionProvider
+
+        self._fake = FakeExtractionProvider(Settings(env=Environment.CI))
+        self._script = dict(script)
+
+    def extract(self, page_image: bytes, *, language_hints: Sequence[str]) -> Any:
+        from app.extraction.providers import FAKE_SCRIPT_KEYWORD, _png_text_chunks
+
+        if FAKE_SCRIPT_KEYWORD in _png_text_chunks(page_image):
+            return self._fake.extract(page_image, language_hints=language_hints)
+        return self._fake._scripted(self._script, page_image)
+
+
+def _image_text(reading: Any) -> tuple[str, ...]:
+    """What a reader gets back from a page image, in reading order: the text layer (every cell
+    of :func:`register_script` is also a span, and the page text is their join), then any cell
+    whose text is not a span (none here; kept so nothing read is ever skipped)."""
+    spans = [s.text for s in reading.spans]
+    extra = [r.value for row in reading.rows for r in row.values() if r.value not in spans]
+    return (*spans, *extra)
+
+
+def extract_register_page(page: Any) -> Any:
+    """One synthetic page through ``extraction.service.read_page`` (the worker's code: provider,
+    masking and validation, image redaction and re-read), DB-free. Returns what would be kept:
+    the masked rows and the stored image read back (``sos_evals.extraction.ExtractionResult``).
+    The provider is the offline fake (no live extraction provider exists yet, FA-01), so the run
+    measures the pipeline's masking and redaction, not OCR quality."""
+    from app.core.config import Environment, Settings
+    from app.extraction import service as extraction
+    from app.extraction.providers import fake_script_png
+    from sos_evals.extraction import ExtractionResult
+
+    script = register_script(page)
+    image = fake_script_png(script)
+    ocr = EvalRegisterOcr(script)
+    reading = extraction.read_page(image, ocr, settings=Settings(env=Environment.CI))
+    rows = tuple(
+        {key: str(cell["value"]) for key, cell in row.fields.items()} for row in reading.clean.rows
+    )
+    stored = {"original": image, "redacted": reading.redacted_image}.get(reading.image)
+    seen = _image_text(ocr.extract(stored, language_hints=("en", "te"))) if stored else ()
+    return ExtractionResult(rows=rows, image=reading.image, image_text=seen)
+
+
+# --- the live judge (FA-07; sos_evals.judge; docs/06 §13.11) -------------------------------------
+
+JUDGE_SCHEMA: Final = {
+    "type": "object",
+    "properties": {"verdict": {"type": "boolean"}},
+    "required": ["verdict"],
+    "additionalProperties": False,
+}
+
+
+class GatewayJudge:
+    """The ``eval_judge`` role through the real gateway (``make eval-live`` only): offline-only
+    role, feature ``eval``, synthetic passages only, prompts from ``evals/judge.toml``. Its
+    metering events become the judge's ``calls`` (priced in the report as eval spend)."""
+
+    name = "eval_judge"
+
+    def __init__(self, gateway: Any, tenant_id: uuid.UUID, sink: Any) -> None:
+        from sos_evals.judge import load_config
+
+        self._gateway = gateway
+        self._tenant_id = tenant_id
+        self._sink = sink
+        self._prompts = load_config().live
+
+    @property
+    def calls(self) -> list[Any]:
+        from sos_evals.adapters import ModelCall
+
+        return [
+            ModelCall(
+                role=e.role,
+                model=e.model,
+                input_tokens=e.input_tokens,
+                output_tokens=e.output_tokens,
+                cache_write_tokens=e.cache_write_tokens,
+                cache_read_tokens=e.cache_read_tokens,
+                called_on=dt.datetime.now(dt.UTC).date(),
+            )
+            for e in self._sink.events
+        ]
+
+    def _verdict(self, system: str, text_: str) -> bool:
+        from app.knowledge.domain import Metering
+
+        out = self._gateway.generate_json(
+            Metering(self._tenant_id, "eval"), "eval_judge", system.strip(), text_, JUDGE_SCHEMA
+        )
+        return out.get("verdict") is True
+
+    def supported(self, claim: str, passages: Sequence[str]) -> bool:
+        numbered = "\n\n".join(f"Passage {n}:\n{p}" for n, p in enumerate(passages, start=1))
+        return self._verdict(
+            self._prompts.faithfulness_system, f"{numbered}\n\nSentence to check:\n{claim}"
+        )
+
+    def correct(self, question: str, answer: str, reference: str) -> bool:
+        return self._verdict(
+            self._prompts.correctness_system,
+            f"Question:\n{question}\n\nReference answer:\n{reference}\n\n"
+            f"Answer to grade:\n{answer}",
+        )
 
 
 LIVE_ADAPTER: Final = "app-live"
