@@ -32,6 +32,7 @@ from app.imports.schemas import (
     PresetOut,
     RowEditIn,
     RowFilter,
+    RowMatchIn,
     SheetEditOut,
     SheetFormat,
     TemplateCreate,
@@ -164,6 +165,26 @@ def edit_sheet_row(
     out = service.edit_row(db, ctx, import_id, row_no, body, expected_version=version)
     response.headers["ETag"] = etag(out.version)
     return out
+
+
+@router.put("/imports/{import_id}/rows/{row_no}/match", response_model=ImportRowOut)
+def match_row(
+    *,
+    ctx: Runner,
+    db: TenantDB,
+    import_id: uuid.UUID,
+    row_no: RowNo,
+    body: RowMatchIn,
+    version: IfMatch,
+) -> ImportRowOut:
+    """Decide a UDISE+ row the import could not match by PEN or by name, date of birth and
+    class (FO-04, FR-UDI-014; permission ``import.run``; ``If-Match``): ``student`` with a
+    ``student_id`` in your reach (404 otherwise), ``skip`` the row, or ``clear`` the decision.
+    A checked file re-checks at once; nothing is recorded on the student until the import is
+    added, and only as UDISE+ values (never the register). 409 ``import_not_matchable`` for an
+    import of another source, 409 ``import_not_editable`` once added, 412 when the import
+    changed meanwhile, 422 ``row_has_admission_no`` for a row matched by its admission number."""
+    return service.match_row(db, ctx, import_id, row_no, body, expected_version=version)
 
 
 @router.get("/imports/{import_id}/sheet/export", response_class=Response, responses=_SHEET_FILE_DOC)

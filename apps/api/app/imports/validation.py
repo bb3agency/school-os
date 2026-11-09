@@ -14,6 +14,14 @@ contradict the recorded register value (``identity_change_required``: use a chan
 class/section must exist in the current academic year and lie within the importer's scope, and
 duplicate admission numbers within the file are errors on every copy.
 
+FO-04 (FR-UDI-011..FR-UDI-016): rows of a ``pen_match_sources`` source (the UDISE+ student list)
+WITHOUT an admission number are matched in this order: the office's own decision for the row
+(a picked student, or ``skip``), a PEN held in SchoolOS (``pen_verified`` when that PEN value is
+verified, else ``pen``), then exactly one student with the same name (capitals and repeated
+spaces ignored), date of birth and class (``name_dob_class``). Anything else is a row error
+(``udise_unmatched``, ``udise_match_ambiguous``) that waits for a person; such rows never create a
+student (BR-01) and every match only records ``udise_plus`` values (invariant 6).
+
 Errors and warnings are ``{"field", "code", "message_key"}`` (+ ``"ref"`` = another row number).
 """
 
@@ -51,8 +59,14 @@ _MASKED_LAST4_RE: Final = re.compile(r"^(?:[Xx*•]{4}[\s-]?){2}(\d{4})$")
 _TWELVE_DIGITS_RE: Final = re.compile(r"^\d{4}[\s-]?\d{4}[\s-]?\d{4}$")
 _DIGITS12_RE: Final = re.compile(r"[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}")
 
-RowStatus = Literal["valid", "error"]
+RowStatus = Literal["valid", "error", "skipped"]
 Action = Literal["create", "update"]
+MatchBasis = Literal["admission_no", "picked", "pen_verified", "pen", "name_dob_class", "skipped"]
+SKIP: Final = "skip"
+UNMATCHED_CODE: Final = "udise_unmatched"
+AMBIGUOUS_CODE: Final = "udise_match_ambiguous"
+PICK_GONE_CODE: Final = "picked_student_unavailable"
+REVIEW_CODES: Final = frozenset({UNMATCHED_CODE, AMBIGUOUS_CODE, PICK_GONE_CODE})
 Issue = dict[str, str]
 
 
@@ -137,6 +151,16 @@ class ValidationContext:
     # holds only those in reach): such a row is ``student_out_of_scope``, never a new student
     # (the admission number is unique per school, so its commit would fail).
     unreachable_admission_keys: frozenset[str] = frozenset()
+    # FO-04 (FR-UDI-011): match rows without an admission number (``pen_match_sources``).
+    match_by_pen: bool = False
+    # Students in the importer's reach by id (for PEN, name + DOB + class and picked matches).
+    reachable: Mapping[str, ExistingStudent] = field(default_factory=dict)
+    # PEN values of the file that are verified on the student holding them (``pen_verified``).
+    verified_pens: frozenset[str] = frozenset()
+    # (name key, ISO date of birth, class id) -> student ids in reach (current-year class).
+    identity_index: Mapping[tuple[str, str, str], tuple[str, ...]] = field(default_factory=dict)
+    # The office's decisions for rows it could not match: row number -> student id or "skip".
+    row_matches: Mapping[int, str] = field(default_factory=dict)
 
     @property
     def creates(self) -> bool:
@@ -150,6 +174,12 @@ class ValidationContext:
 
 def admission_key(value: str) -> str:
     return clean_text(value).casefold()
+
+
+def name_key(value: str) -> str:
+    """A name for the exact name + DOB + class match (FR-UDI-013): NFC, capitals and repeated
+    spaces ignored; every letter and mark must otherwise be the same."""
+    return " ".join(clean_text(value).casefold().split())
 
 
 def allowed_targets(specs: Mapping[str, AttributeSpec], source: str) -> set[str]:
@@ -201,6 +231,8 @@ class RowResult:
     roll_no: str | None = None
     errors: list[Issue] = field(default_factory=list)
     warnings: list[Issue] = field(default_factory=list)
+    match_basis: MatchBasis | None = None  # FO-04: how the row found its student
+    skipped: bool = False  # FO-04: the office chose to skip this row
 
     def parsed(self, specs: Mapping[str, AttributeSpec]) -> dict[str, Any]:
         """What is stored in ``sis.import_rows.parsed``: no C3 value ever (docs/05 §5.2)."""
@@ -213,6 +245,8 @@ class RowResult:
             "section_id": self.section_id,
             "class_label": self.class_label,
             "roll_no": self.roll_no,
+            # FO-04: only rows of a PEN-matching import carry how they found their student.
+            **({"match_basis": self.match_basis} if self.match_basis else {}),
         }
 
 
@@ -238,6 +272,7 @@ class _RowValidator:
         self.targets: dict[int, str] = {int(k): v for k, v in mapping.items() if v != IGNORE}
         self.by_target: dict[str, int] = {v: k for k, v in self.targets.items()}
         self.sections_by_class: dict[str, dict[str, SectionInfo]] = {}
+        self.class_of_section: dict[str, str] = {s.id: s.class_id for s in ctx.sections}
         for section in ctx.sections:
             self.sections_by_class.setdefault(section.class_id, {})[section.name.casefold()] = (
                 section
@@ -418,20 +453,24 @@ class _RowValidator:
         admission = result.values.get("admission_no")
         adm_index = self.by_target.get("admission_no")
         adm_poisoned = adm_index is not None and adm_index in poisoned
-        if (
+        unmatched = (
             admission is None
             and not adm_poisoned
             and not any(e["field"] == "admission_no" for e in result.errors)
-        ):
+        )
+        if unmatched and ctx.match_by_pen:
+            self._match(row.row_no, result)
+            if result.skipped:
+                # Skipped by a person: nothing of it is added, so only a full Aadhaar number in
+                # the file still counts against the row (invariant 4).
+                result.errors = [e for e in result.errors if e["code"] == AADHAAR_CODE]
+                result.warnings = []
+                return result
+        elif unmatched:
             result.errors.append(issue("admission_no", "missing"))
         result.admission_no = admission
-        existing = ctx.existing.get(admission_key(admission)) if admission else None
-        if existing is not None:
-            self._update_row(existing, result)
-        elif admission is not None and admission_key(admission) in ctx.unreachable_admission_keys:
-            result.errors.append(issue("admission_no", "student_out_of_scope"))
-        elif admission is not None:
-            self._create_row(result)
+        if admission is not None:
+            self._by_admission(admission, result)
         self._national_ids(result)
         if not ctx.creates and "admission_no" in result.values:
             # Match key only: the admission number cannot be recorded from this source.
@@ -440,6 +479,57 @@ class _RowValidator:
             if key != "admission_no" and key not in result.values and not _has_error(result, key):
                 result.errors.append(issue(key, "missing"))
         return result
+
+    def _by_admission(self, admission: str, result: RowResult) -> None:
+        ctx = self.ctx
+        existing = ctx.existing.get(admission_key(admission))
+        if existing is not None:
+            result.match_basis = "admission_no" if ctx.match_by_pen else None
+            self._update_row(existing, result)
+        elif admission_key(admission) in ctx.unreachable_admission_keys:
+            result.errors.append(issue("admission_no", "student_out_of_scope"))
+        else:
+            self._create_row(result)
+
+    def _match(self, row_no: int, result: RowResult) -> None:
+        """FO-04 (FR-UDI-011..FR-UDI-014): find the student of a row without an admission
+        number. Never creates a student; a row with no single match waits for a person."""
+        ctx = self.ctx
+        pick = ctx.row_matches.get(row_no)
+        if pick == SKIP:
+            result.match_basis = "skipped"
+            result.skipped = True
+            return
+        if pick is not None:
+            picked = ctx.reachable.get(pick)
+            if picked is None:
+                result.errors.append(issue("student", PICK_GONE_CODE, "errors.udise_pick_gone"))
+                return
+            result.match_basis = "picked"
+            self._update_row(picked, result)
+            return
+        pen = result.values.get("udise_pen")
+        holder = ctx.national_ids.get("udise_pen", {}).get(pen) if pen else None
+        if holder is not None:
+            existing = ctx.reachable.get(holder)
+            if existing is None:
+                result.errors.append(issue("udise_pen", "student_out_of_scope"))
+                return
+            result.match_basis = "pen_verified" if pen in ctx.verified_pens else "pen"
+            self._update_row(existing, result)
+            return
+        name, dob = result.values.get("full_name"), result.values.get("dob")
+        class_id = self.class_of_section.get(result.section_id or "")
+        found: tuple[str, ...] = ()
+        if name and dob and class_id:
+            found = ctx.identity_index.get((name_key(name), dob, class_id), ())
+        if len(found) == 1 and found[0] in ctx.reachable:
+            result.match_basis = "name_dob_class"
+            self._update_row(ctx.reachable[found[0]], result)
+        elif len(found) > 1:
+            result.errors.append(issue("student", AMBIGUOUS_CODE, "errors.udise_match_ambiguous"))
+        else:
+            result.errors.append(issue("student", UNMATCHED_CODE, "errors.udise_unmatched"))
 
     def _national_ids(self, result: RowResult) -> None:
         """FR-IMP-010: a PEN or APAAR ID already on another active record of the school is a row
@@ -511,16 +601,8 @@ def validate_sheet(
 ) -> ValidationResult:
     validator = _RowValidator(sheet, mapping, ctx)
     rows = [validator.row(r) for r in sheet.rows]
-    groups: dict[str, list[RowResult]] = {}
-    for result in rows:
-        if result.admission_no:
-            groups.setdefault(admission_key(result.admission_no), []).append(result)
-    for members in groups.values():
-        if len(members) < 2:
-            continue
-        for result in members:
-            other = next(m.row_no for m in members if m.row_no != result.row_no)
-            result.errors.append(issue("admission_no", "duplicate_in_file", ref=other))
+    _duplicate_admission_numbers(rows)
+    _same_student_twice(rows)
     # FR-IMP-010: one PEN or APAAR ID on two rows is one child entered twice.
     for key in NATIONAL_ID_KEYS:
         by_value: dict[str, list[RowResult]] = {}
@@ -544,24 +626,80 @@ def validate_sheet(
         "ambiguous_dates": 0,
     }
     for result in rows:
-        result.status = "error" if result.errors else "valid"
+        result.status = _status(result)
+        if result.status == "skipped":
+            continue
         stats["valid" if result.status == "valid" else "errors"] += 1
         stats["warnings"] += 1 if result.warnings else 0
         if result.status == "valid" and result.action is not None:
             stats[result.action] += 1
         stats["aadhaar_cells"] += sum(1 for e in result.errors if e["code"] == AADHAAR_CODE)
         stats["ambiguous_dates"] += sum(1 for w in result.warnings if w["code"] == "ambiguous_date")
+    stats.update(_match_stats(rows) if ctx.match_by_pen else {})
     return ValidationResult(rows, stats)
+
+
+def _status(result: RowResult) -> RowStatus:
+    if result.errors:
+        return "error"
+    return "skipped" if result.skipped else "valid"
+
+
+def _duplicate_admission_numbers(rows: Sequence[RowResult]) -> None:
+    groups: dict[str, list[RowResult]] = {}
+    for result in rows:
+        if result.admission_no:
+            groups.setdefault(admission_key(result.admission_no), []).append(result)
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        for result in members:
+            other = next(m.row_no for m in members if m.row_no != result.row_no)
+            result.errors.append(issue("admission_no", "duplicate_in_file", ref=other))
+
+
+def _same_student_twice(rows: Sequence[RowResult]) -> None:
+    """FO-04 (FR-UDI-014): two rows matched to one student without an admission number (by
+    PEN, name or a person's pick) are one child listed twice; neither row is added."""
+    by_student: dict[str, list[RowResult]] = {}
+    for result in rows:
+        if result.student_id and result.match_basis not in (None, "admission_no"):
+            by_student.setdefault(result.student_id, []).append(result)
+    for members in by_student.values():
+        for result in members if len(members) > 1 else ():
+            other = next(m.row_no for m in members if m.row_no != result.row_no)
+            result.errors.append(issue("student", "duplicate_student_in_file", ref=other))
+
+
+def _match_stats(rows: Sequence[RowResult]) -> dict[str, int]:
+    """FO-04 (FR-UDI-012): how many valid rows matched on each basis, how many a person
+    skipped, and how many wait for a person's decision."""
+    stats = {f"matched_{b}": 0 for b in ("admission_no", "picked", "pen_verified", "pen")}
+    stats.update(matched_name_dob_class=0, skipped=0, to_review=0)
+    for result in rows:
+        if result.status == "skipped":
+            stats["skipped"] += 1
+        elif result.status == "valid" and result.match_basis:
+            stats[f"matched_{result.match_basis}"] += 1
+        elif any(e["code"] in REVIEW_CODES for e in result.errors):
+            stats["to_review"] += 1
+    return stats
 
 
 __all__ = [
     "AADHAAR_CODE",
+    "AMBIGUOUS_CODE",
     "ANCHOR_SOURCE",
     "FORMULA_CODE",
     "NATIONAL_ID_CODE",
     "NATIONAL_ID_KEYS",
+    "PICK_GONE_CODE",
+    "REVIEW_CODES",
+    "SKIP",
+    "UNMATCHED_CODE",
     "AttributeSpec",
     "ExistingStudent",
+    "MatchBasis",
     "RowResult",
     "SectionInfo",
     "ValidationContext",
@@ -571,5 +709,6 @@ __all__ = [
     "is_full_aadhaar",
     "issue",
     "mapping_problems",
+    "name_key",
     "validate_sheet",
 ]

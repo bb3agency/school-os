@@ -6,13 +6,18 @@
 # guesses. Confirm with a real download, then set `verified: true` and bump `version`.
 # Values are recorded as source `udise_plus` and compared with the admission register by
 # DQ-011; they never replace register values.
+#
+# FO-04 (FR-UDI-011..FR-UDI-016): the download has no admission number, so a row without one is
+# matched by PEN (verified first), then by one exact name + date of birth + class match; the
+# rest wait for a person to pick the student or skip the row (`pen_match_sources` in
+# config.yaml). Rows never create students (BR-01).
 key: udise-plus-student-list
-version: 1
+version: 2
 label_en: UDISE+ student list (Excel download)
 label_te: UDISE+ విద్యార్థుల జాబితా (Excel డౌన్‌లోడ్)
 description_en: >-
-  The Excel file from the UDISE+ Student Module. Add a column with the school's admission
-  number first: UDISE+ rows are matched to students by admission number.
+  The Excel file from the UDISE+ Student Module, as downloaded. Rows are matched to students by
+  PEN, then by name, date of birth and class; you pick the student for any row left over.
 import_source: udise_plus
 template: true
 verified: false
@@ -22,7 +27,7 @@ source:
   - https://udiseplus.gov.in/
 columns:
   - {header: Admission No, target: admission_no, aliases: [Admission Number, School Admission No],
-     note: "Not in the UDISE+ download; add it before importing."}
+     note: "Not in the UDISE+ download and not needed: rows match by PEN first."}
   - {header: Student Name, target: full_name, aliases: [Name of Student, Student's Name]}
   - {header: Gender, target: gender}
   - {header: Date of Birth, target: dob, aliases: [DOB, Date Of Birth (DD/MM/YYYY)]}
