@@ -205,12 +205,12 @@ def test_FR_MSG_032_estimate_by_month_category_and_purpose() -> None:
     lines = {(x.pricing_category, x.purpose): x for x in nov.lines}
     notice = lines[("utility", "school_notice")]
     assert (notice.sent, notice.billable, notice.free, notice.pending) == (118, 100, 8, 10)
-    assert notice.rate_key == "utility_out_of_window"
+    assert notice.rate == "utility_out_of_window"
     assert notice.estimated_cost_inr == "12.98"  # 110 x 0.10 x 1.18
     assert lines[("utility", "optin_confirm")].estimated_cost_inr == "0.24"  # 4 x 0.05 x 1.18
     assert lines[("marketing", "fee_reminder")].estimated_cost_inr == "2.36"
     unpriced = lines[("authentication", "school_notice")]
-    assert (unpriced.rate_key, unpriced.estimated_cost_inr, unpriced.billable) == (None, "0.00", 7)
+    assert (unpriced.rate, unpriced.estimated_cost_inr, unpriced.billable) == (None, "0.00", 7)
     stopped = lines[("service", "optin_stopped")]
     assert (stopped.free, stopped.estimated_cost_inr) == (1, "0.00")
     # 1 stored service message + 4 automatic replies against a free tier of 2: 3 charged.
@@ -223,7 +223,7 @@ def test_FR_MSG_032_estimate_by_month_category_and_purpose() -> None:
     assert (oct_.sent, oct_.estimated_cost_inr) == (50, "5.90")
     assert (sep.sent, sep.lines, sep.estimated_cost_inr) == (0, [], "0.00")
     assert out.gst_percent == "18"
-    assert {r.key for r in out.rates} == set(RATE_KEYS)
+    assert {r.rate for r in out.rates} == set(RATE_KEYS)
     assert out.service_free_per_month == 2
     assert out.auto_reply_days == 90
 

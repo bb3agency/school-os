@@ -2354,6 +2354,12 @@ SPECS.update(
             {},
         ),
         ("PUT", "/api/v1/messaging/settings"): _msg_settings,
+        # FP-11 (FR-MSG-032): counts and rupees only; message.read school-wide.
+        ("GET", "/api/v1/messaging/spend"): lambda w, r, a: (
+            "/api/v1/messaging/spend",
+            None,
+            {},
+        ),
         ("GET", "/api/v1/guardians/{guardian_id}/optins"): lambda w, r, a: (
             f"/api/v1/guardians/{_msg_guardian(w)}/optins",
             None,
@@ -2810,6 +2816,9 @@ def test_SEC_003_role_route_matrix(
         expected = 403  # R3-1B: recording a withdrawal also needs consent.record (FR-DPDP-026)
     if key in REMINDER_ROUTES and granted and "finance.read" not in held:
         expected = 403  # R2-3J: the fees service checks finance.read (FR-MSG-025)
+    grant = system_roles()[role].grant(guard.sos_permission)
+    if getattr(guard, "sos_scope", None) == "school" and grant is not None and grant.scoped:
+        expected = 403  # scope="school": a section-scoped grant is refused (07 §6.2 "S")
     if (
         key == ("POST", "/api/v1/tasks/{task_id}/portal-event")
         and granted

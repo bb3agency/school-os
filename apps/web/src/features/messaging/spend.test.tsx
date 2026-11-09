@@ -76,7 +76,7 @@ const SPEND: Spend = {
       lines: [
         {
           pricing_category: "utility",
-          rate_key: "utility_out_of_window",
+          rate: "utility_out_of_window",
           purpose: "school_notice",
           sent: 1200,
           billable: 1170,
@@ -86,7 +86,7 @@ const SPEND: Spend = {
         },
         {
           pricing_category: "utility",
-          rate_key: "utility_in_window",
+          rate: "utility_in_window",
           purpose: "optin_confirm",
           sent: 30,
           billable: 30,
@@ -96,7 +96,7 @@ const SPEND: Spend = {
         },
         {
           pricing_category: "service",
-          rate_key: "service_above_free_tier",
+          rate: "service_above_free_tier",
           purpose: "auto_reply",
           sent: 10,
           billable: 0,
@@ -117,8 +117,8 @@ const SPEND: Spend = {
   ],
   gst_percent: "18",
   rates: [
-    { key: "utility_out_of_window", inr: "0.115", verified: false, used: true },
-    { key: "marketing", inr: "0.8631", verified: false, used: false },
+    { rate: "utility_out_of_window", inr: "0.115", verified: false, used: true },
+    { rate: "marketing", inr: "0.8631", verified: false, used: false },
   ],
   rates_checked_on: "2026-11-09",
   next_rate_change: "2027-01-01",

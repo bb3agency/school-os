@@ -24,7 +24,7 @@ import { KEYS, type Account } from "./data";
 
 const line = z.object({
   pricing_category: z.string(),
-  rate_key: z.string().nullable(),
+  rate: z.string().nullable(),
   purpose: z.string(),
   sent: z.number(),
   billable: z.number(),
@@ -50,7 +50,7 @@ export const spendSchema = z.object({
   ),
   gst_percent: z.string(),
   rates: z.array(
-    z.object({ key: z.string(), inr: z.string(), verified: z.boolean(), used: z.boolean() }),
+    z.object({ rate: z.string(), inr: z.string(), verified: z.boolean(), used: z.boolean() }),
   ),
   rates_checked_on: z.string(),
   next_rate_change: z.string(),
@@ -181,7 +181,7 @@ function Breakdown({ month, locale }: { month: Spend["months"][number]; locale: 
                 {CATEGORIES.has(item.pricing_category)
                   ? t(`categories.${item.pricing_category}` as "categories.utility")
                   : item.pricing_category}
-                {item.rate_key === "utility_in_window" ? ` (${t("inWindow")})` : ""}
+                {item.rate === "utility_in_window" ? ` (${t("inWindow")})` : ""}
               </Td>
               <Td numeric>{formatCount(item.sent, locale)}</Td>
               <Td numeric>{formatCount(item.billable, locale)}</Td>

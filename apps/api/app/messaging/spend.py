@@ -141,7 +141,7 @@ def _month(
         out_lines.append(
             SpendLineOut(
                 pricing_category=category,
-                rate_key=line.rate_key,
+                rate=line.rate_key,
                 purpose=purpose,
                 sent=line.sent,
                 billable=line.billable,
@@ -179,7 +179,7 @@ def summarise(
         months=[_month(s, by_month[s], auto_replies.get(s, 0), cfg) for s in starts],
         gst_percent=str(cfg.gst_percent),
         rates=[
-            SpendRateOut(key=key, inr=str(rate.inr), verified=rate.verified, used=rate.used)
+            SpendRateOut(rate=key, inr=str(rate.inr), verified=rate.verified, used=rate.used)
             for key, rate in cfg.rates.items()
         ],
         rates_checked_on=cfg.rates_checked_on,

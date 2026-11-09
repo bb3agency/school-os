@@ -330,7 +330,7 @@ class SpendLineOut(_Out):
         description="Meta's pricing category (utility, service, marketing, authentication, ...); "
         "for a message Meta has not priced yet, utility for a template and service for a text."
     )
-    rate_key: str | None = Field(
+    rate: str | None = Field(
         description="The configured rate used (utility_out_of_window, utility_in_window, "
         "service_above_free_tier, marketing); null when SchoolOS has no rate for the category."
     )
@@ -355,7 +355,7 @@ class SpendMonthOut(_Out):
 
 
 class SpendRateOut(_Out):
-    key: str
+    rate: str = Field(description="utility_out_of_window, utility_in_window, ...")
     inr: str = Field(description="Rupees per charged message before GST.")
     verified: bool = Field(description="Checked against Meta's INR rate card.")
     used: bool = Field(description="False for a category SchoolOS never sends (marketing).")

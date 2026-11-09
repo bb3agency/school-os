@@ -103,13 +103,13 @@ def test_FR_MSG_032_school_wide_readers_see_the_monthly_estimate(
         3,
         1,
     )
-    assert notices["rate_key"] == "utility_out_of_window"
+    assert notices["rate"] == "utility_out_of_window"
     confirms = lines[("utility", "optin_confirm")]
-    assert (confirms["billable"], confirms["rate_key"]) == (3, "utility_in_window")
+    assert (confirms["billable"], confirms["rate"]) == (3, "utility_in_window")
     stopped = lines[("service", "optin_stopped")]
     assert (stopped["free"], stopped["estimated_cost_inr"]) == (1, "0.00")
     assert month["sent"] == 14
-    rates = {r["key"]: r for r in body["rates"]}
+    rates = {r["rate"]: r for r in body["rates"]}
     gst = 1 + float(body["gst_percent"]) / 100
     expected = round(7 * float(rates["utility_out_of_window"]["inr"]) * gst, 2) + round(
         3 * float(rates["utility_in_window"]["inr"]) * gst, 2
