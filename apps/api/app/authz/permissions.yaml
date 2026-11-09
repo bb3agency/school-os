@@ -230,6 +230,10 @@ permissions:
     description: Add exams to the academic year
     sensitivity: normal
     step_up: false
+  exam.unlock:
+    description: Unlock a locked exam so its marks can be corrected (with a reason)
+    sensitivity: critical
+    step_up: true
   marks.record:
     description: "Enter and import marks (class teachers: their sections)"
     sensitivity: sensitive

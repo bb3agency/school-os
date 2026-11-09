@@ -514,6 +514,9 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks"): "an upsert keyed by student",
     ("POST", "/api/v1/sections/{section_id}/attendance/sheet"): "a preview; stores nothing",
     ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/sheet"): "a preview",
+    # FT-01 (D84): a repeat answers 409 exam_already_locked / exam_not_locked.
+    ("POST", "/api/v1/exams/{exam_id}/lock"): "a state transition (409 when locked)",
+    ("POST", "/api/v1/exams/{exam_id}/unlock"): "a state transition (409 when not locked)",
     ("POST", "/api/v1/academic-years/{year_id}/promotions:preview"): "a preview",
     ("POST", "/api/v1/academic-years/{year_id}/promotions:undo"): "a state transition",
     ("POST", "/api/v1/platform/invoice-runs"): "idempotent per month (one run per month)",

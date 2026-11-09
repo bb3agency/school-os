@@ -2002,6 +2002,22 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
     ),
     ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/sheet"): _m5_sheet("marks"),
+    # FT-01 (D84): a fresh exam per call (a second lock of one exam is 409).
+    ("POST", "/api/v1/exams/{exam_id}/lock"): lambda w, r, a: (
+        f"/api/v1/exams/{IN.world_fresh_exam(w)}/lock",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/exams/{exam_id}/unlock"): lambda w, r, a: (
+        f"/api/v1/exams/{IN.world_fresh_exam(w, locked=True)}/unlock",
+        {"reason": "Synthetic correction after lock"},
+        {},
+    ),
+    ("GET", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/history"): lambda w, r, a: (
+        _m5_marks(w, "/history"),
+        None,
+        {},
+    ),
     ("GET", "/api/v1/insights/flags"): lambda w, r, a: ("/api/v1/insights/flags", None, {}),
     ("GET", "/api/v1/insights/summary"): lambda w, r, a: ("/api/v1/insights/summary", None, {}),
     ("GET", "/api/v1/insights/flags/{flag_id}"): lambda w, r, a: (

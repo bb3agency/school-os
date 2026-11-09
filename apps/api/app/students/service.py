@@ -904,8 +904,14 @@ def create_student(
     data: StudentCreate,
     *,
     import_batch_id: uuid.UUID | None = None,
+    onboarding: bool = False,
 ) -> StudentOut:
     """Create a student with its first values (docs/09; permission ``student.create``).
+
+    The enrolment (optional ``section_id``) starts on the admission date when one is given and
+    falls inside the section's academic year (an explicit start, FR-ATT-011); otherwise on the
+    year start for an import (``import_batch_id``) or ``onboarding`` (register extraction), and
+    today for a single student added by hand (implicit starts; FT-09).
 
     Every value names its source. ``import_batch_id`` (imports only, never from the API) tags
     the values with their batch; the batch's own ``import.committed`` event then covers them
@@ -963,8 +969,20 @@ def create_student(
         )
     enrollment_id = None
     if section is not None:
+        admitted = _admission_date(cleaned)
+        start, explicit = initial_start(
+            tenancy.get_academic_year(session, section.academic_year_id),
+            admitted,
+            onboarding=onboarding or import_batch_id is not None,
+        )
         enrollment_id = _enrol(
-            session, ctx, student, section, roll_no=data.roll_no, started_on=None
+            session,
+            ctx,
+            student,
+            section,
+            roll_no=data.roll_no,
+            started_on=start,
+            explicit=explicit,
         ).id
     student = _refresh_projection(session, student, defs)
     changed = {d.key for d, *_ in cleaned}
@@ -1312,6 +1330,36 @@ def update_student_status(
 
 # --- enrolments ------------------------------------------------------------------------------
 
+ADMISSION_DATE_KEY: Final = "admission_date"
+ADMISSION_ANCHOR: Final = "admission_register"
+
+
+def _admission_date(cleaned: Sequence[tuple[AttributeDef, str, CleanValue, Any]]) -> dt.date | None:
+    """The admission date among a new student's values (the admission register first)."""
+    found = [
+        (source == ADMISSION_ANCHOR, clean.date)
+        for definition, source, clean, _ in cleaned
+        if definition.key == ADMISSION_DATE_KEY and clean.date is not None
+    ]
+    if not found:
+        return None
+    return max(found, key=lambda item: item[0])[1]
+
+
+def initial_start(
+    year: Any, admitted: dt.date | None, *, onboarding: bool
+) -> tuple[dt.date | None, bool]:
+    """FT-09 (FR-ATT-010, FR-ATT-011): the start date of a new student's first enrolment and
+    whether it is explicit. The admission date when it falls inside the academic year (explicit);
+    else the year start (implicit) for onboarding paths (imports, register extraction) or when an
+    admission date before the year was given; else ``None`` (the caller's default, today,
+    implicit). ``year`` needs ``starts_on`` and ``ends_on``."""
+    if admitted is not None and year.starts_on <= admitted <= year.ends_on:
+        return admitted, True
+    if onboarding or admitted is not None:
+        return year.starts_on, False
+    return None, False
+
 
 def _enrol(
     session: Session,
@@ -1321,6 +1369,7 @@ def _enrol(
     *,
     roll_no: str | None,
     started_on: dt.date | None,
+    explicit: bool,
 ) -> EnrollmentOut:
     # Every enrolment path (API, imports, register extraction) ends here: a roll number is never
     # a full Aadhaar number (invariant 4; audit 2026-10-04, DL-03).
@@ -1329,6 +1378,8 @@ def _enrol(
     if existing is not None and existing.section_id == section.id:
         raise Conflict("The student is already in this section.", code="already_enrolled")
     start = started_on or _today()
+    # A move between sections keeps its real date (FR-ATT-011): the new enrolment starts on it.
+    explicit = explicit or existing is not None
     with _db_errors():
         if existing is not None:
             repo.end_enrollment(session, existing.id, status="transferred", ended_on=start)
@@ -1342,6 +1393,7 @@ def _enrol(
             roll_no=roll_no,
             status="active",
             started_on=start,
+            started_on_explicit=explicit,
             created_by=ctx.user_id,
         )
     if existing is not None:
@@ -1388,7 +1440,15 @@ def enrol(
     allowed = _allowed_sections(ctx, UPDATE, structure)
     if allowed is not None and section.id not in allowed:
         raise ValidationFailed([error("section_id", "not_found")])
-    out = _enrol(session, ctx, student, section, roll_no=data.roll_no, started_on=data.started_on)
+    out = _enrol(
+        session,
+        ctx,
+        student,
+        section,
+        roll_no=data.roll_no,
+        started_on=data.started_on,
+        explicit=data.started_on is not None,
+    )
     _touch(session, student, _definitions(session))
     _values_changed(session, student_id, [ENROLLMENT_KEY])
     return out
@@ -1919,6 +1979,7 @@ class ActiveEnrolment:
     academic_year_id: uuid.UUID
     roll_no: str | None = None  # exports: class lists and "ready to enter" sheets
     started_on: dt.date | None = None  # fees: instalments due before admission (FR-FEE-005)
+    started_on_explicit: bool = False  # attendance before an explicit start (FR-ATT-012)
 
 
 def active_enrolments(
@@ -1936,6 +1997,8 @@ def active_enrolments(
                 section_id=row.section_id,
                 academic_year_id=row.academic_year_id,
                 roll_no=row.roll_no,
+                started_on=row.started_on,
+                started_on_explicit=row.started_on_explicit,
             )
         )
     return out

@@ -144,6 +144,29 @@ class ExamOut(_Out):
     name: str
     held_on: dt.date
     version: int
+    locked: bool = Field(
+        default=False,
+        description="Locked exams refuse marks writes and sheet imports (409 ``exam_locked``) "
+        "until the principal unlocks them (FR-MRK-008).",
+    )
+    locked_at: dt.datetime | None = None
+    unlocked_at: dt.datetime | None = Field(
+        default=None, description="When the exam was last unlocked (None: never)"
+    )
+    unlock_reason: str | None = Field(
+        default=None, description="The principal's reason for the last unlock"
+    )
+
+
+class ExamUnlockIn(_In):
+    """Unlocking a locked exam (``exam.unlock``, principal, step-up; FR-MRK-010)."""
+
+    reason: Text = Field(
+        min_length=1,
+        max_length=500,
+        description="Why the marks must change (kept on the exam and on every change made "
+        "while it stays unlocked). No Aadhaar numbers.",
+    )
 
 
 class ExamCreate(_In):
@@ -170,6 +193,12 @@ class MarkIn(_In):
 class MarksWrite(_In):
     entries: list[MarkIn] = Field(min_length=1, max_length=2500)
     source: RecordSource = "mark"
+    reason: Text | None = Field(
+        default=None,
+        max_length=500,
+        description="Why marks are corrected (optional; kept in the marks history). After an "
+        "unlock, the unlock reason is kept when this is left out. No Aadhaar numbers.",
+    )
 
 
 class MarkOut(_Out):
@@ -181,6 +210,10 @@ class MarkOut(_Out):
         default=1,
         description="The mark's version. Send it back as ``expected_version`` so a save does "
         "not overwrite someone else's change.",
+    )
+    changed_after_lock: bool = Field(
+        default=False,
+        description="The mark was changed after the exam was first locked (FR-MRK-014)",
     )
 
 
@@ -197,6 +230,30 @@ class MarksGridOut(_Out):
     exam: ExamOut
     subjects: list[str]
     students: list[MarksStudentOut]
+
+
+class MarkChangeOut(_Out):
+    """One change of a stored mark (append-only history; FR-MRK-012)."""
+
+    student: RosterStudentOut
+    subject: str
+    previous_max_marks: Decimal
+    previous_marks: Decimal | None
+    previous_absent: bool
+    new_max_marks: Decimal
+    new_marks: Decimal | None
+    new_absent: bool
+    source: RecordSource
+    after_lock: bool = Field(description="Changed after the exam was first locked")
+    reason: str | None
+    changed_by_name: str | None = Field(description="Who changed it (None: no longer a member)")
+    changed_at: dt.datetime
+
+
+class MarksHistoryOut(_Out):
+    section: RecordSectionOut
+    exam: ExamOut
+    changes: list[MarkChangeOut] = Field(description="Newest first")
 
 
 class MarksSheetOut(_Out):
@@ -218,9 +275,12 @@ __all__ = [
     "AttendanceWrite",
     "ExamCreate",
     "ExamOut",
+    "ExamUnlockIn",
+    "MarkChangeOut",
     "MarkIn",
     "MarkOut",
     "MarksGridOut",
+    "MarksHistoryOut",
     "MarksSheetOut",
     "MarksStudentOut",
     "MarksWrite",

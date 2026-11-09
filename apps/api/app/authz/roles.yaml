@@ -125,6 +125,7 @@ roles:
       attendance.record: school
       attendance.read: school
       exam.manage: school
+      exam.unlock: school_step_up  # FT-01 (D84): only the principal unlocks a locked exam
       marks.record: school
       marks.read: school
       breakglass.approve: school_step_up

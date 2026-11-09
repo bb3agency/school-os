@@ -1,4 +1,5 @@
-"""Attendance, exams and marks tables (migration 0035_student_insights; docs/05 §6.4).
+"""Attendance, exams and marks tables (migrations 0035_student_insights, 0083_exam_lock_enrol;
+docs/05 §6.4).
 
 Typed mappings for queries only; DDL (RLS, CHECKs, composite FKs, column grants, the offboarding
 purge policy) lives in the migration.
@@ -42,6 +43,12 @@ class Exam(Base):
     academic_year_id: Mapped[uuid.UUID]
     name: Mapped[str] = mapped_column(Text)
     held_on: Mapped[dt.date] = mapped_column(Date)
+    # FT-01 (0083): locked exams refuse marks writes; the last unlock and its reason.
+    locked_at: Mapped[dt.datetime | None]
+    locked_by: Mapped[uuid.UUID | None]
+    unlocked_at: Mapped[dt.datetime | None]
+    unlocked_by: Mapped[uuid.UUID | None]
+    unlock_reason: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[uuid.UUID]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
@@ -68,4 +75,30 @@ class ExamMark(Base):
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
 
 
-__all__ = ["AttendanceMark", "Exam", "ExamMark"]
+class ExamMarkHistory(Base):
+    """One change of a stored mark (append-only; FT-01, FR-MRK-012)."""
+
+    __tablename__ = "exam_mark_history"
+    __table_args__ = {"schema": "sis"}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    exam_id: Mapped[uuid.UUID]
+    mark_id: Mapped[uuid.UUID]
+    student_id: Mapped[uuid.UUID]
+    section_id: Mapped[uuid.UUID]
+    subject: Mapped[str] = mapped_column(Text)
+    previous_max_marks: Mapped[Decimal] = mapped_column(Numeric(6, 2))
+    previous_marks: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))
+    previous_absent: Mapped[bool] = mapped_column(Boolean)
+    new_max_marks: Mapped[Decimal] = mapped_column(Numeric(6, 2))
+    new_marks: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))
+    new_absent: Mapped[bool] = mapped_column(Boolean)
+    source: Mapped[str] = mapped_column(Text)
+    after_lock: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    reason: Mapped[str | None] = mapped_column(Text)
+    changed_by: Mapped[uuid.UUID]
+    changed_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+
+
+__all__ = ["AttendanceMark", "Exam", "ExamMark", "ExamMarkHistory"]

@@ -303,9 +303,11 @@ def read_attendance(
     last: dt.date,
     today: dt.date,
     cfg: AcademicsConfig | None = None,
+    starts: Mapping[uuid.UUID, dt.date] | None = None,
 ) -> AttendanceSheet:
     """Parse an attendance sheet for dates ``first..last`` (the section's academic year), none
-    after ``today`` (IST)."""
+    after ``today`` (IST). ``starts``: explicit enrolment starts; a cell dated before a
+    student's start is an issue ``before_enrolment`` and is left out (FR-ATT-013)."""
     cfg = cfg or load_config()
     data = _materialise(rows, cfg)
     _refuse_aadhaar(data)
@@ -331,7 +333,11 @@ def read_attendance(
                     row[0], column, "bad_code" if len(text) <= max_chars else "cell_too_long"
                 )
             elif student_id is not None:
-                entries.append(AttendanceEntry(student_id, day, status))
+                start = (starts or {}).get(student_id)
+                if start is not None and day < start:
+                    issues.add(row[0], column, "before_enrolment")
+                else:
+                    entries.append(AttendanceEntry(student_id, day, status))
     return AttendanceSheet(
         entries=tuple(entries),
         issues=tuple(issues.items),

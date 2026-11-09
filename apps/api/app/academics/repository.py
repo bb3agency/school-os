@@ -11,12 +11,12 @@ import uuid
 from collections.abc import Collection, Mapping, Sequence
 from typing import Any
 
-from sqlalchemy import func, literal_column, or_, select, text
+from sqlalchemy import func, insert, literal_column, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.academics.models import AttendanceMark, Exam, ExamMark
+from app.academics.models import AttendanceMark, Exam, ExamMark, ExamMarkHistory
 from app.core.record_tables import dump_table
 from app.core.records import RecordTable
 
@@ -205,6 +205,27 @@ def get_exam(session: Session, exam_id: uuid.UUID) -> Exam | None:
     return session.get(Exam, exam_id)
 
 
+def exam_for_update(session: Session, exam_id: uuid.UUID) -> Exam | None:
+    """The exam, row-locked until the transaction ends and re-read (a lock or unlock that
+    committed in between is seen; FT-01)."""
+    return session.scalars(
+        select(Exam).where(Exam.id == exam_id).with_for_update(),
+        execution_options={"populate_existing": True},
+    ).one_or_none()
+
+
+def update_exam_lock(session: Session, exam_id: uuid.UUID, values: Mapping[str, Any]) -> Exam:
+    """Set the lock columns of an exam (``locked_*``/``unlocked_*``/``unlock_reason``) and bump
+    its version."""
+    return session.scalars(
+        update(Exam)
+        .where(Exam.id == exam_id)
+        .values(**values, version=Exam.version + 1)
+        .returning(Exam),
+        execution_options={"populate_existing": True, "synchronize_session": False},
+    ).one()
+
+
 def list_exams(session: Session, academic_year_id: uuid.UUID | None) -> list[Exam]:
     stmt = select(Exam)
     if academic_year_id is not None:
@@ -254,6 +275,52 @@ def exam_marks(
             select(ExamMark)
             .where(ExamMark.exam_id == exam_id, ExamMark.student_id.in_(list(student_ids)))
             .order_by(ExamMark.student_id, ExamMark.subject)
+        )
+    )
+
+
+def insert_mark_history(session: Session, rows: Sequence[Mapping[str, Any]]) -> None:
+    """Append history rows (one per changed mark; FT-01). Never updated or deleted by the app."""
+    if not rows:
+        return
+    tenant_id = current_tenant_id(session)
+    session.execute(insert(ExamMarkHistory).values([{"tenant_id": tenant_id, **r} for r in rows]))
+
+
+def mark_history(
+    session: Session, exam_id: uuid.UUID, student_ids: Collection[uuid.UUID], *, limit: int
+) -> list[ExamMarkHistory]:
+    """The latest ``limit`` changes of an exam's marks for ``student_ids``, newest first."""
+    if not student_ids:
+        return []
+    return list(
+        session.scalars(
+            select(ExamMarkHistory)
+            .where(
+                ExamMarkHistory.exam_id == exam_id,
+                ExamMarkHistory.student_id.in_(list(student_ids)),
+            )
+            .order_by(ExamMarkHistory.changed_at.desc(), ExamMarkHistory.id.desc())
+            .limit(limit)
+        )
+    )
+
+
+def marks_changed_after_lock(
+    session: Session, exam_id: uuid.UUID, student_ids: Collection[uuid.UUID]
+) -> set[uuid.UUID]:
+    """Ids of the marks of ``student_ids`` changed after the exam was first locked."""
+    if not student_ids:
+        return set()
+    return set(
+        session.scalars(
+            select(ExamMarkHistory.mark_id)
+            .where(
+                ExamMarkHistory.exam_id == exam_id,
+                ExamMarkHistory.student_id.in_(list(student_ids)),
+                ExamMarkHistory.after_lock.is_(True),
+            )
+            .distinct()
         )
     )
 
@@ -348,6 +415,12 @@ def export_tables(session: Session) -> list[RecordTable]:
             name="exam_marks",
             order_by=("exam_id", "student_id", "subject"),
         ),
+        dump_table(
+            session,
+            ExamMarkHistory.__table__,
+            name="exam_mark_history",
+            order_by=("exam_id", "changed_at", "id"),
+        ),
     ]
 
 
@@ -355,19 +428,24 @@ __all__ = [
     "attendance_by_month",
     "attendance_versions",
     "current_tenant_id",
+    "exam_for_update",
     "exam_marks",
     "exam_name_taken",
     "exam_subjects",
     "export_tables",
     "get_exam",
     "insert_exam",
+    "insert_mark_history",
     "list_exams",
     "lock_attendance_days",
     "lock_exam_marks",
+    "mark_history",
+    "marks_changed_after_lock",
     "marks_of_student",
     "results_of",
     "section_marks",
     "student_marks",
+    "update_exam_lock",
     "upsert_attendance",
     "upsert_marks",
 ]

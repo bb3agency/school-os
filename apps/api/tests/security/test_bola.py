@@ -215,6 +215,8 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/sheet"): {
         "document_id": "01920000-0000-7000-8000-000000000001"
     },
+    ("POST", "/api/v1/exams/{exam_id}/lock"): None,
+    ("POST", "/api/v1/exams/{exam_id}/unlock"): {"reason": "Synthetic correction"},
     ("POST", "/api/v1/students/{student_id}/flags"): {"indicator": "attendance"},
     ("POST", "/api/v1/insights/flags/{flag_id}/actions"): {"kind": "other"},
     ("POST", "/api/v1/insights/flags/{flag_id}/close"): {"reason": "improved"},
@@ -325,6 +327,10 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("GET", "/api/v1/sections/{section_id}/exams/{exam_id}/marks"),
         ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks"),
         ("POST", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/sheet"),
+        # FT-01 (D84): exam lock and unlock, the marks history.
+        ("POST", "/api/v1/exams/{exam_id}/lock"),
+        ("POST", "/api/v1/exams/{exam_id}/unlock"),
+        ("GET", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/history"),
         ("GET", "/api/v1/insights/flags/{flag_id}"),
         ("POST", "/api/v1/students/{student_id}/flags"),
         ("POST", "/api/v1/insights/flags/{flag_id}/actions"),

@@ -22,7 +22,9 @@ from app.academics.schemas import (
     AttendanceWrite,
     ExamCreate,
     ExamOut,
+    ExamUnlockIn,
     MarksGridOut,
+    MarksHistoryOut,
     MarksSheetOut,
     MarksWrite,
     Month,
@@ -42,6 +44,9 @@ ExamReader = Annotated[
     Depends(require_any(service.MARKS_READ, service.MARKS_RECORD, service.EXAM_MANAGE)),
 ]
 ExamManager = Annotated[UserContext, Depends(require(service.EXAM_MANAGE, scope="school"))]
+ExamUnlocker = Annotated[
+    UserContext, Depends(require(service.EXAM_UNLOCK, scope="school", step_up=True))
+]
 MarksReader = Annotated[UserContext, Depends(require(service.MARKS_READ))]
 MarksRecorder = Annotated[UserContext, Depends(require(service.MARKS_RECORD))]
 
@@ -79,8 +84,9 @@ def record_attendance(
     ctx: AttendanceRecorder, db: TenantDB, section_id: uuid.UUID, body: AttendanceWrite
 ) -> WriteResultOut:
     """Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a
-    day again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range`` or
-    ``duplicate_entry`` per entry. An entry may carry ``expected_version`` (the ``version`` read
+    day again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range``,
+    ``before_enrolment`` (before the student's explicit enrolment start) or ``duplicate_entry``
+    per entry. An entry may carry ``expected_version`` (the ``version`` read
     from the day): 412 ``attendance_changed`` when someone else changed that mark since, and
     nothing is saved. The early-warning rules look at these students again."""
     return service.record_attendance(db, ctx, section_id, body)
@@ -92,7 +98,8 @@ def preview_attendance_sheet(
 ) -> AttendanceSheetOut:
     """Read an uploaded attendance sheet (``attendance.record``): first column admission or
     roll number, then one date per column, cells P/A/L/LV. Returns the entries and every
-    problem; stores no attendance. The uploaded file is deleted once read. 422
+    problem (``before_enrolment`` for a date before the student's explicit start); stores no
+    attendance. The uploaded file is deleted once read. 422
     ``aadhaar_full_number_rejected``, ``student_column_missing``, ``too_many_dates``...; 409
     ``document_not_ready`` while the virus check runs."""
     return service.preview_attendance_sheet(ctx, section_id, body)
@@ -126,6 +133,22 @@ def create_exam(ctx: ExamManager, db: TenantDB, body: ExamCreate, idem: Idempote
     )
 
 
+@router.post("/exams/{exam_id}/lock", response_model=ExamOut)
+def lock_exam(ctx: ExamManager, db: TenantDB, exam_id: uuid.UUID) -> ExamOut:
+    """Lock an exam's marks (``exam.manage``; FR-MRK-008): marks writes and marks-sheet
+    previews then answer 409 ``exam_locked``. 409 ``exam_already_locked``; 404 for an exam of
+    another school. Audited ``exam.locked``."""
+    return service.lock_exam(db, ctx, exam_id)
+
+
+@router.post("/exams/{exam_id}/unlock", response_model=ExamOut)
+def unlock_exam(ctx: ExamUnlocker, db: TenantDB, exam_id: uuid.UUID, body: ExamUnlockIn) -> ExamOut:
+    """Unlock a locked exam so its marks can be corrected (``exam.unlock``: the principal only,
+    step-up MFA, 428 without it; FR-MRK-010) with a mandatory reason. 409 ``exam_not_locked``.
+    Audited ``exam.unlocked``; every later change is kept in the marks history."""
+    return service.unlock_exam(db, ctx, exam_id, body)
+
+
 # --- marks ----------------------------------------------------------------------------------------
 
 
@@ -136,6 +159,16 @@ def section_marks(
     """The section's marks for one exam with each student's overall percentage
     (``marks.read``)."""
     return service.section_marks(db, ctx, section_id, exam_id)
+
+
+@router.get("/sections/{section_id}/exams/{exam_id}/marks/history", response_model=MarksHistoryOut)
+def marks_history(
+    ctx: MarksReader, db: TenantDB, section_id: uuid.UUID, exam_id: uuid.UUID
+) -> MarksHistoryOut:
+    """Every change of the section's marks for one exam, newest first (``marks.read``;
+    FR-MRK-013): previous and new value, who, when, the reason and whether it was after the
+    exam was first locked."""
+    return service.marks_history(db, ctx, section_id, exam_id)
 
 
 @router.post("/sections/{section_id}/exams/{exam_id}/marks", response_model=WriteResultOut)
@@ -149,7 +182,9 @@ def record_marks(
     """Save marks per student and subject with the maximum marks, or absent, all or nothing
     (``marks.record``). 422 ``not_in_section``, ``marks_over_max``, ``absent_has_no_marks``,
     ``exam_other_year``...; an entry may carry ``expected_version`` (the mark's ``version``):
-    412 ``marks_changed`` when someone else changed that mark since, and nothing is saved."""
+    412 ``marks_changed`` when someone else changed that mark since, and nothing is saved. 409
+    ``exam_locked`` when the exam is locked (FR-MRK-009). Changes of stored marks are kept in
+    the marks history with the optional ``reason`` (FR-MRK-012)."""
     return service.record_marks(db, ctx, section_id, exam_id, body)
 
 
@@ -159,5 +194,6 @@ def preview_marks_sheet(
 ) -> MarksSheetOut:
     """Read an uploaded marks sheet (``marks.record``): row 1 admission or roll number and
     subjects, row 2 maximum marks, then one row per student (``AB`` = absent). Returns entries
-    and problems; stores no marks; the file is deleted once read."""
+    and problems; stores no marks; the file is deleted once read. 409 ``exam_locked`` for a
+    locked exam."""
     return service.preview_marks_sheet(ctx, section_id, exam_id, body)

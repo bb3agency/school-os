@@ -216,7 +216,8 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | insights.manage (M5: reassign flags, set thresholds within bounds, erase notes or flags) | — | ✓ᴿ | — | — | — | — | — | — | — |
 | attendance.record (M5: mark and import attendance) | — | ✓ | ✓ | — | — | — | S | — | — |
 | attendance.read (M5: attendance registers) | — | ✓ | ✓ | — | — | — | S | — | — |
-| exam.manage (M5: add exams to the year) | — | ✓ | — | — | — | ✓ | — | — | — |
+| exam.manage (M5: add exams to the year; FT-01: lock an exam's marks) | — | ✓ | — | — | — | ✓ | — | — | — |
+| exam.unlock (FT-01: unlock a locked exam with a reason so its marks can be corrected) | — | ✓ᴿ | — | — | — | — | — | — | — |
 | marks.record (M5: enter and import marks) | — | ✓ | — | — | — | ✓ | S | — | — |
 | marks.read (M5: see marks) | — | ✓ | — | — | — | ✓ | S | — | — |
 | tally.device.manage (M6: enrol the Tally edge agent with a one-time code, revoke it; ADR-0032 Proposed, behind a flag) | ✓ᴿ | — | — | — | — | — | — | — | — |

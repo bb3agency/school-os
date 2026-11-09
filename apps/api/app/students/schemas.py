@@ -215,6 +215,11 @@ class EnrollmentOut(_Out):
     roll_no: str | None
     status: str
     started_on: dt.date | None
+    started_on_explicit: bool = Field(
+        default=False,
+        description="The start date is a real date (given, the admission date inside the year, "
+        "or a move): attendance before it is refused (FR-ATT-012).",
+    )
     ended_on: dt.date | None
     version: int
 
