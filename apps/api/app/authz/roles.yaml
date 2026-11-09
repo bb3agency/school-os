@@ -156,6 +156,8 @@ roles:
       fee.report: school_step_up
       # R2-2E UPI and bank statements (ADR-0042 decision 9)
       fee.reconcile: school
+      # FM-02 add-on fees (FR-FEE-095)
+      fee.addon.read: school
       # R3-1B consents and breaches (ADR-0049, ADR-0050; docs/07 §6.2)
       consent.read: school
       consent.record: school
@@ -223,6 +225,8 @@ roles:
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.collect: school
       fee.concession.request: school
+      # FM-02 add-on fees (FR-FEE-095)
+      fee.addon.read: school
       # R3-1B consents (ADR-0049; docs/07 §6.2)
       consent.read: school
       consent.record: school
@@ -293,6 +297,8 @@ roles:
       fee.report: school_step_up
       # R2-2E UPI and bank statements (ADR-0042 decision 9)
       fee.reconcile: school
+      # FM-02 add-on fees (FR-FEE-095)
+      fee.addon.read: school
 
   exam_coordinator:
     name_en: Exam coordinator

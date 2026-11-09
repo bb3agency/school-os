@@ -148,6 +148,8 @@ class LedgerEntry(Base):
     adjustment_id: Mapped[uuid.UUID | None]
     refund_id: Mapped[uuid.UUID | None]
     late_fee_key: Mapped[str | None] = mapped_column(Text)
+    # FM-02 (0088_fee_addons): an add-on charge's source (FR-FEE-087).
+    addon_assignment_id: Mapped[uuid.UUID | None]
     posted_by: Mapped[uuid.UUID | None]
     posted_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
 
@@ -190,6 +192,8 @@ class Adjustment(Base):
     reason_code: Mapped[str] = mapped_column(Text)
     reason: Mapped[str] = mapped_column(Text)
     source_plan_id: Mapped[uuid.UUID | None]
+    # FM-02 (0088_fee_addons): the assignment an ``addon_removal`` credit ends (FR-FEE-090).
+    addon_assignment_id: Mapped[uuid.UUID | None]
     status: Mapped[str] = mapped_column(Text, server_default=sql_text("'pending'"))
     requested_by: Mapped[uuid.UUID]
     requested_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())

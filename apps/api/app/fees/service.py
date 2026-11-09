@@ -33,6 +33,7 @@ from app.core import purge as purging
 from app.core.records import RecordTable
 from app.fees import _common as c
 from app.fees import (
+    addons,
     approvals,
     arrears,
     ask,
@@ -48,6 +49,7 @@ from app.fees import (
     tax_certificates,
     upi,
 )
+from app.fees import addons_repository as addon_repo
 from app.fees import late_fees as late
 from app.fees import online_repository as orepo
 from app.fees import repository as repo
@@ -496,6 +498,7 @@ def export_records(session: Session) -> list[RecordTable]:
         *orepo.export_tables(session),
         *upi_repo.export_tables(session),
         *trepo.export_tables(session),
+        *addon_repo.export_tables(session),
     ]
 
 
@@ -527,6 +530,9 @@ _PURGE = purging.PurgeTables(
         "fin.payment_connections",
         "fin.adjustments",
         "fin.concessions",
+        # FM-02 (0088_fee_addons): ledger entries and adjustments reference assignments
+        "fin.fee_addon_assignments",
+        "fin.fee_addons",
         "fin.student_fee_accounts",
         "fin.fee_plan_instalments",
         "fin.fee_plan_lines",
@@ -572,7 +578,19 @@ parent_tax_certificate = tax_certificates.parent_tax_certificate
 parent_tax_certificate_pdf = tax_certificates.parent_tax_certificate_pdf
 
 
+# --- FM-02 add-on fees (FR-FEE-081..100; app.fees.api_addons) -----------------------------------
+
+ADDON_READ = addons.ADDON_READ
+list_addons = addons.list_addons
+create_addon = addons.create_addon
+update_addon = addons.update_addon
+assign_addon = addons.assign
+unassign_addon = addons.unassign
+addon_students = addons.students_of
+
+
 __all__ = [
+    "ADDON_READ",
     "COLLECT",
     "CONCESSION_APPROVE",
     "CONCESSION_REQUEST",
@@ -607,8 +625,11 @@ __all__ = [
     "ReminderDue",
     "SelfApprovalForbidden",
     "account_summary",
+    "addon_students",
     "ask_school_fees",
     "ask_student_fees",
+    "assign_addon",
+    "create_addon",
     "create_payment_intent",
     "dues_for_student",
     "enabled",
@@ -620,6 +641,7 @@ __all__ = [
     "issue_tax_certificates_bulk",
     "left_with_dues",
     "left_with_dues_csv",
+    "list_addons",
     "list_tax_certificates",
     "mark_tax_certificate_pdf_failed",
     "parent_account_student",
@@ -646,5 +668,7 @@ __all__ = [
     "tax_certificate_download_url",
     "tax_certificate_print_page",
     "tenant_data_counts",
+    "unassign_addon",
+    "update_addon",
     "upi_payee",
 ]

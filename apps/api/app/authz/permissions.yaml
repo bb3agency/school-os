@@ -361,6 +361,12 @@ permissions:
     description: Import bank statements, confirm UPI receipts seen in the bank and work through reconciliation exceptions
     sensitivity: sensitive
     step_up: false
+  # --- FM-02 add-on fees (FR-FEE-095; D85). Migration 0088_fee_addons upserts it. School-wide
+  # only (FR-FEE-024); amounts stay hidden unless finance.read or fee.manage.
+  fee.addon.read:
+    description: See which students are on each add-on fee (transport band, hostel, activity), without amounts
+    sensitivity: sensitive
+    step_up: false
   # --- R2-2D online payments (ADR-0042 decisions 2, 6; docs/07 §6.2; FR-PAY-002..004,
   # FR-PAY-013, FR-PAY-014). Migration 0059_payments_online upserts it.
   payments.configure:

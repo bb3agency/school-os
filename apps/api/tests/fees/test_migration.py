@@ -210,7 +210,8 @@ def test_CLAUDE_6_12_fees_migration_reversible_with_data(populated: _Walk) -> No
 
     command.upgrade(populated.cfg, "head")
     assert _scalar(admin, "SELECT count(*) FROM fin.receipts") == 0
-    # The eight R2-1B keys plus fee.reconcile of 0060_fees_upi (head).
-    assert _scalar(admin, "SELECT count(*) FROM core.permissions WHERE key LIKE 'fee.%'") == 9
+    # The eight R2-1B keys plus fee.reconcile of 0060_fees_upi and fee.addon.read of
+    # 0088_fee_addons (head).
+    assert _scalar(admin, "SELECT count(*) FROM core.permissions WHERE key LIKE 'fee.%'") == 10
     command.downgrade(populated.cfg, before)
     command.upgrade(populated.cfg, "head")

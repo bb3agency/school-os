@@ -603,6 +603,9 @@ IDEMPOTENCY_EXEMPT = {
     "student and year, a repeat with the same receipts answers it unchanged (no new serial)",
     ("POST", "/api/v1/fees/tax-certificates/bulk"): "idempotent by design: as one certificate, a "
     "repeat issues nothing new",
+    # FM-02 add-on fees (FR-FEE-089, FR-FEE-090).
+    ("POST", "/api/v1/fees/addons/{addon_id}/unassign"): "idempotent by design: a repeat finds "
+    "no active assignment (not_assigned) and one credit stands per assignment and instalment",
 }
 
 
