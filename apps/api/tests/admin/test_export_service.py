@@ -195,6 +195,9 @@ EXPECTED_TABLES = {
     "tally_parties",
     "tally_party_links",
     "tally_bills",  # D63 (0077_tally_bills)
+    "tally_export_settings",  # FM-03 (0088_tally_vouchers)
+    "tally_voucher_exports",
+    "tally_exported_vouchers",
     # Ask memory (0038_ask_conversations, ADR-0034): each person's own items and switch.
     "ask_memories",
     "ask_memory_settings",

@@ -33,3 +33,26 @@ retention:
   sync_days: 400                # sync records (counts only) older than this are deleted
 mapping:
   max_candidates: 5             # students suggested for an unlinked ledger (a person links)
+# FM-03 voucher export file and ledger-vs-Tally check (FR-TALLY-011..030). SchoolOS never writes
+# to Tally: the accountant imports the file by hand (Gateway of Tally > Import > Vouchers). The
+# envelope, tags and voucher type names follow the classic Tally XML import format that TallyPrime
+# still accepts; not yet tried in a pilot school's test company, hence verified: false.
+vouchers:
+  verified: false
+  source: "Tally XML import envelope (ERP 9 / TallyPrime 'Import Data' > Vouchers); to be checked in a pilot accountant's test company"
+  tally_request: Import Data
+  report_name: Vouchers
+  voucher_types:              # the school may have renamed them in Tally
+    receipt: Receipt
+    payment: Payment          # cancellations and refunds: money back out of a cash or bank ledger
+    journal: Journal          # fee demand (charges, late fees, concessions, adjustments)
+  max_period_days: 366        # one export covers at most this many days
+  max_vouchers: 20000         # a larger period is refused; export it in parts
+  history_limit: 50           # exports listed on the screen
+  ledger_name_max_length: 100 # Tally allows longer names; school ledgers are far shorter
+  defaults:                   # lead decision D85 (PO to confirm): the research report's choice
+    party_mode: student       # one Tally party per student (its linked ledger), else receivable
+    include_demand: false     # the school raises fee demand in Tally itself; receipts only
+    receivable_ledger: Fee receivable
+    mode_ledgers:
+      cash: Cash

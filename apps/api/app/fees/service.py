@@ -44,6 +44,7 @@ from app.fees import (
     reports,
     setup,
     statements,
+    tally_feed,
     tax_certificates,
     upi,
 )
@@ -558,6 +559,17 @@ ParentTaxCertificate = tax_certificates.ParentTaxCertificate
 parent_tax_certificate = tax_certificates.parent_tax_certificate
 parent_tax_certificate_pdf = tax_certificates.parent_tax_certificate_pdf
 
+# --- FM-03 Tally voucher export and ledger-vs-Tally check (FR-TALLY-011..030; app.tally) --------
+
+TALLY_MODES = tally_feed.MODES
+TallyFeed = tally_feed.TallyFeed
+TallyFeedCash = tally_feed.FeedCash
+TallyFeedDemand = tally_feed.FeedDemand
+TallyFeedHead = tally_feed.FeedHead
+tally_feed_heads = tally_feed.heads
+tally_feed_for = tally_feed.tally_feed
+balances_as_of = tally_feed.balances_as_of
+
 
 __all__ = [
     "COLLECT",
@@ -573,6 +585,7 @@ __all__ = [
     "RENDER_EVENT",
     "RENDER_TASK",
     "REPORT",
+    "TALLY_MODES",
     "TAX_CERTIFICATE_PREPARING",
     "TAX_CERTIFICATE_RENDER_TASK",
     "AskClassFees",
@@ -593,9 +606,14 @@ __all__ = [
     "ReminderAccount",
     "ReminderDue",
     "SelfApprovalForbidden",
+    "TallyFeed",
+    "TallyFeedCash",
+    "TallyFeedDemand",
+    "TallyFeedHead",
     "account_summary",
     "ask_school_fees",
     "ask_student_fees",
+    "balances_as_of",
     "create_payment_intent",
     "dues_for_student",
     "enabled",
@@ -630,6 +648,8 @@ __all__ = [
     "retry_tax_certificate_render",
     "student_years",
     "subject_report",
+    "tally_feed_for",
+    "tally_feed_heads",
     "tax_certificate_download_url",
     "tax_certificate_print_page",
     "tenant_data_counts",

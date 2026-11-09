@@ -57,6 +57,7 @@ from app.public.config import rules as public_rules
 from app.students.api import router as students_router
 from app.tally.api import agent_router as tally_agent_router
 from app.tally.api import router as tally_router
+from app.tally.api_vouchers import router as tally_vouchers_router
 from app.tenancy.api import router as tenancy_router
 
 API_PREFIX = "/api/v1"
@@ -132,6 +133,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     # tally.connector.enabled (default off, 404). The agent routes are device-signed.
     app.include_router(tally_router)
     app.include_router(tally_agent_router)
+    # FM-03: the Tally voucher file (fees gate; SchoolOS never writes to Tally) and the
+    # ledger-vs-Tally check (also needs the connector flag).
+    app.include_router(tally_vouchers_router)
     # R2 public surface (ADR-0047): parent link pages through the BFF's service token only;
     # every route is pinned in app/public/public_routes.yaml.
     app.include_router(public_router)

@@ -9,8 +9,10 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import Boolean, Date, Integer, LargeBinary, Numeric, Text, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.model_base import Base
@@ -148,4 +150,71 @@ class Bill(Base):
     created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
 
 
-__all__ = ["Bill", "Device", "EnrolmentCode", "Group", "Party", "PartyLink", "Sync"]
+class ExportSettings(Base):
+    """The school's Tally ledger mapping for the voucher file (0088_tally_vouchers; FM-03)."""
+
+    __tablename__ = "tally_export_settings"
+    __table_args__ = {"schema": "ops"}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    party_mode: Mapped[str] = mapped_column(Text)
+    receivable_ledger: Mapped[str] = mapped_column(Text)
+    mode_ledgers: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    head_ledgers: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    other_income_ledger: Mapped[str | None] = mapped_column(Text)
+    include_demand: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    company: Mapped[str | None] = mapped_column(Text)
+    updated_by: Mapped[uuid.UUID]
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    updated_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+
+
+class VoucherExport(Base):
+    """One downloaded voucher file (0088_tally_vouchers). The file itself is never kept."""
+
+    __tablename__ = "tally_voucher_exports"
+    __table_args__ = {"schema": "ops"}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    period_from: Mapped[dt.date] = mapped_column(Date)
+    period_to: Mapped[dt.date] = mapped_column(Date)
+    include_exported: Mapped[bool] = mapped_column(Boolean)
+    include_demand: Mapped[bool] = mapped_column(Boolean)
+    party_mode: Mapped[str] = mapped_column(Text)
+    vouchers: Mapped[int] = mapped_column(Integer)
+    new_vouchers: Mapped[int] = mapped_column(Integer)
+    cash_total: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    file_sha256: Mapped[bytes] = mapped_column(LargeBinary)
+    created_by: Mapped[uuid.UUID]
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+
+
+class ExportedVoucher(Base):
+    """A source record's first export (``UNIQUE (tenant_id, voucher_key)``)."""
+
+    __tablename__ = "tally_exported_vouchers"
+    __table_args__ = {"schema": "ops"}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    voucher_key: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(Text)
+    export_id: Mapped[uuid.UUID]
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+
+
+__all__ = [
+    "Bill",
+    "Device",
+    "EnrolmentCode",
+    "ExportSettings",
+    "ExportedVoucher",
+    "Group",
+    "Party",
+    "PartyLink",
+    "Sync",
+    "VoucherExport",
+]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from importlib import resources
-from typing import Self
+from typing import Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -64,6 +64,34 @@ class MappingRules(_Model):
     max_candidates: int = Field(ge=0, le=20)
 
 
+class VoucherTypes(_Model):
+    receipt: str = Field(min_length=1, max_length=50)
+    payment: str = Field(min_length=1, max_length=50)
+    journal: str = Field(min_length=1, max_length=50)
+
+
+class VoucherDefaults(_Model):
+    party_mode: Literal["student", "receivable"]
+    include_demand: bool
+    receivable_ledger: str = Field(min_length=1, max_length=100)
+    mode_ledgers: dict[str, str]
+
+
+class VoucherRules(_Model):
+    """FM-03 export file (FR-TALLY-011..030). ``verified: false`` until a pilot import."""
+
+    verified: bool
+    source: str = Field(min_length=1)
+    tally_request: str = Field(min_length=1, max_length=50)
+    report_name: str = Field(min_length=1, max_length=50)
+    voucher_types: VoucherTypes
+    max_period_days: int = Field(ge=1, le=400)
+    max_vouchers: int = Field(ge=1, le=100000)
+    history_limit: int = Field(ge=1, le=500)
+    ledger_name_max_length: int = Field(ge=10, le=255)
+    defaults: VoucherDefaults
+
+
 class TallyRules(_Model):
     version: int = Field(ge=1)
     flag: str = Field(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
@@ -74,6 +102,7 @@ class TallyRules(_Model):
     silence: SilenceRules
     retention: RetentionRules
     mapping: MappingRules
+    vouchers: VoucherRules
 
 
 @lru_cache(maxsize=1)

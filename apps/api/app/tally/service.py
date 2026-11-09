@@ -1255,6 +1255,9 @@ def export_records(session: Session) -> list[RecordTable]:
 
 _PURGE = purging.PurgeTables(
     deleted=(
+        "ops.tally_exported_vouchers",
+        "ops.tally_voucher_exports",
+        "ops.tally_export_settings",
         "ops.tally_bills",
         "ops.tally_party_links",
         "ops.tally_parties",

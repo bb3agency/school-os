@@ -479,6 +479,10 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/disclosure/link/rotate"): "a state change (step-up, audited): a repeat "
     "only issues another link and revokes the previous one",
     ("POST", "/api/v1/fleet/heartbeat"): "machine route; nonce and timestamp make it replay-safe",
+    # FM-03 (FR-TALLY-022): the vouchers a file carries are recorded once (UNIQUE key); a
+    # repeat carries none of them as new and is audited again like any download.
+    ("POST", "/api/v1/tally/vouchers/export"): "a download; already exported vouchers are "
+    "recorded once, a repeat adds nothing new",
     # FP-13 (FR-DPDP-061): a preview; a repeat only makes another unsent parent notice (the
     # screen passes parent_notice_id to reuse the first); the send itself takes the key.
     ("POST", "/api/v1/privacy/notices/whatsapp/preview"): "a preview; sends nothing",

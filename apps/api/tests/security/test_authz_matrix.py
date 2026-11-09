@@ -2235,6 +2235,90 @@ SPECS.update(
 )
 
 
+# --- FM-03 Tally voucher export (fees gate; the check also needs the connector flag) -------------
+
+_VOUCHER_DAYS_BACK = 25  # a past day no other matrix row closes (day closes go 1, 2, 3... back)
+
+
+def _voucher_period(w: Any, a: Engine) -> dict[str, Any]:
+    """Once per world: a receipt of school A dated a past day that is then closed, and a saved
+    mapping, so every allowed role downloads a file (``include_exported``: repeats too)."""
+    if "tally_voucher_day" not in w.a.ids:
+        import datetime as dt
+        from unittest import mock
+
+        from app.fees import _common
+        from app.fees import service as fees
+
+        f = _fees().F
+        day = f.today() - dt.timedelta(days=_VOUCHER_DAYS_BACK)
+        real = _common.now
+        with mock.patch.object(
+            _common, "now", lambda s: real(s) - dt.timedelta(days=_VOUCHER_DAYS_BACK)
+        ):
+            f.issue(w.a, f.account(w.a), "1.00", role="office_staff")
+            f.call(w.a, "accountant", fees.close_day, day)
+        with a.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO ops.tally_export_settings (id, tenant_id, party_mode, "
+                    "receivable_ledger, mode_ledgers, updated_by) VALUES (:i, :t, 'student', "
+                    "'Fee receivable', '{\"cash\": \"Cash\"}', :u) "
+                    "ON CONFLICT (tenant_id) DO NOTHING"
+                ),
+                {"i": uuid.uuid4(), "t": w.a.tenant_id, "u": w.person("owner").user_id},
+            )
+        w.a.ids["tally_voucher_day"] = day
+    day = w.a.ids["tally_voucher_day"]
+    return {"period_from": str(day), "period_to": str(day), "include_exported": True}
+
+
+def _voucher_settings_put(w: Any, r: str, a: Engine) -> Request:
+    body = {
+        "party_mode": "student",
+        "receivable_ledger": "Fee receivable",
+        "mode_ledgers": {"cash": "Cash"},
+    }
+    return "/api/v1/tally/vouchers/settings", body, {}
+
+
+def _voucher_preview(w: Any, r: str, a: Engine) -> Request:
+    q = _voucher_period(w, a)
+    return (
+        f"/api/v1/tally/vouchers/preview?period_from={q['period_from']}&period_to={q['period_to']}",
+        None,
+        {},
+    )
+
+
+SPECS.update(
+    {
+        ("GET", "/api/v1/tally/vouchers/settings"): lambda w, r, a: (
+            "/api/v1/tally/vouchers/settings",
+            None,
+            {},
+        ),
+        ("PUT", "/api/v1/tally/vouchers/settings"): _voucher_settings_put,
+        ("GET", "/api/v1/tally/vouchers/preview"): _voucher_preview,
+        ("POST", "/api/v1/tally/vouchers/export"): lambda w, r, a: (
+            "/api/v1/tally/vouchers/export",
+            _voucher_period(w, a),
+            {},
+        ),
+        ("GET", "/api/v1/tally/vouchers/exports"): lambda w, r, a: (
+            "/api/v1/tally/vouchers/exports",
+            None,
+            {},
+        ),
+        ("GET", "/api/v1/tally/vouchers/check"): lambda w, r, a: (
+            "/api/v1/tally/vouchers/check",
+            None,
+            {},
+        ),
+    }
+)
+
+
 # --- R2-1C WhatsApp messaging (ADR-0043): fake provider, school A connected as needed -------------
 
 
@@ -2807,6 +2891,11 @@ def _call(api: Any, w: Any, admin: Engine, role: str, key: tuple[str, str], **kw
         # R2-1B: fees are on for school A only while the request is built and sent.
         with _fees().on(admin, w.a.tenant_id, key[1]):
             path, body, headers = SPECS[key](w, role, admin)
+            if key[1].startswith("/api/v1/tally/"):
+                # FM-03: the voucher routes follow the fees gate; the check also needs the
+                # connector flag.
+                with _tally().flag_on(admin, w.a.tenant_id):
+                    return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
             return api.call(w.person(role), key[0], path, json=body, headers=headers, **kw)
     if _disclosure().is_disclosure_path(key[1]):
         # R3-1C: the disclosure is offered to CBSE schools only (FR-DISC-001).
