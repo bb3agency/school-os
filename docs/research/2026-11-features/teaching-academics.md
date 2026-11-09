@@ -39,6 +39,8 @@
 
 ### FT-01 · Exam lock and marks history (YA-04)
 
+- **Status:** built 2026-11-09 with the lead defaults of D84 (principal-only unlock with step-up and a reason, no second person for corrections, history of every change after the first entry); `0083_exam_lock_enrol`, FR-MRK-008..FR-MRK-015. Not built here: the "Lock" prompt when report cards are generated (FT-04).
+
 - **Users:** exam coordinator, principal; protects parents and the school.
 - **Problem:** any `marks.record` holder can change an exam's marks at any time, including after results are shared; the audit holds counts only, so an old value cannot be recovered (`docs/security/audit-2026-11-09-academics-jobs.md` YA-04; `academics/service.py:667`). Deferred as a feature by D83 (`docs/14-roadmap.md:575`).
 - **Today:** optimistic versions per mark (YA-05) only.
@@ -171,6 +173,8 @@
 - **Owner questions:** may the principal confirm results for a whole section in one step?
 
 ### FT-09 · Real admission dates for attendance checks (YA-06)
+
+- **Status:** built 2026-11-09 (D84); `0083_exam_lock_enrol` with a one-off backfill in the migration; FR-ATT-010..FR-ATT-015. The onboarding path is the spreadsheet import and register extraction (there is no separate onboarding wizard in the API).
 
 - **Users:** class teacher, office clerk.
 - **Problem:** a child admitted on 1 November can be marked for July; those marks feed absence alerts and early-warning flags. The fix was blocked because every enrolment without an explicit date gets `started_on = today` (`students/service.py:1331`), so a November onboarding would refuse June-October backfill (YA-06).
