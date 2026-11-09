@@ -117,9 +117,63 @@ class AutomaticConfig(_Model):
     fee_reminder_time: dt.time
 
 
+RateKey = Literal[
+    "utility_out_of_window", "utility_in_window", "service_above_free_tier", "marketing"
+]
+RATE_KEYS: Final[tuple[RateKey, ...]] = get_args(RateKey)
+
+
+class Rate(_Model):
+    """One Meta rate in rupees per billable message before GST (FR-MSG-029). ``verified`` is
+    false until the value is checked against Meta's INR rate card; ``used`` false for a category
+    SchoolOS never sends (marketing)."""
+
+    inr: Decimal = Field(gt=0, le=10)
+    verified: bool
+    used: bool = True
+    source: str = Field(min_length=10, max_length=400)
+
+
 class CostConfig(_Model):
-    utility_rate_inr: Decimal = Field(gt=0, le=10)
     gst_percent: Decimal = Field(ge=0, le=50)
+    rates_checked_on: dt.date
+    rate_change_months: tuple[int, ...] = Field(min_length=1, max_length=12)
+    service_free_per_month: int = Field(ge=0, le=1_000_000)
+    in_window_purposes: frozenset[str]
+    rates: dict[RateKey, Rate]
+
+    @field_validator("rate_change_months")
+    @classmethod
+    def _months(cls, value: tuple[int, ...]) -> tuple[int, ...]:
+        if any(m < 1 or m > 12 for m in value) or len(set(value)) != len(value):
+            raise ValueError("rate_change_months are distinct months 1..12")
+        return tuple(sorted(value))
+
+    @field_validator("rates")
+    @classmethod
+    def _every_rate(cls, value: dict[RateKey, Rate]) -> dict[RateKey, Rate]:
+        if set(value) != set(RATE_KEYS):
+            raise ValueError(f"cost.rates must list {', '.join(RATE_KEYS)}")
+        return value
+
+    @property
+    def utility_rate_inr(self) -> Decimal:
+        """The rate of a business-initiated utility template (broadcast and reminder previews)."""
+        return self.rates["utility_out_of_window"].inr
+
+    def next_rate_change(self, after: dt.date) -> dt.date:
+        """The first day strictly after ``after`` on which Meta may change its rates (1 Jan,
+        1 Apr, 1 Jul or 1 Oct with the shipped configuration)."""
+        for year in (after.year, after.year + 1):
+            for month in self.rate_change_months:
+                day = dt.date(year, month, 1)
+                if day > after:
+                    return day
+        raise AssertionError("unreachable: a rate-change month exists every year")
+
+    def rates_recheck_due(self, today: dt.date) -> bool:
+        """FR-MSG-031: Meta may have changed its rates since ``rates_checked_on``."""
+        return today >= self.next_rate_change(self.rates_checked_on)
 
 
 class RetentionConfig(_Model):
@@ -211,10 +265,13 @@ def classify(text: str | None, button_payload: str | None = None) -> tuple[Keywo
 __all__ = [
     "LANGUAGES",
     "OPTIN_CATEGORIES",
+    "RATE_KEYS",
     "Keyword",
     "Language",
     "MessagingConfig",
     "OptinCategory",
+    "Rate",
+    "RateKey",
     "classify",
     "load_config",
 ]

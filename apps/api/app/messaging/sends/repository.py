@@ -187,8 +187,9 @@ def set_message(session: Session, message_id: uuid.UUID, values: Mapping[str, An
 
 
 def sent_since(session: Session, since: dt.datetime) -> int:
-    """Template messages handed to Meta since ``since`` (the daily cap; texts inside an open
-    window are free and do not count)."""
+    """Template messages handed to Meta since ``since`` (the daily cap). Free-form replies
+    inside a window the parent opened do not count against Meta's messaging limit; since 1 Oct
+    2026 they are charged above Meta's free tier (FR-MSG-029), which the spend view shows."""
     stmt = select(func.count()).where(
         Message.kind == "template", Message.sent_at.is_not(None), Message.sent_at >= since
     )
