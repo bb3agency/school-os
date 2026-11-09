@@ -350,6 +350,15 @@ export function SchoolShell({
           icon: "chart",
         },
         {
+          // FM-04 (FR-FEE-061..074): period, DCB, registers, ageing and the year-end pack.
+          href: "/fees/reports/collections",
+          label: t("fees.nav.reports"),
+          permission: "finance.read",
+          feature: "fees",
+          icon: "chart",
+          activePattern: "^/fees/reports(/|$)",
+        },
+        {
           // R2-2E (US-2109): bank statements, UPI confirmations and exceptions.
           href: "/fees/reconcile",
           label: t("fees.nav.reconcile"),

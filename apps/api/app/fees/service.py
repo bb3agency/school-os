@@ -39,6 +39,7 @@ from app.fees import (
     ledger,
     online,
     parent_pages,
+    period_reports,
     receipts,
     refund_hooks,
     reports,
@@ -141,6 +142,18 @@ left_with_dues_csv = reports.left_with_dues_csv
 # R2-3J: the accounts of a manual WhatsApp fee reminder (FR-MSG-025; messaging.sends)
 ReminderAccount = reports.ReminderAccount
 reminder_accounts = reports.reminder_accounts
+# FM-04 accountant and management reports (FR-FEE-061..075)
+collection_register = period_reports.collection_register
+collection_print = period_reports.collection_print
+collection_download = period_reports.collection_download
+dcb = period_reports.dcb
+dcb_download = period_reports.dcb_download
+registers = period_reports.registers
+register_download = period_reports.register_download
+ageing = period_reports.ageing
+ageing_download = period_reports.ageing_download
+series_check = period_reports.series_check
+year_end_pack = period_reports.year_end_pack
 
 post_late_fees = late.post_for_school
 

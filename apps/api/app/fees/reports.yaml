@@ -1,0 +1,24 @@
+# Accountant and management reports (FM-04; FR-FEE-061..075; ADR-0042). Versioned configuration
+# shipped inside the package (invariant 13). Read by app/fees/reports_config.py.
+version: 1
+
+# Periods are IST calendar dates (FR-FEE-022). A period report covers at most this many days
+# (research FM-04: "cap the date range at one financial year"). Lead decision D85: a calendar
+# range of up to 366 days rather than "inside one financial year", so a month that spans
+# 31 March still fits.
+max_range_days: 366
+
+# Rows shown on screen per list (the totals always cover every row); a download carries up to
+# download_max_rows rows (the year-end pack uses the same cap per file).
+view_max_rows: 500
+download_max_rows: 50000
+
+# Outstanding ageing (FR-FEE-068): overdue amounts of the current year by days past their due
+# date. Each number is the last day of a bucket; the last bucket is "more than" the last number.
+# Earlier-year dues (FM-01) are always their own column, whatever their age.
+# Source: research FM-04 proposal (0-30, 31-90, 90+). Lead decision D85, PO to confirm.
+ageing_days: [30, 90]
+
+# Missing numbers listed per series in the receipt series check (FR-FEE-070); the count is
+# always complete.
+series_missing_shown: 200
