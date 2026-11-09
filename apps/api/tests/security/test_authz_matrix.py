@@ -2587,6 +2587,23 @@ def _tax() -> ModuleType:
 SPECS.update(_tax().matrix_specs())
 
 
+def _addons() -> ModuleType:
+    """tests/fees/addon_security_support.py (FM-02 add-on fees)."""
+    name = "sos_test_fees_addon_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "addon_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_addons().matrix_specs())
+
+
 def _disclosure() -> ModuleType:
     """tests/disclosure/security_support.py (R3-1C: CBSE on per call, snapshots of a school)."""
     name = "sos_test_disclosure_security_support"
@@ -2770,7 +2787,10 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
     if (method, path) in _privacy().MATRIX_STATUS:
         return int(_privacy().MATRIX_STATUS[(method, path)])
     if method == "POST" and path in (
-        _fees().MATRIX_CREATES | _upi().MATRIX_CREATES | _tax().MATRIX_CREATES
+        _fees().MATRIX_CREATES
+        | _upi().MATRIX_CREATES
+        | _tax().MATRIX_CREATES
+        | _addons().MATRIX_CREATES
     ):
         return 201
     if (method, path) in _fees().ONLINE_REFUSED:
