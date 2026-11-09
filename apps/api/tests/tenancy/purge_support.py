@@ -1302,6 +1302,41 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             h=b"\x00" * 32,
             m=ids["m1"],
         )
+        # FM-02 (0088_fee_addons): an add-on fee, one student on it and its charge.
+        addon, assignment = uuid.uuid4(), uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO fin.fee_addons (id, tenant_id, academic_year_id, head_id, label, "
+            "amounts, created_by) VALUES (:i, :t, :y, :h, 'Synthetic band', "
+            '\'{"1": "10.00"}\'::jsonb, :m)',
+            i=addon,
+            t=t,
+            y=ids["year1"],
+            h=f["head"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.fee_addon_assignments (id, tenant_id, addon_id, account_id, head_id, "
+            "start_instalment, assigned_by) VALUES (:i, :t, :d, :a, :h, 1, :m)",
+            i=assignment,
+            t=t,
+            d=addon,
+            a=f["acct"],
+            h=f["head"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.ledger_entries (id, tenant_id, account_id, entry_kind, amount, "
+            "instalment_no, head_id, entry_date, addon_assignment_id) VALUES (:i, :t, :a, "
+            "'charge', 10, 1, :h, '2026-09-01', :s)",
+            i=uuid.uuid4(),
+            t=t,
+            a=f["acct"],
+            h=f["head"],
+            s=assignment,
+        )
         # --- R2-2D online payments (0059_payments_online): one row in every online table ------
         o = {k: uuid.uuid4() for k in ("handle", "conn", "intent", "run")}
         _run(

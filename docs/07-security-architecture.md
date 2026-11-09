@@ -249,6 +249,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | fee.refund.approve (R2-1B: maker-checker; principal or accountant, D17) | — | ✓ᴿ | — | — | ✓ᴿ | — | — | — | — |
 | fee.report (R2-1B: download the day book and dues lists, bulk personal financial data) | ✓ᴿ | ✓ᴿ | — | — | ✓ᴿ | — | — | — | ✓ᴿ |
 | fee.reconcile (R2-2E: import bank statements, confirm UPI receipts seen in the bank, work through UPI exceptions; school-wide only) | — | ✓ | — | — | ✓ | — | — | — | — |
+| fee.addon.read (FM-02: who is on each add-on fee, such as a transport band, hostel or activity, without amounts; for a transport in-charge; school-wide only) | — | ✓ | ✓ | — | ✓ | — | — | — | — |
 | payments.configure (R2-2D: connect, test, rotate the webhook secret of, or disconnect the school's own Razorpay account; ADR-0042) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | consent.read (R3-1B: optional-purpose consents, the consent view with APAAR and WhatsApp opt-ins, section counts, print consent forms; ADR-0049) | ✓ | ✓ | ✓ | ✓ | — | ✓ | S | — | ✓ |
 | consent.record (R3-1B: record a family's decision with the signed form, print forms; ADR-0049) | — | ✓ | ✓ | ✓ | — | — | — | — | — |
