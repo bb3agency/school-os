@@ -676,6 +676,19 @@ export function r1Answer(
       ),
     ];
   }
+  // FO-01 (FR-UDI-023): no follow-ups recorded yet, so the readiness page shows no
+  // "Waiting on parents" line.
+  const followups = /^\/api\/v1\/dq\/readiness\/([a-z0-9-]+)\/follow-ups$/.exec(path);
+  if (followups && get) {
+    const list: Schemas["FollowupListOut"] = {
+      profile_key: followups[1] ?? SSC,
+      today: "2026-11-09",
+      overdue_after_days: 14,
+      totals: [],
+      items: [],
+    };
+    return [200, list];
+  }
   const readiness =
     /^\/api\/v1\/dq\/readiness\/([a-z0-9-]+)(?:\/students(?:\/([0-9a-f-]{36}))?)?$/.exec(path);
   if (readiness && get) {
