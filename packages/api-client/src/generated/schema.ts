@@ -2510,6 +2510,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exams/{exam_id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock Exam
+         * @description Lock an exam's marks (``exam.manage``; FR-MRK-008): marks writes and marks-sheet
+         *     previews then answer 409 ``exam_locked``. 409 ``exam_already_locked``; 404 for an exam of
+         *     another school. Audited ``exam.locked``.
+         */
+        post: operations["lock_exam_api_v1_exams__exam_id__lock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exams/{exam_id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unlock Exam
+         * @description Unlock a locked exam so its marks can be corrected (``exam.unlock``: the principal only,
+         *     step-up MFA, 428 without it; FR-MRK-010) with a mandatory reason. 409 ``exam_not_locked``.
+         *     Audited ``exam.unlocked``; every later change is kept in the marks history.
+         */
+        post: operations["unlock_exam_api_v1_exams__exam_id__unlock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/export-profiles": {
         parameters: {
             query?: never;
@@ -4108,6 +4152,133 @@ export interface paths {
         get: operations["fee_status_api_v1_fees_status_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/tax-certificates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tax Certificates
+         * @description Certificates, newest first (``fee.collect`` or ``finance.read``; FR-FEE-055).
+         */
+        get: operations["list_tax_certificates_api_v1_fees_tax_certificates_get"];
+        put?: never;
+        /**
+         * Issue Tax Certificate
+         * @description Issue the tuition fee certificate of one student for one financial year (``fee.collect``;
+         *     FR-FEE-049). Repeating it returns the issued certificate (``outcome: unchanged``) while the
+         *     receipts and amounts are the same; otherwise the earlier one is superseded (``reissued``).
+         *     Errors: 404 (student), 409 ``no_tuition_paid``, ``too_many_receipts``, 422
+         *     ``financial_year``.
+         */
+        post: operations["issue_tax_certificate_api_v1_fees_tax_certificates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/tax-certificates/{tax_certificate_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Tax Certificate */
+        get: operations["get_tax_certificate_api_v1_fees_tax_certificates__tax_certificate_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/tax-certificates/{tax_certificate_id}/download-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tax Certificate Download Url
+         * @description A short-lived link to the stored PDF. 409 ``pdf_not_ready``.
+         */
+        get: operations["tax_certificate_download_url_api_v1_fees_tax_certificates__tax_certificate_id__download_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/tax-certificates/{tax_certificate_id}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print Tax Certificate
+         * @description The certificate as a print-ready A4 page; a superseded one is marked. Audited.
+         */
+        get: operations["print_tax_certificate_api_v1_fees_tax_certificates__tax_certificate_id__print_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/tax-certificates/{tax_certificate_id}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Render Tax Certificate
+         * @description Make the PDF again after it failed (``fee.collect``).
+         */
+        post: operations["render_tax_certificate_api_v1_fees_tax_certificates__tax_certificate_id__render_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/tax-certificates/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Tax Certificates Bulk
+         * @description Issue the certificates of one class or section of the current year (``fee.collect``;
+         *     FR-FEE-050). Students without tuition paid in the year are skipped. 409
+         *     ``too_many_students``.
+         */
+        post: operations["issue_tax_certificates_bulk_api_v1_fees_tax_certificates_bulk_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8432,6 +8603,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/links/current/tax-certificate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Current Tax Certificate
+         * @description The PDF of the child's tuition fee certificate for the financial year the page's "Tax
+         *     certificate" button names (FM-06; FR-FEE-058), presigned for at most 5 minutes. A read: it
+         *     opens the latest certificate the school issued and never issues one; 404 while none is
+         *     issued, 202 ``preparing`` while its PDF is being made. Audited by fees. Not a view.
+         */
+        get: operations["current_tax_certificate_api_v1_public_links_current_tax_certificate_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/links/exchange": {
         parameters: {
             query?: never;
@@ -8658,8 +8852,9 @@ export interface paths {
         /**
          * Record Attendance
          * @description Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a
-         *     day again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range`` or
-         *     ``duplicate_entry`` per entry. An entry may carry ``expected_version`` (the ``version`` read
+         *     day again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range``,
+         *     ``before_enrolment`` (before the student's explicit enrolment start) or ``duplicate_entry``
+         *     per entry. An entry may carry ``expected_version`` (the ``version`` read
          *     from the day): 412 ``attendance_changed`` when someone else changed that mark since, and
          *     nothing is saved. The early-warning rules look at these students again.
          */
@@ -8704,7 +8899,8 @@ export interface paths {
          * Preview Attendance Sheet
          * @description Read an uploaded attendance sheet (``attendance.record``): first column admission or
          *     roll number, then one date per column, cells P/A/L/LV. Returns the entries and every
-         *     problem; stores no attendance. The uploaded file is deleted once read. 422
+         *     problem (``before_enrolment`` for a date before the student's explicit start); stores no
+         *     attendance. The uploaded file is deleted once read. 422
          *     ``aadhaar_full_number_rejected``, ``student_column_missing``, ``too_many_dates``...; 409
          *     ``document_not_ready`` while the virus check runs.
          */
@@ -8734,9 +8930,33 @@ export interface paths {
          * @description Save marks per student and subject with the maximum marks, or absent, all or nothing
          *     (``marks.record``). 422 ``not_in_section``, ``marks_over_max``, ``absent_has_no_marks``,
          *     ``exam_other_year``...; an entry may carry ``expected_version`` (the mark's ``version``):
-         *     412 ``marks_changed`` when someone else changed that mark since, and nothing is saved.
+         *     412 ``marks_changed`` when someone else changed that mark since, and nothing is saved. 409
+         *     ``exam_locked`` when the exam is locked (FR-MRK-009). Changes of stored marks are kept in
+         *     the marks history with the optional ``reason`` (FR-MRK-012).
          */
         post: operations["record_marks_api_v1_sections__section_id__exams__exam_id__marks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections/{section_id}/exams/{exam_id}/marks/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Marks History
+         * @description Every change of the section's marks for one exam, newest first (``marks.read``;
+         *     FR-MRK-013): previous and new value, who, when, the reason and whether it was after the
+         *     exam was first locked.
+         */
+        get: operations["marks_history_api_v1_sections__section_id__exams__exam_id__marks_history_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8756,7 +8976,8 @@ export interface paths {
          * Preview Marks Sheet
          * @description Read an uploaded marks sheet (``marks.record``): row 1 admission or roll number and
          *     subjects, row 2 maximum marks, then one row per student (``AB`` = absent). Returns entries
-         *     and problems; stores no marks; the file is deleted once read.
+         *     and problems; stores no marks; the file is deleted once read. 409 ``exam_locked`` for a
+         *     locked exam.
          */
         post: operations["preview_marks_sheet_api_v1_sections__section_id__exams__exam_id__marks_sheet_post"];
         delete?: never;
@@ -12244,7 +12465,7 @@ export interface components {
              * Portal
              * @enum {string}
              */
-            portal: "udise_plus" | "bseap" | "cbse" | "cisce" | "apaar" | "school";
+            portal: "udise_plus" | "bseap" | "cbse" | "cisce" | "apaar" | "school_admin" | "rte" | "school";
             /** Profile Keys */
             profile_keys: string[];
             /** Readiness */
@@ -14005,13 +14226,26 @@ export interface components {
         };
         /** DisclosureDraftOut */
         DisclosureDraftOut: {
+            /**
+             * Carried Over From
+             * @description The older format version the draft was last saved with, when its items were carried over to the current version (FR-DISC-014); null otherwise.
+             */
+            carried_over_from?: number | null;
             /** Documents */
             documents: {
                 [key: string]: components["schemas"]["DraftDocumentOut"][];
             };
+            /**
+             * Dropped
+             * @description Item keys of the older version that were not carried over (saving the draft discards them).
+             */
+            dropped?: string[];
             /** Format Key */
             format_key: string;
-            /** Format Version */
+            /**
+             * Format Version
+             * @description The format version the draft is edited in (current).
+             */
             format_version: number;
             /**
              * From Schoolos
@@ -14609,6 +14843,12 @@ export interface components {
             section_id: string;
             /** Started On */
             started_on: string | null;
+            /**
+             * Started On Explicit
+             * @description The start date is a real date (given, the admission date inside the year, or a move): attendance before it is refused (FR-ATT-012).
+             * @default false
+             */
+            started_on_explicit: boolean;
             /** Status */
             status: string;
             /**
@@ -14759,10 +14999,39 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Locked
+             * @description Locked exams refuse marks writes and sheet imports (409 ``exam_locked``) until the principal unlocks them (FR-MRK-008).
+             * @default false
+             */
+            locked: boolean;
+            /** Locked At */
+            locked_at?: string | null;
             /** Name */
             name: string;
+            /**
+             * Unlock Reason
+             * @description The principal's reason for the last unlock
+             */
+            unlock_reason?: string | null;
+            /**
+             * Unlocked At
+             * @description When the exam was last unlocked (None: never)
+             */
+            unlocked_at?: string | null;
             /** Version */
             version: number;
+        };
+        /**
+         * ExamUnlockIn
+         * @description Unlocking a locked exam (``exam.unlock``, principal, step-up; FR-MRK-010).
+         */
+        ExamUnlockIn: {
+            /**
+             * Reason
+             * @description Why the marks must change (kept on the exam and on every change made while it stays unlocked). No Aadhaar numbers.
+             */
+            reason: string;
         };
         /**
          * ExpectedWindowOut
@@ -15416,8 +15685,23 @@ export interface components {
             /** Version */
             version: string;
         };
+        /**
+         * FormatChoiceOut
+         * @description A row or column of a ``count_table`` item.
+         */
+        FormatChoiceOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
         /** FormatItemOut */
         FormatItemOut: {
+            /**
+             * Columns
+             * @description count_table columns.
+             */
+            columns?: components["schemas"]["FormatChoiceOut"][] | null;
             /** Contact */
             contact: boolean;
             /**
@@ -15438,12 +15722,20 @@ export interface components {
             /** Required */
             required: boolean;
             /**
+             * Rows
+             * @description count_table rows.
+             */
+            rows?: components["schemas"]["FormatChoiceOut"][] | null;
+            /**
              * Takes Documents
              * @description The item accepts school documents (PDFs).
              */
             takes_documents: boolean;
-            /** Type */
-            type: ("text" | "integer" | "number" | "yes_no" | "email" | "phone" | "results") | null;
+            /**
+             * Type
+             * @description ``count_table`` (format version 2): whole numbers per row and column, sent as ``{row_key: {column_key: n}}`` (counts only, never names; FR-DISC-016).
+             */
+            type: ("text" | "integer" | "number" | "yes_no" | "email" | "phone" | "results" | "count_table") | null;
         };
         /** FormatLineOut */
         FormatLineOut: {
@@ -15771,6 +16063,8 @@ export interface components {
              * @default 100
              */
             sort_order: number;
+            /** Tax Tuition */
+            tax_tuition?: boolean | null;
         };
         /** HeadOut */
         HeadOut: {
@@ -15794,6 +16088,8 @@ export interface components {
             name: string;
             /** Sort Order */
             sort_order: number;
+            /** Tax Tuition */
+            tax_tuition: boolean;
             /** Version */
             version: number;
         };
@@ -15809,6 +16105,8 @@ export interface components {
             name?: string | null;
             /** Sort Order */
             sort_order?: number | null;
+            /** Tax Tuition */
+            tax_tuition?: boolean | null;
         };
         /** HealthOut */
         HealthOut: {
@@ -17356,6 +17654,49 @@ export interface components {
             /** Columns */
             columns: components["schemas"]["ColumnMap"][];
         };
+        /**
+         * MarkChangeOut
+         * @description One change of a stored mark (append-only history; FR-MRK-012).
+         */
+        MarkChangeOut: {
+            /**
+             * After Lock
+             * @description Changed after the exam was first locked
+             */
+            after_lock: boolean;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /**
+             * Changed By Name
+             * @description Who changed it (None: no longer a member)
+             */
+            changed_by_name: string | null;
+            /** New Absent */
+            new_absent: boolean;
+            /** New Marks */
+            new_marks: string | null;
+            /** New Max Marks */
+            new_max_marks: string;
+            /** Previous Absent */
+            previous_absent: boolean;
+            /** Previous Marks */
+            previous_marks: string | null;
+            /** Previous Max Marks */
+            previous_max_marks: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "mark" | "import";
+            student: components["schemas"]["RosterStudentOut"];
+            /** Subject */
+            subject: string;
+        };
         /** MarkedReadOut */
         MarkedReadOut: {
             /** Updated */
@@ -17413,6 +17754,12 @@ export interface components {
         MarkOut: {
             /** Absent */
             absent: boolean;
+            /**
+             * Changed After Lock
+             * @description The mark was changed after the exam was first locked (FR-MRK-014)
+             * @default false
+             */
+            changed_after_lock: boolean;
             /** Marks */
             marks: string | null;
             /** Max Marks */
@@ -17434,6 +17781,16 @@ export interface components {
             students: components["schemas"]["MarksStudentOut"][];
             /** Subjects */
             subjects: string[];
+        };
+        /** MarksHistoryOut */
+        MarksHistoryOut: {
+            /**
+             * Changes
+             * @description Newest first
+             */
+            changes: components["schemas"]["MarkChangeOut"][];
+            exam: components["schemas"]["ExamOut"];
+            section: components["schemas"]["RecordSectionOut"];
         };
         /** MarksSheetOut */
         MarksSheetOut: {
@@ -17463,6 +17820,11 @@ export interface components {
         MarksWrite: {
             /** Entries */
             entries: components["schemas"]["MarkIn-Input"][];
+            /**
+             * Reason
+             * @description Why marks are corrected (optional; kept in the marks history). After an unlock, the unlock reason is kept when this is left out. No Aadhaar numbers.
+             */
+            reason?: string | null;
             /**
              * Source
              * @default mark
@@ -18791,6 +19153,13 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[TaxCertificateListItem] */
+        Page_TaxCertificateListItem_: {
+            /** Data */
+            data: components["schemas"]["TaxCertificateListItem"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[TenantExportOut] */
         Page_TenantExportOut_: {
             /** Data */
@@ -18970,6 +19339,7 @@ export interface components {
             office_phone: string | null;
             /** Pay Online */
             pay_online: boolean;
+            tax_certificate?: components["schemas"]["ParentTaxCertificateOut"] | null;
             /** Total Due */
             total_due: string;
             upi: components["schemas"]["ParentUpiOut"] | null;
@@ -19108,6 +19478,19 @@ export interface components {
             receipt_number: string;
             /** Student Name */
             student_name: string;
+            tax_certificate?: components["schemas"]["ParentTaxCertificateOut"] | null;
+        };
+        /**
+         * ParentTaxCertificateOut
+         * @description FM-06 (FR-FEE-057): the "Tax certificate FY <financial_year>" button, shown from 1 January
+         *     of the year's last quarter. ``issued``: the school has issued it (the button opens the PDF);
+         *     otherwise the page asks the parent to request it from the office.
+         */
+        ParentTaxCertificateOut: {
+            /** Financial Year */
+            financial_year: string;
+            /** Issued */
+            issued: boolean;
         };
         /**
          * ParentUpiOut
@@ -19812,7 +20195,7 @@ export interface components {
              * Portal
              * @enum {string}
              */
-            portal: "udise_plus" | "bseap" | "cbse" | "cisce" | "apaar" | "school";
+            portal: "udise_plus" | "bseap" | "cbse" | "cisce" | "apaar" | "school_admin" | "rte" | "school";
             /**
              * State
              * @enum {string}
@@ -23931,6 +24314,195 @@ export interface components {
             owner_membership_id?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /**
+         * TaxCertificateBulkIssue
+         * @description Issue the certificates of one class or one section (current year), exactly one of them.
+         *     Students without tuition paid in the year are skipped.
+         */
+        TaxCertificateBulkIssue: {
+            /** Class Id */
+            class_id?: string | null;
+            /** Financial Year */
+            financial_year: string;
+            /** Section Id */
+            section_id?: string | null;
+        };
+        /** TaxCertificateBulkOut */
+        TaxCertificateBulkOut: {
+            /** Certificate Ids */
+            certificate_ids: string[];
+            /** Financial Year */
+            financial_year: string;
+            /** Issued */
+            issued: number;
+            /** Reissued */
+            reissued: number;
+            /** Skipped No Tuition */
+            skipped_no_tuition: number;
+            /** Students */
+            students: number;
+            /** Unchanged */
+            unchanged: number;
+        };
+        /** TaxCertificateDownloadOut */
+        TaxCertificateDownloadOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Filename */
+            filename: string;
+            /** Url */
+            url: string;
+        };
+        /**
+         * TaxCertificateIssue
+         * @description Issue the certificate of one student for one financial year (``2026-27``, April-March).
+         */
+        TaxCertificateIssue: {
+            /** Financial Year */
+            financial_year: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** TaxCertificateListItem */
+        TaxCertificateListItem: {
+            /** Amount */
+            amount: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Class Section */
+            class_section: string;
+            /** Financial Year */
+            financial_year: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /**
+             * Pdf Status
+             * @enum {string}
+             */
+            pdf_status: "queued" | "ready" | "failed";
+            /** Receipt Count */
+            receipt_count: number;
+            /** Serial Number */
+            serial_number: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "issued" | "superseded";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
+        };
+        /** TaxCertificateOut */
+        TaxCertificateOut: {
+            /** Admission No */
+            admission_no: string;
+            /** Amount */
+            amount: string;
+            /** Amount In Words */
+            amount_in_words: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Class Section */
+            class_section: string;
+            /** Content Sha256 */
+            content_sha256: string;
+            /** Financial Year */
+            financial_year: string;
+            /** Head Names */
+            head_names: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** In Progress */
+            in_progress: boolean;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /**
+             * Issued By
+             * Format: uuid
+             */
+            issued_by: string;
+            /** Issued By Name */
+            issued_by_name: string | null;
+            /** Legal Verified */
+            legal_verified: boolean;
+            /**
+             * Outcome
+             * @description Only on issue: ``issued`` (new), ``reissued`` (the amounts changed: the earlier certificate is superseded and keeps its serial) or ``unchanged`` (the issued certificate already shows these amounts and is returned as it is).
+             */
+            outcome?: ("issued" | "reissued" | "unchanged") | null;
+            /** Paid */
+            paid: string;
+            /**
+             * Pdf Status
+             * @enum {string}
+             */
+            pdf_status: "queued" | "ready" | "failed";
+            /** Receipts */
+            receipts: components["schemas"]["TaxCertificateReceiptOut"][];
+            /** Refunded */
+            refunded: string;
+            /** Serial Number */
+            serial_number: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "issued" | "superseded";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
+            /** Superseded By */
+            superseded_by: string | null;
+        };
+        /** TaxCertificateReceiptOut */
+        TaxCertificateReceiptOut: {
+            /** Amount */
+            amount: string;
+            /**
+             * Receipt Date
+             * Format: date
+             */
+            receipt_date: string;
+            /** Receipt Number */
+            receipt_number: string;
+            /** Refunded */
+            refunded: string;
         };
         /**
          * TcFeeNote
@@ -31009,6 +31581,98 @@ export interface operations {
             };
         };
     };
+    lock_exam_api_v1_exams__exam_id__lock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exam_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExamOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    unlock_exam_api_v1_exams__exam_id__unlock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exam_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExamUnlockIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExamOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_export_profiles_api_v1_export_profiles_get: {
         parameters: {
             query?: {
@@ -34883,6 +35547,326 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeeStatusOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_tax_certificates_api_v1_fees_tax_certificates_get: {
+        parameters: {
+            query?: {
+                class_id?: string | null;
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                financial_year?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                section_id?: string | null;
+                status?: ("issued" | "superseded") | null;
+                student_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TaxCertificateListItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    issue_tax_certificate_api_v1_fees_tax_certificates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxCertificateIssue"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxCertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_tax_certificate_api_v1_fees_tax_certificates__tax_certificate_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tax_certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxCertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    tax_certificate_download_url_api_v1_fees_tax_certificates__tax_certificate_id__download_url_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tax_certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxCertificateDownloadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    print_tax_certificate_api_v1_fees_tax_certificates__tax_certificate_id__print_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tax_certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 page (no scripts) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    render_tax_certificate_api_v1_fees_tax_certificates__tax_certificate_id__render_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tax_certificate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxCertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    issue_tax_certificates_bulk_api_v1_fees_tax_certificates_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxCertificateBulkIssue"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxCertificateBulkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -45511,6 +46495,49 @@ export interface operations {
             };
         };
     };
+    current_tax_certificate_api_v1_public_links_current_tax_certificate_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentDocumentLinkOut"];
+                };
+            };
+            /** @description The certificate's PDF is being made; try again after Retry-After. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentDocumentPreparingOut"];
+                };
+            };
+            /** @description Unknown, expired or revoked link (always the same body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests or failed lookups from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     exchange_link_api_v1_public_links_exchange_post: {
         parameters: {
             query?: never;
@@ -46305,6 +47332,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WriteResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    marks_history_api_v1_sections__section_id__exams__exam_id__marks_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exam_id: string;
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarksHistoryOut"];
                 };
             };
             /** @description Validation Error */

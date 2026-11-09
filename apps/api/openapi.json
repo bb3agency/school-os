@@ -5045,6 +5045,8 @@
               "cbse",
               "cisce",
               "apaar",
+              "school_admin",
+              "rte",
               "school"
             ],
             "title": "Portal",
@@ -9900,6 +9902,18 @@
       },
       "DisclosureDraftOut": {
         "properties": {
+          "carried_over_from": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The older format version the draft was last saved with, when its items were carried over to the current version (FR-DISC-014); null otherwise.",
+            "title": "Carried Over From"
+          },
           "documents": {
             "additionalProperties": {
               "items": {
@@ -9910,11 +9924,20 @@
             "title": "Documents",
             "type": "object"
           },
+          "dropped": {
+            "description": "Item keys of the older version that were not carried over (saving the draft discards them).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
           "format_key": {
             "title": "Format Key",
             "type": "string"
           },
           "format_version": {
+            "description": "The format version the draft is edited in (current).",
             "title": "Format Version",
             "type": "integer"
           },
@@ -11624,6 +11647,12 @@
             ],
             "title": "Started On"
           },
+          "started_on_explicit": {
+            "default": false,
+            "description": "The start date is a real date (given, the admission date inside the year, or a move): attendance before it is refused (FR-ATT-012).",
+            "title": "Started On Explicit",
+            "type": "boolean"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -11900,9 +11929,52 @@
             "title": "Id",
             "type": "string"
           },
+          "locked": {
+            "default": false,
+            "description": "Locked exams refuse marks writes and sheet imports (409 ``exam_locked``) until the principal unlocks them (FR-MRK-008).",
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "locked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked At"
+          },
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "unlock_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The principal's reason for the last unlock",
+            "title": "Unlock Reason"
+          },
+          "unlocked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the exam was last unlocked (None: never)",
+            "title": "Unlocked At"
           },
           "version": {
             "title": "Version",
@@ -11917,6 +11989,24 @@
           "version"
         ],
         "title": "ExamOut",
+        "type": "object"
+      },
+      "ExamUnlockIn": {
+        "additionalProperties": false,
+        "description": "Unlocking a locked exam (``exam.unlock``, principal, step-up; FR-MRK-010).",
+        "properties": {
+          "reason": {
+            "description": "Why the marks must change (kept on the exam and on every change made while it stays unlocked). No Aadhaar numbers.",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ExamUnlockIn",
         "type": "object"
       },
       "ExpectedWindowOut": {
@@ -13712,8 +13802,42 @@
         "title": "FleetVersionOut",
         "type": "object"
       },
+      "FormatChoiceOut": {
+        "description": "A row or column of a ``count_table`` item.",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "FormatChoiceOut",
+        "type": "object"
+      },
       "FormatItemOut": {
         "properties": {
+          "columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FormatChoiceOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "count_table columns.",
+            "title": "Columns"
+          },
           "contact": {
             "title": "Contact",
             "type": "boolean"
@@ -13774,6 +13898,21 @@
             "title": "Required",
             "type": "boolean"
           },
+          "rows": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FormatChoiceOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "count_table rows.",
+            "title": "Rows"
+          },
           "takes_documents": {
             "description": "The item accepts school documents (PDFs).",
             "title": "Takes Documents",
@@ -13789,7 +13928,8 @@
                   "yes_no",
                   "email",
                   "phone",
-                  "results"
+                  "results",
+                  "count_table"
                 ],
                 "type": "string"
               },
@@ -13797,6 +13937,7 @@
                 "type": "null"
               }
             ],
+            "description": "``count_table`` (format version 2): whole numbers per row and column, sent as ``{row_key: {column_key: n}}`` (counts only, never names; FR-DISC-016).",
             "title": "Type"
           }
         },
@@ -14765,6 +14906,17 @@
             "minimum": 0.0,
             "title": "Sort Order",
             "type": "integer"
+          },
+          "tax_tuition": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Tuition"
           }
         },
         "required": [
@@ -14814,6 +14966,10 @@
             "title": "Sort Order",
             "type": "integer"
           },
+          "tax_tuition": {
+            "title": "Tax Tuition",
+            "type": "boolean"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -14827,6 +14983,7 @@
           "gst_exempt",
           "active",
           "sort_order",
+          "tax_tuition",
           "version"
         ],
         "title": "HeadOut",
@@ -14901,6 +15058,17 @@
               }
             ],
             "title": "Sort Order"
+          },
+          "tax_tuition": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Tuition"
           }
         },
         "title": "HeadPatch",
@@ -19067,6 +19235,118 @@
         "title": "MappingIn",
         "type": "object"
       },
+      "MarkChangeOut": {
+        "description": "One change of a stored mark (append-only history; FR-MRK-012).",
+        "properties": {
+          "after_lock": {
+            "description": "Changed after the exam was first locked",
+            "title": "After Lock",
+            "type": "boolean"
+          },
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "changed_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who changed it (None: no longer a member)",
+            "title": "Changed By Name"
+          },
+          "new_absent": {
+            "title": "New Absent",
+            "type": "boolean"
+          },
+          "new_marks": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Marks"
+          },
+          "new_max_marks": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "New Max Marks",
+            "type": "string"
+          },
+          "previous_absent": {
+            "title": "Previous Absent",
+            "type": "boolean"
+          },
+          "previous_marks": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Marks"
+          },
+          "previous_max_marks": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Previous Max Marks",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "source": {
+            "enum": [
+              "mark",
+              "import"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "student": {
+            "$ref": "#/components/schemas/RosterStudentOut"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student",
+          "subject",
+          "previous_max_marks",
+          "previous_marks",
+          "previous_absent",
+          "new_max_marks",
+          "new_marks",
+          "new_absent",
+          "source",
+          "after_lock",
+          "reason",
+          "changed_by_name",
+          "changed_at"
+        ],
+        "title": "MarkChangeOut",
+        "type": "object"
+      },
       "MarkIn-Input": {
         "additionalProperties": false,
         "properties": {
@@ -19204,6 +19484,12 @@
             "title": "Absent",
             "type": "boolean"
           },
+          "changed_after_lock": {
+            "default": false,
+            "description": "The mark was changed after the exam was first locked (FR-MRK-014)",
+            "title": "Changed After Lock",
+            "type": "boolean"
+          },
           "marks": {
             "anyOf": [
               {
@@ -19284,6 +19570,31 @@
           "students"
         ],
         "title": "MarksGridOut",
+        "type": "object"
+      },
+      "MarksHistoryOut": {
+        "properties": {
+          "changes": {
+            "description": "Newest first",
+            "items": {
+              "$ref": "#/components/schemas/MarkChangeOut"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "exam": {
+            "$ref": "#/components/schemas/ExamOut"
+          },
+          "section": {
+            "$ref": "#/components/schemas/RecordSectionOut"
+          }
+        },
+        "required": [
+          "section",
+          "exam",
+          "changes"
+        ],
+        "title": "MarksHistoryOut",
         "type": "object"
       },
       "MarksSheetOut": {
@@ -19372,6 +19683,19 @@
             "minItems": 1,
             "title": "Entries",
             "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why marks are corrected (optional; kept in the marks history). After an unlock, the unlock reason is kept when this is left out. No Aadhaar numbers.",
+            "title": "Reason"
           },
           "source": {
             "default": "mark",
@@ -23608,6 +23932,34 @@
         "title": "Page[TaskOut]",
         "type": "object"
       },
+      "Page_TaxCertificateListItem_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TaxCertificateListItem"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "Page[TaxCertificateListItem]",
+        "type": "object"
+      },
       "Page_TenantExportOut_": {
         "properties": {
           "data": {
@@ -23888,6 +24240,16 @@
           "pay_online": {
             "title": "Pay Online",
             "type": "boolean"
+          },
+          "tax_certificate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentTaxCertificateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "total_due": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
@@ -24212,6 +24574,16 @@
           "student_name": {
             "title": "Student Name",
             "type": "string"
+          },
+          "tax_certificate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentTaxCertificateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -24228,6 +24600,26 @@
           "has_pdf"
         ],
         "title": "ParentReceiptOut",
+        "type": "object"
+      },
+      "ParentTaxCertificateOut": {
+        "additionalProperties": false,
+        "description": "FM-06 (FR-FEE-057): the \"Tax certificate FY <financial_year>\" button, shown from 1 January\nof the year's last quarter. ``issued``: the school has issued it (the button opens the PDF);\notherwise the page asks the parent to request it from the office.",
+        "properties": {
+          "financial_year": {
+            "title": "Financial Year",
+            "type": "string"
+          },
+          "issued": {
+            "title": "Issued",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "financial_year",
+          "issued"
+        ],
+        "title": "ParentTaxCertificateOut",
         "type": "object"
       },
       "ParentUpiOut": {
@@ -26187,6 +26579,8 @@
               "cbse",
               "cisce",
               "apaar",
+              "school_admin",
+              "rte",
               "school"
             ],
             "title": "Portal",
@@ -37158,6 +37552,430 @@
           }
         },
         "title": "TaskUpdate",
+        "type": "object"
+      },
+      "TaxCertificateBulkIssue": {
+        "additionalProperties": false,
+        "description": "Issue the certificates of one class or one section (current year), exactly one of them.\nStudents without tuition paid in the year are skipped.",
+        "properties": {
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          },
+          "financial_year": {
+            "pattern": "^20[0-9]{2}-[0-9]{2}$",
+            "title": "Financial Year",
+            "type": "string"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          }
+        },
+        "required": [
+          "financial_year"
+        ],
+        "title": "TaxCertificateBulkIssue",
+        "type": "object"
+      },
+      "TaxCertificateBulkOut": {
+        "properties": {
+          "certificate_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Certificate Ids",
+            "type": "array"
+          },
+          "financial_year": {
+            "title": "Financial Year",
+            "type": "string"
+          },
+          "issued": {
+            "title": "Issued",
+            "type": "integer"
+          },
+          "reissued": {
+            "title": "Reissued",
+            "type": "integer"
+          },
+          "skipped_no_tuition": {
+            "title": "Skipped No Tuition",
+            "type": "integer"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          },
+          "unchanged": {
+            "title": "Unchanged",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "financial_year",
+          "students",
+          "issued",
+          "reissued",
+          "unchanged",
+          "skipped_no_tuition",
+          "certificate_ids"
+        ],
+        "title": "TaxCertificateBulkOut",
+        "type": "object"
+      },
+      "TaxCertificateDownloadOut": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "filename"
+        ],
+        "title": "TaxCertificateDownloadOut",
+        "type": "object"
+      },
+      "TaxCertificateIssue": {
+        "additionalProperties": false,
+        "description": "Issue the certificate of one student for one financial year (``2026-27``, April-March).",
+        "properties": {
+          "financial_year": {
+            "pattern": "^20[0-9]{2}-[0-9]{2}$",
+            "title": "Financial Year",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "financial_year"
+        ],
+        "title": "TaxCertificateIssue",
+        "type": "object"
+      },
+      "TaxCertificateListItem": {
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "class_section": {
+            "title": "Class Section",
+            "type": "string"
+          },
+          "financial_year": {
+            "title": "Financial Year",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "issued_at": {
+            "format": "date-time",
+            "title": "Issued At",
+            "type": "string"
+          },
+          "pdf_status": {
+            "enum": [
+              "queued",
+              "ready",
+              "failed"
+            ],
+            "title": "Pdf Status",
+            "type": "string"
+          },
+          "receipt_count": {
+            "title": "Receipt Count",
+            "type": "integer"
+          },
+          "serial_number": {
+            "title": "Serial Number",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "issued",
+              "superseded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "serial_number",
+          "financial_year",
+          "as_of",
+          "student_id",
+          "student_name",
+          "class_section",
+          "amount",
+          "receipt_count",
+          "status",
+          "issued_at",
+          "pdf_status"
+        ],
+        "title": "TaxCertificateListItem",
+        "type": "object"
+      },
+      "TaxCertificateOut": {
+        "properties": {
+          "admission_no": {
+            "title": "Admission No",
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "amount_in_words": {
+            "title": "Amount In Words",
+            "type": "string"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "class_section": {
+            "title": "Class Section",
+            "type": "string"
+          },
+          "content_sha256": {
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "financial_year": {
+            "title": "Financial Year",
+            "type": "string"
+          },
+          "head_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Head Names",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "in_progress": {
+            "title": "In Progress",
+            "type": "boolean"
+          },
+          "issued_at": {
+            "format": "date-time",
+            "title": "Issued At",
+            "type": "string"
+          },
+          "issued_by": {
+            "format": "uuid",
+            "title": "Issued By",
+            "type": "string"
+          },
+          "issued_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued By Name"
+          },
+          "legal_verified": {
+            "title": "Legal Verified",
+            "type": "boolean"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "issued",
+                  "reissued",
+                  "unchanged"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only on issue: ``issued`` (new), ``reissued`` (the amounts changed: the earlier certificate is superseded and keeps its serial) or ``unchanged`` (the issued certificate already shows these amounts and is returned as it is).",
+            "title": "Outcome"
+          },
+          "paid": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Paid",
+            "type": "string"
+          },
+          "pdf_status": {
+            "enum": [
+              "queued",
+              "ready",
+              "failed"
+            ],
+            "title": "Pdf Status",
+            "type": "string"
+          },
+          "receipts": {
+            "items": {
+              "$ref": "#/components/schemas/TaxCertificateReceiptOut"
+            },
+            "title": "Receipts",
+            "type": "array"
+          },
+          "refunded": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Refunded",
+            "type": "string"
+          },
+          "serial_number": {
+            "title": "Serial Number",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "issued",
+              "superseded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          },
+          "superseded_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By"
+          }
+        },
+        "required": [
+          "id",
+          "serial_number",
+          "financial_year",
+          "as_of",
+          "in_progress",
+          "student_id",
+          "student_name",
+          "admission_no",
+          "class_section",
+          "paid",
+          "refunded",
+          "amount",
+          "amount_in_words",
+          "receipts",
+          "head_names",
+          "status",
+          "superseded_by",
+          "issued_by",
+          "issued_by_name",
+          "issued_at",
+          "pdf_status",
+          "content_sha256",
+          "legal_verified"
+        ],
+        "title": "TaxCertificateOut",
+        "type": "object"
+      },
+      "TaxCertificateReceiptOut": {
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "receipt_date": {
+            "format": "date",
+            "title": "Receipt Date",
+            "type": "string"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "refunded": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Refunded",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_number",
+          "receipt_date",
+          "amount",
+          "refunded"
+        ],
+        "title": "TaxCertificateReceiptOut",
         "type": "object"
       },
       "TcFeeNote": {
@@ -51245,6 +52063,152 @@
         ]
       }
     },
+    "/api/v1/exams/{exam_id}/lock": {
+      "post": {
+        "description": "Lock an exam's marks (``exam.manage``; FR-MRK-008): marks writes and marks-sheet\npreviews then answer 409 ``exam_locked``. 409 ``exam_already_locked``; 404 for an exam of\nanother school. Audited ``exam.locked``.",
+        "operationId": "lock_exam_api_v1_exams__exam_id__lock_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "exam_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Exam Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lock Exam",
+        "tags": [
+          "attendance and marks"
+        ]
+      }
+    },
+    "/api/v1/exams/{exam_id}/unlock": {
+      "post": {
+        "description": "Unlock a locked exam so its marks can be corrected (``exam.unlock``: the principal only,\nstep-up MFA, 428 without it; FR-MRK-010) with a mandatory reason. 409 ``exam_not_locked``.\nAudited ``exam.unlocked``; every later change is kept in the marks history.",
+        "operationId": "unlock_exam_api_v1_exams__exam_id__unlock_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "exam_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Exam Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExamUnlockIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unlock Exam",
+        "tags": [
+          "attendance and marks"
+        ]
+      }
+    },
     "/api/v1/export-profiles": {
       "get": {
         "description": "Board and portal pre-check profiles (e.g. ``cbse-registration-2027``, ``udise-plus``)\nwith their field order for the \"ready to enter\" sheet (permission ``export.board`` or\n``export.portal``). ``allowed`` says whether you can run each one. Board profiles are\nlisted for the school's declared boards only (FR-TEN-020).",
@@ -57619,6 +58583,586 @@
           }
         },
         "summary": "Fee Status",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/tax-certificates": {
+      "get": {
+        "description": "Certificates, newest first (``fee.collect`` or ``finance.read``; FR-FEE-055).",
+        "operationId": "list_tax_certificates_api_v1_fees_tax_certificates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "financial_year",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^20[0-9]{2}-[0-9]{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Financial Year"
+            }
+          },
+          {
+            "in": "query",
+            "name": "student_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "section_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Section Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "issued",
+                    "superseded"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Page size (max 200).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size (max 200).",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque cursor from next_cursor.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque cursor from next_cursor.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TaxCertificateListItem_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Tax Certificates",
+        "tags": [
+          "fees"
+        ]
+      },
+      "post": {
+        "description": "Issue the tuition fee certificate of one student for one financial year (``fee.collect``;\nFR-FEE-049). Repeating it returns the issued certificate (``outcome: unchanged``) while the\nreceipts and amounts are the same; otherwise the earlier one is superseded (``reissued``).\nErrors: 404 (student), 409 ``no_tuition_paid``, ``too_many_receipts``, 422\n``financial_year``.",
+        "operationId": "issue_tax_certificate_api_v1_fees_tax_certificates_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaxCertificateIssue"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxCertificateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Issue Tax Certificate",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/tax-certificates/bulk": {
+      "post": {
+        "description": "Issue the certificates of one class or section of the current year (``fee.collect``;\nFR-FEE-050). Students without tuition paid in the year are skipped. 409\n``too_many_students``.",
+        "operationId": "issue_tax_certificates_bulk_api_v1_fees_tax_certificates_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaxCertificateBulkIssue"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxCertificateBulkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Issue Tax Certificates Bulk",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/tax-certificates/{tax_certificate_id}": {
+      "get": {
+        "operationId": "get_tax_certificate_api_v1_fees_tax_certificates__tax_certificate_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tax_certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tax Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxCertificateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Tax Certificate",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/tax-certificates/{tax_certificate_id}/download-url": {
+      "get": {
+        "description": "A short-lived link to the stored PDF. 409 ``pdf_not_ready``.",
+        "operationId": "tax_certificate_download_url_api_v1_fees_tax_certificates__tax_certificate_id__download_url_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tax_certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tax Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxCertificateDownloadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tax Certificate Download Url",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/tax-certificates/{tax_certificate_id}/print": {
+      "get": {
+        "description": "The certificate as a print-ready A4 page; a superseded one is marked. Audited.",
+        "operationId": "print_tax_certificate_api_v1_fees_tax_certificates__tax_certificate_id__print_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tax_certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tax Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Print-ready A4 page (no scripts)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Print Tax Certificate",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/tax-certificates/{tax_certificate_id}/render": {
+      "post": {
+        "description": "Make the PDF again after it failed (``fee.collect``).",
+        "operationId": "render_tax_certificate_api_v1_fees_tax_certificates__tax_certificate_id__render_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tax_certificate_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tax Certificate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxCertificateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Render Tax Certificate",
         "tags": [
           "fees"
         ]
@@ -74861,6 +76405,44 @@
         ]
       }
     },
+    "/api/v1/public/links/current/tax-certificate": {
+      "get": {
+        "description": "The PDF of the child's tuition fee certificate for the financial year the page's \"Tax\ncertificate\" button names (FM-06; FR-FEE-058), presigned for at most 5 minutes. A read: it\nopens the latest certificate the school issued and never issues one; 404 while none is\nissued, 202 ``preparing`` while its PDF is being made. Audited by fees. Not a view.",
+        "operationId": "current_tax_certificate_api_v1_public_links_current_tax_certificate_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentDocumentLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentDocumentPreparingOut"
+                }
+              }
+            },
+            "description": "The certificate's PDF is being made; try again after Retry-After."
+          },
+          "404": {
+            "description": "Unknown, expired or revoked link (always the same body)."
+          },
+          "429": {
+            "description": "Too many requests or failed lookups from this address."
+          }
+        },
+        "summary": "Current Tax Certificate",
+        "tags": [
+          "public"
+        ]
+      }
+    },
     "/api/v1/public/links/exchange": {
       "post": {
         "description": "Check a parent link token for the BFF's exchange-and-redirect (FR-PUB-010). No user\ntoken; the BFF's service token only. Answers what the cookie needs; not counted as a view.",
@@ -75906,7 +77488,7 @@
         ]
       },
       "post": {
-        "description": "Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a\nday again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range`` or\n``duplicate_entry`` per entry. An entry may carry ``expected_version`` (the ``version`` read\nfrom the day): 412 ``attendance_changed`` when someone else changed that mark since, and\nnothing is saved. The early-warning rules look at these students again.",
+        "description": "Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a\nday again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range``,\n``before_enrolment`` (before the student's explicit enrolment start) or ``duplicate_entry``\nper entry. An entry may carry ``expected_version`` (the ``version`` read\nfrom the day): 412 ``attendance_changed`` when someone else changed that mark since, and\nnothing is saved. The early-warning rules look at these students again.",
         "operationId": "record_attendance_api_v1_sections__section_id__attendance_post",
         "parameters": [
           {
@@ -76064,7 +77646,7 @@
     },
     "/api/v1/sections/{section_id}/attendance/sheet": {
       "post": {
-        "description": "Read an uploaded attendance sheet (``attendance.record``): first column admission or\nroll number, then one date per column, cells P/A/L/LV. Returns the entries and every\nproblem; stores no attendance. The uploaded file is deleted once read. 422\n``aadhaar_full_number_rejected``, ``student_column_missing``, ``too_many_dates``...; 409\n``document_not_ready`` while the virus check runs.",
+        "description": "Read an uploaded attendance sheet (``attendance.record``): first column admission or\nroll number, then one date per column, cells P/A/L/LV. Returns the entries and every\nproblem (``before_enrolment`` for a date before the student's explicit start); stores no\nattendance. The uploaded file is deleted once read. 422\n``aadhaar_full_number_rejected``, ``student_column_missing``, ``too_many_dates``...; 409\n``document_not_ready`` while the virus check runs.",
         "operationId": "preview_attendance_sheet_api_v1_sections__section_id__attendance_sheet_post",
         "parameters": [
           {
@@ -76218,7 +77800,7 @@
         ]
       },
       "post": {
-        "description": "Save marks per student and subject with the maximum marks, or absent, all or nothing\n(``marks.record``). 422 ``not_in_section``, ``marks_over_max``, ``absent_has_no_marks``,\n``exam_other_year``...; an entry may carry ``expected_version`` (the mark's ``version``):\n412 ``marks_changed`` when someone else changed that mark since, and nothing is saved.",
+        "description": "Save marks per student and subject with the maximum marks, or absent, all or nothing\n(``marks.record``). 422 ``not_in_section``, ``marks_over_max``, ``absent_has_no_marks``,\n``exam_other_year``...; an entry may carry ``expected_version`` (the mark's ``version``):\n412 ``marks_changed`` when someone else changed that mark since, and nothing is saved. 409\n``exam_locked`` when the exam is locked (FR-MRK-009). Changes of stored marks are kept in\nthe marks history with the optional ``reason`` (FR-MRK-012).",
         "operationId": "record_marks_api_v1_sections__section_id__exams__exam_id__marks_post",
         "parameters": [
           {
@@ -76304,9 +77886,87 @@
         ]
       }
     },
+    "/api/v1/sections/{section_id}/exams/{exam_id}/marks/history": {
+      "get": {
+        "description": "Every change of the section's marks for one exam, newest first (``marks.read``;\nFR-MRK-013): previous and new value, who, when, the reason and whether it was after the\nexam was first locked.",
+        "operationId": "marks_history_api_v1_sections__section_id__exams__exam_id__marks_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "exam_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Exam Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarksHistoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Marks History",
+        "tags": [
+          "attendance and marks"
+        ]
+      }
+    },
     "/api/v1/sections/{section_id}/exams/{exam_id}/marks/sheet": {
       "post": {
-        "description": "Read an uploaded marks sheet (``marks.record``): row 1 admission or roll number and\nsubjects, row 2 maximum marks, then one row per student (``AB`` = absent). Returns entries\nand problems; stores no marks; the file is deleted once read.",
+        "description": "Read an uploaded marks sheet (``marks.record``): row 1 admission or roll number and\nsubjects, row 2 maximum marks, then one row per student (``AB`` = absent). Returns entries\nand problems; stores no marks; the file is deleted once read. 409 ``exam_locked`` for a\nlocked exam.",
         "operationId": "preview_marks_sheet_api_v1_sections__section_id__exams__exam_id__marks_sheet_post",
         "parameters": [
           {
