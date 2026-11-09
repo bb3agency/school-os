@@ -24,6 +24,7 @@ import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { useApiForm } from "@/lib/forms";
 import { formatDate, formatInr } from "@/lib/format";
 import type { Locale } from "@/i18n/routing";
+import { suggestionsOf, TcSuggestionHint } from "@/features/year-end/TcSuggestion";
 import { localLabel, useCertificateTypes, useInputLabel } from "./parts";
 import {
   CERT_KEYS,
@@ -355,6 +356,9 @@ function IssueForm({
   const router = useRouter();
   const api = useBffClient("staff");
   const inputLabel = useInputLabel();
+  const locale = useLocale();
+  // FT-08 (FR-YRE-014..016): "From SchoolOS" values, used only when the person clicks "Use".
+  const suggestions = suggestionsOf(preview);
   // Each failed submit moves focus to the error summary again.
   const [attempt, setAttempt] = useState(0);
   const form = useApiForm({
@@ -400,9 +404,21 @@ function IssueForm({
             <p className="text-sm text-ink-muted">{t("noInputs")}</p>
           ) : null}
           <div className="grid gap-4 md:grid-cols-2">
-            {info.inputs.map((input) => (
-              <InputField key={input.key} input={input} error={form.errors[input.key]} />
-            ))}
+            {info.inputs.map((input) => {
+              const suggestion = suggestions.find((item) => item.key === input.key);
+              const choice = input.choices.find((item) => item.value === suggestion?.value);
+              return (
+                <div key={input.key} className="space-y-1">
+                  <InputField input={input} error={form.errors[input.key]} />
+                  <TcSuggestionHint
+                    suggestion={suggestion}
+                    controlId={inputId(input.key)}
+                    fieldLabel={inputLabel(input)}
+                    valueLabel={choice ? localLabel(choice, locale) : (suggestion?.value ?? "")}
+                  />
+                </div>
+              );
+            })}
           </div>
           {info.ends_enrolment ? (
             <Alert tone="warning" title={t("endsEnrolmentTitle")}>

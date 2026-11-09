@@ -2189,6 +2189,10 @@
       "write_off_reduces_due": "A write-off is a negative amount on a fee line, like -1500."
     },
     "api": {
+      "year_result_changed": {
+        "title": "Someone else changed these results",
+        "body": "Reload the section, check the results again and save once more."
+      },
       "generic": {
         "title": "Something went wrong",
         "body": "Try again. If it keeps happening, contact support and give them the reference below."
@@ -11939,6 +11943,125 @@
         "colAdmission": "Admission no.",
         "colClass": "Class"
       }
+    }
+  },
+  "yearEnd": {
+    "nav": "Year-end results",
+    "title": "Year-end results",
+    "description": "SchoolOS proposes each student's annual result from the year's marks and register. The principal confirms every result before the promotion and the UDISE+ progression.",
+    "progressionLink": "UDISE+ progression sheet",
+    "section": "Section",
+    "pickTitle": "Choose a section",
+    "pickBody": "Pick a section to see its proposed and confirmed results.",
+    "noAccessTitle": "You cannot see annual results",
+    "noAccessBody": "Ask the principal or the office admin if you need them.",
+    "emptyTitle": "No students in this section",
+    "emptyBody": "No student finishes the year in this section.",
+    "cardTitle": "{section} · {year}",
+    "counts": "{confirmed} of {students} confirmed · {detained} detained",
+    "tableLabel": "Annual results of {section}",
+    "unnamed": "Student without a name",
+    "someone": "a staff member",
+    "daysOf": "{days} of {working}",
+    "noProposal": "No marks",
+    "notConfirmed": "Not confirmed",
+    "choose": "Choose a result",
+    "decisionFor": "Result for {name}",
+    "reasonFor": "Reason for detaining {name}",
+    "reasonPlaceholder": "Why the student is detained",
+    "reasonHint": "A detained result needs a reason. Do not type Aadhaar numbers.",
+    "confirmedBy": "Confirmed by {name} on {date}",
+    "save": "{count, plural, =0 {Nothing to save} one {Confirm # result} other {Confirm # results}}",
+    "saveHint": "Only changed results are sent. Students move to the next class only when you run the promotion.",
+    "readOnly": "Only the principal can confirm results.",
+    "savedTitle": "Results saved",
+    "saved": "{written} saved, {unchanged} unchanged.",
+    "savedWarnings": "{count, plural, one {# student is detained in a no-detention class: check the rule before the promotion.} other {# students are detained in a no-detention class: check the rule before the promotion.}}",
+    "promotionNote": "Detained students are suggested as held back on the promotion screen. You can still change the list there.",
+    "columns": {
+      "roll": "Roll",
+      "student": "Student",
+      "percent": "Marks %",
+      "days": "Days attended",
+      "proposed": "SchoolOS proposes",
+      "decision": "Result"
+    },
+    "result": {
+      "passed": "Passed",
+      "promoted": "Promoted",
+      "detained": "Detained",
+      "not_appeared": "Not appeared"
+    },
+    "problems": {
+      "reason_required": "Give a reason for detaining this student.",
+      "aadhaar": "Remove the 12-digit number from the reason."
+    },
+    "warnings": {
+      "no_detention_class": "This class follows the no-detention rule. Detaining is allowed but check the rule first."
+    },
+    "rules": {
+      "title": "How SchoolOS proposes results",
+      "passMark": "Passed at {percent}% or more over all the year's exams; below that, detained.",
+      "noDetention": "This class is in the no-detention list, so SchoolOS never proposes detained here.",
+      "unverified": "Not yet confirmed for your school: check before you rely on it.",
+      "days": "Days attended count days marked present or late. Working days are the days the section was marked until the school calendar is set up."
+    },
+    "progression": {
+      "title": "UDISE+ progression sheet",
+      "description": "Each student's class, confirmed result, marks percentage and days attended, as UDISE+ asks for them. Fill the blanks before you start on the portal.",
+      "back": "Back to year-end results",
+      "year": "Academic year",
+      "noAccessTitle": "You cannot see the progression sheet",
+      "noAccessBody": "Ask the principal or the office admin if you need it.",
+      "emptyTitle": "No students in this year",
+      "emptyBody": "No student finishes this academic year.",
+      "cardTitle": "{year} · {count, plural, one {# student} other {# students}}",
+      "cardBody": "Only confirmed results are shown. Figures come from the time the result was confirmed.",
+      "download": "Download CSV",
+      "downloading": "Preparing the file…",
+      "downloaded": "Saved {name}",
+      "blanksLabel": "Blanks to fill",
+      "tableLabel": "UDISE+ progression of {year}",
+      "complete": "Complete",
+      "blanks": {
+        "result": "{count, plural, =0 {All results confirmed} one {# result not confirmed} other {# results not confirmed}}",
+        "percent": "{count, plural, =0 {Marks for everyone} one {# without marks} other {# without marks}}",
+        "days_attended": "{count, plural, =0 {Attendance for everyone} one {# without attendance} other {# without attendance}}",
+        "udise_pen": "{count, plural, =0 {PEN for everyone} one {# without a PEN} other {# without a PEN}}"
+      },
+      "blankNames": {
+        "result": "result",
+        "percent": "marks",
+        "days_attended": "attendance",
+        "udise_pen": "PEN"
+      },
+      "columns": {
+        "admission": "Admission no.",
+        "student": "Student",
+        "pen": "PEN",
+        "section": "Section",
+        "result": "Result",
+        "percent": "Marks %",
+        "days": "Days attended",
+        "blanks": "Blanks"
+      }
+    },
+    "tc": {
+      "fromSchoolOs": "From SchoolOS: {value}",
+      "use": "Use",
+      "useLabel": "Use the SchoolOS value for {field}",
+      "source": {
+        "year_result": "the confirmed annual result",
+        "attendance_register": "the attendance register up to today"
+      }
+    },
+    "promotion": {
+      "title": "Held back from the confirmed results",
+      "body": "{count, plural, =0 {No student is confirmed as detained.} one {# student is confirmed as detained.} other {# students are confirmed as detained.}}",
+      "unconfirmed": "{count, plural, =0 {Every student has a confirmed result.} one {# student has no confirmed result yet.} other {# students have no confirmed result yet.}}",
+      "noDetention": "{count, plural, one {# of them is in a no-detention class: check the rule.} other {# of them are in a no-detention class: check the rule.}}",
+      "add": "Add them to the held-back list",
+      "added": "Added to the held-back list. Review it before you preview."
     }
   }
 }

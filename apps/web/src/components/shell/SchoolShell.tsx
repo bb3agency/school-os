@@ -143,6 +143,13 @@ export function SchoolShell({
           permission: ["marks.read", "marks.record", "exam.manage"],
           icon: "chart",
         },
+        {
+          // FT-08 (FR-YRE-019): year-end results and the UDISE+ progression sheet.
+          href: "/year-end",
+          label: t("yearEnd.nav"),
+          permission: "year_result.read",
+          icon: "clipboard",
+        },
         { href: "/flags", label: t("insights.nav"), permission: "insights.read", icon: "flag" },
       ],
     },
