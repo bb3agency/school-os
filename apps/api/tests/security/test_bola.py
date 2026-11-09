@@ -217,6 +217,9 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     },
     ("POST", "/api/v1/exams/{exam_id}/lock"): None,
     ("POST", "/api/v1/exams/{exam_id}/unlock"): {"reason": "Synthetic correction"},
+    ("POST", "/api/v1/sections/{section_id}/year-results"): {
+        "entries": [{"student_id": "01920000-0000-7000-8000-000000000001", "result": "passed"}]
+    },
     ("POST", "/api/v1/students/{student_id}/flags"): {"indicator": "attendance"},
     ("POST", "/api/v1/insights/flags/{flag_id}/actions"): {"kind": "other"},
     ("POST", "/api/v1/insights/flags/{flag_id}/close"): {"reason": "improved"},
@@ -331,6 +334,12 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/exams/{exam_id}/lock"),
         ("POST", "/api/v1/exams/{exam_id}/unlock"),
         ("GET", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/history"),
+        # FT-08 (D85): year-end results are not owner permissions.
+        ("GET", "/api/v1/sections/{section_id}/year-results"),
+        ("POST", "/api/v1/sections/{section_id}/year-results"),
+        ("GET", "/api/v1/academic-years/{year_id}/year-results/held-back"),
+        ("GET", "/api/v1/academic-years/{year_id}/udise-progression"),
+        ("GET", "/api/v1/academic-years/{year_id}/udise-progression/csv"),
         ("GET", "/api/v1/insights/flags/{flag_id}"),
         ("POST", "/api/v1/students/{student_id}/flags"),
         ("POST", "/api/v1/insights/flags/{flag_id}/actions"),

@@ -365,6 +365,8 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.certificates.schemas.ContentLine.key": "printed field code",
     "app.certificates.schemas.Blocker.attribute_key": "attribute catalog key",
     "app.certificates.schemas.PreviewWarning.attribute_key": "attribute catalog key",
+    # FT-08 (D85): the TC input a "From SchoolOS" value is for.
+    "app.certificates.schemas.TcInputSuggestion.key": "certificate input code",
     # R2-1A (ADR-0045): TC format codes and printed line codes.
     "app.certificates.schemas.CertificateFormatOut.key": "TC format code",
     "app.certificates.schemas.FormatLineOut.key": "printed line code",
@@ -523,6 +525,8 @@ IDEMPOTENCY_EXEMPT = {
     # FT-01 (D84): a repeat answers 409 exam_already_locked / exam_not_locked.
     ("POST", "/api/v1/exams/{exam_id}/lock"): "a state transition (409 when locked)",
     ("POST", "/api/v1/exams/{exam_id}/unlock"): "a state transition (409 when not locked)",
+    # FT-08 (D85): confirming results is an upsert keyed by student and year.
+    ("POST", "/api/v1/sections/{section_id}/year-results"): "an upsert keyed by student and year",
     ("POST", "/api/v1/academic-years/{year_id}/promotions:preview"): "a preview",
     ("POST", "/api/v1/academic-years/{year_id}/promotions:undo"): "a state transition",
     ("POST", "/api/v1/platform/invoice-runs"): "idempotent per month (one run per month)",

@@ -189,6 +189,19 @@ class TcFeeNote(_Out):
     account_id: uuid.UUID = Field(description="The fee account, to open it on the fee screens.")
 
 
+class TcInputSuggestion(_Out):
+    """A TC input SchoolOS suggests from its records (FT-08; FR-YRE-014..FR-YRE-016): shown as
+    "From SchoolOS" next to the input, which the person may change. Never filled in silently:
+    the request still carries what the person typed or accepted."""
+
+    key: Literal["promotion", "working_days", "days_attended"]
+    value: str = Field(max_length=20)
+    source: Literal["year_result", "attendance_register"] = Field(
+        description="year_result: the confirmed annual result; attendance_register: days "
+        "marked in the register up to today"
+    )
+
+
 class CertificatePreview(_Out):
     student_id: uuid.UUID
     certificate_type: CertificateType
@@ -204,6 +217,8 @@ class CertificatePreview(_Out):
     format_version: int | None = None
     # FR-CERT-025: information for finance readers only; never printed, never a blocker.
     fee_note: TcFeeNote | None = None
+    # FT-08 (FR-YRE-014): "From SchoolOS" values for TC inputs the format asks for.
+    input_suggestions: list[TcInputSuggestion] = Field(default_factory=list)
 
 
 # --- certificates --------------------------------------------------------------------------------
