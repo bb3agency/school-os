@@ -40,6 +40,7 @@ from sqlalchemy.orm import Session
 
 from app.audit import service as audit
 from app.authz.context import UserContext
+from app.compliance import service as compliance
 from app.core import pdf
 from app.core import purge as purging
 from app.core.config import get_settings
@@ -65,6 +66,7 @@ from app.disclosure.schemas import (
     PublicDisclosureOut,
     PublicDocumentLinkOut,
     PublishIn,
+    RegisterCertificateOut,
     SnapshotDetailOut,
     SnapshotOut,
     WithdrawIn,
@@ -252,6 +254,42 @@ def _draft_documents(
     return out
 
 
+def _register(
+    session: Session, fmt: formats.DisclosureFormat
+) -> dict[str, list[RegisterCertificateOut]]:
+    """FC-01 (FR-COMP-020): the compliance register's current certificates for the format's
+    document items (read through ``compliance.service``)."""
+    found = compliance.disclosure_certificates(session)
+    out: dict[str, list[RegisterCertificateOut]] = {}
+    for item in fmt.items():
+        if not item.takes_documents or item.key not in found:
+            continue
+        out[item.key] = [
+            RegisterCertificateOut(
+                certificate_id=c.certificate_id,
+                kind=c.kind,
+                kind_label=c.kind_label,
+                valid_until=c.valid_until,
+                state="no_expiry" if c.state == "missing" else c.state,
+                document_id=c.document_id,
+                publishable=c.document_id is not None
+                and documents.publishable_version(session, c.document_id) is not None,
+            )
+            for c in found[item.key]
+        ]
+    return out
+
+
+def _expired_items(session: Session, fmt: formats.DisclosureFormat) -> list[str]:
+    """Document items whose register certificate has expired (FR-COMP-021)."""
+    found = compliance.disclosure_certificates(session)
+    return [
+        item.key
+        for item in fmt.items()
+        if item.takes_documents and any(c.state == "expired" for c in found.get(item.key, []))
+    ]
+
+
 def _draft_out(
     session: Session, ctx: UserContext, draft: DisclosureDraft | None
 ) -> DisclosureDraftOut:
@@ -267,6 +305,8 @@ def _draft_out(
         documents=_draft_documents(session, ctx, chosen),
         from_schoolos=_from_schoolos(session, fmt),
         missing=values.missing_required(fmt, inputs),
+        register=_register(session, fmt),
+        expired_policy=compliance.disclosure_policy(),
         version=draft.version if draft else 0,
         updated_at=draft.updated_at if draft else None,
         updated_by_name=names.get(draft.updated_by) if draft and draft.updated_by else None,
@@ -478,6 +518,11 @@ def publish(session: Session, ctx: UserContext, body: PublishIn) -> SnapshotOut:
             )
     if problems.errors:
         raise ValidationFailed(problems.errors)
+    # FC-01 (FR-COMP-021, FR-COMP-022): a certificate the register holds for an item has
+    # expired: refused or only warned (and audited), by the catalogue's `disclosure` setting.
+    expired = _expired_items(session, fmt)
+    if expired and compliance.disclosure_policy() == "refuse":
+        compliance.refuse_expired(expired)
     school_name, school = derive.school_values(session)
     content = values.build_content(
         fmt,
@@ -522,6 +567,7 @@ def publish(session: Session, ctx: UserContext, body: PublishIn) -> SnapshotOut:
             "format_version": fmt.version,
             "documents": len(published),
             "handle_id": draft.link_handle_id,
+            "expired_certificates": expired,
         },
     )
     return _snapshot_out(session, snapshot, snapshot.id)

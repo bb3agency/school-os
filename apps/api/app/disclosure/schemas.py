@@ -142,6 +142,21 @@ class DraftDocumentOut(_Out):
     )
 
 
+class RegisterCertificateOut(_Out):
+    """The current certificate the compliance register holds for an item (FC-01;
+    FR-COMP-020, FR-COMP-021)."""
+
+    certificate_id: uuid.UUID
+    kind: str
+    kind_label: str
+    valid_until: dt.date | None
+    state: Literal["valid", "expiring", "expired", "no_expiry"]
+    document_id: uuid.UUID | None = Field(description="The register's copy, if any.")
+    publishable: bool = Field(
+        description="The register's copy can be published (a clean PDF school document)."
+    )
+
+
 class DisclosureDraftOut(_Out):
     format_key: str
     format_version: int = Field(description="The format version the draft is edited in (current).")
@@ -161,6 +176,15 @@ class DisclosureDraftOut(_Out):
         description="School and derived items by item key, as they are now (not frozen)."
     )
     missing: list[str] = Field(description="Required items still empty (publishing refuses).")
+    register: dict[str, list[RegisterCertificateOut]] = Field(
+        default_factory=dict,
+        description="Document items backed by the compliance register (FC-01): the current "
+        "certificates by item key. An expired one warns before publishing (or refuses, by "
+        "configuration; 422 certificate_expired).",
+    )
+    expired_policy: Literal["warn", "refuse"] = Field(
+        default="warn", description="What publishing does when a register certificate expired."
+    )
     version: int = Field(description="0 until the draft is first saved; send it in If-Match.")
     updated_at: dt.datetime | None
     updated_by_name: str | None
