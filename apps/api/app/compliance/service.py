@@ -44,11 +44,11 @@ from app.compliance.models import ComplianceCertificate as Row
 from app.compliance.schemas import (
     CertificateCreate,
     CertificateDetailOut,
-    CertificateOut,
     CertificateUpdate,
+    ComplianceCertificateOut,
+    ComplianceOwnerOut,
     DocumentRefOut,
     KindOut,
-    OwnerOut,
     RegisterCountsOut,
     RegisterOut,
     RegisterRowOut,
@@ -179,10 +179,10 @@ def _lookups(session: Session, ctx: UserContext, rows: Iterable[Row]) -> _Lookup
     return _Lookups(owners=owners, active=active, recorders=recorders, titles=titles)
 
 
-def _out(row: Row, day: dt.date, names: _Lookups) -> CertificateOut:
+def _out(row: Row, day: dt.date, names: _Lookups) -> ComplianceCertificateOut:
     owner = None
     if row.owner_membership_id is not None:
-        owner = OwnerOut(
+        owner = ComplianceOwnerOut(
             membership_id=row.owner_membership_id,
             display_name=names.owners.get(row.owner_membership_id),
             active=row.owner_membership_id in names.active,
@@ -190,7 +190,7 @@ def _out(row: Row, day: dt.date, names: _Lookups) -> CertificateOut:
     document = None
     if row.document_id is not None:
         document = DocumentRefOut(id=row.document_id, title=names.titles.get(row.document_id))
-    return CertificateOut(
+    return ComplianceCertificateOut(
         id=row.id,
         kind=row.kind,
         kind_label=_kind_label(row),
@@ -282,10 +282,12 @@ def register(session: Session, ctx: UserContext) -> RegisterOut:
     )
 
 
-def _owner_choices(session: Session) -> list[OwnerOut]:
+def _owner_choices(session: Session) -> list[ComplianceOwnerOut]:
     return sorted(
         (
-            OwnerOut(membership_id=m.membership_id, display_name=m.display_name, active=True)
+            ComplianceOwnerOut(
+                membership_id=m.membership_id, display_name=m.display_name, active=True
+            )
             for m in identity.active_members(session)
         ),
         key=lambda o: (o.display_name or "").casefold(),
@@ -374,7 +376,7 @@ def _values(data: CertificateCreate | CertificateUpdate, kind: str) -> dict[str,
     }
 
 
-def record(session: Session, ctx: UserContext, data: CertificateCreate) -> CertificateOut:
+def record(session: Session, ctx: UserContext, data: CertificateCreate) -> ComplianceCertificateOut:
     """Record a certificate (``compliance.manage``; FR-COMP-004). A catalogue kind the school
     already holds is renewed: the current one is kept as ``superseded``. For ``other``,
     ``renews_id`` names the one it renews. Errors (422): ``unknown_kind``, ``label_required``,
@@ -456,7 +458,7 @@ def update(
     data: CertificateUpdate,
     *,
     expected_version: int,
-) -> CertificateOut:
+) -> ComplianceCertificateOut:
     """Correct the current certificate (``compliance.manage``, ``If-Match``; FR-COMP-008).
     Changing "valid until" restarts its reminders. Errors: 409 ``certificate_not_current``,
     412 stale ``If-Match``, 422 as :func:`record`."""
@@ -480,7 +482,7 @@ def update(
 
 def remove(
     session: Session, ctx: UserContext, certificate_id: uuid.UUID, *, expected_version: int
-) -> CertificateOut:
+) -> ComplianceCertificateOut:
     """Remove a certificate recorded by mistake (``compliance.manage``, ``If-Match``;
     FR-COMP-009). It stays in the history as ``removed``; when it renewed an earlier one, that
     one is current again. Errors: 409 ``certificate_not_current``, 412 stale ``If-Match``."""

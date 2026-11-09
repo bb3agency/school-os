@@ -23,7 +23,6 @@ from app.academics.schemas import (
     CalendarEntryAddedOut,
     CalendarEntryIn,
     CalendarMonthOut,
-    CalendarOut,
     CalendarPatternIn,
     CalendarSuggestionsOut,
     ExamCreate,
@@ -34,6 +33,7 @@ from app.academics.schemas import (
     MarksSheetOut,
     MarksWrite,
     Month,
+    SchoolCalendarOut,
     SheetIn,
     WriteResultOut,
 )
@@ -217,10 +217,10 @@ def preview_marks_sheet(
 # --- school calendar (FT-06; FR-CAL-*) ---------------------------------------------------------
 
 
-@router.get("/academic-years/{year_id}/calendar", response_model=CalendarOut)
+@router.get("/academic-years/{year_id}/calendar", response_model=SchoolCalendarOut)
 def get_calendar(
     ctx: CalendarReader, db: TenantDB, year_id: uuid.UUID, response: Response
-) -> CalendarOut:
+) -> SchoolCalendarOut:
     """The year's school calendar: weekly pattern, holidays, vacations and extra working days
     (``student.read_basic``; FR-CAL-001). Before it is set up: the default pattern with
     ``set_up`` false. ``ETag`` carries the version (0 before set-up)."""
@@ -229,7 +229,7 @@ def get_calendar(
     return out
 
 
-@router.put("/academic-years/{year_id}/calendar", response_model=CalendarOut)
+@router.put("/academic-years/{year_id}/calendar", response_model=SchoolCalendarOut)
 def set_calendar_pattern(
     *,
     ctx: CalendarManager,
@@ -238,7 +238,7 @@ def set_calendar_pattern(
     body: CalendarPatternIn,
     version: OptionalIfMatch,
     response: Response,
-) -> CalendarOut:
+) -> SchoolCalendarOut:
     """Save the weekly pattern (``tenant.structure.manage``; FR-CAL-001). The first save sets
     up the calendar: from then on attendance on a day off is refused (422 ``holiday``).
     ``If-Match`` (``W/"0"`` before set-up) is honoured when sent: 412 ``calendar_changed``.

@@ -21,8 +21,8 @@ from app.compliance import service
 from app.compliance.schemas import (
     CertificateCreate,
     CertificateDetailOut,
-    CertificateOut,
     CertificateUpdate,
+    ComplianceCertificateOut,
     RegisterOut,
     RegisterSummaryOut,
 )
@@ -33,7 +33,7 @@ Reader = Annotated[UserContext, Depends(require(service.READ, scope="school"))]
 Manager = Annotated[UserContext, Depends(require(service.MANAGE, scope="school"))]
 
 
-def _etag[M: CertificateOut](response: Response, item: M) -> M:
+def _etag[M: ComplianceCertificateOut](response: Response, item: M) -> M:
     response.headers["ETag"] = etag(item.version)
     return item
 
@@ -53,7 +53,7 @@ def get_summary(ctx: Reader, db: TenantDB) -> RegisterSummaryOut:
     return service.summary(db, ctx)
 
 
-@router.post("/certificates", response_model=CertificateOut, status_code=201)
+@router.post("/certificates", response_model=ComplianceCertificateOut, status_code=201)
 def record_certificate(
     ctx: Manager, db: TenantDB, body: CertificateCreate, idem: IdempotencyDep
 ) -> Response:
@@ -82,7 +82,7 @@ def get_certificate(
     return _etag(response, service.get_certificate(db, ctx, certificate_id))
 
 
-@router.put("/certificates/{certificate_id}", response_model=CertificateOut)
+@router.put("/certificates/{certificate_id}", response_model=ComplianceCertificateOut)
 def update_certificate(
     *,
     ctx: Manager,
@@ -91,17 +91,17 @@ def update_certificate(
     body: CertificateUpdate,
     version: IfMatch,
     response: Response,
-) -> CertificateOut:
+) -> ComplianceCertificateOut:
     """Correct the current certificate (all editable fields; permission ``compliance.manage``,
     ``If-Match``). Changing "valid until" restarts its reminders. Errors: 409
     ``certificate_not_current``, 412 stale ``If-Match``, 422 as when recording."""
     return _etag(response, service.update(db, ctx, certificate_id, body, expected_version=version))
 
 
-@router.post("/certificates/{certificate_id}:remove", response_model=CertificateOut)
+@router.post("/certificates/{certificate_id}:remove", response_model=ComplianceCertificateOut)
 def remove_certificate(
     ctx: Manager, db: TenantDB, certificate_id: uuid.UUID, version: IfMatch, response: Response
-) -> CertificateOut:
+) -> ComplianceCertificateOut:
     """Remove a certificate recorded by mistake (permission ``compliance.manage``,
     ``If-Match``); it stays in the history as removed, and the one it renewed is current
     again. Errors: 409 ``certificate_not_current``, 412 stale ``If-Match``."""

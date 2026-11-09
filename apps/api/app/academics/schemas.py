@@ -375,7 +375,7 @@ class CalendarEntryAddedOut(CalendarEntryOut):
     )
 
 
-class CalendarOut(_Out):
+class SchoolCalendarOut(_Out):
     """A year's school calendar (FR-CAL-001..FR-CAL-003)."""
 
     academic_year_id: uuid.UUID

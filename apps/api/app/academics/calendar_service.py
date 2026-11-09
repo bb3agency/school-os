@@ -40,10 +40,10 @@ from app.academics.schemas import (
     CalendarEntryIn,
     CalendarEntryOut,
     CalendarMonthOut,
-    CalendarOut,
     CalendarPatternIn,
     CalendarSuggestionOut,
     CalendarSuggestionsOut,
+    SchoolCalendarOut,
 )
 from app.academics.school_calendar import Calendar, DayInfo, load_calendar_config, overlapping
 from app.audit import service as audit
@@ -118,10 +118,10 @@ def _entry_out(entry: CalendarEntry) -> CalendarEntryOut:
 
 def _calendar_out(
     session: Session, year: AcademicYearOut, row: SchoolCalendar | None
-) -> CalendarOut:
+) -> SchoolCalendarOut:
     if row is None:
         pattern = load_calendar_config().default_pattern
-        return CalendarOut(
+        return SchoolCalendarOut(
             academic_year_id=year.id,
             starts_on=year.starts_on,
             ends_on=year.ends_on,
@@ -134,7 +134,7 @@ def _calendar_out(
         )
     entries = repo.calendar_entries(session, year.id)
     cal = _build(year, row, entries)
-    return CalendarOut(
+    return SchoolCalendarOut(
         academic_year_id=year.id,
         starts_on=year.starts_on,
         ends_on=year.ends_on,
@@ -147,7 +147,7 @@ def _calendar_out(
     )
 
 
-def get_calendar(session: Session, ctx: UserContext, year_id: uuid.UUID) -> CalendarOut:
+def get_calendar(session: Session, ctx: UserContext, year_id: uuid.UUID) -> SchoolCalendarOut:
     """A year's calendar (FR-CAL-001). Before set-up: the default pattern, ``set_up`` false."""
     year = _year(session, year_id)
     return _calendar_out(session, year, repo.get_calendar(session, year.id))
@@ -160,7 +160,7 @@ def set_pattern(
     data: CalendarPatternIn,
     *,
     expected_version: int | None = None,
-) -> CalendarOut:
+) -> SchoolCalendarOut:
     """Save the weekly pattern; the first save sets up the calendar (FR-CAL-001). 412
     ``calendar_changed`` when ``expected_version`` is stale (0: not set up yet). Audit
     ``calendar.set_up`` / ``calendar.pattern_changed``."""

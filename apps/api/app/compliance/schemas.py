@@ -86,7 +86,7 @@ class CertificateUpdate(_Fields):
     label: Text120 = Field(default=None, description="Only for kind 'other'.")
 
 
-class OwnerOut(BaseModel):
+class ComplianceOwnerOut(BaseModel):
     membership_id: uuid.UUID
     display_name: str | None = Field(description="null when the member has left.")
     active: bool
@@ -97,7 +97,7 @@ class DocumentRefOut(BaseModel):
     title: str | None = Field(description="null when the document is gone or hidden from you.")
 
 
-class CertificateOut(_Out):
+class ComplianceCertificateOut(_Out):
     id: uuid.UUID
     kind: str
     kind_label: str = Field(description="The catalogue label, or the school's own for 'other'.")
@@ -109,7 +109,7 @@ class CertificateOut(_Out):
     state: State
     days_left: int | None = Field(description="Days until it lapses (negative once expired).")
     document: DocumentRefOut | None
-    owner: OwnerOut | None
+    owner: ComplianceOwnerOut | None
     notes: str | None
     status: Status
     superseded_by: uuid.UUID | None
@@ -138,7 +138,7 @@ class RegisterRowOut(BaseModel):
     kind: str
     kind_label: str
     state: State
-    certificate: CertificateOut | None
+    certificate: ComplianceCertificateOut | None
 
 
 class RegisterCountsOut(BaseModel):
@@ -156,14 +156,16 @@ class RegisterOut(BaseModel):
     expiring_days: int
     verified: bool = Field(description="false: the catalogue is not checked against the rules.")
     today: dt.date
-    owners: list[OwnerOut] = Field(
+    owners: list[ComplianceOwnerOut] = Field(
         default_factory=list,
         description="Active members a renewal can be given to (only for compliance.manage).",
     )
 
 
-class CertificateDetailOut(CertificateOut):
-    history: list[CertificateOut] = Field(description="Earlier certificates of the same kind.")
+class CertificateDetailOut(ComplianceCertificateOut):
+    history: list[ComplianceCertificateOut] = Field(
+        description="Earlier certificates of the same kind."
+    )
 
 
 class RegisterSummaryOut(BaseModel):
@@ -177,11 +179,11 @@ class RegisterSummaryOut(BaseModel):
 __all__ = [
     "CertificateCreate",
     "CertificateDetailOut",
-    "CertificateOut",
     "CertificateUpdate",
+    "ComplianceCertificateOut",
+    "ComplianceOwnerOut",
     "DocumentRefOut",
     "KindOut",
-    "OwnerOut",
     "RegisterCountsOut",
     "RegisterOut",
     "RegisterRowOut",
