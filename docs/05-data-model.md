@@ -1445,6 +1445,7 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | Job runs, outbox and idempotency keys (`ops.job_runs`, `ops.outbox`, `ops.idempotency_keys`) | Life of the school (ids and counts only); delivered outbox events 30 days after delivery (D51; undelivered kept); idempotency keys 24 hours | |
 | School structure, settings and keys (years, classes, sections, `core.tenant_keys`, field definitions, WhatsApp set-up) | Life of the school | No personal data; keys destroyed at offboarding (crypto-shredding) |
 | Disclosure snapshots (`ops.disclosure_snapshots`) | Life of the school | The record of what was published; view counts 90 days |
+| School compliance certificates (`ops.compliance_certificates`) | Life of the school | The school's own certificates and their renewals; no personal data (FC-01) |
 | RTE admissions / claims (`sis.rte_*`; not scheduled) | Admissions: as the student record; claims and lines: 8 years after the financial year (D21) | |
 | Portal calendar dates and reminders (`ops.portal_*`) | 2 academic years | Configuration and idempotency, no personal data |
 | Platform incidents (`platform.incidents*`) | 3 years after closing | SchoolOS's own records, no personal data (ADR-0050) |

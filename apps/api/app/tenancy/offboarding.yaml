@@ -12,6 +12,9 @@ purge_order:
   # R3-1C (ADR-0051): disclosure rows reference public handles (the draft's link), documents and
   # their versions (published versions), so they go before public and documents.
   - disclosure
+  # FC-01: compliance certificates reference documents and memberships, so they go before
+  # both (nothing references them).
+  - compliance
   # R2-1C (ADR-0043): messaging rows reference public handles, guardians and students, so they
   # go first.
   - messaging

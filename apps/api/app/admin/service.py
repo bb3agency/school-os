@@ -85,6 +85,7 @@ from app.authz.resolver import build_snapshot
 from app.certificates import service as certificates
 from app.changes import service as changes
 from app.circulars import service as circulars
+from app.compliance import service as compliance
 from app.core import purge as purging
 from app.core import retention
 from app.core.config import get_settings
@@ -579,6 +580,8 @@ def _collect(session: Session, snap: _Snapshot) -> tuple[list[RecordTable], dict
         *fees.export_records(session),
         # R3-1C (FR-DISC-012): the disclosure draft, snapshots and published document versions.
         *disclosure.export_records(session),
+        # FC-01 (FR-COMP-016): the school's compliance certificate register.
+        *compliance.export_records(session),
         # ADR-0034: each person's Ask memory items and switch (their own work context; the
         # query log and conversations are not in the archive, docs/05 §12). Item texts only
         # with include_sensitive (D56).

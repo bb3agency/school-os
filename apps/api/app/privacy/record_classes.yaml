@@ -269,6 +269,17 @@ classes:
     erasure: refused_official_record
     source: Entered and published by the school
 
+  compliance_certificates:
+    label: School compliance certificates
+    owner: compliance
+    tables: [ops.compliance_certificates]
+    classification: C1
+    docs_row: School compliance certificates
+    retention: Life of the school
+    basis: The school's own certificates (fire NOC, building safety, recognition, affiliation) and their renewals; nothing about one person.
+    erasure: no_personal_data
+    source: Recorded by the school office from the certificates the school holds
+
   imports:
     label: Spreadsheet imports
     owner: imports
