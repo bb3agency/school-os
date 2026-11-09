@@ -73,6 +73,13 @@ function Item({ item }: { item: ApprovalItem }) {
             <span className="text-sm text-ink-muted">{item.class_section}</span>
           ) : null}
         </p>
+        {/* The adjustment's reason code, e.g. "Written off by management" (FR-FEE-042). */}
+        {item.kind === "adjustment" &&
+        tf.has(`adjustmentReasons.${item.summary_code}` as "adjustmentReasons.write_off") ? (
+          <p className="text-sm font-semibold">
+            {tf(`adjustmentReasons.${item.summary_code}` as "adjustmentReasons.write_off")}
+          </p>
+        ) : null}
         <p className="break-words">{item.reason}</p>
         <p className="text-sm text-ink-muted">
           {t("requestedBy", {

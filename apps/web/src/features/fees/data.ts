@@ -53,6 +53,13 @@ export type Concession = S["ConcessionOut"];
 export type Adjustment = S["AdjustmentOut"];
 export type DailyReport = S["DailyReportOut"];
 export type Dues = S["DuesOut"];
+/** FM-01 (FR-FEE-036/037): a student's open accounts, earlier years first, and the split. */
+export type StudentYears = S["StudentYearsOut"];
+export type YearDue = S["YearDue"];
+export type SplitPart = S["SplitPart"];
+/** FM-01 (FR-FEE-038): students who left with an open balance. */
+export type LeftWithDues = S["LeftWithDuesOut"];
+export type LeftWithDuesRow = S["LeftWithDuesRow"];
 export type CounterMode = "cash" | "cheque" | "bank_transfer" | "upi_qr";
 export type ReceiptMode = Receipt["mode"];
 
@@ -73,6 +80,8 @@ export const KEYS = {
   daily: (date: string) => ["staff", "fees", "daily", date] as const,
   dues: (sectionId: string, classId: string) =>
     ["staff", "fees", "dues", sectionId, classId] as const,
+  studentYears: (studentId: string) => ["staff", "fees", "student-years", studentId] as const,
+  leftWithDues: ["staff", "fees", "left-with-dues"] as const,
   /**
    * The school's years and classes for the fee pickers. Under the academic-structure prefixes
    * (STRUCTURE_KEYS.years / .classes), so a year or class added or renamed there shows here

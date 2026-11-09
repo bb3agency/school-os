@@ -38,8 +38,11 @@ export type BroadcastPage = S["BroadcastPage"];
 export type BroadcastReport = S["BroadcastReportOut"];
 export type Automatic = S["AutomaticOut"];
 export type SendRun = S["SendRunOut"];
-/** R2-3J (FR-MSG-025): manual fee reminders from the dues list. */
-export type FeeReminderSelection = S["FeeReminderSelectionIn"];
+/**
+ * R2-3J (FR-MSG-025): manual fee reminders from the dues list. The dialog adds
+ * `include_earlier_years` itself (FM-01, FR-FEE-035: an explicit option, default off).
+ */
+export type FeeReminderSelection = Omit<S["FeeReminderSelectionIn"], "include_earlier_years">;
 export type FeeReminderPreview = S["FeeReminderPreviewOut"];
 export type FeeRemindersSent = S["FeeRemindersOut"];
 /** R2-4 (FR-MSG-027): "Send payment link" is the same dialog with kind payment_link. */

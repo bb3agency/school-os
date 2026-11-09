@@ -60,6 +60,7 @@ const dues: LinkEnvelope = {
     child_first_name: "Venkata",
     class_name: "Class IX",
     as_of: "2026-10-18",
+    earlier_years: [],
     instalments: [
       {
         instalment_no: 1,
@@ -243,6 +244,52 @@ describe("tax certificate button (FM-06, FR-FEE-057)", () => {
     };
     render(<LinkFrame envelope={withButton} csrf="c" />);
     expect(screen.getByRole("link", { name: "Tax certificate FY 2026-27" })).toBeInTheDocument();
+  });
+});
+
+describe("earlier years on the dues page (FM-01, FR-FEE-039)", () => {
+  const earlier_years = [
+    { label: "2024-25", due: "1200.00" },
+    { label: "2025-26", due: "4800.00" },
+  ];
+
+  it("lists earlier years oldest first, before this year's fees, paid at the office", () => {
+    const { container } = render(
+      <LinkFrame envelope={{ ...dues, dues: { ...dues.dues!, earlier_years } }} csrf="c" />,
+    );
+    const block = screen.getByRole("region", { name: "Earlier years" });
+    const items = within(block).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("2024-25");
+    expect(items[0]).toHaveTextContent("₹1,200.00");
+    expect(items[1]).toHaveTextContent("2025-26");
+    expect(items[1]).toHaveTextContent("₹4,800.00");
+    expect(items[0]).toHaveTextContent("Pay at the school office");
+    // Before this year's pay form; "Pay online" still covers this year only.
+    const form = container.querySelector("form#pay");
+    expect(
+      block.compareDocumentPosition(form as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(form as HTMLElement).queryByText("2025-26")).toBeNull();
+    expect(container.textContent).toContain("₹7,050.00");
+  });
+
+  it("says nothing is due for this year when only earlier years are open", () => {
+    render(
+      <LinkFrame
+        envelope={{
+          ...dues,
+          dues: { ...dues.dues!, earlier_years, instalments: [], total_due: "0.00" },
+        }}
+        csrf="c"
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Nothing is due for this year now.");
+    expect(screen.getByRole("region", { name: "Earlier years" })).toBeInTheDocument();
+  });
+
+  it("shows no block without earlier-year dues", () => {
+    render(<LinkFrame envelope={dues} csrf="c" />);
+    expect(screen.queryByRole("region", { name: "Earlier years" })).toBeNull();
   });
 });
 

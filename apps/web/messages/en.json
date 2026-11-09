@@ -2182,7 +2182,8 @@
       "ai_bundle": "This AI answer bundle is no longer offered. Choose another bundle.",
       "quiet_hours_empty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00.",
       "invalid_time": "Enter a time as HH:MM, for example 07:00.",
-      "keys_rejected": "Razorpay did not accept this key id and secret. Copy both again from the Razorpay dashboard (Account & Settings > API keys)."
+      "keys_rejected": "Razorpay did not accept this key id and secret. Copy both again from the Razorpay dashboard (Account & Settings > API keys).",
+      "write_off_reduces_due": "A write-off is a negative amount on a fee line, like -1500."
     },
     "api": {
       "generic": {
@@ -2548,7 +2549,9 @@
     "lateFeeWaiverOnly": "The late-fee line takes only a late-fee waiver. Choose that reason or another line.",
     "quietHoursEmpty": "Quiet hours must start and end at different times. For quiet hours overnight, start after the end, for example 21:00 to 07:00.",
     "refundAboveLeft": "The refund is more than this receipt took less the refunds already asked for. Lower it.",
-    "dailyCapRange": "Enter a whole number from 1 to 10,00,000, or leave it empty for the default."
+    "dailyCapRange": "Enter a whole number from 1 to 10,00,000, or leave it empty for the default.",
+    "writeOffReducesDue": "A write-off is a negative amount, like -1500.",
+    "writeOffAboveDue": "This is more than what is still due on the line. Lower it to the amount due or less."
   },
   "support": {
     "piiWarningTitle": "Do not include student personal data",
@@ -9122,7 +9125,12 @@
       "queued": "{count, plural, =0 {Nothing new was queued: everyone was reminded already.} one {# reminder is queued. It goes out outside quiet hours.} other {# reminders are queued. They go out outside quiet hours.}}",
       "done": "Done",
       "paymentsNotConnected": "Online payments are not connected, so parents could not pay from the page.",
-      "openPayments": "Open payment settings"
+      "openPayments": "Open payment settings",
+      "includeEarlier": "Include earlier-year dues",
+      "includeEarlierHint": "Each parent gets one message with the total overdue of all the student's open years, this year and earlier years.",
+      "earlierYearTitle": "Earlier-year dues chosen",
+      "earlierYearBody": "Some chosen rows are dues from earlier school years. Tick “Include earlier-year dues” to remind about them.",
+      "earlierYearLinkBody": "Payment links cover this year's fees only. Choose this year's rows, or send a reminder instead."
     },
     "receipt": {
       "label": "WhatsApp",
@@ -9213,7 +9221,8 @@
       "reconcile": "Reconcile UPI",
       "upiSettings": "UPI QR",
       "feeSettings": "Fee settings",
-      "taxCertificates": "Tax certificates"
+      "taxCertificates": "Tax certificates",
+      "leftWithDues": "Left with dues"
     },
     "modes": {
       "cash": "Cash",
@@ -9364,6 +9373,36 @@
         "noQr": "The school's UPI QR is not set yet. The accountant adds it in Settings > UPI QR.",
         "inUse": "This UTR is already on receipt",
         "seenInBank": "The bank statement already shows a credit with this UTR."
+      },
+      "earlierYearsDue": "Earlier years",
+      "years": {
+        "title": "Earlier years",
+        "description": "This student has fees open in more than one school year, earlier years first. Each year is collected with its own receipt.",
+        "columns": {
+          "year": "Year",
+          "overdue": "Overdue",
+          "dueNow": "Due now",
+          "actions": "Actions"
+        },
+        "earlierYear": "Earlier year",
+        "noYear": "Year not recorded",
+        "onForm": "On the form",
+        "collect": "Collect for {year}",
+        "earlierTotal": "Due from earlier years",
+        "allTotal": "Due now, all years",
+        "splitTitle": "Split one payment oldest first",
+        "splitAmount": "Amount the parent is paying (₹)",
+        "splitHint": "SchoolOS works out how much goes to each year, oldest year first. Nothing is saved yet.",
+        "split": "Split oldest first",
+        "partsTitle": "One receipt for each year",
+        "partsNote": "Collect each part with its own receipt. Nothing is saved until you save each receipt.",
+        "takePart": "Collect the {year} part",
+        "partDone": "Receipt saved",
+        "nextPart": "Next part: {year}",
+        "errors": {
+          "not_positive": "Enter an amount above zero, like 4999 or 4999.50.",
+          "above_outstanding": "This is more than the student owes across all years. Lower the amount."
+        }
       }
     },
     "receipts": {
@@ -9480,7 +9519,8 @@
       "adjustmentsTitle": "Adjustments",
       "none": "None yet.",
       "sendPaymentLink": "Send payment link on WhatsApp",
-      "tabMessages": "Messages"
+      "tabMessages": "Messages",
+      "writeOffNote": "Written off by management: a negative amount on a fee line, never more than what is still due. Another principal or accountant approves it."
     },
     "approvals": {
       "title": "Fee approvals",
@@ -9589,7 +9629,8 @@
       "remindAll": "Send reminders to everyone in this list",
       "sendPaymentLink": "Send payment link",
       "paymentLinkAll": "Send payment links to everyone in this list",
-      "rowActions": "Actions for {name}"
+      "rowActions": "Actions for {name}",
+      "arrearsStudents": "{count, plural, one {# student} other {# students}}"
     },
     "setup": {
       "title": "Fee setup",
@@ -9827,6 +9868,10 @@
       "too_many_students": {
         "title": "Class too large",
         "body": "This class is too large to apply at once. Apply the plan one section at a time."
+      },
+      "adjustment_exceeds_due": {
+        "title": "More than what is due",
+        "body": "This would take the line below zero. Lower it to what is still due; money already paid is returned with a refund."
       }
     },
     "upi": {
@@ -10113,6 +10158,36 @@
           "body": "Certificates are issued for the last 8 financial years only. Choose a later year."
         }
       }
+    },
+    "leftWithDues": {
+      "title": "Left with dues",
+      "description": "Students who left or graduated with fees still open, for management follow-up.",
+      "infoTitle": "Never on a TC",
+      "infoBody": "This list is for information only. It is never printed on a transfer certificate or any other certificate, and it never stops or delays one.",
+      "csv": "Download left with dues (CSV)",
+      "students": "Students who left with dues",
+      "total": "Balance still open",
+      "writtenOffTotal": "Written off by management",
+      "totalsLabel": "Totals of dues left open",
+      "listTitle": "Students who left with dues",
+      "noName": "Name not recorded",
+      "columns": {
+        "student": "Student",
+        "status": "Status",
+        "accounts": "Accounts",
+        "oldest": "Oldest due date",
+        "lastPayment": "Last payment",
+        "writtenOff": "Written off",
+        "writtenOffInr": "Written off (₹)",
+        "balance": "Balance",
+        "balanceInr": "Balance (₹)"
+      },
+      "status": {
+        "left": "Left (TC issued or withdrawn)",
+        "graduated": "Graduated"
+      },
+      "emptyTitle": "No student left with dues",
+      "emptyBody": "No student who left or graduated has fees still open."
     }
   },
   "payments": {

@@ -527,6 +527,13 @@ a.public-button:hover {
   border-top: 1px solid var(--rule);
 }
 
+/* FM-01: earlier years' dues, above this year's fees; paid at the school office. */
+.public-earlier {
+  margin: 1rem 0 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--rule);
+}
+
 /* FM-06: the "Tax certificate FY ..." block under the receipt or the dues. */
 .public-tax {
   margin-top: 1.25rem;

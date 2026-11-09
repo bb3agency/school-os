@@ -30,14 +30,9 @@ type Payment = components["schemas"]["ParentPaymentStatusOut"];
 type T = ReturnType<typeof parentTranslator>;
 /**
  * FM-06 (FR-FEE-057): the "Tax certificate FY ..." button block of the receipt and dues pages
- * (`tax_certificate` on ParentReceiptOut and ParentDuesOut). Hand-written until the API client
- * is regenerated; null or absent = no button.
+ * (`tax_certificate` on ParentReceiptOut and ParentDuesOut); null or absent = no button.
  */
-type TaxCertificateButton = { financial_year: string; issued: boolean } | null | undefined;
-
-function taxButtonOf(block: object): TaxCertificateButton {
-  return (block as { tax_certificate?: TaxCertificateButton }).tax_certificate;
-}
+type TaxCertificateButton = components["schemas"]["ParentTaxCertificateOut"] | null | undefined;
 
 /** A one-line message from the page's own forms (reason codes from the query). */
 export type PageNotice =
@@ -273,7 +268,7 @@ function ReceiptSheet({
         <p className="public-muted">{t("common.pdfNotReady")}</p>
       )}
       <p className="public-note">{t("receipt.keep")}</p>
-      <TaxCertificate button={taxButtonOf(receipt)} t={t} flash={flash} />
+      <TaxCertificate button={receipt.tax_certificate} t={t} flash={flash} />
     </section>
   );
 }
@@ -295,6 +290,30 @@ function DueRow({ due, t }: { due: Dues["instalments"][number]; t: T }) {
       </span>
       <span className="public-due-amount public-figure">{parentRupees(due.due)}</span>
     </>
+  );
+}
+
+/**
+ * FM-01 (FR-FEE-039): what the same child still owes for earlier school years, oldest first
+ * (one total per year: label and amount only). Paid at the school office: "Pay online" and the
+ * total above cover this year's fees only.
+ */
+function EarlierYears({ years, t }: { years: Dues["earlier_years"]; t: T }) {
+  if (years.length === 0) return null;
+  return (
+    <section className="public-earlier" aria-labelledby="public-earlier-heading">
+      <h2 id="public-earlier-heading">{t("dues.earlierTitle")}</h2>
+      <ul className="public-dues">
+        {years.map((year) => (
+          <li key={year.label} className="public-due">
+            <span className="public-due-label">{year.label}</span>
+            <span className="public-muted">{t("dues.earlierPayAtOffice")}</span>
+            <span className="public-due-amount public-figure">{parentRupees(year.due)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="public-muted">{t("dues.earlierNote")}</p>
+    </section>
   );
 }
 
@@ -325,9 +344,10 @@ function DuesSheet({
           {t(`dues.errors.${flash.error}`)}
         </Banner>
       ) : null}
+      <EarlierYears years={dues.earlier_years} t={t} />
       {dues.instalments.length === 0 ? (
         <Banner tone="green" icon="valid">
-          {t("dues.nothingDue")}
+          {dues.earlier_years.length > 0 ? t("dues.nothingDueThisYear") : t("dues.nothingDue")}
         </Banner>
       ) : dues.pay_online ? (
         <form className="public-form" method="post" action="/p/pay" id="pay">
@@ -403,7 +423,7 @@ function DuesSheet({
         ) : null}
       </p>
       <p className="public-muted">{t("dues.noCard")}</p>
-      <TaxCertificate button={taxButtonOf(dues)} t={t} flash={flash} />
+      <TaxCertificate button={dues.tax_certificate} t={t} flash={flash} />
     </section>
   );
 }
