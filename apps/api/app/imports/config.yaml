@@ -37,6 +37,12 @@ raw_file_retention_days: 90         # FR-IMP-007 (docs/05 §13: import raw files
 # existing students matched by admission number.
 creating_sources: [admission_register, tc_incoming, manual_entry]
 
+# FO-04 (FR-UDI-011..FR-UDI-016): sources whose rows may match a student WITHOUT an admission
+# number, in this order: a verified PEN held in SchoolOS, then any PEN held, then one exact
+# name + date of birth + class match. Anything else waits for a person to pick the student or
+# skip the row. Such rows never create a student (BR-01). Lead decision D85, PO to confirm.
+pen_match_sources: [udise_plus]
+
 # Required columns per row. `always` applies to every row; `create` to rows that create a student
 # (plus per-source extras).
 required:

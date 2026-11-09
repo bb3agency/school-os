@@ -3205,7 +3205,11 @@
       "admission_no_not_mapped": "ప్రవేశ సంఖ్య ఉన్న కాలమ్‌ను ఎంచుకోండి. సరిపోల్చడానికి ప్రతి వరుసకూ అది అవసరం.",
       "aadhaar_full_number_rejected": "ఇది పూర్తి ఆధార్ సంఖ్యలా ఉంది. దాన్ని ఉంచలేదు. ఫైల్‌లో చివరి 4 అంకెలను మాత్రమే ఉంచండి.",
       "aadhaar_last4_only": "ఇది పూర్తి ఆధార్ సంఖ్యలా ఉంది. దాన్ని ఉంచలేదు. ఫైల్‌లో చివరి 4 అంకెలను మాత్రమే ఉంచండి.",
-      "formula_not_evaluated": "ఈ సెల్‌లో ఫార్ములా ఉంది, దాన్ని ఎప్పుడూ నడపం. ఫైల్‌లో దాని స్థానంలో విలువను పెట్టండి."
+      "formula_not_evaluated": "ఈ సెల్‌లో ఫార్ములా ఉంది, దాన్ని ఎప్పుడూ నడపం. ఫైల్‌లో దాని స్థానంలో విలువను పెట్టండి.",
+      "udise_unmatched": "no student has this PEN, or this name, date of birth and class. Choose the student or skip the row.",
+      "udise_match_ambiguous": "more than one student has this name, date of birth and class. Choose the student or skip the row.",
+      "picked_student_unavailable": "the student you chose is no longer in your classes. Choose again.",
+      "duplicate_student_in_file": "another row (row {row}) is the same student. Keep one of them."
     },
     "mapping": {
       "duplicate": "ఈ వివరాన్ని ఇప్పటికే మరో కాలమ్ నింపుతోంది. వేరే వివరాన్ని ఎంచుకోండి, లేదా ఈ కాలమ్‌ను దిగుమతి చేయవద్దు.",
@@ -12537,6 +12541,157 @@
       "noDetention": "{count, plural, one {వారిలో # మంది నిలిపివేత లేని తరగతిలో ఉన్నారు: నియమాన్ని చూడండి.} other {వారిలో # మంది నిలిపివేత లేని తరగతిలో ఉన్నారు: నియమాన్ని చూడండి.}}",
       "add": "వారిని అదే తరగతి జాబితాలో చేర్చండి",
       "added": "అదే తరగతి జాబితాలో చేర్చబడ్డారు. ప్రివ్యూకు ముందు జాబితాను చూడండి."
+    }
+  },
+  "udise": {
+    "nav": "UDISE+ corrections",
+    "title": "UDISE+ corrections to the MEO",
+    "description": "Names, dates of birth and gender that are wrong in UDISE+. Prepare a request, print the letter for the MEO office and follow it up.",
+    "readinessCrumb": "Board and portal readiness",
+    "aboutTitle": "A request, not a change",
+    "aboutBody": "SchoolOS lists the differences between UDISE+ and the school's admission register. The MEO or MIS coordinator corrects UDISE+; nothing in the school's records changes here. Import the UDISE+ list again afterwards to see which corrections were made.",
+    "noPermissionTitle": "You cannot prepare UDISE+ requests",
+    "noPermissionBody": "Ask the office admin or the principal: this needs permission to run readiness checks.",
+    "profile": "Check",
+    "profiles": {
+      "bseap-ssc-2027": "AP SSC March 2027",
+      "apaar": "APAAR ID"
+    },
+    "unverifiedTitle": "Format not yet confirmed",
+    "unverifiedBody": "This request follows the public guidance we could find. Show it to your MEO office once and tell us if they want another format.",
+    "noneTitle": "Nothing to ask for",
+    "noneBody": "UDISE+ agrees with the school's records for every student this check covers.",
+    "summary": "{lines, plural, one {# correction} other {# corrections}} for {students, plural, one {# student} other {# students}}; {requested, plural, =0 {none requested yet} one {# already requested} other {# already requested}}.",
+    "emptyTitle": "No corrections",
+    "emptyBody": "Nothing to correct in this group.",
+    "notShown": "Student outside your classes",
+    "colStudent": "Student",
+    "colPen": "PEN",
+    "colField": "Field",
+    "colValues": "UDISE+ and correct value",
+    "colEvidence": "Source and evidence",
+    "colState": "Now",
+    "colRequested": "Request",
+    "inUdise": "In UDISE+:",
+    "correct": "Correct:",
+    "blank": "(blank)",
+    "aadhaar": {
+      "yes": "Matches Aadhaar: yes",
+      "no": "Matches Aadhaar: no",
+      "not_recorded": "Aadhaar details not recorded"
+    },
+    "alreadyRequested": "Already requested",
+    "notRequested": "Not requested yet",
+    "lineState": {
+      "open": "Still wrong",
+      "fixed": "Corrected",
+      "unavailable": "Not in your classes"
+    },
+    "status": {
+      "prepared": "Prepared",
+      "sent": "Sent",
+      "done": "Done",
+      "rejected": "Rejected"
+    },
+    "requestsTitle": "Requests",
+    "noRequestsTitle": "No requests yet",
+    "noRequestsBody": "Prepared requests appear here with their state.",
+    "colPrepared": "Prepared on",
+    "colLines": "Corrections",
+    "colSent": "Sent",
+    "colStatus": "State",
+    "linesFor": "{lines, plural, one {# correction} other {# corrections}} for {students, plural, one {# student} other {# students}}",
+    "sentTo": "Sent on {date} to {to}",
+    "notSent": "Not sent yet",
+    "prepare": {
+      "trigger": "{count, plural, =0 {Nothing to request} one {Prepare request (# correction)} other {Prepare request (# corrections)}}",
+      "title": "Prepare a UDISE+ correction request",
+      "description": "{count, plural, one {# correction} other {# corrections}} not yet requested will go into one request.",
+      "confirm": "Prepare request",
+      "consequence": "Nothing changes in the school's records. The principal then prints the letter for the MEO office."
+    },
+    "detail": {
+      "title": "UDISE+ correction request",
+      "progress": "{fixed, plural, =0 {None corrected yet} one {# corrected} other {# corrected}}; {open, plural, =0 {nothing left to correct} one {# still wrong} other {# still wrong}}."
+    },
+    "letter": {
+      "prepare": "Print letter for the MEO",
+      "checking": "Checking…",
+      "open": "Open letter to print",
+      "newTab": "opens in a new tab",
+      "askPrincipal": "The principal or the office admin prints the letter (it needs permission for portal exports)."
+    },
+    "sent": {
+      "trigger": "Record as sent",
+      "title": "Record that the request was sent",
+      "description": "Say when and to which office. Use the role, not a person's name.",
+      "confirm": "Record as sent",
+      "date": "Sent on",
+      "to": "Sent to",
+      "toHint": "The office that will correct UDISE+.",
+      "choose": "Choose an office"
+    },
+    "close": {
+      "description": "{fixed, plural, =0 {No correction is confirmed yet} one {# correction is confirmed} other {# corrections are confirmed}} by the last UDISE+ import; {open, plural, =0 {none is still wrong} one {# is still wrong} other {# are still wrong}}.",
+      "done": {
+        "trigger": "Mark done",
+        "title": "Mark the request done"
+      },
+      "rejected": {
+        "trigger": "Mark rejected",
+        "title": "Mark the request rejected"
+      }
+    },
+    "match": {
+      "colMatch": "Matched by",
+      "rowLabel": "Row {row}",
+      "toReview": "Choose the student",
+      "basis": {
+        "admission_no": "Admission number",
+        "picked": "Chosen by you",
+        "pen_verified": "PEN (verified)",
+        "pen": "PEN",
+        "name_dob_class": "Name, date of birth and class",
+        "skipped": "Skipped"
+      },
+      "pick": {
+        "trigger": "Choose student",
+        "title": "Which student is this row?",
+        "description": "{name}: no student has this PEN, or no single student has this name, date of birth and class.",
+        "confirm": "Use this student",
+        "change": "Change",
+        "consequence": "The UDISE+ values of this row are added to this student when the import is added. The admission register is not changed."
+      },
+      "skip": "Skip row",
+      "skipAria": "Skip the row of {name}",
+      "undo": "Undo choice",
+      "undoAria": "Undo the choice for {name}"
+    },
+    "errors": {
+      "nothing_to_request": {
+        "title": "Nothing to request",
+        "body": "Every difference is already in an open request, or none is left."
+      },
+      "line_not_open": {
+        "title": "Some corrections changed",
+        "body": "Some differences were corrected or requested meanwhile. Reload the page."
+      },
+      "udise_request_state": {
+        "title": "This request changed",
+        "body": "Someone else already updated this request. Reload the page to see it."
+      },
+      "nothing_to_print": {
+        "title": "Nothing left to print",
+        "body": "Every correction in this request is made, or the students are outside your classes."
+      },
+      "import_not_matchable": {
+        "title": "Not a UDISE+ list",
+        "body": "Only a UDISE+ student list matches rows by PEN."
+      },
+      "row_has_admission_no": {
+        "title": "This row has an admission number",
+        "body": "It is matched by that number. Correct the number in the sheet instead."
+      }
     }
   }
 }

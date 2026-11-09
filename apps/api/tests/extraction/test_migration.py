@@ -289,6 +289,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         "0089_school_calendar",  # FT-06 school calendar (D85)
         "0090_year_end",  # FT-08 year-end results (D85)
         "0091_udise_followup",  # FO-01/FO-03 follow-ups and UDISE+ to-do ticks
+        "0092_udise_corrections",  # FO-02 UDISE+ correction requests, FO-04 UDISE+ row matches
     }
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
         command.downgrade(cfg, "0017_exports")

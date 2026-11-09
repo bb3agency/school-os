@@ -1376,6 +1376,9 @@ _PURGE = purging.PurgeTables(
         "sis.udise_movement_marks",
         "ops.portal_reminders",
         "ops.portal_calendar_dates",
+        # FO-02 (0092_udise_corrections): lines reference their request.
+        "sis.udise_correction_lines",
+        "sis.udise_correction_requests",
         "sis.dq_findings",
         "sis.dq_runs",
     ),

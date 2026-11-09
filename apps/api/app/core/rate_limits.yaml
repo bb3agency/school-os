@@ -198,6 +198,8 @@ routes:
   GET /api/v1/students/{student_id}/certificates/preview: [render]
   POST /api/v1/notices/{notice_id}/render: [render]
   GET /api/v1/dq/readiness/{profile_key}/slips: [render]
+  # FO-02: the UDISE+ correction letter to the MEO
+  GET /api/v1/dq/udise-corrections/{correction_id}/letter: [render]
   GET /api/v1/students/{student_id}/apaar-consent/form: [render]
   GET /api/v1/sections/{section_id}/apaar-consent-forms: [render]
   GET /api/v1/consents/forms: [render]
@@ -208,6 +210,10 @@ routes:
   GET /api/v1/dq/readiness: [readiness_reads, readiness_school]
   GET /api/v1/dq/readiness/{profile_key}: [readiness_reads, readiness_school]
   GET /api/v1/dq/readiness/{profile_key}/students: [readiness_reads, readiness_school]
+  # FO-02: UDISE+ correction requests assess the readiness of the school's students
+  GET /api/v1/dq/udise-corrections/candidates: [readiness_reads, readiness_school]
+  POST /api/v1/dq/udise-corrections: [readiness_reads, readiness_school]
+  GET /api/v1/dq/udise-corrections/{correction_id}: [readiness_reads, readiness_school]
   # R3-1D (FR-RDY-003): the portal calendar shows each event's readiness counts
   GET /api/v1/dq/calendar: [readiness_reads, readiness_school]
   POST /api/v1/academic-years/{year_id}/promotions:preview: [heavy_jobs]

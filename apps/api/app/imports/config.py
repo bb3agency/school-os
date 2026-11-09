@@ -43,6 +43,8 @@ class ImportConfig:
     class_aliases: Mapping[str, tuple[str, ...]]
     class_noise_words: tuple[str, ...]
     sheet_watermark_texts: Mapping[str, str] = field(default_factory=dict)
+    # FO-04: sources whose rows may match by PEN or name + DOB + class (FR-UDI-011).
+    pen_match_sources: frozenset[str] = frozenset()
 
     @property
     def sheet_watermark(self) -> str:
@@ -84,6 +86,7 @@ def parse_config(raw: Mapping[str, Any]) -> ImportConfig:
             str(k): str(v)
             for k, v in ((raw.get("sheet") or {}).get("export_watermark") or {}).items()
         },
+        pen_match_sources=frozenset(_strs(raw.get("pen_match_sources"))),
     )
 
 

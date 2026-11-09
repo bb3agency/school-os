@@ -546,6 +546,24 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             s=ids["student"],
             u=u["user"],
             m=ids["m1"],
+        # --- UDISE+ correction requests (0092_udise_corrections; FO-02) ----------------------
+        udise_request = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO sis.udise_correction_requests (id, tenant_id, profile_key, "
+            "lines_count, students_count, prepared_by) VALUES (:i, :t, 'apaar', 1, 1, :u)",
+            i=udise_request,
+            t=t,
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.udise_correction_lines (id, tenant_id, request_id, student_id, "
+            "attribute_key) VALUES (:i, :t, :r, :s, 'full_name')",
+            i=uuid.uuid4(),
+            t=t,
+            r=udise_request,
+            s=ids["student"],
         )
         # --- certificates and registers (0033_certificates) ---------------------------------
         _run(

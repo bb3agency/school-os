@@ -109,6 +109,8 @@ def test_FR_ADM_001_other_modules_export_their_tables_without_ciphertext(
         # FO-01/FO-03 (0091_udise_followup): follow-up log and UDISE+ to-do ticks.
         "dq_followups",
         "udise_movement_marks",
+        "udise_correction_requests",
+        "udise_correction_lines",
         "import_batches",
         "import_mapping_templates",
         "documents",

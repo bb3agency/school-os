@@ -45,7 +45,8 @@ export type ErrorNamespace =
   | "disclosure"
   | "fees.taxCertificate"
   | "schoolCalendar"
-  | "udiseFollowup";
+  | "udiseFollowup"
+  | "udise";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

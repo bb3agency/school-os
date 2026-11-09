@@ -37,6 +37,7 @@ BatchStatus = Literal[
     "failed",
 ]
 RowStatus = Literal["valid", "error", "committed", "skipped", "reverted"]
+MatchBasis = Literal["admission_no", "picked", "pen_verified", "pen", "name_dob_class", "skipped"]
 RowFilter = Literal["valid", "error", "committed", "skipped", "reverted", "warning"]
 Target = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{1,63}$")]
 
@@ -163,8 +164,19 @@ class ImportRowOut(_Out):
     section_id: uuid.UUID | None
     class_section: str | None
     roll_no: str | None
+    # FO-04 (FR-UDI-012): how a row of a UDISE+ list found its student; null for other imports.
+    match_basis: MatchBasis | None = None
     errors: list[Issue]
     warnings: list[Issue]
+
+
+class RowMatchIn(BaseModel):
+    """FO-04 (FR-UDI-014): a person's decision for a UDISE+ row the import could not match."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["student", "skip", "clear"]
+    student_id: uuid.UUID | None = None
 
 
 # --- staged sheet (FR-IMP-008, FR-IMP-009) -------------------------------------------------------

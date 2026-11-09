@@ -95,6 +95,7 @@ from app.imports.schemas import (
     PresetMappingOut,
     PresetOut,
     RowEditIn,
+    RowMatchIn,
     SheetCellOut,
     SheetColumnOut,
     SheetEditOut,
@@ -119,6 +120,8 @@ from app.imports.validation import (
     AADHAAR_MESSAGE_KEY,
     ANCHOR_SOURCE,
     NATIONAL_ID_KEYS,
+    REVIEW_CODES,
+    SKIP,
     AttributeSpec,
     ExistingStudent,
     RowResult,
@@ -130,6 +133,7 @@ from app.imports.validation import (
     is_full_aadhaar,
     issue,
     mapping_problems,
+    name_key,
     validate_sheet,
 )
 from app.imports.values import ClassInfo, ClassResolver, cell_text
@@ -331,6 +335,7 @@ def _row_out(row: ImportRow) -> ImportRowOut:
         section_id=_uuid(parsed.get("section_id")),
         class_section=parsed.get("class_label"),
         roll_no=parsed.get("roll_no"),
+        match_basis=parsed.get("match_basis"),
         errors=[Issue(**e) for e in row.errors],
         warnings=[Issue(**w) for w in row.warnings],
     )
@@ -465,6 +470,66 @@ def _existing_students(
     return out
 
 
+@dataclass(frozen=True, slots=True)
+class _PenMatch:
+    reachable: dict[str, ExistingStudent]
+    verified_pens: frozenset[str]
+    identity_index: dict[tuple[str, str, str], tuple[str, ...]]
+
+
+def _pen_match(
+    session: Session,
+    ctx: UserContext,
+    structure: _Structure,
+    national_ids: Mapping[str, Mapping[str, str]],
+) -> _PenMatch:
+    """FO-04 (FR-UDI-011..FR-UDI-013): what a UDISE+ row without an admission number can match:
+    the students in the importer's reach (``student.read_basic`` scope), the file's PEN values
+    that are verified on their holder, and (name, date of birth, current class) of each
+    student over every non-restricted source. Values stay in memory; never logged."""
+    ids = students.list_students_in_scope(session, ctx)
+    placements = students.current_placements(session, ids)
+    class_of = {s.id: s.class_id for s in structure.sections}
+    values = students.source_values(session, ids, ["full_name", "dob", "udise_pen"])
+    file_pens = set(national_ids.get("udise_pen", {}))
+    reachable: dict[str, ExistingStudent] = {}
+    verified: set[str] = set()
+    index: dict[tuple[str, str, str], set[str]] = {}
+    for sid in ids:
+        section = placements.get(sid)
+        key = str(sid)
+        reachable[key] = ExistingStudent(
+            id=key, section_id=str(section) if section else None, anchor_values={}
+        )
+        per = values.get(sid, {})
+        verified.update(
+            v.value
+            for v in per.get("udise_pen", {}).values()
+            if v.verification_status == "verified" and v.value in file_pens
+        )
+        class_id = class_of.get(str(section)) if section else None
+        if class_id is None:
+            continue
+        names = {name_key(v.value) for v in per.get("full_name", {}).values() if v.value}
+        dobs = {v.value for v in per.get("dob", {}).values() if v.value}
+        for name in names:
+            for dob in dobs:
+                index.setdefault((name, dob, class_id), set()).add(key)
+    return _PenMatch(
+        reachable=reachable,
+        verified_pens=frozenset(p for p in verified if p),
+        identity_index={k: tuple(sorted(v)) for k, v in index.items()},
+    )
+
+
+def _row_matches(batch: ImportBatch) -> dict[int, str]:
+    out: dict[int, str] = {}
+    for key, value in (batch.row_matches or {}).items():
+        if key.isdigit() and isinstance(value, str):
+            out[int(key)] = value
+    return out
+
+
 def _validation_context(
     session: Session, ctx: UserContext, batch: ImportBatch, sheet: Sheet, permission: str
 ) -> ValidationContext:
@@ -481,6 +546,8 @@ def _validation_context(
     targets = set(batch.mapping.values())
     national_ids = _national_ids(session, sheet, batch.mapping)
     wanted = _sheet_admission_keys(sheet, batch.mapping)
+    by_pen = batch.source in import_config().pen_match_sources
+    match = _pen_match(session, ctx, structure, national_ids) if by_pen else None
     return ValidationContext(
         source=batch.source,
         specs=specs,
@@ -508,6 +575,11 @@ def _validation_context(
             for adm in (students.admission_numbers_outside_reach(session, ctx) if wanted else ())
             if (key := admission_key(adm)) in wanted
         ),
+        match_by_pen=by_pen,
+        reachable=match.reachable if match else {},
+        verified_pens=match.verified_pens if match else frozenset(),
+        identity_index=match.identity_index if match else {},
+        row_matches=_row_matches(batch) if by_pen else {},
     )
 
 
@@ -837,12 +909,24 @@ def _start_job(session: Session, ctx: UserContext, task: str, batch_id: uuid.UUI
     )
 
 
+def _has_match_key(source: str, mapping: Mapping[str, str]) -> bool:
+    """Rows can find their students: the admission number is mapped or, for a UDISE+ list
+    (FO-04, FR-UDI-011), the PEN or the student's name is."""
+    targets = set(mapping.values())
+    if "admission_no" in targets:
+        return True
+    return source in import_config().pen_match_sources and bool(
+        {"udise_pen", "full_name"} & targets
+    )
+
+
 def request_validation(session: Session, ctx: UserContext, batch_id: uuid.UUID) -> ImportOut:
-    """Validate every row in a worker (202). Needs the admission number column mapped."""
+    """Validate every row in a worker (202). Needs the admission number column mapped (for a
+    UDISE+ list: the admission number, the PEN or the name)."""
     batch = _visible(session, ctx, batch_id, RUN, lock=True)
     if batch.status not in EDITABLE:
         raise Conflict("This import is not ready to be checked.", code="import_not_editable")
-    if "admission_no" not in batch.mapping.values():
+    if not _has_match_key(batch.source, batch.mapping):
         raise ValidationFailed([issue("columns", "admission_no_not_mapped")])
     job = _start_job(session, ctx, VALIDATE_TASK, batch.id)
     updated = repo.update_batch(
@@ -1288,6 +1372,105 @@ def edit_row(
     )
 
 
+def match_row(
+    session: Session,
+    ctx: UserContext,
+    batch_id: uuid.UUID,
+    row_no: int,
+    data: RowMatchIn,
+    *,
+    expected_version: int,
+) -> ImportRowOut:
+    """FO-04 (FR-UDI-014, FR-UDI-015): a person decides a UDISE+ row the import could not match
+    by PEN or by name + date of birth + class: this student (``student_id``), ``skip`` the
+    row, or ``clear`` the decision (``import.run``; ``If-Match`` with the import's ETag).
+
+    Only for an import whose source matches by PEN (409 ``import_not_matchable``), while it can
+    still be edited (409 ``import_not_editable``), and only for a row that has no admission
+    number (422 ``row_has_admission_no``). The student must be in the importer's reach (404
+    otherwise, no existence oracle). The rows are re-checked at once; nothing is recorded on
+    the student until the import is added (invariant 6), and a picked row only ever records
+    ``udise_plus`` values. Audit ``import.row_matched`` (row number, decision, student id)."""
+    batch = _visible(session, ctx, batch_id, RUN, lock=True)
+    if batch.version != expected_version:
+        raise PreconditionFailed(
+            "The import was changed meanwhile. Reload the sheet and try again."
+        )
+    if batch.source not in import_config().pen_match_sources:
+        raise Conflict(
+            "Only a UDISE+ student list matches rows by PEN.", code="import_not_matchable"
+        )
+    reason = _read_only_reason(batch)
+    if reason is not None:
+        raise Conflict(_READ_ONLY_MESSAGES[reason], code="import_not_editable")
+    sheet, _ = _staged_sheet(session, batch)
+    row = next((r for r in sheet.rows if r.row_no == row_no), None)
+    if row is None:
+        raise NotFound("Row not found")
+    adm_index = next((int(k) for k, v in batch.mapping.items() if v == "admission_no"), None)
+    if adm_index is not None and cell_text(row.cell(adm_index).value):
+        raise ValidationFailed(
+            [issue("row_no", "row_has_admission_no", "errors.udise_row_has_admission_no")],
+            detail="This row has an admission number: it is matched by that number.",
+        )
+    matches = dict(batch.row_matches or {})
+    decision: str
+    if data.decision == "student":
+        if data.student_id is None:
+            raise ValidationFailed([issue("student_id", "missing")])
+        students.ensure_in_scope(session, ctx, data.student_id)
+        matches[str(row_no)] = str(data.student_id)
+        decision = "student"
+    elif data.decision == "skip":
+        matches[str(row_no)] = SKIP
+        decision = "skip"
+    else:
+        matches.pop(str(row_no), None)
+        decision = "clear"
+    batch.row_matches = matches
+    counts: dict[str, Any] = {}
+    if batch.status == "validated":
+        result, _ = _refresh_checks(session, ctx, batch, sheet, _specs(session))
+        counts = {"stats": result.stats, "error_count": result.error_rows}
+    updated = repo.update_batch(session, batch.id, row_matches=matches, **counts)
+    if updated is None:  # pragma: no cover - row locked above
+        raise _not_found()
+    _audit(
+        session,
+        "import.row_matched",
+        batch.id,
+        {
+            "row_no": row_no,
+            "decision": decision,
+            **({"student_id": str(data.student_id)} if decision == "student" else {}),
+        },
+    )
+    log.info("imports.row_matched", import_id=str(batch.id), decision=decision)
+    stored = repo.rows_by_no(session, batch.id, [row_no])
+    if stored:
+        return _row_out(stored[0])
+    return ImportRowOut(
+        row_no=row_no,
+        status="valid",
+        action=None,
+        student_id=None,
+        admission_no=None,
+        values={},
+        sensitive=[],
+        section_id=None,
+        class_section=None,
+        roll_no=None,
+        match_basis=None,
+        errors=[],
+        warnings=[],
+    )
+
+
+def review_codes() -> frozenset[str]:
+    """Row error codes that wait for a person's match decision (FO-04)."""
+    return REVIEW_CODES
+
+
 def export_sheet(
     session: Session, ctx: UserContext, batch_id: uuid.UUID, fmt: SheetFormat
 ) -> SheetFile:
@@ -1585,7 +1768,7 @@ def run_parse(
             },
         )
         validated = False
-        if "admission_no" in mapping.values() and ctx.has(RUN):
+        if _has_match_key(batch.source, mapping) and ctx.has(RUN):
             result = validate_sheet(sheet, mapping, _validation_context(s, ctx, batch, sheet, RUN))
             batch = _store_validation(s, batch, result, specs)
             _notify_validated(s, batch, membership_id, job_id)

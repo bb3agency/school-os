@@ -74,6 +74,7 @@ export const CLIENT_NAMESPACES = {
     "touch",
     "udiseFollowup",
     "udiseTodo",
+    "udise",
     "ui",
     "validation",
     "yearEnd",

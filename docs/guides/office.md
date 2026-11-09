@@ -91,6 +91,26 @@ reminders 30, 14, 7 and 1 days before the window closes (some windows remind on 
 our own event** adds a school date. Before paying the AP SSC exam fee, open **Board readiness** and
 fix what is not ready: the board takes its data from UDISE+.
 
+**UDISE+ corrections** lists the names, dates of birth and gender that are wrong in UDISE+
+(the school cannot change them there; the MEO office does). Choose the check, then:
+
+1. Select **Prepare request**. Every correction not yet asked for goes into one request. Nothing in
+   the school's records changes.
+2. The principal or office admin opens the request and selects **Print letter for the MEO**, then
+   **Open letter to print** (it asks you to confirm it's you). The letter lists each student's PEN,
+   the value in UDISE+, the correct value and the evidence the school holds. It never shows an
+   Aadhaar number, only "Matches Aadhaar: yes/no".
+3. After you hand it over, select **Record as sent**, the date and the office.
+4. Import the UDISE+ student list again later: each line shows **Corrected** or **Still wrong**.
+   Then select **Mark done** (or **Mark rejected**).
+
+**Importing the UDISE+ student list.** Upload the Excel file as downloaded from the UDISE+ Student
+Module; you do not need to add an admission number column. SchoolOS finds each row's student by
+PEN, then by the same name, date of birth and class. **Matched by** says how. A row marked
+**Choose the student** found no single student: select **Choose student** and search by name or
+admission number, or **Skip row**. The import never creates a student and never changes the
+admission register; UDISE+ values are kept beside it for the checks.
+
 ## 3. Correction requests (two people)
 
 Identity fields (name, date of birth, parent names and similar) are never changed directly.

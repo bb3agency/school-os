@@ -1015,6 +1015,37 @@ Follow-ups on fixes that must happen outside the school (a parent's Aadhaar upda
 
 ---
 
+### 3.32 UDISE+ corrections to the MEO and UDISE+ list import by PEN (FR-UDI-001..020) (FO-02, FO-04, wave F2)
+
+Schools cannot correct a child's name or date of birth in UDISE+ themselves; the MEO / MIS office does it on a written request (docs/research/2026-11-features/office-portals.md FO-02). The UDISE+ download has no admission number, so its rows are matched by PEN first (FO-04). Both produce requests and findings, never changes to the school's records (invariant 6, BR-01). Migration `0092_udise_corrections`; routes in docs/09 (Data quality; Imports and extraction).
+
+| ID | Requirement | Verify |
+|---|---|---|
+| FR-UDI-001 | Holders of `dq.readiness.manage` MUST see, per readiness profile listed in `app/dq/config/udise_corrections.yaml` (`bseap-ssc-2027`, `apaar`), every readiness difference whose fix owner is `school_udise` and whose wrong record is `udise_plus` (live assessment, waived differences excluded), limited to the students they reach. | T |
+| FR-UDI-002 | Each line MUST show the student (name, admission number, class), the PEN, the field, the value in UDISE+, the correct value and its record, the evidence held (records in `evidence` that agree with the correct value) and whether it matches the Aadhaar-as-printed details as yes / no / not recorded. A line whose correct value only a C3 record holds MUST be left out (correct the register first). Never an Aadhaar number (invariant 4). | T |
+| FR-UDI-003 | Lines MUST be grouped by field as MIS offices batch them (names, date of birth, gender; config `groups`). | T |
+| FR-UDI-004 | A request MUST be prepared from the open lines (all, or a chosen subset) that no open (`prepared` or `sent`) request already holds; it stores student ids and field keys only, never values. 422 `nothing_to_request` / `line_not_open` / `too_many` (config `max_lines`). Audit `dq.udise_request.prepared` with counts per group. | T |
+| FR-UDI-005 | The letter MUST be an A4 print view (no scripts, one hashed style block, strict CSP) of the request's open lines grouped by field, with the school's letterhead, the recipient role, a reference, the "matches Aadhaar" note, a signature block and the `verified: false` notice while the format is unconfirmed. It needs `export.portal` with step-up; `check=true` answers 204 without printing; 409 `nothing_to_print` when no line is open. Audit `dq.udise_request.printed` (counts). *(Lead decision D85, PO to confirm: preparing and tracking with `dq.readiness.manage`, printing with `export.portal`.)* | T |
+| FR-UDI-006 | A prepared request MUST be recordable as `sent` with a date (not in the future, at most a year back) and a recipient role from config `recipients` (never a person's name), with `If-Match`. Audit `dq.udise_request.sent`. | T |
+| FR-UDI-007 | Each line of a request MUST show its state now: `open` (UDISE+ still differs), `fixed` (the readiness check no longer finds it, e.g. after the next UDISE+ list import) or `unavailable` (outside the caller's reach). | T |
+| FR-UDI-008 | A sent request MUST be closable as `done` or `rejected` with `If-Match` (409 `udise_request_state` from any other state). Audit `dq.udise_request.done` / `.rejected`. | T |
+| FR-UDI-009 | Requests and lines MUST be tenant tables under invariant 1 (RLS, composite FKs, offboarding purge), in the school's full export and the record class `data_quality`; `sos_app` may not delete them and may update only the workflow columns of a request. Another school's request is 404. | T |
+| FR-UDI-010 | The request format MUST stay `verified: false` with its sources in `udise_corrections.yaml` until a pilot school's MEO office confirms it (owner decision D3). *(Lead decision D85, PO to confirm.)* | I |
+| FR-UDI-011 | A row of a `pen_match_sources` import (the UDISE+ student list) without an admission number MUST be matched in this order: the person's decision for the row, a PEN held by a student in the importer's reach (`pen_verified` when that value is verified, else `pen`), then exactly one student in reach with the same name (capitals and repeated spaces ignored), date of birth and current class (`name_dob_class`). *(Lead decision D85, PO to confirm.)* | T |
+| FR-UDI-012 | Each such row MUST carry its match basis (`sis.import_rows.parsed.match_basis`, `ImportRowOut.match_basis`), shown on the validation sheet, and the batch stats MUST count rows per basis, skipped rows and rows to review. | T |
+| FR-UDI-013 | Two or more name + DOB + class candidates MUST NOT match (`udise_match_ambiguous`); no candidate is `udise_unmatched`. Both wait for a person. | T |
+| FR-UDI-014 | `PUT /imports/{id}/rows/{row_no}/match` (`import.run`, `If-Match`) MUST record the person's decision (a student in reach, `skip`, or `clear`) for a row without an admission number, re-check the sheet at once and audit `import.row_matched` (row, decision, student id). Two rows matched to one student are both refused (`duplicate_student_in_file`). | T |
+| FR-UDI-015 | A UDISE+ list import MUST NEVER create a student; a matched row records only `udise_plus` values through the student service (invariant 6). A PEN held outside the importer's reach is `student_out_of_scope`. | T |
+| FR-UDI-016 | A row that has an admission number MUST still be matched by it first; other import sources keep the admission-number rule unchanged. | T |
+| FR-UDI-017 | A skipped row MUST be neither added nor an error (only a full Aadhaar number in it still counts against the row). | T |
+| FR-UDI-018 | A UDISE+ list MUST be checkable with the PEN or the name mapped and no admission-number column (auto-check after parsing and `POST .../validate`). | T |
+| FR-UDI-019 | The web MUST offer the UDISE+ corrections list and request pages (prepare, print letter, record sent, close) and, on a UDISE+ import, the match basis per row with "Choose student" and "Skip row" for rows to review, keyboard-usable at 1366×768. | T |
+| FR-UDI-020 | Logs MUST carry ids and counts only; audit summaries MUST carry no names, dates of birth or PEN values. | T |
+
+*As built (wave F2, FO-02 and FO-04, 2026-11-09):* all built and tested (`apps/api/tests/dq/test_udise_corrections.py`, `apps/api/tests/imports/test_udise_match*.py`, `apps/api/tests/dq/udise_security_support.py`, `apps/web/src/features/udise/`). The change request number of a corrected register value is not printed yet (the letter names the register as the source).
+
+---
+
 ## 4. Non-functional requirements
 
 ### 4.1 Security (NFR-SEC), summary; controls in 07

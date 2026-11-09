@@ -361,6 +361,19 @@ def export_record_tables(session: Session) -> list[RecordTable]:
         # the reminders sent (C1, no personal data).
         dump_table(session, PC, name="portal_calendar_dates", order_by=("created_at", "id")),
         dump_table(session, PR, name="portal_reminders", order_by=("sent_at", "id")),
+        # FO-02 UDISE+ correction requests (ids, field keys and dates only).
+        dump_table(
+            session,
+            m.udise_correction_requests,
+            name="udise_correction_requests",
+            order_by=("prepared_at", "id"),
+        ),
+        dump_table(
+            session,
+            m.udise_correction_lines,
+            name="udise_correction_lines",
+            order_by=("created_at", "id"),
+        ),
     ]
 
 

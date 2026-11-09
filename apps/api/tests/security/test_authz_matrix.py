@@ -2882,6 +2882,42 @@ def _consents() -> ModuleType:
 SPECS.update(_consents().matrix_specs())
 
 
+def _udise() -> ModuleType:
+    """tests/dq/udise_security_support.py (FO-02 UDISE+ correction requests)."""
+    name = "sos_test_dq_udise_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "dq" / "udise_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_udise().matrix_specs())
+
+
+def _udise_match(w: Any, r: str, a: Engine) -> Request:
+    """FO-04 (FR-UDI-014): skip the unmatched row of a fresh UDISE+ list of school A."""
+    data = IM.xlsx_bytes(
+        [
+            ["Name of Student", "Date of Birth", "Class", "Section"],
+            ["Synthetica Nobody", "02/02/2012", "IX", "A"],
+        ]
+    )
+    batch_id = IM.start(a, w.a, data, source="udise_plus")
+    return (
+        f"/api/v1/imports/{batch_id}/rows/2/match",
+        {"decision": "skip"},
+        _if_match(IM.batch(a, batch_id)["version"]),
+    )
+
+
+SPECS[("PUT", "/api/v1/imports/{import_id}/rows/{row_no}/match")] = _udise_match
+
+
 def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one answer per route family
     creates = {
         "/api/v1/users",
@@ -2950,6 +2986,8 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         _consents().MATRIX_ACCEPTED
     ):
         return 202
+    if (method, path) in _udise().MATRIX_STATUS:
+        return int(_udise().MATRIX_STATUS[(method, path)])  # FO-02: guard passed (no difference)
     if (method, path) in _disclosure().MATRIX_STATUS:
         return int(_disclosure().MATRIX_STATUS[(method, path)])
     if (method, path) in _consents().MATRIX_STATUS:

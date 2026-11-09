@@ -125,6 +125,8 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}"): {
         "cells": [{"column": 1, "value": "Synthetica BOLA"}]
     },
+    # FO-04: a person's match decision for a UDISE+ row.
+    ("PUT", "/api/v1/imports/{import_id}/rows/{row_no}/match"): {"decision": "skip"},
     ("POST", "/api/v1/documents/{document_id}/sheet/versions"): {
         "base_version_no": 1,
         "edits": [{"row_no": 2, "column": 0, "value": "Synthetica BOLA"}],
@@ -320,6 +322,7 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/imports/{import_id}/revert"),
         ("GET", "/api/v1/imports/{import_id}/sheet"),
         ("PATCH", "/api/v1/imports/{import_id}/sheet/rows/{row_no}"),
+        ("PUT", "/api/v1/imports/{import_id}/rows/{row_no}/match"),
         ("GET", "/api/v1/imports/{import_id}/sheet/export"),
         ("GET", "/api/v1/imports/{import_id}/preset-mapping"),
         # Cancelling needs student.identity_change.request (the owner only approves).
@@ -858,6 +861,20 @@ def _b_upi(w: Any, key: str) -> uuid.UUID:
     return value
 
 
+def _udise() -> ModuleType:
+    """tests/dq/udise_security_support.py (FO-02 UDISE+ correction requests)."""
+    name = "sos_test_dq_udise_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "dq" / "udise_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
 def _tax() -> ModuleType:
     """tests/fees/tax_security_support.py (FM-06: a tuition fee certificate of school B)."""
     name = "sos_test_fees_tax_security_support"
@@ -1014,6 +1031,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "breach_id": lambda w: _consents().b_breach(_ADMIN[0], w),
     # FC-12 (ADR-0059): a legal hold of school B.
     "hold_id": lambda w: _consents().b_hold(_ADMIN[0], w),
+    # FO-02: a UDISE+ correction request of school B.
+    "correction_id": lambda w: _udise().b_request(_ADMIN[0], w),
 }
 
 
@@ -1047,6 +1066,19 @@ BODIES.update(_fees().BOLA_BODIES)
 BODIES.update(_upi().BOLA_BODIES)
 BODIES.update(_tax().BOLA_BODIES)
 BODIES.update(_addons().BOLA_BODIES)
+BODIES.update(_udise().BOLA_BODIES)
+# FO-02: dq.readiness.manage and export.portal are the principal's, not the owner's.
+ACTOR.update(
+    dict.fromkeys(
+        (
+            ("GET", "/api/v1/dq/udise-corrections/{correction_id}"),
+            ("POST", "/api/v1/dq/udise-corrections/{correction_id}/sent"),
+            ("POST", "/api/v1/dq/udise-corrections/{correction_id}/close"),
+            ("GET", "/api/v1/dq/udise-corrections/{correction_id}/letter"),
+        ),
+        "principal",
+    )
+)
 BODIES.update(_disclosure().BOLA_BODIES)
 
 

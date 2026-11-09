@@ -1,0 +1,62 @@
+# UDISE+ correction request to the MEO / MIS coordinator (FO-02; FR-UDI-001..FR-UDI-010).
+# Loaded and validated by app.dq.udise_corrections.load_udise_config() (CLAUDE.md §6.13: words,
+# groups and limits live here, not in code).
+#
+# UNVERIFIED (owner decision D3): no official request format was found. Secondary sources say
+# schools cannot edit a child's name or date of birth in UDISE+ themselves and send requests to
+# the block or district MIS coordinator, who batches them by field. Each district may want its
+# own format: confirm with a pilot school's MEO office, then set `verified: true` and bump
+# `version`. Lead decision D85, PO to confirm.
+version: 1
+verified: false
+source:
+  - https://educationforallinindia.com/udise-2026-27-answers-to-the-questions-parents-teachers-and-school-heads-are-actually-asking/
+  - docs/research/2026-11-features/office-portals.md (FO-02)
+
+# Readiness profiles whose UDISE+ differences a request can ask for (each needs a readiness
+# check comparing the `udise_plus` source; app/dq/config/profiles/*.yaml).
+profiles: [bseap-ssc-2027, apaar]
+
+# The fields grouped as MIS offices batch them, in print order. A field of a difference that no
+# group names is left out of the request.
+groups:
+  - key: name
+    label: Name corrections
+    fields: [full_name, father_name, mother_name]
+  - key: dob
+    label: Date of birth corrections
+    fields: [dob]
+  - key: gender
+    label: Gender corrections
+    fields: [gender]
+
+# Who the school sent the request to (`sent_to`): a role, never a person's name.
+recipients:
+  meo: Mandal Educational Officer (MEO)
+  mis_coordinator: Mandal or block MIS coordinator
+  district_mis: District MIS coordinator
+  deo: District Educational Officer (DEO)
+
+# How the letter names a record that agrees with the correct value (the evidence the school holds).
+evidence:
+  admission_register: Admission register
+  birth_certificate: Birth certificate
+  tc_incoming: Transfer certificate (incoming)
+
+# Most lines one request can hold (one district office batch).
+max_lines: 500
+
+letter:
+  title: Request to correct student details in UDISE+
+  intro: >-
+    The details below are recorded wrongly in UDISE+ for the students of our school listed here.
+    Each correct value is taken from the school's admission register, the legal record of the
+    school, and is supported by the evidence named in the last column. We request you to correct
+    them in UDISE+.
+  aadhaar_note: >-
+    "Matches Aadhaar" says only whether the correct value agrees with the details printed on the
+    student's Aadhaar card. No Aadhaar number is given in this request.
+  closing: >-
+    We will check UDISE+ again after the corrections are made and confirm the outcome to your
+    office.
+  signature: Signature of the head of the school, with seal

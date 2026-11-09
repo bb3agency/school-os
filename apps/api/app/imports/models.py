@@ -66,6 +66,9 @@ class ImportBatch(Base):
     reverted_at: Mapped[dt.datetime | None]
     reverted_by: Mapped[uuid.UUID | None]
     raw_file_deleted_at: Mapped[dt.datetime | None]
+    # FO-04 (0092_udise_corrections): the office's match decisions for unmatched UDISE+ rows,
+    # row number -> student id or "skip".
+    row_matches: Mapped[dict[str, str]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
 
 

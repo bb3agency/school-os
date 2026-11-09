@@ -165,6 +165,9 @@ EXPECTED_TABLES = {
     # FO-01/FO-03 (0091_udise_followup): follow-up log and UDISE+ to-do ticks.
     "dq_followups",
     "udise_movement_marks",
+    # FO-02 (0092_udise_corrections): UDISE+ correction requests to the MEO.
+    "udise_correction_requests",
+    "udise_correction_lines",
     "import_batches",
     "import_mapping_templates",
     "documents",

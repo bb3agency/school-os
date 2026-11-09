@@ -240,7 +240,8 @@ classes:
   data_quality:
     label: Data-quality checks
     owner: dq
-    tables: [sis.dq_findings, sis.dq_runs, sis.dq_followups, sis.udise_movement_marks]
+    tables: [sis.dq_findings, sis.dq_runs, sis.dq_followups, sis.udise_movement_marks,
+             sis.udise_correction_requests, sis.udise_correction_lines]
     classification: C2
     docs_row: Data-quality findings and runs
     retention: As the student record (re-checked on every change)

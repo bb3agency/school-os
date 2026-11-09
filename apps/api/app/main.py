@@ -26,6 +26,7 @@ from app.documents.api import router as documents_router
 from app.dq.api import router as dq_router
 from app.dq.api import tasks_router as dq_tasks_router
 from app.dq.followup_api import router as dq_followup_router
+from app.dq.udise_api import router as udise_router
 from app.exports.api import router as exports_router
 from app.extraction.api import router as extraction_router
 from app.fees import webhook as payments_webhook
@@ -94,6 +95,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(audit_router)
     app.include_router(documents_router)
     app.include_router(imports_router)
+    app.include_router(udise_router)  # FO-02 UDISE+ correction requests (before dq paths)
     app.include_router(dq_router)
     app.include_router(dq_followup_router)
     # R3-1D (FR-RDY-010): link a circular task to a portal calendar event.
