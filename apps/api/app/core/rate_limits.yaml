@@ -238,6 +238,13 @@ routes:
   GET /api/v1/fees/tax-certificates/{tax_certificate_id}/print: [render]
   POST /api/v1/fees/tax-certificates/{tax_certificate_id}/render: [render]
   POST /api/v1/fees/tax-certificates/bulk: [heavy_jobs]
+  # FM-04 accountant and management reports: the print view, downloads and the year-end pack
+  GET /api/v1/fees/reports/collections/print: [render]
+  GET /api/v1/fees/reports/collections/download: [exports]
+  GET /api/v1/fees/reports/dcb/download: [exports]
+  GET /api/v1/fees/reports/registers/download: [exports]
+  GET /api/v1/fees/reports/ageing/download: [exports]
+  GET /api/v1/fees/reports/year-end-pack: [exports]
   # support tickets
   POST /api/v1/support/tickets: [support_tickets]
   POST /api/v1/platform/support/tickets: [support_tickets]

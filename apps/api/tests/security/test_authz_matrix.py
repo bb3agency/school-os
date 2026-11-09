@@ -2587,6 +2587,23 @@ def _tax() -> ModuleType:
 SPECS.update(_tax().matrix_specs())
 
 
+def _fee_reports() -> ModuleType:
+    """tests/fees/reports_security_support.py (FM-04 accountant and management reports)."""
+    name = "sos_test_fees_reports_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "reports_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_fee_reports().matrix_specs())
+
+
 def _disclosure() -> ModuleType:
     """tests/disclosure/security_support.py (R3-1C: CBSE on per call, snapshots of a school)."""
     name = "sos_test_disclosure_security_support"
