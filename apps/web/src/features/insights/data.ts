@@ -4,6 +4,7 @@ import type { components } from "@schoolos/api-client";
 import { useQuery } from "@tanstack/react-query";
 import * as z from "@/lib/zod";
 import { AuthRedirectError } from "@/lib/bff/fetch";
+import type { ApiClient } from "@schoolos/api-client";
 import { ApiError, NotAvailableError, toLoadable, unwrap, useBffClient } from "@/lib/bff/query";
 import type { Loadable } from "@/lib/loadable";
 import { AADHAAR_GROUP_SEPARATOR } from "@/lib/aadhaar";
@@ -26,6 +27,7 @@ export const PERM = {
   attendanceRead: "attendance.read",
   attendanceRecord: "attendance.record",
   examManage: "exam.manage",
+  examUnlock: "exam.unlock",
   marksRead: "marks.read",
   marksRecord: "marks.record",
   insightsRead: "insights.read",
@@ -118,6 +120,8 @@ export const KEYS = {
     ["staff", "attendance", "month", section, month] as const,
   exams: ["staff", "exams"] as const,
   marks: (section: string, exam: string) => ["staff", "marks", section, exam] as const,
+  marksHistory: (section: string, exam: string) =>
+    ["staff", "marks", section, exam, "history"] as const,
 } as const;
 
 /** `W/"3"` for If-Match (the API's ETag format). */
@@ -390,3 +394,125 @@ export const examSchema = z.object({
   name: z.string().trim().min(1, { error: "required" }).max(80, { error: "tooLong" }),
   held_on: z.string().regex(ISO_DATE, { error: "invalidDate" }),
 });
+
+// --- FT-01 exam lock and marks history (FR-MRK-008..FR-MRK-015) ---------------------------------
+// The lock, unlock and history routes and the lock fields are not in the generated client until
+// the lead regenerates it (`make openapi`). Until then they are called through a loosely typed
+// view of the same BFF client and every answer is checked with the zod schemas below.
+
+/** The lock state of an exam (fields the API adds to ExamOut). */
+export const examLockSchema = z.object({
+  locked: z.boolean().default(false),
+  locked_at: z.string().nullable().default(null),
+  unlocked_at: z.string().nullable().default(null),
+  unlock_reason: z.string().nullable().default(null),
+});
+export type ExamLock = z.infer<typeof examLockSchema>;
+
+/** Lock fields of an exam from the list or grid; an older API (no fields) reads as unlocked. */
+export function examLock(exam: unknown): ExamLock {
+  const parsed = examLockSchema.safeParse(exam ?? {});
+  return parsed.success
+    ? parsed.data
+    : { locked: false, locked_at: null, unlocked_at: null, unlock_reason: null };
+}
+
+/** Whether a mark of the grid was changed after the exam was first locked (FR-MRK-014). */
+export function changedAfterLock(mark: unknown): boolean {
+  return (
+    typeof mark === "object" &&
+    mark !== null &&
+    (mark as { changed_after_lock?: unknown }).changed_after_lock === true
+  );
+}
+
+const decimal = z.union([z.string(), z.number()]);
+
+export const markChangeSchema = z.object({
+  student: z.object({
+    student_id: z.string(),
+    full_name: z.string().nullable(),
+    admission_no: z.string().nullable(),
+    roll_no: z.string().nullable(),
+  }),
+  subject: z.string(),
+  previous_max_marks: decimal,
+  previous_marks: decimal.nullable(),
+  previous_absent: z.boolean(),
+  new_max_marks: decimal,
+  new_marks: decimal.nullable(),
+  new_absent: z.boolean(),
+  source: z.enum(["mark", "import"]),
+  after_lock: z.boolean(),
+  reason: z.string().nullable(),
+  changed_by_name: z.string().nullable(),
+  changed_at: z.string(),
+});
+export type MarkChange = z.infer<typeof markChangeSchema>;
+
+export const marksHistorySchema = z.object({ changes: z.array(markChangeSchema) });
+export type MarksHistory = z.infer<typeof marksHistorySchema>;
+
+type LooseResult = { data?: unknown; error?: unknown; response: Response };
+interface LooseClient {
+  GET(path: string, init: { params: { path: Record<string, string> } }): Promise<LooseResult>;
+  POST(
+    path: string,
+    init: { params: { path: Record<string, string> }; body?: unknown },
+  ): Promise<LooseResult>;
+}
+
+function loose(api: ApiClient): LooseClient {
+  return api as unknown as LooseClient;
+}
+
+/** POST /exams/{id}/lock (exam.manage; FR-MRK-008). */
+export async function lockExam(api: ApiClient, examId: string): Promise<ExamLock> {
+  const out = await unwrap(
+    loose(api).POST("/api/v1/exams/{exam_id}/lock", { params: { path: { exam_id: examId } } }),
+  );
+  return examLockSchema.parse(out);
+}
+
+/** The reason the principal gives to unlock an exam (FR-MRK-010): 1..500 characters. */
+export const unlockSchema = z.object({
+  reason: freeText(500).refine((value) => value.length > 0, { error: "required" }),
+});
+
+/** POST /exams/{id}/unlock (exam.unlock: principal, step-up; FR-MRK-010). */
+export async function unlockExam(
+  api: ApiClient,
+  examId: string,
+  reason: string,
+): Promise<ExamLock> {
+  const out = await unwrap(
+    loose(api).POST("/api/v1/exams/{exam_id}/unlock", {
+      params: { path: { exam_id: examId } },
+      body: { reason },
+    }),
+  );
+  return examLockSchema.parse(out);
+}
+
+/** GET /sections/{id}/exams/{id}/marks/history (marks.read; FR-MRK-013). */
+export function useMarksHistory(
+  section: string,
+  exam: string,
+  enabled: boolean,
+): Loadable<MarksHistory> {
+  const api = useBffClient("staff");
+  const query = useQuery({
+    queryKey: KEYS.marksHistory(section, exam),
+    queryFn: async () =>
+      marksHistorySchema.parse(
+        await unwrap(
+          loose(api).GET("/api/v1/sections/{section_id}/exams/{exam_id}/marks/history", {
+            params: { path: { section_id: section, exam_id: exam } },
+          }),
+        ),
+      ),
+    enabled: enabled && section !== "" && exam !== "",
+    retry,
+  });
+  return toLoadable(query);
+}

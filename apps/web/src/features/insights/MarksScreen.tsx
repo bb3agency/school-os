@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -25,6 +26,8 @@ import { NARROW_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import {
   KEYS,
   PERM,
+  changedAfterLock,
+  examLock,
   examSchema,
   todayIst,
   useExams,
@@ -33,6 +36,7 @@ import {
   type MarksGrid,
   type MarksSheet,
 } from "./data";
+import { ExamLockPanel, MarksHistoryCard } from "./ExamLock";
 import { LoadGate, ProblemList, SectionPicker } from "./parts";
 import { SheetImport } from "./SheetImport";
 
@@ -142,6 +146,12 @@ function MarksTable({ grid }: { grid: MarksGrid }) {
                           : `${Number(mark.marks)}/${Number(mark.max_marks)}`
                         : ""}
                     </span>
+                    {mark && changedAfterLock(mark) ? (
+                      // FR-MRK-014: text, not colour alone.
+                      <Badge tone="warning" className="ms-1">
+                        {t("changedAfterLock")}
+                      </Badge>
+                    ) : null}
                   </Td>
                 );
               })}
@@ -190,6 +200,7 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
   const [saved, setSaved] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const [conflict, setConflict] = useState(false);
+  const [lockedNow, setLockedNow] = useState(false);
   const students = grid.students;
   // YA-05: the version of the paper as read (0: no mark yet), so a save cannot overwrite a mark
   // someone else saved since. Subjects match whatever their case, as on the server.
@@ -273,6 +284,10 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
       if (failure instanceof ApiError && failure.code === "marks_changed") {
         // YA-05: show the other person's marks; the typed ones stay for a second look.
         setConflict(true);
+        await onSaved();
+      } else if (failure instanceof ApiError && failure.code === "exam_locked") {
+        // FR-MRK-009: the exam was locked while the teacher typed; show the lock.
+        setLockedNow(true);
         await onSaved();
       } else {
         setError(failure);
@@ -445,6 +460,11 @@ function SubjectEntry({ grid, onSaved }: { grid: MarksGrid; onSaved: () => Promi
             {t("changedBySomeone")}
           </Alert>
         ) : null}
+        {lockedNow ? (
+          <Alert tone="warning" live>
+            {t("lockedWhileTyping")}
+          </Alert>
+        ) : null}
         <ApiErrorAlert error={error} />
         <ProblemList error={error} />
         <SaveBar dirty={dirty}>
@@ -487,6 +507,9 @@ export function MarksScreen() {
   const api = useBffClient("staff");
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: KEYS.marks(section, exam) });
+  // FR-MRK-009: a locked exam takes no sheet (the API answers 409 exam_locked anyway).
+  const selectedLocked =
+    exams.status === "ready" && examLock(exams.data.find((e) => e.id === exam)).locked;
 
   return (
     <div className="space-y-5">
@@ -526,10 +549,17 @@ export function MarksScreen() {
             <LoadGate data={grid}>
               {(value) => (
                 <>
+                  <ExamLockPanel exam={value.exam} section={value.section.id} />
+                  {examLock(value.exam).locked ? (
+                    <Alert tone="warning" title={t("lock.bannerTitle")}>
+                      {t("lock.bannerBody")}
+                    </Alert>
+                  ) : null}
                   <Card title={t("gridTitle", { exam: value.exam.name })}>
                     <MarksTable grid={value} />
                   </Card>
-                  {canRecord ? (
+                  <MarksHistoryCard section={value.section.id} exam={value.exam.id} />
+                  {canRecord && !examLock(value.exam).locked ? (
                     // XA-01: keyed by section and exam, so marks typed for one exam are never
                     // kept (and saved) when the teacher picks another whose grid is cached.
                     <SubjectEntry
@@ -542,7 +572,7 @@ export function MarksScreen() {
               )}
             </LoadGate>
           ) : null}
-          {canRecord && section && exam ? (
+          {canRecord && section && exam && !selectedLocked ? (
             <SheetImport<MarkIn, MarksSheet>
               // XA-01: a sheet read for one exam or section is never offered for another.
               key={`${section}:${exam}`}

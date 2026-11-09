@@ -1422,3 +1422,130 @@ describe("two people saving the same day or exam (YA-01, YA-05, XA-06)", () => {
     expect(screen.getByLabelText("Marks of Synthetica Ravi")).toHaveValue("40");
   });
 });
+
+describe("exam lock and marks history (FT-01; FR-MRK-008..FR-MRK-014)", () => {
+  const EXAM = "0192f3a4-0000-7000-8000-00000000ea09";
+  const base = {
+    id: EXAM,
+    academic_year_id: YEAR,
+    name: "Summative assessment 1",
+    held_on: "2026-11-02",
+    version: 1,
+  };
+
+  async function pick() {
+    renderWithIntl(<MarksScreen />);
+    const picker = await screen.findByLabelText(en.marks.section);
+    await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(1));
+    await userEvent.selectOptions(picker, SECTION);
+    const exams = screen.getByLabelText(en.marks.exam);
+    await waitFor(() => expect(within(exams).getAllByRole("option").length).toBeGreaterThan(1));
+    await userEvent.selectOptions(exams, EXAM);
+  }
+
+  function grid(exam: Record<string, unknown>, changed = false) {
+    return Response.json({
+      section: section(),
+      exam,
+      subjects: ["Telugu"],
+      students: day().students.map((row) => ({
+        student: row.student,
+        marks:
+          row.student.student_id === STUDENT_ID
+            ? [
+                {
+                  subject: "Telugu",
+                  max_marks: "100",
+                  marks: "30",
+                  absent: false,
+                  version: 2,
+                  changed_after_lock: changed,
+                },
+              ]
+            : [],
+        percent: null,
+      })),
+    });
+  }
+
+  it("a locked exam shows the banner, hides marks entry and flags marks changed after lock", async () => {
+    const exam = { ...base, locked: true, locked_at: "2026-11-05T05:30:00Z" };
+    signedIn(["marks.read", "marks.record"]);
+    stub.routes["GET /bff/api/v1/exams"] = () => Response.json([exam]);
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`] = () => grid(exam, true);
+    await pick();
+    expect(await screen.findByText(en.marks.lock.bannerTitle)).toBeVisible();
+    expect(screen.getByText(en.marks.lock.askPrincipal)).toBeVisible();
+    expect(screen.getByText(en.marks.changedAfterLock)).toBeVisible();
+    expect(screen.queryByLabelText(en.marks.entry.subject)).toBeNull();
+    expect(screen.queryByText(en.marks.import.title)).toBeNull();
+    expect(screen.queryByRole("button", { name: en.marks.lock.unlock })).toBeNull();
+  });
+
+  it("the exam coordinator locks an open exam", async () => {
+    signedIn(["marks.read", "marks.record", "exam.manage"]);
+    stub.routes["GET /bff/api/v1/exams"] = () => Response.json([base]);
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`] = () => grid(base);
+    stub.routes[`POST /bff/api/v1/exams/${EXAM}/lock`] = () =>
+      Response.json({ ...base, version: 2, locked: true, locked_at: "2026-11-09T05:30:00Z" });
+    await pick();
+    await userEvent.click(await screen.findByRole("button", { name: en.marks.lock.lock }));
+    expect(await screen.findByText(en.marks.lock.lockedDone)).toBeVisible();
+    expect(stub.callsTo(`POST /bff/api/v1/exams/${EXAM}/lock`)).toHaveLength(1);
+  });
+
+  it("the principal unlocks with a reason; an empty reason is refused before sending", async () => {
+    const exam = { ...base, locked: true, locked_at: "2026-11-05T05:30:00Z" };
+    signedIn(["marks.read", "marks.record", "exam.manage", "exam.unlock"]);
+    stub.routes["GET /bff/api/v1/exams"] = () => Response.json([exam]);
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`] = () => grid(exam);
+    stub.routes[`POST /bff/api/v1/exams/${EXAM}/unlock`] = () =>
+      Response.json({ ...base, version: 3, locked: false, unlock_reason: "Re-totalled" });
+    await pick();
+    const unlock = await screen.findByRole("button", { name: en.marks.lock.unlock });
+    await userEvent.click(unlock);
+    expect(stub.callsTo(`POST /bff/api/v1/exams/${EXAM}/unlock`)).toHaveLength(0);
+    await userEvent.type(screen.getByLabelText(en.marks.lock.reason), "Re-totalled paper 2");
+    await userEvent.click(unlock);
+    expect(await screen.findByText(en.marks.lock.unlockedDone)).toBeVisible();
+    const call = stub.callsTo(`POST /bff/api/v1/exams/${EXAM}/unlock`)[0];
+    expect(JSON.parse(call?.body ?? "{}")).toEqual({ reason: "Re-totalled paper 2" });
+  });
+
+  it("opening the history lists each change with who, when and why", async () => {
+    signedIn(["marks.read"]);
+    stub.routes["GET /bff/api/v1/exams"] = () => Response.json([base]);
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks`] = () => grid(base);
+    stub.routes[`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks/history`] = () =>
+      Response.json({
+        section: section(),
+        exam: base,
+        changes: [
+          {
+            student: day().students[0]?.student,
+            subject: "Telugu",
+            previous_max_marks: "100",
+            previous_marks: "25",
+            previous_absent: false,
+            new_max_marks: "100",
+            new_marks: "30",
+            new_absent: false,
+            source: "mark",
+            after_lock: true,
+            reason: "Re-totalled paper 2",
+            changed_by_name: "Synthetic Principal Suresh",
+            changed_at: "2026-11-06T06:00:00Z",
+          },
+        ],
+      });
+    await pick();
+    expect(
+      stub.callsTo(`GET /bff/api/v1/sections/${SECTION}/exams/${EXAM}/marks/history`),
+    ).toHaveLength(0);
+    await userEvent.click(await screen.findByText(en.marks.history.title));
+    expect(await screen.findByText("Re-totalled paper 2")).toBeVisible();
+    expect(screen.getByText("Synthetic Principal Suresh")).toBeVisible();
+    expect(screen.getByText(en.marks.history.afterLock)).toBeVisible();
+    expect(screen.getByText("25/100")).toBeVisible();
+  });
+});
