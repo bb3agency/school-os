@@ -1197,6 +1197,7 @@ source_modules =
 forbidden_modules =
     app.academics.repository
     app.academics.models
+    app.academics.year_end_repository
 allow_indirect_imports = True
 
 [importlinter:contract:insights-internals]

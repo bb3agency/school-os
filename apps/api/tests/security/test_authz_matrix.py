@@ -2056,6 +2056,32 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # FT-08 (D85): year-end results, held-back suggestions and the UDISE+ progression sheet.
+    ("GET", "/api/v1/sections/{section_id}/year-results"): lambda w, r, a: (
+        _m5_section(w, "/year-results"),
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/sections/{section_id}/year-results"): lambda w, r, a: (
+        _m5_section(w, "/year-results"),
+        {"entries": [{"student_id": str(_m5_s9a(w)), "result": "passed"}]},
+        {},
+    ),
+    ("GET", "/api/v1/academic-years/{year_id}/year-results/held-back"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/year-results/held-back",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/academic-years/{year_id}/udise-progression"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/udise-progression",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/academic-years/{year_id}/udise-progression/csv"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/udise-progression/csv",
+        None,
+        {},
+    ),
     ("GET", "/api/v1/insights/flags"): lambda w, r, a: ("/api/v1/insights/flags", None, {}),
     ("GET", "/api/v1/insights/summary"): lambda w, r, a: ("/api/v1/insights/summary", None, {}),
     ("GET", "/api/v1/insights/flags/{flag_id}"): lambda w, r, a: (

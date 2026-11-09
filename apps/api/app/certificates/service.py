@@ -43,6 +43,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
+from app.academics import service as academics
 from app.apaar import service as apaar
 from app.audit import service as audit
 from app.authz.context import UserContext
@@ -80,6 +81,7 @@ from app.certificates.schemas import (
     PublicDuplicate,
     ReasonIn,
     TcFeeNote,
+    TcInputSuggestion,
     VerificationOut,
     VerificationReasonIn,
 )
@@ -938,7 +940,29 @@ def preview(
     )
     out = _preview_out(record, sensitive=sensitive)
     if certificate_type == "transfer":
-        out = out.model_copy(update={"fee_note": _fee_note(session, ctx, student_id)})
+        out = out.model_copy(
+            update={
+                "fee_note": _fee_note(session, ctx, student_id),
+                "input_suggestions": _input_suggestions(session, record, student_id),
+            }
+        )
+    return out
+
+
+def _input_suggestions(
+    session: Session, record: _Record, student_id: uuid.UUID
+) -> list[TcInputSuggestion]:
+    """FT-08 (FR-YRE-014..FR-YRE-016): "From SchoolOS" values for the TC inputs the school's
+    format asks for (AP TC: qualified for promotion, working days, days attended), from the
+    confirmed annual result and the attendance register. Only inputs the layout has, and only
+    choices it accepts; the person may change them, and nothing is filled in silently."""
+    inputs = record.layout.inputs
+    out: list[TcInputSuggestion] = []
+    for found in academics.tc_suggestions(session, student_id, today=_today(session)):
+        spec = inputs.get(found.key)
+        if spec is None or (spec.kind == "choice" and found.value not in spec.choices):
+            continue
+        out.append(TcInputSuggestion(key=found.key, value=found.value, source=found.source))
     return out
 
 

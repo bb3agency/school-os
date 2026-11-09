@@ -23,6 +23,7 @@ from app.academics.models import (
     ExamMark,
     ExamMarkHistory,
     SchoolCalendar,
+    YearResultRow,
 )
 from app.core.record_tables import dump_table
 from app.core.records import RecordTable
@@ -523,6 +524,12 @@ def export_tables(session: Session) -> list[RecordTable]:
             CalendarEntry.__table__,
             name="calendar_entries",
             order_by=("academic_year_id", "starts_on", "id"),
+        ),
+        dump_table(
+            session,
+            YearResultRow.__table__,
+            name="year_results",
+            order_by=("academic_year_id", "student_id"),
         ),
     ]
 

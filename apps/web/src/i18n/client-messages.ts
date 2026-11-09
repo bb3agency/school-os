@@ -74,6 +74,7 @@ export const CLIENT_NAMESPACES = {
     "touch",
     "ui",
     "validation",
+    "yearEnd",
   ],
   /** The operator console, app/[locale]/platform. */
   platform: [

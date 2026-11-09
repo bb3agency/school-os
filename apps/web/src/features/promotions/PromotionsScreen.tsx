@@ -25,6 +25,7 @@ import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDateTime } from "@/lib/format";
 import { ready, type Loadable } from "@/lib/loadable";
 import { classLabel, useStructureLists, useYearSections } from "@/features/academic-structure/data";
+import { HeldBackSuggestion } from "@/features/year-end/HeldBackSuggestion";
 import {
   AFTER_PROMOTION_KEYS,
   PROMOTE,
@@ -542,6 +543,11 @@ function HeldBackPicker({
         {t("heldBackTitle")}
       </h3>
       <p className="text-sm text-ink-muted">{t("heldBackHint")}</p>
+      <HeldBackSuggestion
+        yearId={from.id}
+        held={held}
+        onAdd={(ids) => ids.forEach((id) => onToggle(id, null))}
+      />
       {canRead ? (
         <>
           <form role="search" onSubmit={onSearch} className="flex flex-wrap items-end gap-2">

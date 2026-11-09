@@ -1,9 +1,10 @@
 """Data-principal access report contribution of the academics module (R3-1A; FR-DPDP-009,
 ADR-0048 decision 6, PRV-031).
 
-A student's attendance as monthly counts per status and their marks per exam and subject (or
-"Absent"). SchoolOS stores no grade, so none is shown. Attendance registers and marks are school
-records (``refused_official_record``): this module never erases.
+A student's attendance as monthly counts per status, their marks per exam and subject (or
+"Absent") and their confirmed annual results (FT-08). SchoolOS stores no grade, so none is
+shown. Attendance registers, marks and annual results are school records
+(``refused_official_record``): this module never erases.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from typing import Final
 from sqlalchemy.orm import Session
 
 from app.academics import repository as repo
+from app.academics import year_end_repository as yrepo
 from app.core.report_format import cap_rows, fmt_count, fmt_date, fmt_text
 from app.core.subjects import MAX_SECTION_ROWS, ReportSection, Subject
 
@@ -23,6 +25,13 @@ CLASS_KEY: Final = "attendance_and_marks"
 STATUSES: Final = ("present", "late", "absent", "leave")
 ATTENDANCE_COLUMNS: Final = ("Month", "Present", "Late", "Absent", "On leave")
 MARKS_COLUMNS: Final = ("Exam", "Held on", "Subject", "Marks", "Maximum marks")
+RESULT_COLUMNS: Final = ("Confirmed on", "Result", "Marks %", "Days attended", "Reason")
+RESULT_LABELS: Final = {
+    "passed": "Passed",
+    "promoted": "Promoted",
+    "detained": "Detained",
+    "not_appeared": "Not appeared",
+}
 
 
 def _number(value: Decimal | None) -> str:
@@ -79,12 +88,40 @@ def _marks(session: Session, subject: Subject) -> ReportSection | None:
     )
 
 
+def _year_results(session: Session, subject: Subject) -> ReportSection | None:
+    found = yrepo.results_of_student(session, subject.id)
+    if not found:
+        return None
+    rows = [
+        (
+            fmt_date(row.confirmed_at.date()),
+            RESULT_LABELS.get(row.result, row.result),
+            _number(row.percent),
+            fmt_text(None if row.days_attended is None else str(row.days_attended)),
+            fmt_text(row.reason),
+        )
+        for row in reversed(found)
+    ]
+    kept, note = cap_rows(rows)
+    return ReportSection(
+        class_key=CLASS_KEY,
+        title="Annual results",
+        columns=RESULT_COLUMNS,
+        rows=tuple(kept),
+        note=note,
+    )
+
+
 def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
     """The student's monthly attendance and exam marks, newest first; [] for other subject
     kinds or when nothing is recorded."""
     if subject.kind != "student":
         return []
-    sections = [_attendance(session, subject), _marks(session, subject)]
+    sections = [
+        _attendance(session, subject),
+        _marks(session, subject),
+        _year_results(session, subject),
+    ]
     return [s for s in sections if s is not None]
 
 

@@ -185,6 +185,7 @@ EXPECTED_TABLES = {
     "exam_mark_history",  # FT-01 (0084_exam_lock_enrol)
     "school_calendars",  # FT-06 (0089_school_calendar)
     "calendar_entries",
+    "year_results",  # FT-08 (0090_year_end)
     "behaviour_notes",
     "insight_flags",
     "flag_actions",

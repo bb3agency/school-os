@@ -242,6 +242,15 @@ permissions:
     description: "See marks (class teachers: their sections)"
     sensitivity: sensitive
     step_up: false
+  # FT-08 year-end progression pack (D85; 0090_year_end; FR-YRE-*): school-wide only.
+  year_result.read:
+    description: See annual results, held-back decisions and the UDISE+ progression sheet
+    sensitivity: sensitive
+    step_up: false
+  year_result.confirm:
+    description: Confirm each student's annual result (passed, promoted, detained, not appeared) with a reason for detention
+    sensitivity: sensitive
+    step_up: false
   insights.note:
     description: Write behaviour notes about students (educational purposes only)
     sensitivity: sensitive
