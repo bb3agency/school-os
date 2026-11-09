@@ -1,0 +1,41 @@
+# The faithfulness and correctness judge (sos_evals.judge; docs/06 §13.11; FA-07, FR-KB-051..057).
+# Thresholds and prompts live here, not in code (CLAUDE.md invariant 13). The judge model itself is
+# the `eval_judge` role of apps/api/app/knowledge/config/models.yaml (offline only, synthetic data).
+
+version = 1
+
+[calibration]
+# A judge whose agreement with the labels of judge_calibration.jsonl is below this is not evidence:
+# faithfulness and answer correctness are not measured and their gates fail. Pinned equal to the
+# judge_agreement gate in gates.toml (evals/tests/test_judge.py). Lead decision D85, PO to confirm.
+min_agreement = 0.90
+
+# The deterministic stand-in every offline run uses (CI, make eval, app-fake). Word overlap and an
+# exact figure check, not meaning: it proves the plumbing; the live judge is calibrated for real.
+[stub]
+claim_word_recall = 0.6
+reference_word_recall = 0.6
+stopwords = [
+  "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "have", "in", "is", "it",
+  "its", "of", "on", "or", "the", "this", "that", "to", "was", "were", "with", "will", "per",
+]
+
+# Prompts of the live judge (make eval-live; apps/api/tests/knowledge/eval_bridge.py GatewayJudge).
+# The judge answers JSON {"verdict": true|false}; the passages are synthetic.
+[live]
+faithfulness_system = """
+You check one sentence of an answer written for a school's staff against the passages it cites.
+Return {"verdict": true} only if every statement in the sentence is directly supported by the
+passages: same dates, times, amounts, names, numbers and conditions. Wording may differ. Return
+{"verdict": false} if anything in the sentence is missing from the passages, contradicts them, or
+adds a date, number or condition they do not state. Ignore citation markers such as [1]. Judge
+only the sentence; do not use outside knowledge.
+"""
+correctness_system = """
+You grade an answer to a school staff member's question against a reference answer written by a
+person. Return {"verdict": true} if the answer gives the information in the reference: every date,
+time, amount, name and number in the reference must appear in the answer with the same value;
+extra correct context is fine; the language or wording may differ. Return {"verdict": false} if
+the answer misses or changes any of it, or says the information was not found. Do not use outside
+knowledge.
+"""

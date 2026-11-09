@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
 
-from sos_evals import cost, datasets, gates, generator, report, runner
+from sos_evals import cost, datasets, gates, generator, judge, report, runner
 from sos_evals.stubs import STUBS
 
 EXIT_HARNESS_ERROR = 3
@@ -35,10 +35,15 @@ def build_report(
     fail_on_soft: bool = False,
     models_file: Path = cost.MODELS_FILE,
     price_date: date | None = None,
+    judge_file: Path = judge.JUDGE_FILE,
 ) -> report.Report:
     data = datasets.load(datasets_dir)
     prices = cost.load_price_book(models_file)
+    judging = judge.load_config(judge_file)
     stub = STUBS[adapter](data.corpus, data.items)
+    # An adapter may bring its own judge (the live eval_judge on make eval-live); every offline
+    # run uses the deterministic stub judge.
+    answer_judge = getattr(stub, "judge", None) or judge.StubJudge(judging.stub)
     result = runner.run(
         data.select(suite),
         data.corpus,
@@ -60,6 +65,11 @@ def build_report(
         recall_fast=suite == "fast",
         prices=prices,
         price_date=price_date,
+        answer_judge=answer_judge,
+        judge_calibration=data.judge_calibration,
+        judge_min_agreement=judging.min_agreement,
+        extraction_adapter=stub,
+        extraction_cases=data.extraction,
     )
     gate_results = gates.evaluate(gates.load_gates(gates_file), result.metrics)
     code = gates.exit_code(gate_results, fail_on_soft=fail_on_soft)
@@ -88,6 +98,7 @@ def _run(args: argparse.Namespace) -> int:
         fail_on_soft=args.fail_on_soft,
         models_file=args.models,
         price_date=args.price_date,
+        judge_file=args.judge_config,
     )
     json_path, md_path = report.write(result, args.out)
     for gate in result.gates:
@@ -161,6 +172,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="price every recorded call at the prices in force on this date (YYYY-MM-DD), "
         "e.g. 2027-01-01 when introductory prices end; default: each call's own date",
+    )
+    run.add_argument(
+        "--judge-config",
+        type=Path,
+        default=judge.JUDGE_FILE,
+        help="judge thresholds and prompts (default: evals/judge.toml)",
     )
     run.add_argument(
         "--fail-on-soft",
