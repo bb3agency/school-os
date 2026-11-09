@@ -150,6 +150,22 @@ def test_FR_MSG_041_not_reached_list_names_reasons_no_phones(
     )
     assert slips.status_code == 200, slips.text
 
+    # ... or the section's print link with missing_only: the reached family gets no slip.
+    def section_slips(missing_only: bool) -> str:
+        res = api.call(
+            school.people["office_staff"],
+            "GET",
+            f"/api/v1/sections/{school.ids['section_9a']}/join-slips",
+            params={"categories": ["notices"], "missing_only": str(missing_only).lower()},
+        )
+        assert res.status_code == 200, res.text
+        return str(res.text)
+
+    missing_page, full_page = section_slips(True), section_slips(False)
+    assert item["name"] in missing_page
+    marker = '<section class="slip"'
+    assert missing_page.count(marker) < full_page.count(marker)
+
 
 def _broadcast(api: Any, school: Any) -> tuple[str, uuid.UUID]:
     notice_id = S.notice(school)
