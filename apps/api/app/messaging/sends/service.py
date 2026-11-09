@@ -580,6 +580,45 @@ def broadcast_report(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class BroadcastDelivery:
+    """A confirmed broadcast's audience and the furthest status each guardian's message reached
+    (``read`` > ``delivered`` > ``sent`` > ``queued`` > ``failed`` > ``skipped``). Ids and codes
+    only."""
+
+    broadcast_id: uuid.UUID
+    notice_id: uuid.UUID
+    section_ids: tuple[uuid.UUID, ...]
+    left_out: int
+    guardian_status: Mapping[uuid.UUID, str]
+
+
+_STATUS_RANK: Final = {"skipped": 0, "failed": 1, "queued": 2, "sent": 3, "delivered": 4, "read": 5}
+
+
+def broadcast_delivery(session: Session, broadcast_id: uuid.UUID) -> BroadcastDelivery | None:
+    """System read for the privacy notice evidence (FP-13, FR-DPDP-063): who the broadcast
+    reached, per guardian. ``None`` for an unknown broadcast or a preview never confirmed. The
+    caller authorised the read and limits any names it shows to the reader's scope."""
+    row = repo.get_broadcast(session, broadcast_id)
+    if row is None or row.status == "previewed":
+        return None
+    best: dict[uuid.UUID, str] = {}
+    for m in repo.broadcast_messages(session, row.id):
+        if m.guardian_id is None:
+            continue
+        current = best.get(m.guardian_id)
+        if current is None or _STATUS_RANK.get(m.status, 0) > _STATUS_RANK.get(current, 0):
+            best[m.guardian_id] = m.status
+    return BroadcastDelivery(
+        broadcast_id=row.id,
+        notice_id=row.notice_id,
+        section_ids=tuple(row.section_ids),
+        left_out=sum(int(v) for v in (row.skipped or {}).values()),
+        guardian_status=best,
+    )
+
+
 def revoke_link(session: Session, ctx: UserContext, message_id: uuid.UUID) -> RevokeLinkOut:
     """Stop the parent link a message carried from working (ADR-0046 decision 5, FR-PUB-007;
     ``message.send``). 404 for an unknown message or one without a link. Audited
@@ -1361,7 +1400,9 @@ __all__ = [
     "SEND",
     "SEND_EVENT",
     "SEND_TASK",
+    "BroadcastDelivery",
     "automatic",
+    "broadcast_delivery",
     "broadcast_report",
     "cancel_notice_messages",
     "confirm_broadcast",

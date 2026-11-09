@@ -354,6 +354,8 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.privacy.schemas.PrivacyRecordClassOut.key": "record class code",
     "app.privacy.schemas.PrivacyTemplateOut.key": "notice template code",
     "app.privacy.schemas.PrivacyNoticeOut.template_key": "notice template code",
+    # FC-03 (FR-DPDP-053): readiness checklist item code.
+    "app.privacy.readiness_schemas.ReadinessItemOut.key": "readiness item code",
     # Catalog and code keys, not credentials.
     "app.admin.schemas.RetentionCategoryOut.key": "retention category code",
     "app.students.schemas.AttributeOut.key": "attribute catalog key",

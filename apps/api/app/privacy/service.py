@@ -71,6 +71,7 @@ from app.identity.principal import STEP_UP_MAX_AGE
 from app.notifications import service as notifications
 from app.privacy import config as cfg
 from app.privacy import consents_service as consents
+from app.privacy import readiness_repository as readiness_repo
 from app.privacy import render
 from app.privacy import repository as repo
 from app.privacy.models import PrivacyNotice, PrivacyRequest, PrivacyRequestEvent
@@ -428,6 +429,8 @@ def _notice_out(row: PrivacyNotice, names: Mapping[uuid.UUID, str]) -> PrivacyNo
         issued_on=row.issued_on,
         channel=cast(Any, row.channel),
         document_id=row.document_id,
+        parent_notice_id=row.parent_notice_id,
+        broadcast_id=row.broadcast_id,
         recorded_by_name=names.get(row.recorded_by_membership),
         recorded_at=row.recorded_at,
     )
@@ -437,6 +440,22 @@ def list_notices(session: Session) -> list[PrivacyNoticeOut]:
     rows = repo.list_notices(session)
     names = identity.member_display_names(session, {r.recorded_by_membership for r in rows})
     return [_notice_out(r, names) for r in rows]
+
+
+def notice_out(session: Session, row: PrivacyNotice) -> PrivacyNoticeOut:
+    """One notice record as returned by the API (FP-13 delivery view)."""
+    names = identity.member_display_names(session, {row.recorded_by_membership})
+    return _notice_out(row, names)
+
+
+def school_values(session: Session) -> dict[str, str | None]:
+    """The school's name and privacy contact as filled into notices (FC-03, FP-13)."""
+    return _school_values(session)
+
+
+def today(session: Session) -> dt.date:
+    """Today in IST from the database clock."""
+    return _today(session)
 
 
 def record_notice(session: Session, ctx: UserContext, data: PrivacyNoticeIn) -> PrivacyNoticeOut:
@@ -1215,9 +1234,24 @@ def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
         guardian_id=subject.id if subject.kind == "guardian" else None,
         membership_id=subject.id if subject.kind == "member" else None,
     )
+    sections: list[ReportSection] = []
+    if subject.kind == "student":
+        given = readiness_repo.admission_notices_of(session, subject.id)
+        if given:
+            sections.append(
+                ReportSection(
+                    class_key="privacy_admission_notices",
+                    title="Privacy notice given at admission",
+                    columns=("Given on", "How"),
+                    rows=tuple(
+                        (_fmt(g.given_on), g.channel.replace("_", " ").capitalize()) for g in given
+                    ),
+                )
+            )
     if not rows:
-        return []
+        return sections
     return [
+        *sections,
         ReportSection(
             class_key="privacy_requests",
             title="Privacy requests and complaints",
@@ -1231,7 +1265,7 @@ def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
                 )
                 for r in rows
             ),
-        )
+        ),
     ]
 
 
@@ -1630,7 +1664,7 @@ def notify_due(session: Session) -> int:
 def export_records(session: Session, *, include_sensitive: bool = False) -> list[RecordTable]:
     """The register for the school's full data export (FR-DPDP-018). Free texts only with
     ``include_sensitive``, decrypted, as a separate table."""
-    tables = repo.export_tables(session)
+    tables = repo.export_tables(session) + readiness_repo.export_tables(session)
     if include_sensitive:
         rows = []
         for r in repo.all_requests(session):
@@ -1694,6 +1728,9 @@ exports.register_module_document(
 
 _PURGE = purging.PurgeTables(
     deleted=(
+        # FC-03 (0083_dpdp_readiness): admission notices reference notices, so they go first.
+        "ops.privacy_admission_notices",
+        "ops.privacy_readiness_marks",
         "ops.privacy_request_links",
         "ops.privacy_request_events",
         "ops.privacy_requests",

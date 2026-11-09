@@ -215,6 +215,9 @@ EXPECTED_TABLES = {
     "privacy_requests",
     "privacy_request_events",
     "privacy_request_links",
+    # FC-03 (0083_dpdp_readiness): readiness marks and notices given at admission.
+    "privacy_readiness_marks",
+    "privacy_admission_notices",
     "retention_settings",
     # R2-1B fees (0058_fees_core, FR-FEE-027): every fin table, empty ones too.
     "fees_fee_settings",
