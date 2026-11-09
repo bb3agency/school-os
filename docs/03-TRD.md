@@ -993,7 +993,7 @@ Faithfulness and answer correctness from a calibrated judge, and a register-phot
 | FR-KB-062 | A new extraction provider adapter (FA-01) MUST pass the extraction hard gates on this set before it is selectable outside local/ci. | I |
 
 *As built (wave F2, FA-07, 2026-11-09):* FR-KB-051..056 and 058..061 are built and tested (`evals/tests/test_judge.py`, `evals/tests/test_extraction.py`, `evals/tests/test_gates.py`, `apps/api/tests/knowledge/test_eval_bridge.py::test_FR_KB_06*`/`_055_*`, `apps/api/tests/extraction/test_read_page.py`). Stub-perfect: agreement 1.0, faithfulness 1.0, correctness 1.0; extraction unmasked 0, redaction recall 1.0, field accuracy 0.981, row recall 1.0. The live judge (057) and provider selection (062) wait for D2 and FA-01. Not built here: the notice-draft faithfulness eval and the scanned-circular OCR set of FA-07 items 3 and 5. FR-KB-063..065 are reserved for them.
-### 3.32 Year-end progression pack (FR-YRE-001..020) (FT-08, wave F2)
+### 3.33 Year-end progression pack (FR-YRE-001..020) (FT-08, wave F2)
 
 Results → promotion → UDISE+ progression → TC, typed once (docs/research/2026-11-features/teaching-academics.md FT-08). Module `app/academics` (`year_end.py`), table `sis.year_results` (`0090_year_end`; docs/05 §6.4), permissions `year_result.read` / `year_result.confirm` (docs/07 §6.2), routes docs/09 "Year-end results", web `/[locale]/year-end`. Integration points: FT-06 school calendar (working days), FT-03 assessment schemes (the pass formula), FO-01/FO-03 UDISE+ follow-up (the progression blanks as findings or to-do items).
 
@@ -1021,7 +1021,7 @@ Results → promotion → UDISE+ progression → TC, typed once (docs/research/2
 | FR-YRE-020 | Logs MUST carry ids and counts only (no names, reasons or results per student). | T |
 
 *As built (wave F2, FT-08, 2026-11-09):* backend, migration `0090_year_end`, TC suggestions and web screens built; tests `apps/api/tests/academics/test_year_end.py`, security matrix/BOLA entries, web `apps/web/src/features/year-end/*.test.tsx`. Working days are "days the section was marked" until FT-06 lands.
-### 3.32 UDISE+ follow-ups and to-do list (FR-UDI-021..040) (FO-01, FO-03, wave F2)
+### 3.34 UDISE+ follow-ups and to-do list (FR-UDI-021..040) (FO-01, FO-03, wave F2)
 
 Follow-ups on fixes that must happen outside the school (a parent's Aadhaar update, a UDISE+ correction by the MEO / MIS coordinator) and the list of steps to repeat in the UDISE+ Student Module after something happened in SchoolOS (docs/research/2026-11-features/office-portals.md FO-01, FO-03). Module `dq` (`followups.py`, `movements.py`, `followup_config.py`, config `app/dq/config/udise_followup.yaml`), migration `0091_udise_followup`. No new permission: reads use `dq.readiness.read`, writes `dq.readiness.manage`. FO-02 (correction request pack) and FO-04 (UDISE+ list import by PEN) are separate.
 
@@ -1052,7 +1052,7 @@ Follow-ups on fixes that must happen outside the school (a parent's Aadhaar upda
 
 ---
 
-### 3.32 UDISE+ corrections to the MEO and UDISE+ list import by PEN (FR-UDI-001..020) (FO-02, FO-04, wave F2)
+### 3.35 UDISE+ corrections to the MEO and UDISE+ list import by PEN (FR-UDI-001..020) (FO-02, FO-04, wave F2)
 
 Schools cannot correct a child's name or date of birth in UDISE+ themselves; the MEO / MIS office does it on a written request (docs/research/2026-11-features/office-portals.md FO-02). The UDISE+ download has no admission number, so its rows are matched by PEN first (FO-04). Both produce requests and findings, never changes to the school's records (invariant 6, BR-01). Migration `0092_udise_corrections`; routes in docs/09 (Data quality; Imports and extraction).
 
@@ -1080,7 +1080,7 @@ Schools cannot correct a child's name or date of birth in UDISE+ themselves; the
 | FR-UDI-020 | Logs MUST carry ids and counts only; audit summaries MUST carry no names, dates of birth or PEN values. | T |
 
 *As built (wave F2, FO-02 and FO-04, 2026-11-09):* all built and tested (`apps/api/tests/dq/test_udise_corrections.py`, `apps/api/tests/imports/test_udise_match*.py`, `apps/api/tests/dq/udise_security_support.py`, `apps/web/src/features/udise/`). The change request number of a corrected register value is not printed yet (the letter names the register as the source).
-### 3.32 Weekly management brief (FR-BRF) (FA-05, wave F2)
+### 3.36 Weekly management brief (FR-BRF) (FA-05, wave F2)
 
 A weekly, counts-only brief for the school's owner and principal (docs/research/2026-11-features/ai-platform.md FA-05; module `app/brief`, config `app/brief/config.yaml`; migration `0095_weekly_brief`). No AI writes any of it.
 
@@ -1104,7 +1104,7 @@ A weekly, counts-only brief for the school's owner and principal (docs/research/
 
 *As built (wave F2, FA-05, 2026-11-09):* FR-BRF-001..015 built (`app/brief/`, tests `apps/api/tests/brief/`, web `/brief` with print CSS). Not built: the A4 monthly variant (the weekly page prints), WhatsApp to the owner (owner question open), the AI summary (FR-BRF-014).
 
-### 3.32 School compliance certificates (FR-COMP) (FC-01, wave F2)
+### 3.37 School compliance certificates (FR-COMP) (FC-01, wave F2)
 
 The school's own certificates (fire NOC, building safety, occupancy, recognition, RTE recognition, CBSE affiliation, NOC, DEO certificate, society registration, water and sanitation): a register with renewal history, expiry reminders and the CBSE Appendix IX link (docs/research/2026-11-features/compliance-safety.md FC-01; module `app/compliance`; migration `0096_compliance_register`; docs/05 §16.9; docs/09 "Compliance certificates"). School-level facts, no personal data. FR-COMP-023..030 are reserved for FC-07 inspection readiness packs.
 

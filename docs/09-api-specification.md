@@ -895,7 +895,7 @@ All routes need `brief.read` (school-wide: owner, principal). Counts only; a stu
 | GET | `/brief/preferences` | The caller's own choice (`in_app`, `email`, `email_available`, `version`; `ETag`) |
 | PUT | `/brief/preferences` | Change it (`If-Match` honoured, `W/"0"` before the first save; 412 `version_mismatch`); audited |
 
-### Compliance certificates (FC-01, wave F2; docs/03 §3.32; built 2026-11-09)
+### Compliance certificates (FC-01, wave F2; docs/03 §3.37; built 2026-11-09)
 
 Module `app/compliance` (`app/compliance/api.py`). The school's own certificates; no personal data. Reads `compliance.read` (owner, principal, office admin, auditor), writes `compliance.manage` (owner, principal, office admin), school-wide, no step-up.
 
