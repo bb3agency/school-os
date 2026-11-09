@@ -220,6 +220,8 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | exam.unlock (FT-01: unlock a locked exam with a reason so its marks can be corrected) | — | ✓ᴿ | — | — | — | — | — | — | — |
 | marks.record (M5: enter and import marks) | — | ✓ | — | — | — | ✓ | S | — | — |
 | marks.read (M5: see marks) | — | ✓ | — | — | — | ✓ | S | — | — |
+| year_result.read (FT-08: annual results, held-back suggestions, UDISE+ progression sheet; school-wide only) | — | ✓ | ✓ | — | — | ✓ | — | — | — |
+| year_result.confirm (FT-08: confirm each student's annual result; detained needs a reason) | — | ✓ | — | — | — | — | — | — | — |
 | tally.device.manage (M6: enrol the Tally edge agent with a one-time code, revoke it; ADR-0032 Proposed, behind a flag) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | tally.configure (M6: choose Tally ledger groups, link Tally ledgers to students; ADR-0032 Proposed, behind a flag) | ✓ | ✓ | — | — | ✓ | — | — | — | — |
 | breakglass.approve | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |

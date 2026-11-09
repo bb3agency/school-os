@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.academics.models import AttendanceMark, Exam, ExamMark, ExamMarkHistory
+from app.academics.models import AttendanceMark, Exam, ExamMark, ExamMarkHistory, YearResultRow
 from app.core.record_tables import dump_table
 from app.core.records import RecordTable
 
@@ -420,6 +420,12 @@ def export_tables(session: Session) -> list[RecordTable]:
             ExamMarkHistory.__table__,
             name="exam_mark_history",
             order_by=("exam_id", "changed_at", "id"),
+        ),
+        dump_table(
+            session,
+            YearResultRow.__table__,
+            name="year_results",
+            order_by=("academic_year_id", "student_id"),
         ),
     ]
 

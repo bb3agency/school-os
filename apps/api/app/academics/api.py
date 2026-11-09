@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response
 
-from app.academics import service
+from app.academics import service, year_end
 from app.academics.schemas import (
     AttendanceDayOut,
     AttendanceMonthOut,
@@ -30,6 +30,13 @@ from app.academics.schemas import (
     Month,
     SheetIn,
     WriteResultOut,
+)
+from app.academics.year_end_schemas import (
+    HeldBackOut,
+    ProgressionOut,
+    YearResultsOut,
+    YearResultsWrite,
+    YearResultsWriteOut,
 )
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require, require_any
@@ -197,3 +204,83 @@ def preview_marks_sheet(
     and problems; stores no marks; the file is deleted once read. 409 ``exam_locked`` for a
     locked exam."""
     return service.preview_marks_sheet(ctx, section_id, exam_id, body)
+
+
+# --- year-end progression pack (FT-08; D85; FR-YRE-*) ---------------------------------------------
+
+YearResultReader = Annotated[
+    UserContext, Depends(require(service.YEAR_RESULT_READ, scope="school"))
+]
+YearResultConfirmer = Annotated[
+    UserContext, Depends(require(service.YEAR_RESULT_CONFIRM, scope="school"))
+]
+PortalExporter = Annotated[
+    UserContext, Depends(require(year_end.EXPORT_PORTAL, scope="school", step_up=True))
+]
+
+
+@router.get("/sections/{section_id}/year-results", response_model=YearResultsOut)
+def year_results(ctx: YearResultReader, db: TenantDB, section_id: uuid.UUID) -> YearResultsOut:
+    """Every student finishing the year in the section with SchoolOS's proposed annual result
+    (from the year's marks; days attended from the register) and the confirmed result, who
+    confirmed it and when (``year_result.read``, school-wide; FR-YRE-002). Any year's section,
+    also after the promotion. 404 for another school's section."""
+    return service.year_results(db, ctx, section_id)
+
+
+@router.post("/sections/{section_id}/year-results", response_model=YearResultsWriteOut)
+def confirm_year_results(
+    ctx: YearResultConfirmer, db: TenantDB, section_id: uuid.UUID, body: YearResultsWrite
+) -> YearResultsWriteOut:
+    """Confirm or change annual results, all or nothing (``year_result.confirm``: the
+    principal; FR-YRE-004). ``detained`` needs a reason (422 ``reason_required``); 422
+    ``not_in_section``, ``duplicate``, ``aadhaar_full_number_rejected``; 412
+    ``year_result_changed`` for a stale ``expected_version``. In a no-detention class a
+    ``detained`` result is saved with the warning ``no_detention_class`` (never refused).
+    Audited ``year_result.confirmed``. Nothing changes a student's class: the promotion does."""
+    return service.confirm_results(db, ctx, section_id, body)
+
+
+@router.get("/academic-years/{year_id}/year-results/held-back", response_model=HeldBackOut)
+def year_held_back(ctx: YearResultReader, db: TenantDB, year_id: uuid.UUID) -> HeldBackOut:
+    """Students of the year confirmed as detained, for the promotion screen to pre-fill its
+    held-back list (``year_result.read``; FR-YRE-008), with those in no-detention classes and
+    the count still unconfirmed. The promotion routes are unchanged."""
+    return service.held_back(db, ctx, year_id)
+
+
+@router.get("/academic-years/{year_id}/udise-progression", response_model=ProgressionOut)
+def udise_progression(ctx: YearResultReader, db: TenantDB, year_id: uuid.UUID) -> ProgressionOut:
+    """UDISE+ progression check sheet (``year_result.read``; FR-YRE-010): per student finishing
+    the year, class and section, the confirmed result, % marks and days attended, the PEN, and
+    the blanks to fill before the portal."""
+    return service.progression(db, ctx, year_id)
+
+
+_CSV_DOC: dict[int | str, dict[str, Any]] = {
+    200: {
+        "description": "CSV file (UTF-8 with BOM), one row per student",
+        "content": {"text/csv": {"schema": {"type": "string"}}},
+    }
+}
+
+
+@router.get(
+    "/academic-years/{year_id}/udise-progression/csv",
+    response_class=Response,
+    responses=_CSV_DOC,
+)
+def udise_progression_csv(ctx: PortalExporter, db: TenantDB, year_id: uuid.UUID) -> Response:
+    """Download the progression check sheet as CSV (``export.portal`` with step-up MFA, 428
+    without it, and ``year_result.read`` school-wide, 403 without it; FR-YRE-013). Audited
+    ``year_end.progression_exported`` before the file is sent."""
+    file = service.progression_csv(db, ctx, year_id)
+    return Response(
+        content=file.body,
+        media_type=year_end.CSV_MEDIA_TYPE,
+        headers={
+            "Content-Disposition": f'attachment; filename="{file.filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

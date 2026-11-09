@@ -101,4 +101,29 @@ class ExamMarkHistory(Base):
     changed_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
 
 
-__all__ = ["AttendanceMark", "Exam", "ExamMark", "ExamMarkHistory"]
+class YearResultRow(Base):
+    """A student's confirmed annual result (FT-08, 0088_year_end; FR-YRE-004)."""
+
+    __tablename__ = "year_results"
+    __table_args__ = {"schema": "sis"}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    academic_year_id: Mapped[uuid.UUID]
+    student_id: Mapped[uuid.UUID]
+    section_id: Mapped[uuid.UUID]
+    result: Mapped[str] = mapped_column(Text)
+    proposed_result: Mapped[str | None] = mapped_column(Text)
+    percent: Mapped[Decimal | None] = mapped_column(Numeric(4, 1))
+    days_attended: Mapped[int | None] = mapped_column(Integer)
+    working_days: Mapped[int | None] = mapped_column(Integer)
+    reason: Mapped[str | None] = mapped_column(Text)
+    rule_version: Mapped[int] = mapped_column(Integer)
+    confirmed_by: Mapped[uuid.UUID]
+    confirmed_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    updated_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+
+
+__all__ = ["AttendanceMark", "Exam", "ExamMark", "ExamMarkHistory", "YearResultRow"]

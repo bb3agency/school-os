@@ -197,6 +197,22 @@ def student_ids_in_sections(
     return list(session.scalars(stmt.order_by(Enrollment.student_id)))
 
 
+def student_ids_finishing_year(
+    session: Session, *, academic_year_id: uuid.UUID, section_ids: Collection[uuid.UUID] | None
+) -> list[uuid.UUID]:
+    """Students who end the year in these sections: enrolment ``active`` or ``completed`` (a
+    promotion closed it) in that year (``section_ids`` None = every section). FT-08."""
+    stmt = select(Enrollment.student_id).where(
+        Enrollment.academic_year_id == academic_year_id,
+        Enrollment.status.in_(("active", "completed")),
+    )
+    if section_ids is not None:
+        if not section_ids:
+            return []
+        stmt = stmt.where(Enrollment.section_id.in_(list(section_ids)))
+    return list(session.scalars(stmt.distinct().order_by(Enrollment.student_id)))
+
+
 def all_student_ids(session: Session) -> list[uuid.UUID]:
     return list(session.scalars(select(Student.id).order_by(Student.id)))
 

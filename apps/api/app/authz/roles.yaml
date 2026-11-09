@@ -128,6 +128,8 @@ roles:
       attendance.read: school
       exam.manage: school
       exam.unlock: school_step_up  # FT-01 (D84): only the principal unlocks a locked exam
+      year_result.read: school  # FT-08 (D85)
+      year_result.confirm: school  # FT-08 (D85): only the principal confirms results
       marks.record: school
       marks.read: school
       breakglass.approve: school_step_up
@@ -213,6 +215,7 @@ roles:
       register.read: school_step_up
       attendance.record: school
       attendance.read: school
+      year_result.read: school  # FT-08 (D85): the UDISE+ progression sheet
       apaar.consent.read: school
       apaar.consent.record: school
       # R2-1C messaging (ADR-0043)
@@ -319,6 +322,7 @@ roles:
       exam.manage: school
       marks.record: school
       marks.read: school
+      year_result.read: school  # FT-08 (D85)
       apaar.consent.read: school
       # R3-1B consents (ADR-0049; docs/07 §6.2)
       consent.read: school

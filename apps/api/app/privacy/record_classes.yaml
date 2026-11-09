@@ -195,7 +195,7 @@ classes:
   attendance_and_marks:
     label: Attendance, exams and marks
     owner: academics
-    tables: [sis.attendance_marks, sis.exams, sis.exam_marks]
+    tables: [sis.attendance_marks, sis.exams, sis.exam_marks, sis.year_results]
     classification: C2
     docs_row: Attendance, exams and marks
     retention: Life of the school (school records)

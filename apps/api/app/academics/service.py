@@ -81,6 +81,16 @@ from app.academics.schemas import (
     WriteResultOut,
 )
 from app.academics.subjects import subject_report
+from app.academics.year_end import (
+    YEAR_RESULT_CONFIRM,
+    YEAR_RESULT_READ,
+    confirm_results,
+    held_back,
+    progression,
+    progression_csv,
+    tc_suggestions,
+    year_results,
+)
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.scope import ensure_section_visible
@@ -1112,7 +1122,13 @@ def export_records(session: Session) -> list[RecordTable]:
 
 
 _PURGE = purging.PurgeTables(
-    deleted=("sis.exam_mark_history", "sis.exam_marks", "sis.exams", "sis.attendance_marks"),
+    deleted=(
+        "sis.year_results",
+        "sis.exam_mark_history",
+        "sis.exam_marks",
+        "sis.exams",
+        "sis.attendance_marks",
+    ),
 )
 
 
@@ -1141,27 +1157,35 @@ __all__ = [
     "MARKS_READ",
     "MARKS_RECORD",
     "RECORDS_CHANGED_EVENT",
+    "YEAR_RESULT_CONFIRM",
+    "YEAR_RESULT_READ",
     "DayMark",
     "ExamResult",
     "absent_students",
     "attendance_day",
     "attendance_history",
     "attendance_month",
+    "confirm_results",
     "create_exam",
     "exam_results",
     "export_records",
+    "held_back",
     "list_exams",
     "lock_exam",
     "marks_history",
     "percent_of",
     "preview_attendance_sheet",
     "preview_marks_sheet",
+    "progression",
+    "progression_csv",
     "purge_tenant_data",
     "record_attendance",
     "record_marks",
     "section_marks",
     "subject_report",
+    "tc_suggestions",
     "tenant_data_counts",
     "today_ist",
     "unlock_exam",
+    "year_results",
 ]

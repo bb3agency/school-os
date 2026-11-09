@@ -1685,6 +1685,19 @@ def enrolment_histories(
     return out
 
 
+def students_finishing_year(
+    session: Session, *, academic_year_id: uuid.UUID, section_ids: Collection[uuid.UUID] | None
+) -> list[uuid.UUID]:
+    """Students whose enrolment in ``academic_year_id`` (in ``section_ids``; None = every
+    section) is active or was completed by a promotion: the year-end class lists of FT-08
+    (FR-YRE-002). System read: the caller MUST hold a school-wide grant (``year_result.read``
+    is school-wide only) because past-year sections are outside :func:`list_students_in_scope`.
+    """
+    return repo.student_ids_finishing_year(
+        session, academic_year_id=academic_year_id, section_ids=section_ids
+    )
+
+
 # --- search and lists --------------------------------------------------------------------------
 
 

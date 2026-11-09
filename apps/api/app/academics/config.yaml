@@ -51,3 +51,40 @@ sheets:
     max_scanned_rows: 2000
   max_file_bytes: 2097152                   # 2 MB: one section's register or marks sheet
   max_issues: 200                           # problems listed per preview (the rest are counted)
+
+# FT-08 year-end progression pack (lead decision D85; FR-YRE-*). SchoolOS PROPOSES an annual
+# result from the year's marks; the principal confirms every one (PRV-005: a person decides).
+# Nothing here is applied automatically, and the RTE no-detention rule only WARNS.
+year_end:
+  # Bump when the proposal rule or the figures change (stored on each confirmed result).
+  rule_version: 1
+  # Proposal: "passed" at or above this overall percentage over the year's exams (sum of marks
+  # / sum of maximum marks, absent papers left out: FR-MRK-005), "detained" below it (or
+  # "promoted" in a no-detention class), "not_appeared" when the student has papers but was
+  # absent from every one; no proposal without papers. UNVERIFIED (owner decision D3): boards
+  # and schools differ (33% CBSE, 35% AP SSC, per subject there); FT-03 assessment schemes
+  # replace this with the board's own formula.
+  pass_percent: 35
+  pass_percent_verified: false
+  pass_percent_source: >-
+    Common pass marks of Indian boards (33% CBSE, 35% AP SSC), per subject there; one overall
+    percentage is a first version (docs/research/2026-11-features/teaching-academics.md FT-08).
+    Not confirmed with a pilot school.
+  # RTE no-detention: classes (by class code) where "detained" is never proposed and a confirmed
+  # "detained" shows a warning (never refused). UNVERIFIED (owner decision D3): AP kept
+  # no-detention for classes I-VIII after the RTE (Amendment) Rules 2024; no later AP order was
+  # found.
+  no_detention:
+    verified: false
+    class_codes: [I, II, III, IV, V, VI, VII, VIII]
+    source: >-
+      ThePrint, 23 Dec 2024, "Centre amends RTE rules, allows states/UTs to end no-detention
+      policy for classes 5 and 8" (accessed 2026-11-09): the amendment binds central-government
+      schools; Andhra Pradesh kept the policy for classes I-VIII.
+  # Attendance statuses that count as a day attended (late is present, leave is not).
+  attended_statuses: [present, late]
+  # Results confirmed per request (one large section).
+  max_entries: 200
+  max_reason_chars: 500
+  # UDISE+ progression sheet: students per sheet (one school's year).
+  max_sheet_students: 5000
