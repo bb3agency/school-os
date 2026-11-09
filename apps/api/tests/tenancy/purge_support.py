@@ -1040,6 +1040,29 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             d=ids["doc"],
             v=ids["ver"],
         )
+        # --- FC-01 (0096_compliance_register): a renewed certificate and its predecessor -----
+        renewed = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.compliance_certificates (id, tenant_id, kind, valid_until, "
+            "document_id, owner_membership_id, recorded_by) VALUES (:i, :t, 'fire_noc', "
+            "current_date + 300, :d, :m, :u)",
+            i=renewed,
+            t=t,
+            d=ids["doc"],
+            m=ids["m1"],
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.compliance_certificates (id, tenant_id, kind, valid_until, status, "
+            "superseded_by, superseded_at, recorded_by) VALUES (:i, :t, 'fire_noc', "
+            "current_date - 10, 'superseded', :s, now(), :u)",
+            i=uuid.uuid4(),
+            t=t,
+            s=renewed,
+            u=u["user"],
+        )
         # --- student timeline and early warning (M5, 0035_student_insights) ---------------
         exam, flag, mark = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
         _run(

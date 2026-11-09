@@ -1460,6 +1460,7 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | Job runs, outbox and idempotency keys (`ops.job_runs`, `ops.outbox`, `ops.idempotency_keys`) | Life of the school (ids and counts only); delivered outbox events 30 days after delivery (D51; undelivered kept); idempotency keys 24 hours | |
 | School structure, settings and keys (years, classes, sections, `core.tenant_keys`, field definitions, WhatsApp set-up) | Life of the school | No personal data; keys destroyed at offboarding (crypto-shredding) |
 | Disclosure snapshots (`ops.disclosure_snapshots`) | Life of the school | The record of what was published; view counts 90 days |
+| School compliance certificates (`ops.compliance_certificates`) | Life of the school | The school's own certificates and their renewals; no personal data (FC-01) |
 | RTE admissions / claims (`sis.rte_*`; not scheduled) | Admissions: as the student record; claims and lines: 8 years after the financial year (D21) | |
 | Portal calendar dates and reminders (`ops.portal_*`) | 2 academic years | Configuration and idempotency, no personal data |
 | Weekly management briefs (`ops.weekly_briefs`; FA-05) | 104 weeks (2 years) | School-level counts only; older weeks are deleted by the Monday job (`keep_weeks` in `app/brief/config.yaml`) |
@@ -1729,6 +1730,12 @@ Open follow-ups and to-do items are computed on every read (live readiness; TCs,
 | `ops.brief_preferences` | C1 | Primary key `(tenant_id, membership_id)`, composite FK to `core.memberships` `ON DELETE CASCADE`; `in_app` (default true), `email` (default false: opt-in), `updated_at`, `version`. `sos_app` may update the choice columns. Record class `brief_preferences` (`allowed`; module `brief` is a subject-report contributor and eraser for members) |
 
 Offboarding owner `brief` (before `notifications`, `offboarding.yaml`).
+
+### 16.9 School compliance certificates (`ops`; FC-01, FR-COMP-001..022; `0096_compliance_register`)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `ops.compliance_certificates` | C1 (no personal data) | `kind` (a key of `app/compliance/catalogue.yaml`; `other` carries `label` 3-120, CHECK `compliance_certificates_label`), `reference_no` (1-80), `issued_by` (1-200), `valid_from`, `valid_until` (NULL = no expiry; CHECK from <= until), `document_id` (composite FK to `kb.documents`, `ON DELETE SET NULL (document_id)`), `owner_membership_id` (composite FK to `core.memberships`), `notes` (1-500), `status` CHECK (`current`,`superseded`,`removed`) with `superseded_by` (composite FK to itself, DEFERRABLE INITIALLY DEFERRED)/`superseded_at` and `removed_by`/`removed_at` set exactly for their status, `last_reminded_lead` (-1 after the expiry notice, else the lead day)/`last_reminded_on`, `recorded_by`, `created_at`, `updated_at`, `version`. Partial unique index `compliance_certificates_one_current (tenant_id, kind) WHERE status = 'current' AND kind <> 'other'`. `sos_app` SELECT, INSERT and UPDATE of the editable and workflow columns; never DELETE. Offboarding owner `compliance` (before documents and identity); record class `compliance_certificates`; in the full export |
 
 ### 16.7 Classification, export and offboarding (as built)
 

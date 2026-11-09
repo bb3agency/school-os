@@ -895,6 +895,21 @@ All routes need `brief.read` (school-wide: owner, principal). Counts only; a stu
 | GET | `/brief/preferences` | The caller's own choice (`in_app`, `email`, `email_available`, `version`; `ETag`) |
 | PUT | `/brief/preferences` | Change it (`If-Match` honoured, `W/"0"` before the first save; 412 `version_mismatch`); audited |
 
+### Compliance certificates (FC-01, wave F2; docs/03 §3.32; built 2026-11-09)
+
+Module `app/compliance` (`app/compliance/api.py`). The school's own certificates; no personal data. Reads `compliance.read` (owner, principal, office admin, auditor), writes `compliance.manage` (owner, principal, office admin), school-wide, no step-up.
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET | `/compliance/certificates` | `compliance.read` | The register: `rows` (`kind`, `kind_label`, `state` `valid`/`expiring`/`expired`/`no_expiry`/`missing`, `certificate` or null), `counts`, `kinds` (catalogue, `verified: false`), `expiring_days`, `today`, `owners` (active members; only for `compliance.manage`) (FR-COMP-003) |
+| GET | `/compliance/summary` | `compliance.read` | `{expired, expiring, missing}` for the dashboard (FR-COMP-014) |
+| POST | `/compliance/certificates` | `compliance.manage` | Body `{kind, label?, renews_id?, reference_no?, issued_by?, valid_from?, valid_until?, document_id?, owner_membership_id?, notes?}` → 201 `CertificateOut` + `ETag`; a kind already held is renewed (FR-COMP-004). `Idempotency-Key`. 422 `unknown_kind`, `label_required`, `label_not_allowed`, `renews_not_allowed`, `renews_not_found`, `document_not_found`, `owner_not_active`, `aadhaar_full_number_rejected`; 409 `conflict` |
+| GET | `/compliance/certificates/{certificate_id}` | `compliance.read` | One certificate with `history` (earlier ones of its kind) and `ETag` |
+| PUT | `/compliance/certificates/{certificate_id}` | `compliance.manage` | Correct the current certificate (all editable fields), `If-Match`; 409 `certificate_not_current`, 412 |
+| POST | `/compliance/certificates/{certificate_id}:remove` | `compliance.manage` | Recorded by mistake: `removed`, the renewed one current again; `If-Match`; 409 `certificate_not_current`, 412 |
+
+The disclosure draft (`GET /disclosure/draft`) gains `certificates` (item key → the register's current certificates: `certificate_id`, `kind`, `kind_label`, `valid_until`, `state`, `document_id`, `publishable`) and `expired_policy` (`warn` | `refuse`); `POST /disclosure/publish` answers 422 `certificate_expired` when the policy is `refuse` (FR-COMP-020..022). Notification template `compliance.certificate.expiring` (resource type `compliance_certificate`). **New error codes:** `unknown_kind`, `label_required`, `label_not_allowed`, `renews_not_allowed`, `renews_not_found`, `certificate_not_current`, `certificate_expired`.
+
 ## 5. Examples
 
 ### 5.1 Search students

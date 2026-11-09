@@ -1,0 +1,118 @@
+# School compliance certificates (FC-01; FR-COMP-001..FR-COMP-030; docs/05 §16.9). Versioned
+# configuration read by app/compliance/config.py (invariant 13). These are the SCHOOL's own
+# certificates (fire NOC, building safety, recognition, affiliation, water and sanitation), not
+# anyone's personal data.
+#
+# verified: false. Built from public SECONDARY sources read on 2026-11-09
+# (docs/research/2026-11-features/compliance-safety.md §2), not from the G.O.s or bye-laws
+# themselves. `typical_validity_months` is only a hint: the school types the real "valid until"
+# date printed on its certificate (validity differs by district, building height and year).
+# null means "usually no expiry"; the school can still type a date.
+#
+# kinds          key -> label, issuing authority, typical validity, the boards it applies to
+#                (empty list: every school), the CBSE Appendix IX items it backs
+#                (app/disclosure/formats/cbse-appendix-ix.v2.yaml item keys), a source note.
+#                `other` is reserved: a certificate the school names itself.
+# reminders      lead days before "valid until": one in-app notice per lead day to the renewal
+#                owner and the holders of compliance.manage; 0 is the notice on the day it
+#                lapses. Then again every `expired_every_days` days while it stays expired
+#                (lead decision D85).
+# expiring_days  a certificate is "expiring" this many days before it lapses (dashboard).
+# disclosure     what publishing CBSE Appendix IX does when a certificate the register holds for
+#                an item has expired: warn (default, lead decision D85, PO to confirm) or refuse
+#                (422 certificate_expired).
+version: 1
+verified: false
+source: "docs/research/2026-11-features/compliance-safety.md FC-01 (secondary sources, 2026-11-09); AP fire NOC five-yearly and recognition ten-yearly from the Dec 2025 announcement, G.O. number not found (owner decision 6)"
+
+reminders:
+  lead_days: [90, 60, 30, 7, 0]
+  expired_every_days: 30
+expiring_days: 90
+disclosure: warn
+
+kinds:
+  fire_noc:
+    label: Fire safety certificate (fire NOC)
+    authority: State fire services department
+    typical_validity_months: 60
+    boards: []
+    disclosure_items: [fire_safety]
+    note: "AP: once every five years for school buildings up to 30 m (Dec 2025 announcement, unverified); many states renew yearly."
+  building_safety:
+    label: Building safety (structural stability) certificate
+    authority: Local body engineer or a licensed structural engineer
+    typical_validity_months: 60
+    boards: []
+    disclosure_items: [building_safety]
+    note: "Validity differs by state and authority (unverified); type the date on the certificate."
+  occupancy:
+    label: Occupancy or completion certificate
+    authority: Local body (municipality or panchayat)
+    typical_validity_months: null
+    boards: []
+    disclosure_items: []
+    note: "Usually issued once for the building."
+  state_recognition:
+    label: School recognition (state education department)
+    authority: District Educational Officer or the state school education department
+    typical_validity_months: 120
+    boards: [BSEAP]
+    disclosure_items: []
+    note: "AP private schools: renewal every ten years (Dec 2025 announcement, unverified)."
+  rte_recognition:
+    label: Recognition certificate under the RTE Act 2009
+    authority: District Educational Officer
+    typical_validity_months: null
+    boards: []
+    disclosure_items: [rte_recognition]
+    note: "Renewal rules differ by state (unverified)."
+  state_noc:
+    label: No objection certificate (NOC) of the state government for CBSE affiliation
+    authority: State school education department
+    typical_validity_months: null
+    boards: [CBSE]
+    disclosure_items: [noc]
+    note: "Asked for at affiliation and upgradation (CBSE Affiliation Bye-Laws 2018, unverified)."
+  cbse_affiliation:
+    label: CBSE affiliation letter and latest extension
+    authority: Central Board of Secondary Education
+    typical_validity_months: 60
+    boards: [CBSE]
+    disclosure_items: [affiliation_letter]
+    note: "Extension of affiliation is usually for five years (unverified)."
+  deo_certificate:
+    label: DEO certificate or self-certification for CBSE affiliation
+    authority: District Educational Officer, or the school's own self-certification
+    typical_validity_months: null
+    boards: [CBSE]
+    disclosure_items: [deo_certificate]
+    note: "CBSE circular 1/2026 names it for Appendix IX (secondary summary, unverified)."
+  trust_registration:
+    label: Society, trust or company registration
+    authority: Registrar of societies, trusts or companies
+    typical_validity_months: null
+    boards: []
+    disclosure_items: [trust_registration]
+    note: "Some societies must renew; type the date when yours does."
+  water_safety:
+    label: Drinking water test report or certificate
+    authority: Public health laboratory or rural water supply department
+    typical_validity_months: 12
+    boards: []
+    disclosure_items: [sanitation_certificates]
+    note: "Yearly testing is common practice (unverified)."
+  health_sanitation:
+    label: Health and sanitation certificate
+    authority: Local body health officer
+    typical_validity_months: 12
+    boards: []
+    disclosure_items: [sanitation_certificates]
+    note: "Yearly renewal is common practice (unverified)."
+  other:
+    label: Other certificate (named by the school)
+    authority: As printed on the certificate
+    typical_validity_months: null
+    boards: []
+    disclosure_items: []
+    note: "For a certificate not in this list."

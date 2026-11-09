@@ -17,6 +17,11 @@ import { SaveBar } from "@/components/ui/SaveBar";
 import { Select, SelectField } from "@/components/ui/Select";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { useDocumentList } from "@/features/documents/data";
+import {
+  ExpiredWarning,
+  RegisterNote,
+  registerCertificates,
+} from "@/features/compliance/RegisterNote";
 import { ApiError, unwrap, useBffClient } from "@/lib/bff/query";
 import { useStaffCan, useStaffMe } from "@/lib/bff/staff-me";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -806,16 +811,29 @@ function DraftEditor({
       );
     }
     if (item.fill === "document") {
+      // FC-01 (FR-COMP-020, FR-COMP-021): the compliance register's certificate for the item.
+      const fromRegister = registerCertificates(draft)[item.key];
+      const chosen = state.documents[item.key] ?? [];
       return (
-        <DocumentPicker
-          item={item}
-          chosen={state.documents[item.key] ?? []}
-          known={known}
-          error={byItem[item.key]}
-          onChange={(ids) =>
-            update({ ...state, documents: { ...state.documents, [item.key]: ids } })
-          }
-        />
+        <div className="space-y-3">
+          {fromRegister?.some((c) => c.state === "expired") ? <ExpiredWarning /> : null}
+          <RegisterNote
+            certificates={fromRegister}
+            chosen={chosen}
+            onUse={(id) =>
+              update({ ...state, documents: { ...state.documents, [item.key]: [...chosen, id] } })
+            }
+          />
+          <DocumentPicker
+            item={item}
+            chosen={chosen}
+            known={known}
+            error={byItem[item.key]}
+            onChange={(ids) =>
+              update({ ...state, documents: { ...state.documents, [item.key]: ids } })
+            }
+          />
+        </div>
       );
     }
     if (item.type === "count_table") {

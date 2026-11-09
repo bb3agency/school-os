@@ -482,6 +482,18 @@ templates:
       title: ఒక చట్టపరమైన నిలుపుదల సమీక్షకు వచ్చింది
       body: "{state, select, overdue {ఒక చట్టపరమైన నిలుపుదల సమీక్ష తేదీ {days, plural, one {# రోజు} other {# రోజులు}} క్రితం దాటింది.} other {ఒక చట్టపరమైన నిలుపుదల {days, plural, =0 {ఒక రోజు లోపు} one {# రోజులో} other {# రోజుల్లో}} సమీక్షకు వస్తుంది.}} ఈ రికార్డులు ఇంకా ఉంచాలా అని చూసి, నిలుపుదలను కొనసాగించండి లేదా తొలగించండి."
 
+  # FC-01 compliance certificates (FR-COMP-011, FR-COMP-012): a school certificate lapses soon or
+  # has lapsed. `certificate` is the catalogue label (never a name the school typed). Staff only.
+  compliance.certificate.expiring:
+    params: [certificate, days, state]
+    resource_type: compliance_certificate
+    en:
+      title: "{state, select, expired {A school certificate has expired} other {A school certificate expires soon}}"
+      body: "{state, select, expired {{certificate} expired {days, plural, one {# day} other {# days}} ago.} other {{certificate} expires {days, plural, =0 {today} one {in # day} other {in # days}}.}} Start the renewal, then record the new certificate in the compliance register."
+    te:
+      title: "{state, select, expired {పాఠశాల ధృవపత్రం గడువు ముగిసింది} other {పాఠశాల ధృవపత్రం గడువు త్వరలో ముగుస్తుంది}}"
+      body: "{state, select, expired {{certificate} గడువు {days, plural, one {# రోజు} other {# రోజులు}} క్రితం ముగిసింది.} other {{certificate} గడువు {days, plural, =0 {ఈ రోజు} one {# రోజులో} other {# రోజుల్లో}} ముగుస్తుంది.}} పునరుద్ధరణ ప్రారంభించి, కొత్త ధృవపత్రాన్ని రిజిస్టర్‌లో నమోదు చేయండి."
+
   # R3-1D portal calendar (FR-RDY-006, FR-RDY-007; ADR-0053). Staff only, never parents (D45).
   # Params are a portal code and counts: the readiness of the event's linked profile across the
   # school (students 0 when the event links no profile with a readiness check). The link opens

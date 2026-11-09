@@ -1104,6 +1104,37 @@ A weekly, counts-only brief for the school's owner and principal (docs/research/
 
 *As built (wave F2, FA-05, 2026-11-09):* FR-BRF-001..015 built (`app/brief/`, tests `apps/api/tests/brief/`, web `/brief` with print CSS). Not built: the A4 monthly variant (the weekly page prints), WhatsApp to the owner (owner question open), the AI summary (FR-BRF-014).
 
+### 3.32 School compliance certificates (FR-COMP) (FC-01, wave F2)
+
+The school's own certificates (fire NOC, building safety, occupancy, recognition, RTE recognition, CBSE affiliation, NOC, DEO certificate, society registration, water and sanitation): a register with renewal history, expiry reminders and the CBSE Appendix IX link (docs/research/2026-11-features/compliance-safety.md FC-01; module `app/compliance`; migration `0096_compliance_register`; docs/05 §16.9; docs/09 "Compliance certificates"). School-level facts, no personal data. FR-COMP-023..030 are reserved for FC-07 inspection readiness packs.
+
+| ID | Requirement | Verify |
+|---|---|---|
+| FR-COMP-001 | Certificate kinds, issuing authority, typical validity, the boards each applies to and the Appendix IX items each backs MUST live in the versioned `app/compliance/catalogue.yaml` with `verified: false` and a source note until checked against the G.O.s and bye-laws (owner decision 6 of the research). A bad catalogue MUST stop the API at start-up. | T |
+| FR-COMP-002 | The register MUST expect every catalogue kind whose boards include one of the school's boards (a kind with no boards applies to every school); `other` is a certificate the school names itself (3-120 characters) and may repeat. | T |
+| FR-COMP-003 | `GET /compliance/certificates` (`compliance.read`) MUST list every expected kind (`missing` until recorded) and every current certificate with its state, most urgent first (expired, missing, expiring, valid, no expiry), with counts, the catalogue and, for `compliance.manage`, the active members a renewal can be given to. | T |
+| FR-COMP-004 | Recording a certificate (`compliance.manage`) of a catalogue kind the school already holds MUST be its renewal: the old row becomes `superseded` (pointing at the renewal) in the same transaction and is kept; at most one current row per catalogue kind (database index; a racing renewal answers 409). An `other` certificate names the one it renews (`renews_id`). | T |
+| FR-COMP-005 | `GET /compliance/certificates/{id}` MUST show the earlier certificates of the same kind (newest first). | T |
+| FR-COMP-006 | A certificate's copy MUST be a document the caller can see with a usable (scanned or being scanned) version, through `documents.service` (422 `document_not_found`); its renewal owner MUST be an active member (422 `owner_not_active`); a full Aadhaar number in any typed text MUST be refused (422 `aadhaar_full_number_rejected`). | T |
+| FR-COMP-007 | Recording, correcting, removing and reminding MUST be audited in the same transaction (`compliance.certificate.recorded`, `.updated`, `.removed`, `.reminded`) with ids, kind, dates, document id and changed field names only, never typed texts. | T |
+| FR-COMP-008 | Correcting the current certificate (`PUT`, `If-Match`) MUST replace its editable fields; a changed "valid until" date MUST restart its reminders. A superseded or removed certificate cannot be changed (409 `certificate_not_current`). | T |
+| FR-COMP-009 | Removing a certificate recorded by mistake (`POST …:remove`, `If-Match`) MUST keep it as `removed`; when it was a renewal, the certificate it replaced MUST become current again. | T |
+| FR-COMP-010 | A certificate's state MUST come from its "valid until" date and today in IST: no date = `no_expiry`; before today = `expired` (valid through the printed day); within `expiring_days` (90) = `expiring`; otherwise `valid`. The school always types the printed dates; the typical validity is only a hint. | T |
+| FR-COMP-011 | A daily job (07:10 IST, active schools only) MUST send in-app reminders at the catalogue's lead days (90, 60, 30, 7 and 0 days before "valid until") to the renewal owner (when still active) and the holders of `compliance.manage`; one step per lead day (a missed day sends only the latest), never to parents. *(Lead decision D85, PO to confirm.)* | T |
+| FR-COMP-012 | After a certificate lapses the job MUST send one expiry notice, then again every `expired_every_days` (30) days while it stays expired. Notices name the catalogue label only (an `other` certificate is "A certificate the school added"), never a typed text. *(Lead decision D85, PO to confirm.)* | T |
+| FR-COMP-013 | Reminders MUST be idempotent per certificate and lead day (`last_reminded_lead`, `last_reminded_on`) and per recipient and day (notification dedupe key). | T |
+| FR-COMP-014 | `GET /compliance/summary` (`compliance.read`) MUST give counts only (expired, expiring, missing) for the school dashboard. | T |
+| FR-COMP-015 | The register MUST be a tenant table under invariant 1 (RLS ENABLE + FORCE, composite FKs to documents, members and itself); `sos_app` never deletes rows; the offboarding purge (module `compliance`) removes them. | T |
+| FR-COMP-016 | The full data export MUST include the register (`compliance_certificates`); record class `compliance_certificates` (C1, no personal data, life of the school). | T |
+| FR-COMP-017 | `compliance.read`: owner, principal, office admin, auditor; `compliance.manage`: owner, principal, office admin; school-wide, no step-up (no personal data). *(Lead decision D85, PO to confirm.)* | T |
+| FR-COMP-018 | Another school's certificate MUST answer 404 on every route, the same as a random id. | T |
+| FR-COMP-019 | The web register (`/compliance`) MUST show state, validity, renewal owner and copy per row, the counts and the "typical validity is only a guide" note, and offer record, renew, correct and remove to `compliance.manage`, keyboard-usable at 1366×768. | T |
+| FR-COMP-020 | The CBSE Appendix IX draft MUST show, for each document item a catalogue kind backs, the register's current certificate (kind, valid until, state, whether its copy can be published) read through `compliance.service`, and offer to use its copy. | T |
+| FR-COMP-021 | Publishing Appendix IX while a certificate the register holds for an item has expired MUST warn on the draft and record the items in the `disclosure.published` audit summary (`expired_certificates`). | T |
+| FR-COMP-022 | With `disclosure: refuse` in the catalogue, publishing MUST answer 422 `certificate_expired` naming the items. Default `warn`. *(Lead decision D85, PO to confirm.)* | T |
+
+*As built (wave F2, FC-01, 2026-11-09):* FR-COMP-001..022 are built and tested (`apps/api/tests/compliance/`, `apps/api/tests/disclosure/test_compliance_register.py`, `apps/web/src/features/compliance/compliance.test.ts`). FC-07 inspection readiness packs (FR-COMP-023..030) are not built.
+
 ---
 
 ## 4. Non-functional requirements

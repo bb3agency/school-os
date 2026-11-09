@@ -2194,7 +2194,14 @@
       "before_step": "వాగ్దానం చేసిన తేదీ దశకు ముందు ఉండకూడదు. తర్వాతి తేదీ ఎంచుకోండి.",
       "too_far": "తేదీ చాలా ముందుకు ఉంది. ముందటి తేదీ ఎంచుకోండి.",
       "not_allowed": "ఇక్కడ ఈ విలువ అనుమతించబడదు. ఖాళీగా ఉంచండి.",
-      "no_open_fix": "ఈ సవరణ కోసం ఇక ఏదీ వేచి లేదు. జాబితాను మళ్లీ లోడ్ చేయండి."
+      "no_open_fix": "ఈ సవరణ కోసం ఇక ఏదీ వేచి లేదు. జాబితాను మళ్లీ లోడ్ చేయండి.",
+      "document_not_found": "Choose a document from the list.",
+      "label_required": "Type the name of the certificate.",
+      "label_not_allowed": "Only an 'other' certificate takes a name.",
+      "unknown_kind": "Choose a certificate from the list.",
+      "renews_not_allowed": "Only an 'other' certificate names the one it renews.",
+      "renews_not_found": "The certificate it renews was changed. Reload the page.",
+      "certificate_expired": "This certificate has expired. Record the renewed one before publishing."
     },
     "api": {
       "year_result_changed": {
@@ -12059,6 +12066,16 @@
         "title": "ఇది ఇప్పుడు చూపుతున్న పేజీ కాదు",
         "body": "ఇప్పుడు చూపుతున్న పేజీని మాత్రమే ఉపసంహరించవచ్చు. చూడటానికి పేజీని మళ్లీ లోడ్ చేయండి."
       }
+    },
+    "certificates": {
+      "fromRegister": "From the compliance register: {name}",
+      "registerValid": "valid until {date}",
+      "registerNoExpiry": "no expiry",
+      "registerExpired": "expired on {date}",
+      "useRegisterCopy": "Use the register's copy",
+      "registerNotPublishable": "The register's copy can't be published: upload a clean PDF as an 'other' document.",
+      "expiredWarningTitle": "A certificate on this page has expired",
+      "expiredWarningBody": "Record the renewed certificate in the compliance register, or publish knowing the page shows an expired certificate."
     }
   },
   "privacy": {
@@ -12945,6 +12962,97 @@
       "row_has_admission_no": {
         "title": "This row has an admission number",
         "body": "It is matched by that number. Correct the number in the sheet instead."
+      }
+    }
+  },
+  "compliance": {
+    "nav": "Compliance certificates",
+    "title": "Compliance certificates",
+    "description": "The school's own certificates (fire NOC, building safety, recognition, affiliation, water and sanitation): when each one lapses and who renews it.",
+    "recordButton": "Record a certificate",
+    "noPermissionTitle": "You can't see the compliance certificates",
+    "noPermissionBody": "Ask the principal or the office admin if you need to check a certificate.",
+    "unverifiedTitle": "Typical validity is only a guide",
+    "unverifiedBody": "The list of certificates and their usual validity come from public sources that SchoolOS has not checked against the rules. Always type the dates printed on your certificate.",
+    "emptyTitle": "No certificates yet",
+    "emptyBody": "Record the school's fire NOC, recognition and other certificates so SchoolOS can remind you before they lapse.",
+    "colCertificate": "Certificate",
+    "colValidity": "Valid until",
+    "colOwner": "Renewed by",
+    "colCopy": "Copy",
+    "colActions": "Actions",
+    "reference": "No. {number}",
+    "daysLeft": "{days, plural, =0 {lapses today} one {# day left} other {# days left}}",
+    "daysAgo": "{days, plural, one {expired # day ago} other {expired # days ago}}",
+    "noOwner": "No one chosen",
+    "ownerLeft": "A former member",
+    "ownerInactive": "No longer active: choose someone else",
+    "copyHidden": "A document you can't open",
+    "noCopy": "No copy attached",
+    "state": {
+      "valid": "Valid",
+      "expiring": "Expires soon",
+      "expired": "Expired",
+      "no_expiry": "No expiry",
+      "missing": "Not recorded"
+    },
+    "counts": {
+      "expired": "Expired",
+      "expiring": "Expiring within {days} days",
+      "missing": "Not recorded",
+      "valid": "Valid"
+    },
+    "actions": {
+      "record": "Record",
+      "recordAria": "Record the {name}",
+      "renew": "Renew",
+      "renewAria": "Record the renewed {name}",
+      "edit": "Correct",
+      "editAria": "Correct the {name}",
+      "remove": "Remove",
+      "removeAria": "Remove the {name}"
+    },
+    "form": {
+      "recordTitle": "Record a certificate",
+      "renewTitle": "Record the renewed {name}",
+      "editTitle": "Correct the {name}",
+      "description": "Type the details as printed on the certificate.",
+      "renewDescription": "The current certificate is kept in the history. Type the details of the new one as printed.",
+      "kind": "Certificate",
+      "choose": "Choose a certificate",
+      "issuedByHint": "Usually issued by: {authority}.",
+      "typicalValidity": "Often valid for {months, plural, one {# month} other {# months}}.",
+      "typicalNoExpiry": "Usually does not expire.",
+      "label": "Name of the certificate",
+      "referenceNo": "Certificate number",
+      "issuedBy": "Issued by",
+      "validFrom": "Valid from",
+      "validUntil": "Valid until",
+      "validUntilHint": "The last day it is valid. Leave empty if it does not expire.",
+      "document": "Copy in Documents",
+      "documentHint": "Upload the scan in Documents first. To also show it on the CBSE disclosure page, upload a PDF as an 'other' document.",
+      "noDocument": "No copy",
+      "loading": "Loading documents…",
+      "owner": "Who renews it",
+      "noOwner": "No one chosen",
+      "ownerHint": "Reminders go to this person and to everyone who manages compliance certificates.",
+      "notes": "Notes",
+      "record": "Record certificate",
+      "save": "Save changes"
+    },
+    "removeDialog": {
+      "title": "Remove this certificate?",
+      "confirm": "Remove",
+      "consequence": "Use this only for a certificate recorded by mistake. It stays in the history as removed; if it was a renewal, the earlier certificate becomes current again."
+    },
+    "errors": {
+      "certificate_not_current": {
+        "title": "This certificate was replaced",
+        "body": "Only the current certificate can be changed. Reload the page to see the latest one."
+      },
+      "conflict": {
+        "title": "Someone recorded this at the same time",
+        "body": "Reload the page and check the certificate before trying again."
       }
     }
   }

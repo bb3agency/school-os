@@ -511,6 +511,13 @@ export function SchoolShell({
           icon: "creditCard",
         },
         {
+          // FC-01: the school's compliance certificates (fire NOC, recognition, affiliation).
+          href: "/compliance",
+          label: t("compliance.nav"),
+          permission: "compliance.read",
+          icon: "checkCircle",
+        },
+        {
           // R3-1C (US-2901, ADR-0051): the CBSE Appendix IX disclosure, CBSE schools only.
           href: "/settings/disclosure",
           label: t("disclosure.nav"),

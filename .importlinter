@@ -63,6 +63,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.identity.repository
@@ -103,6 +104,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.tenancy.repository
@@ -143,6 +145,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.platform.repository
@@ -186,6 +189,7 @@ forbidden_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 
 # The HTML -> PDF renderer (headless Chromium, bundled font, sandbox setting) is app.core.pdf,
@@ -242,6 +246,7 @@ source_modules =
     app.messaging
     app.disclosure
     app.brief
+    app.compliance
     # Every privacy module except breach_sync (and breach_tasks, which runs it): R3-1B's sanctioned
     # bridge that pulls SchoolOS incident notices through app.platform.service (ADR-0050), like
     # app.breakglass.
@@ -315,6 +320,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.ops.repository
@@ -355,6 +361,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.dq.repository
@@ -397,6 +404,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.students.repository
@@ -437,6 +445,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.documents.repository
@@ -477,6 +486,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.notifications.repository
@@ -516,6 +526,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.breakglass.repository
@@ -638,6 +649,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.imports.repository
@@ -703,6 +715,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.changes.repository
@@ -743,6 +756,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.extraction.repository
@@ -782,6 +796,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.exports.repository
@@ -843,6 +858,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.admin.repository
@@ -885,6 +901,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.admin
@@ -948,6 +965,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.knowledge.gateway
@@ -1139,6 +1157,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.circulars.repository
@@ -1200,6 +1219,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.certificates.repository
@@ -1271,6 +1291,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.academics.repository
@@ -1312,6 +1333,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.insights.repository
@@ -1397,6 +1419,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.tally.repository
@@ -1462,6 +1485,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.apaar.repository
@@ -1523,6 +1547,7 @@ source_modules =
     app.tally
     app.messaging
     app.disclosure
+    app.compliance
     app.fees
     app.privacy
 forbidden_modules =
@@ -1589,6 +1614,7 @@ source_modules =
     app.public
     app.fees
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.messaging.repository
@@ -1679,6 +1705,7 @@ source_modules =
     app.public
     app.messaging
     app.disclosure
+    app.compliance
     app.privacy
 forbidden_modules =
     app.fees.repository
@@ -1783,10 +1810,74 @@ source_modules =
     app.fees
     app.messaging
     app.privacy
+    app.compliance
 forbidden_modules =
     app.disclosure.repository
     app.disclosure.models
 allow_indirect_imports = True
+
+# --- FC-01 school compliance certificate register ----------------------------------------------
+# Other modules use only app.compliance.service (the disclosure reads which certificate backs an
+# Appendix IX item through it). It reaches documents, members, notifications and the school's
+# boards through their services.
+
+[importlinter:contract:compliance-internals]
+name = compliance: repository/models are private (use app.compliance.service)
+type = forbidden
+source_modules =
+    app.main
+    app.core
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.ops
+    app.devtools
+    app.dq
+    app.students
+    app.documents
+    app.notifications
+    app.breakglass
+    app.imports
+    app.changes
+    app.extraction
+    app.exports
+    app.knowledge
+    app.admin
+    app.circulars
+    app.certificates
+    app.apaar
+    app.academics
+    app.insights
+    app.tally
+    app.public
+    app.fees
+    app.messaging
+    app.disclosure
+    app.privacy
+forbidden_modules =
+    app.compliance.repository
+    app.compliance.models
+allow_indirect_imports = True
+
+# The catalogue and its date rules stay pure (no DB, web or feature modules).
+[importlinter:contract:compliance-pure-library]
+name = compliance config stays pure (no DB, web or feature modules)
+type = forbidden
+source_modules =
+    app.compliance.config
+forbidden_modules =
+    sqlalchemy
+    fastapi
+    app.core.db
+    app.audit
+    app.authz
+    app.identity
+    app.tenancy
+    app.platform
+    app.students
+    app.documents
 
 # The disclosure's format, value checks and page template stay pure (no DB, web or feature
 # modules besides core.redaction).
@@ -1846,6 +1937,7 @@ source_modules =
     app.fees
     app.messaging
     app.disclosure
+    app.compliance
 forbidden_modules =
     app.privacy.repository
     app.privacy.models

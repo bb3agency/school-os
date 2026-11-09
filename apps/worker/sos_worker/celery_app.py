@@ -20,6 +20,7 @@ from app.breakglass.tasks import beat_schedule as breakglass_beat_schedule
 from app.brief.tasks import beat_schedule as brief_beat_schedule
 from app.changes.tasks import beat_schedule as changes_beat_schedule
 from app.circulars.tasks import beat_schedule as circulars_beat_schedule
+from app.compliance.tasks import beat_schedule as compliance_beat_schedule
 from app.core.config import get_settings
 from app.core.logging import bind_task_context, clear_context, reset_context, setup_logging
 from app.core.telemetry import setup_telemetry
@@ -55,6 +56,7 @@ import app.apaar.service  # isort: skip
 import app.breakglass.service  # isort: skip
 import app.brief.service  # isort: skip
 import app.changes.service  # isort: skip
+import app.compliance.service  # isort: skip
 import app.circulars.service  # isort: skip
 import app.documents.service  # isort: skip
 import app.disclosure.service  # isort: skip
@@ -142,6 +144,8 @@ TASK_MODULES: list[str] = [
     "app.privacy.tasks",
     # FA-05 weekly management brief (FR-BRF-010): Monday mornings, database work only.
     "app.brief.tasks",
+    # FC-01 compliance certificates: the daily expiry reminders.
+    "app.compliance.tasks",
 ]
 
 
@@ -311,6 +315,8 @@ def create_celery() -> Celery:
             **privacy_beat_schedule(),
             # FA-05 (FR-BRF-010): the weekly management brief, Mondays 07:45 IST.
             **brief_beat_schedule(),
+            # FR-COMP-011 (FC-01): certificate expiry reminders to staff (daily, 07:10 IST).
+            **compliance_beat_schedule(),
             # FR-PUB-006: expired parent link handles deleted 30 days after expiry (daily).
             **public_beat_schedule(),
             # FR-MSG-006, FR-MSG-020, FR-MSG-021, FR-MSG-023: webhook inbox sweep (1 min),

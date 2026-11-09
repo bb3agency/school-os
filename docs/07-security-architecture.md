@@ -262,6 +262,8 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | brief.read (FA-05: the weekly management brief, counts only, and the member's own delivery choice; D85) | ✓ | ✓ | — | — | — | — | — | — | — |
 | disclosure.edit (R3-1C: edit the CBSE Appendix IX draft, see the published history, download the published files; CBSE schools only; ADR-0051) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | disclosure.publish (R3-1C: publish the disclosure, withdraw it, change its public link; ADR-0051) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
+| compliance.read (FC-01: the school's compliance certificate register, states, renewal history and dashboard counts; school-level facts, no personal data; D85) | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
+| compliance.manage (FC-01: record, renew, correct and remove the school's certificates, choose who renews them; D85) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | privacy.read (R3-1A: requests and grievances list and detail within the reader's student reach, notice records, record classes) | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ |
 | privacy.request.manage (R3-1A: log requests and grievances, record verification, link change requests, build access reports, record notice issues, write responses) | ✓ | ✓ | ✓ | — | — | — | — | — | — |
 | privacy.request.decide (R3-1A: release an access report, approve an erasure, close an access, erasure or grievance request; maker-checker against the person who logged it) | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
