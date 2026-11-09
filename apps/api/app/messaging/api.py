@@ -291,11 +291,19 @@ def section_join_slips(
         list[OptinCategory],
         Query(min_length=1, max_length=3, description="Categories the slips opt into."),
     ],
+    missing_only: Annotated[
+        bool,
+        Query(description="Only the students a chosen category reaches no guardian of (FP-01)."),
+    ] = False,
 ) -> HTMLResponse:
     """The same slips for a whole section (the web's print link; ids and codes only in the URL,
-    no personal data). ``messaging.optin.record``, scope; errors as
-    ``POST /messaging/join-slips``."""
-    data = JoinSlipsIn(section_id=section_id, categories=list(dict.fromkeys(categories)))
+    no personal data). ``missing_only``: only the students not reached in a chosen category
+    (FR-MSG-043). ``messaging.optin.record``, scope; errors as ``POST /messaging/join-slips``."""
+    data = JoinSlipsIn(
+        section_id=section_id,
+        categories=list(dict.fromkeys(categories)),
+        missing_only=missing_only,
+    )
     return join_slips(ctx, db, data)
 
 

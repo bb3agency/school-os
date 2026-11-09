@@ -985,6 +985,16 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             i=uuid.uuid4(),
             t=t,
         )
+        # --- FP-02 urgent closure messages (0093_msg_reach_closure) -------------------------
+        _run(
+            c,
+            "INSERT INTO msg.closures (id, tenant_id, whole_school, closed_from, closed_to, "
+            "reason_code, sent_by) VALUES (:i, :t, true, current_date, current_date, "
+            "'weather', :u)",
+            i=uuid.uuid4(),
+            t=t,
+            u=u["user"],
+        )
         # --- CBSE disclosure (R3-1C, 0065_disclosure): a draft, a snapshot and its document --
         snapshot = uuid.uuid4()
         _run(

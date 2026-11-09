@@ -29,6 +29,7 @@ import {
   type SendRun,
 } from "./data";
 import { DeliveryProgress } from "./SendNoticePanel";
+import { BroadcastFollowUpCard } from "./ReachScreens";
 import { MessagingGate } from "./WhatsAppSettingsScreen";
 
 type SectionRow = BroadcastReport["sections"][number];
@@ -309,6 +310,7 @@ export function BroadcastReportScreen({ broadcastId }: { broadcastId: string }) 
                   void queryClient.invalidateQueries({ queryKey: KEYS.broadcast(broadcastId) })
                 }
               />
+              <BroadcastFollowUpCard broadcastId={broadcastId} />
               {Object.keys(data.failure_reasons).length > 0 ? (
                 <Card title={t("reasonsTitle")}>
                   <ul className="space-y-1 text-sm text-ink">

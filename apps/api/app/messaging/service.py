@@ -1320,6 +1320,24 @@ def section_summary(
 # --- join slips (FR-MSG-009) ------------------------------------------------------------------
 
 
+def _unreached(
+    session: Session, student_ids: Sequence[uuid.UUID], categories: Sequence[OptinCategory]
+) -> list[uuid.UUID]:
+    """FP-01 (FR-MSG-043): the students for whom at least one of ``categories`` reaches no
+    guardian (none opted in for it on their current mobile number)."""
+    briefs = students.guardians_of_students(session, student_ids)
+    current = repo.current_optins(session, sorted({b.guardian_id for b in briefs}))
+    reached: set[tuple[uuid.UUID, str]] = set()
+    for brief in briefs:
+        if not brief.has_phone:
+            continue
+        for category in categories:
+            row = current.get((brief.guardian_id, category))
+            if _for_current_number(session, brief.guardian_id, row):
+                reached.add((brief.student_id, category))
+    return [s for s in student_ids if any((s, c) not in reached for c in categories)]
+
+
 def _code_hash(code: str) -> bytes:
     return hashlib.sha256(code.encode("ascii")).digest()
 
@@ -1347,6 +1365,8 @@ def join_slips(session: Session, ctx: UserContext, data: JoinSlipsIn) -> str:
     account = repo.live_account(session)
     if account is None or not account.display_phone:
         raise NotConnected("Connect WhatsApp before printing join slips.")
+    if data.missing_only:
+        student_ids = _unreached(session, student_ids, data.categories)
     names = students.summaries(session, ctx, student_ids)
     guardians = [g for g in students.guardians_of_students(session, student_ids) if g.has_phone]
     cfg = load_config().optin
@@ -2528,6 +2548,8 @@ _PURGE = purging.PurgeTables(
         # 0061_messaging_sends: messages reference broadcasts
         "msg.send_runs",
         "msg.broadcasts",
+        # 0093_msg_reach_closure: closure messages reference closures by source id only
+        "msg.closures",
         "msg.join_codes",
         "msg.optins",
         "msg.settings",

@@ -313,6 +313,12 @@ permissions:
     description: Send an approved notice to parents on WhatsApp, send it again with a reason, and revoke a parent link
     sensitivity: sensitive
     step_up: false
+  # FP-02 (ADR-0043 amendment 2026-11-09, lead decision D85): the principal only; migration
+  # 0093_msg_reach_closure upserts it.
+  message.closure.send:
+    description: Send an urgent school closure message to parents on WhatsApp, also during quiet hours (06:00-21:30 IST)
+    sensitivity: critical
+    step_up: true
 
   # --- R3-1A privacy requests (ADR-0048, US-2601..US-2609, FR-DPDP-001..018) -----------------
   # Migration 0066_privacy_requests upserts these into core.permissions. School-wide only.

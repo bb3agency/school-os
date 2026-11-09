@@ -242,6 +242,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | messaging.optin.record (R2-1C: record opt-in/opt-out with evidence, print join slips) | — | ✓ | ✓ | ✓ | — | — | S | — | — |
 | message.read (R2-1C: delivery log, message history, opt-in states) | ✓ | ✓ | ✓ | ✓ | ✓ | — | S | — | ✓ |
 | message.send (R2-3G: send an approved notice on WhatsApp, send again with a reason, revoke a parent link) | — | ✓ | ✓ | — | — | — | — | — | — |
+| message.closure.send (FP-02: send an urgent school closure message on WhatsApp, also during quiet hours, 06:00-21:30 IST; ADR-0043 amendment, lead decision D85) | — | ✓ᴿ | — | — | — | — | — | — | — |
 | fee.collect (R2-1B: take payments at the counter, issue receipts, request receipt cancellations; fee permissions are school-wide only, FR-FEE-024) | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
 | fee.manage (R2-1B: fee heads, plans, applying plans, adjustment requests, fee settings, day close) | — | ✓ | — | — | ✓ | — | — | — | — |
 | fee.concession.request (R2-1B) | — | ✓ | ✓ | — | ✓ | — | — | — | — |

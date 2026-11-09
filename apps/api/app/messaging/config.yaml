@@ -86,6 +86,40 @@ broadcasts:
   # dues list shows at most fees config limits.dues_max_rows, 5000, rows).
   max_reminder_accounts: 5000
 
+# Opt-in coverage and reach follow-up (FP-01; FR-MSG-039..046). A follow-up list, never an
+# automatic resend: a message neither read on WhatsApp nor opened on its parent page this long
+# after it was sent is listed as "not opened".
+reach:
+  not_opened_hours: 48
+  max_list_rows: 2000
+
+# Urgent closure message (FP-02; FR-MSG-047..055; ADR-0043 amendment of 2026-11-09). Lead
+# decision D85, PO to confirm: the principal (message.closure.send, step-up) may send the
+# school_closure utility template between window_start and window_end IST, also inside the
+# school's quiet hours; never outside this window (a later message waits for window_start).
+# The daily cap, the account pause, the notices switch, opt-ins and D31 still apply.
+closures:
+  window_start: "06:00"
+  window_end: "21:30"
+  max_days_ahead: 7
+  max_days: 7
+  uses_window_days: 120
+  # The reason phrase completes "... closed on <dates> because of <reason>." (Telugu texts are
+  # not reviewed, like every Telugu template; they go out only with SOS_TELUGU_ENABLED on.)
+  reasons:
+    weather:
+      en: heavy rain or a storm warning
+      te: భారీ వర్షం లేదా తుఫాను హెచ్చరిక
+    government_order:
+      en: an order from the government
+      te: ప్రభుత్వ ఉత్తర్వు
+    local_situation:
+      en: the local situation
+      te: స్థానిక పరిస్థితి
+    other:
+      en: unavoidable reasons
+      te: తప్పనిసరి కారణాలు
+
 # Automatic messages (FR-MSG-013, FR-MSG-014; owner decision D25). IST times; absence alerts use
 # the school's own time from msg.settings.
 automatic:

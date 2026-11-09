@@ -42,9 +42,15 @@ Purpose = Literal[
     "fee_reminder",
     "fee_receipt",
     "optin_stopped",
+    "school_closure",
 ]
 TemplatePurpose = Literal[
-    "optin_confirm", "school_notice", "absence_alert", "fee_reminder", "fee_receipt"
+    "optin_confirm",
+    "school_notice",
+    "absence_alert",
+    "fee_reminder",
+    "fee_receipt",
+    "school_closure",
 ]
 Button = Literal["url"]
 TextKey = Literal["optin_stopped", "auto_reply", "auto_reply_no_phone"]

@@ -147,6 +147,7 @@ roles:
       message.read: school
       # R2-3G sending (ADR-0043; docs/07 §6.2)
       message.send: school
+      message.closure.send: school_step_up  # FP-02 (D85): only the principal sends closures
       # R2-1B fees (ADR-0042; docs/07 §6.2): school-wide only, never scoped (FR-FEE-024)
       fee.collect: school
       fee.manage: school

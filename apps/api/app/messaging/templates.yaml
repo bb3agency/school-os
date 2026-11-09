@@ -118,6 +118,26 @@ templates:
       body: "చెల్లింపు అందింది ({{1}}): {{3}} కోసం ₹{{2}}, రసీదు {{4}}, తేదీ {{5}}. రసీదు చూడటానికి కింద ఉన్న బటన్ నొక్కండి."
       url_label: రసీదు చూడండి
 
+  # FP-02 (FR-MSG-047; ADR-0043 amendment of 2026-11-09): the urgent closure message. Utility
+  # (a safety update about the child's school day; Meta decides the category at review). Sent
+  # only by the principal, also inside quiet hours (06:00-21:30 IST window, config closures).
+  school_closure:
+    version: 1
+    purpose: school_closure
+    category: utility
+    optin_category: notices
+    variables:
+      - {name: school_name, max_length: 60}
+      - {name: dates, max_length: 40}
+      - {name: reason, max_length: 80}
+    buttons: []
+    en:
+      reviewed: true
+      body: "Urgent update from {{1}}: the school will be closed on {{2}} because of {{3}}. Please contact the school office if you have questions."
+    te:
+      reviewed: false
+      body: "అత్యవసర సమాచారం ({{1}}): {{3}} కారణంగా {{2}} న పాఠశాల మూసి ఉంటుంది. ప్రశ్నలు ఉంటే దయచేసి పాఠశాల కార్యాలయాన్ని సంప్రదించండి."
+
 texts:
   optin_stopped:
     en:

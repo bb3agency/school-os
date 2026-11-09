@@ -25,6 +25,7 @@ sources:
   messaging.template.absence_alert: {reviewed: false}
   messaging.template.fee_reminder: {reviewed: false}
   messaging.template.fee_receipt: {reviewed: false}
+  messaging.template.school_closure: {reviewed: false}
   messaging.text.optin_stopped: {reviewed: false}
   messaging.text.auto_reply: {reviewed: false}
   messaging.text.auto_reply_no_phone: {reviewed: false}

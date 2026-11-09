@@ -89,6 +89,20 @@ Lead decisions recorded in docs/18 §8 (the owner asked not to be asked):
 
 **Consequences.** Schools see an honest estimate and its age; Meta's invoice remains the final amount. Values stay `verified: false` until someone checks Meta's INR rate card and updates `rates_checked_on` (follow-up). Requirements FR-MSG-029..034 (docs/03 §3.22); FR-MSG-035..038 are reserved for this amendment.
 
+## Amendment (2026-11-09): urgent closure messages inside quiet hours (FP-02; lead decision D85, PO to confirm)
+
+**Context.** District Collectors close schools (government, aided and private) by orders dated the evening before, for cyclones and heavy rain (Cyclone Montha, October 2025; research `docs/research/2026-11-features/parents-communication.md` fact 5). Under decision 10 a notice approved at 22:00 waits out quiet hours (21:00-07:00) and reaches parents at 07:00, when buses may already be running. No urgent path existed.
+
+**Decision.**
+
+1. **One urgent template.** A new UTILITY template `school_closure` (version 1, `optin_category: notices`, no button, no STOP text per D32): "Urgent update from {school}: the school will be closed on {dates} because of {reason}. Please contact the school office if you have questions." The reason is a code from `config.yaml` `closures.reasons` (`weather`, `government_order`, `local_situation`, `other`) rendered as a fixed phrase; no free text the principal types reaches parents. Meta decides the category at template review; if Meta re-categorises it as marketing, the existing pause on re-categorisation applies (decision 3).
+2. **Who.** Only holders of the new permission `message.closure.send` (critical, step-up MFA), granted to the **principal** system role only. Preview and send both need a recent step-up (a POST under a step-up permission, SEC-005). No second approver: the principal already holds `notice.approve`, so the send is the approval; it is audited `messaging.closure.sent` in the same transaction (dates, reason code, audience, counts, when sending starts).
+3. **When (the exception).** Closure messages may be sent between `closures.window_start` and `closures.window_end` IST, **06:00-21:30** by default (configuration), also inside the school's quiet hours; **never outside that window**: a message queued at 23:00 waits for 06:00. A closure message whose last closure date has passed is skipped `too_late`. Every other notice keeps decision 10 unchanged.
+4. **Limits that still apply.** The daily cap (D25), the account pause and quality pause, an unapproved or paused template, INR billing (FR-MSG-004), the notices switch, opt-ins for `notices` on the guardian's current number, one message per guardian, and D31 (nothing while the school is suspended). Closures may start today or within 7 days and last at most 7 days (configuration).
+5. **Misuse is visible.** `GET /messaging/closures` shows the principal how many closure messages were sent in the last 120 days (configuration) with delivery counts; the table `msg.closures` (migration `0093_msg_reach_closure`) is insert-only for the app role and follows the message retention (13 months).
+
+**Consequences.** Coastal schools can tell parents about an evening closure order the same night (until 21:30) or first thing in the morning (from 06:00) without waiting for the notice workflow. The window is a lead default for the PO to confirm (D85; the research proposal was 05:30-22:30). Telugu text of the template and the reason phrases is `reviewed: false` like every Telugu template. A parent page with the order text (the research's "Details" button) is not built: it would need a new parent-link kind (ADR-0046) and is a follow-up. Requirements FR-MSG-047..055 (docs/03 §3.22); FP-01 (opt-in coverage and reach follow-up, FR-MSG-039..046) needs no amendment.
+
 ## Related requirements
 
 FR-MSG-001..034 (docs/03 §3.21-3.22), FR-PUB-001..012, SEC-034, SEC-035, SEC-039, PRV-025..028; US-2201..US-2210 (docs/02 C22). Docs: 01 §7.3, 02 §9, 05 §15.3, 07 §3 TB11, §4 T28-T35, 08 §15, 09 §4 "Messaging", "Webhooks", 10 §11.2, 14 R2, 17 §5.8.

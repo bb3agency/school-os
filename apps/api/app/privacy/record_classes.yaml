@@ -330,7 +330,7 @@ classes:
   messages:
     label: WhatsApp messages sent
     owner: messaging
-    tables: [msg.messages, msg.send_runs, msg.broadcasts]
+    tables: [msg.messages, msg.send_runs, msg.broadcasts, msg.closures]
     classification: C2
     docs_row: Messages (
     retention: 13 months; encrypted variables erased after 180 days
