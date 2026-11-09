@@ -758,7 +758,8 @@ def apply_plan(
     created = present = 0
     entries: list[dict[str, Any]] = []
     charged_lines = {
-        aid: {(b.instalment_no, b.head_id) for b in buckets if b.charged}
+        # FM-02: add-on charges never stand in for a plan charge of the same line.
+        aid: {(b.instalment_no, b.head_id) for b in buckets if b.plan_charged}
         for aid, buckets in ledger.buckets_by_account(
             session, [a.id for a in existing.values()]
         ).items()
@@ -870,12 +871,14 @@ def _differences(session: Session, plan: FeePlan) -> list[PlanDifference]:
     for account in accounts:
         per = {(b.instalment_no, b.head_id): b for b in buckets.get(account.id, [])}
         # Only instalments the student was charged for (a late admission keeps its start).
-        charged_instalments = {k[0] for k, b in per.items() if b.charged}
+        # FM-02 (FR-FEE-093): add-on charges are their own source; a new version compares
+        # only what the plan charged.
+        charged_instalments = {k[0] for k, b in per.items() if b.plan_charged}
         keys = {k for k in planned if k[0] in charged_instalments}
-        keys |= {(k[0], k[1]) for k, b in per.items() if b.charged and k[1] is not None}
+        keys |= {(k[0], k[1]) for k, b in per.items() if b.plan_charged and k[1] is not None}
         for inst_no, head_id in sorted(keys, key=lambda k: (k[0], str(k[1]))):
             bucket = per.get((inst_no, head_id))
-            charged = (bucket.charged if bucket else ZERO) + earlier.get(
+            charged = (bucket.plan_charged if bucket else ZERO) + earlier.get(
                 (account.id, inst_no, head_id), ZERO
             )
             want = planned.get((inst_no, head_id), ZERO)

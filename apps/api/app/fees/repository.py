@@ -459,12 +459,15 @@ class BucketSum:
     head_id: uuid.UUID | None
     entry_kind: str
     amount: Decimal
+    addon: bool = False  # FM-02: add-on charges (their source is an assignment, FR-FEE-087)
 
 
 def bucket_sums(session: Session, account_ids: Collection[uuid.UUID]) -> list[BucketSum]:
-    """Sum of entries per (account, instalment, head, kind): the dues of each line."""
+    """Sum of entries per (account, instalment, head, kind, add-on or not): the dues of each
+    line."""
     if not account_ids:
         return []
+    addon = LedgerEntry.addon_assignment_id.is_not(None)
     stmt = (
         select(
             LedgerEntry.account_id,
@@ -472,6 +475,7 @@ def bucket_sums(session: Session, account_ids: Collection[uuid.UUID]) -> list[Bu
             LedgerEntry.head_id,
             LedgerEntry.entry_kind,
             func.sum(LedgerEntry.amount),
+            addon,
         )
         .where(LedgerEntry.account_id.in_(list(account_ids)))
         .group_by(
@@ -479,10 +483,12 @@ def bucket_sums(session: Session, account_ids: Collection[uuid.UUID]) -> list[Bu
             LedgerEntry.instalment_no,
             LedgerEntry.head_id,
             LedgerEntry.entry_kind,
+            addon,
         )
     )
     return [
-        BucketSum(r[0], int(r[1]), r[2], str(r[3]), Decimal(r[4])) for r in session.execute(stmt)
+        BucketSum(r[0], int(r[1]), r[2], str(r[3]), Decimal(r[4]), bool(r[5]))
+        for r in session.execute(stmt)
     ]
 
 

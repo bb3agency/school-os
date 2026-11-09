@@ -51,6 +51,13 @@ class Bucket:
     payment: Decimal = ZERO  # negative
     reversal: Decimal = ZERO
     refund: Decimal = ZERO
+    # FM-02: the part of ``charged`` posted by add-on assignments (FR-FEE-087). A plan and an
+    # add-on may charge the same line; plan versions compare only ``plan_charged``.
+    addon: Decimal = ZERO
+
+    @property
+    def plan_charged(self) -> Decimal:
+        return self.charged - self.addon
 
     @property
     def due(self) -> Decimal:
@@ -68,7 +75,9 @@ class Bucket:
     def paid(self) -> Decimal:
         return -self.payment - self.reversal
 
-    def add(self, kind: str, amount: Decimal) -> None:
+    def add(self, kind: str, amount: Decimal, *, addon: bool = False) -> None:
+        if addon:
+            self.addon += amount
         attr = {
             "charge": "charged",
             "concession": "concession",
@@ -220,7 +229,7 @@ def buckets_by_account(
         bucket = grouped[row.account_id].get(key)
         if bucket is None:
             bucket = grouped[row.account_id][key] = Bucket(row.instalment_no, row.head_id)
-        bucket.add(row.entry_kind, row.amount)
+        bucket.add(row.entry_kind, row.amount, addon=row.addon)
     return {aid: list(per.values()) for aid, per in grouped.items()}
 
 

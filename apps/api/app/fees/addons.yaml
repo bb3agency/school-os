@@ -1,0 +1,31 @@
+# Per-student add-on fees: transport bands, hostel, optional activities (FM-02; FR-FEE-081..100;
+# ADR-0042 follow-up; lead decision D85, PO to confirm). Versioned configuration shipped inside
+# the package (invariant 13). Read by app/fees/addons_config.py.
+version: 1
+
+# Head kinds an add-on template may charge. Hostel and activity fees use heads of kind `other`.
+# The head must also be collectable (GST exempt): taxable heads are invoiced in Tally (FR-FEE-023).
+head_kinds: [transport, books, other]
+
+# Who decides a change of money owed (owner question of FM-02, D85 default):
+#   reduction_only: taking a student off an add-on (also the old band of a band change) credits
+#                   the charges already posted only through maker-checker adjustments (reason
+#                   addon_removal, approved with fee.concession.approve); assigning (an increase
+#                   or a new add-on) is a normal fee.manage action, audited.
+change_approval: reduction_only
+
+limits:
+  # Templates per academic year.
+  max_templates_per_year: 100
+  # Students of one bulk assign or unassign (one transaction).
+  max_bulk_students: 2000
+  # Students named one by one in a picked list.
+  max_picked_students: 300
+
+# Setup help text (GST note from research report FM-02; unverified until a CA confirms it).
+gst_note:
+  verified: false
+  source: "docs/research/2026-11-features/money.md FM-02 (GST entry 66 and school transport rulings)"
+  text: >-
+    Transport the school itself provides or contracts is usually exempt from GST. If parents pay
+    a bus operator directly, that is not a school fee: do not record it here.
