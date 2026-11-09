@@ -673,10 +673,10 @@ def test_US_3103_AC1_one_task_and_counts_only_notifications_per_lead_day(
     assert len(recipients) == len(sent)
     for n in sent:
         params = n["params"]
-        assert set(params) == {"portal", "days", "ready", "students"}  # counts only
-        assert params["portal"] == "bseap"
-        assert params["days"] == 14
-        assert params["students"] == 1
+        # Counts only (FR-RDY-007; FO-01/FO-03 add overdue follow-ups and UDISE+ to-dos).
+        assert set(params) == {"portal", "days", "ready", "students", "overdue", "todo"}
+        assert (params["portal"], params["days"], params["students"]) == ("bseap", 14, 1)
+        assert (params["overdue"], params["todo"]) == (0, 0)
         assert n["resource_type"] == "portal_calendar"
         assert n["resource_id"] == s.ids["year"]
 

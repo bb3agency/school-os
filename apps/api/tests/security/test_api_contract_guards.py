@@ -299,6 +299,14 @@ NON_UUID_PATH_PARAMS = {
     # calendar file event or the school's own event, found only inside the caller's school.
     ("PUT", "/api/v1/dq/calendar/{event_key}", "event_key"),
     ("DELETE", "/api/v1/dq/calendar/{event_key}", "event_key"),
+    # FO-01/FO-03: follow-ups per readiness profile and the UDISE+ to-do item key (a kind and
+    # the uuid of the record it comes from), bounded and pattern-checked; derived only from the
+    # caller's own reach.
+    ("GET", "/api/v1/dq/readiness/{profile_key}/follow-ups", "profile_key"),
+    ("POST", "/api/v1/dq/readiness/{profile_key}/follow-ups", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/follow-ups/{student_id}", "profile_key"),
+    ("PUT", "/api/v1/dq/udise-todo/{item_key}", "item_key"),
+    ("DELETE", "/api/v1/dq/udise-todo/{item_key}", "item_key"),
     # R2-1A: a certificate verification code (ADR-0045), bounded; the guard shape-checks it.
     ("GET", "/api/v1/public/certificates/{code}", "code"),
     # R2-2D: the Razorpay webhook route value (ADR-0047 decision 3), bounded; the guard resolves.
@@ -403,6 +411,9 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.dq.schemas.PortalWindowOut.event_key": "portal calendar event code",
     "app.dq.schemas.CalendarEventOut.event_key": "portal calendar event code",
     "app.dq.schemas.CalendarReadinessOut.profile_key": "DQ profile code",
+    "app.dq.followup_schemas.FollowupListOut.profile_key": "DQ profile code",
+    "app.dq.followup_schemas.FollowupHistoryOut.profile_key": "DQ profile code",
+    "app.dq.followup_schemas.MovementItemOut.item_key": "UDISE+ to-do item code (kind:uuid)",
     "app.circulars.schemas.TaskOut.portal_event_key": "portal calendar event code",
     "app.exports.schemas.ExportProfileOut.key": "export profile code",
     "app.exports.schemas.ExportOut.profile_key": "export profile code",

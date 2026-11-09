@@ -1031,8 +1031,11 @@ def _id_routes() -> list[tuple[str, str]]:
         # A readiness profile key (ADR-0040) and a privacy notice template key (R3-1A) name
         # configuration, not an object of the school; so does a portal calendar event key
         # (ADR-0053): it is looked up only inside the caller's school (cross-school 404 in
-        # tests/dq/test_calendar_api.py).
-        if isinstance(rc.original_route, APIRoute) and params - {"profile_key", "event_key", "key"}:
+        # tests/dq/test_calendar_api.py). A UDISE+ to-do item key (FO-03, ``kind:uuid``) is derived
+        # only from the caller's own reach (cross-school 404 in
+        # tests/dq/test_udise_followup_api.py::test_FR_UDI_039_todo_authz_scope_and_tenant).
+        configuration = {"profile_key", "event_key", "key", "item_key"}
+        if isinstance(rc.original_route, APIRoute) and params - configuration:
             out.extend((m, str(rc.path)) for m in sorted(rc.methods or ()))
     return sorted(out)
 

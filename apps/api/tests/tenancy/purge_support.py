@@ -523,6 +523,30 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             h=_sha("conflict"),
             r=ids["dqrun"],
         )
+        # --- FO-01/FO-03 (0091_udise_followup): a follow-up step and a UDISE+ to-do tick ------
+        _run(
+            c,
+            "INSERT INTO sis.dq_followups (id, tenant_id, student_id, profile_key, fix_owner, "
+            "event, occurred_on, recorded_by, recorded_by_membership) VALUES (:i, :t, :s, "
+            "'bseap-ssc-2027', 'parent_aadhaar', 'slip_given', '2026-11-02', :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            s=ids["student"],
+            u=u["user"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.udise_movement_marks (id, tenant_id, item_key, kind, student_id, "
+            "state, marked_by, marked_by_membership) VALUES (:i, :t, :k, 'admission', :s, "
+            "'done', :u, :m)",
+            i=uuid.uuid4(),
+            t=t,
+            k=f"admission:{ids['student']}",
+            s=ids["student"],
+            u=u["user"],
+            m=ids["m1"],
+        )
         # --- certificates and registers (0033_certificates) ---------------------------------
         _run(
             c,

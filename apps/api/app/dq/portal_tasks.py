@@ -33,6 +33,7 @@ from app.core.errors import ValidationFailed
 from app.core.ids import new_id
 from app.core.logging import get_logger
 from app.dq import calendar as cal
+from app.dq import followups, movements
 from app.dq import repository as repo
 from app.dq.calendar_service import (
     MANAGE,
@@ -149,6 +150,7 @@ def _remind(
     left: int,
     counts: tuple[int, int],
     active: Collection[uuid.UUID],
+    waiting: tuple[int, int] = (0, 0),
 ) -> int:
     row = event.row
     owner = row["owner_membership_id"] if row is not None else None
@@ -166,7 +168,15 @@ def _remind(
             created_by_membership=row["confirmed_by_membership"],
         )
     ready, students = counts
-    params = {"portal": event.portal, "days": max(left, 0), "ready": ready, "students": students}
+    overdue, todo = waiting
+    params = {
+        "portal": event.portal,
+        "days": max(left, 0),
+        "ready": ready,
+        "students": students,
+        "overdue": overdue,
+        "todo": todo,
+    }
     dedupe = f"portal_calendar:{event.year.id}:{event.key}:{lead}"
     recipients: list[notifications.Recipients] = [
         notifications.PermissionSelector(READINESS_MANAGE)
@@ -216,6 +226,25 @@ def _remind(
     return notified
 
 
+UDISE_PORTAL: Final = "udise_plus"
+
+
+def _overdue_followups(
+    session: Session, ctx: UserContext, profile_key: str, cache: dict[str, int]
+) -> int:
+    """FO-01 (FR-UDI-028): overdue follow-ups of the event's first readiness profile, once."""
+    if profile_key not in cache:
+        cache[profile_key] = followups.overdue_count(session, ctx, profile_key)
+    return cache[profile_key]
+
+
+def _waiting_todo(session: Session, ctx: UserContext, cache: list[int]) -> int:
+    """FO-03 (FR-UDI-038): UDISE+ to-do items waiting too long, once per run."""
+    if not cache:
+        cache.append(movements.open_counts(session, ctx)[1])
+    return cache[0]
+
+
 def _unique_violation(exc: IntegrityError) -> bool:
     diag = getattr(exc.orig, "diag", None)
     return getattr(diag, "constraint_name", None) == "portal_reminders_once"
@@ -234,6 +263,8 @@ def send_reminders(session: Session, *, today: dt.date | None = None) -> int:
     ]
     ctx = system_context(tenant_id)
     cache: dict[str, tuple[int, int]] = {}
+    followup_cache: dict[str, int] = {}
+    todo_cache: list[int] = []
     active: set[uuid.UUID] | None = None
     sent = 0
     for event in events_in_force(session, years):
@@ -245,12 +276,23 @@ def send_reminders(session: Session, *, today: dt.date | None = None) -> int:
             continue
         keys = readiness_keys(event)
         counts = readiness_counts(session, ctx, keys[0], cache) if keys else (0, 0)
+        waiting = (
+            _overdue_followups(session, ctx, keys[0], followup_cache) if keys else 0,
+            _waiting_todo(session, ctx, todo_cache) if event.portal == UDISE_PORTAL else 0,
+        )
         if active is None:
             active = active_member_ids(session)
         try:
             with session.begin_nested():
                 sent += _remind(
-                    session, tenant_id, event, lead=lead, left=left, counts=counts, active=active
+                    session,
+                    tenant_id,
+                    event,
+                    lead=lead,
+                    left=left,
+                    counts=counts,
+                    active=active,
+                    waiting=waiting,
                 )
         except IntegrityError as exc:
             if not _unique_violation(exc):

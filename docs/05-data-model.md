@@ -1695,6 +1695,15 @@ The dq module purges both tables and is purged **before** `circulars` (`offboard
 
 **Effect.** Holds that are `active` or `lift_pending` stop retention and erasure: `app.privacy.service.hold_scope` is registered with `app.core.holds`, and every job of `app/privacy/holds.yaml` `retention_jobs` asks `holds.check(...)` in the school's `tenant_session` before deleting (a whole-class hold stops the job; a student hold keeps that student's behaviour notes and early-warning flags). No provider means "everything held" (fail closed).
 
+### 16.9 UDISE+ follow-ups and to-do ticks (`sis`; FO-01, FO-03, FR-UDI-021..040; `0091_udise_followup`)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `sis.dq_followups` | C2 | **Append-only** (trigger `dq_followups_append_only`; `sos_app` SELECT and INSERT only). `student_id` (composite FK to `sis.students`), `profile_key` (readiness profile), `fix_owner` CHECK (`parent_aadhaar`,`school_udise`), `event` (code), `channel` (code, nullable), `occurred_on`, `promised_on` (set exactly for `promised_by`, CHECK `dq_followups_promise`, not before `occurred_on`), `recorded_by` → `core.users`, `recorded_by_membership` (composite FK to `core.memberships`), `recorded_at`. Dates and codes only: no value, no name, no free text |
+| `sis.udise_movement_marks` | C1 | The clerk's tick on a computed UDISE+ to-do item: `item_key` (`<kind>:<uuid>`, unique per school), `kind` CHECK (`transfer_out`,`left_without_tc`,`admission`,`progression`), `student_id` (composite FK; NULL exactly for `progression`), `state` CHECK (`done`,`not_needed`), `marked_by`, `marked_by_membership`, `marked_at`, `created_at`, `updated_at`, `version`. `sos_app` may update `state` and the marker columns and DELETE a row (undo) |
+
+Open follow-ups and to-do items are computed on every read (live readiness; TCs, leavers, admissions and promotions), so only the steps and ticks are stored. Both tables belong to the `data_quality` record class, are purged by the `dq` owner and are in the full data export (`dq_followups`, `udise_movement_marks`).
+
 ### 16.7 Classification, export and offboarding (as built)
 
 - Privacy requests, their events, consents and breach records are **C2**; request texts, nominee details, breach descriptions and containment steps are **C3 (encrypted)**; RTE admissions and claim lines (when built) are **C3** because they reveal a family's economic or social category (ADR-0052).

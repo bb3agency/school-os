@@ -487,14 +487,16 @@ templates:
   # school (students 0 when the event links no profile with a readiness check). The link opens
   # the school's portal calendar (resource id: the academic year).
   portal_calendar.reminder:
-    params: [portal, days, ready, students]
+    # FO-01/FO-03 (FR-UDI-028, FR-UDI-038): overdue follow-ups of the linked profile and UDISE+
+    # to-do items waiting too long (UDISE+ events only); counts only.
+    params: [portal, days, ready, students, overdue, todo]
     resource_type: portal_calendar
     en:
       title: "{portal, select, udise_plus {UDISE+} bseap {AP SSC board} cbse {CBSE} cisce {CISCE} apaar {APAAR} school_admin {School administration} rte {RTE admissions} other {Portal}} window closes {days, plural, =0 {today} one {tomorrow} other {in # days}}"
-      body: "{students, plural, =0 {Check the dates and who owns the work on the portal calendar.} other {{ready} of # students are ready. Open the portal calendar to see the window and fix what is not ready.}}"
+      body: "{students, plural, =0 {Check the dates and who owns the work on the portal calendar.} other {{ready} of # students are ready. Open the portal calendar to see the window and fix what is not ready.}} {overdue, plural, =0 {} one {# follow-up on a fix outside the school is overdue.} other {# follow-ups on fixes outside the school are overdue.}} {todo, plural, =0 {} one {# UDISE+ to-do item has waited too long.} other {# UDISE+ to-do items have waited too long.}}"
     te:
       title: "{portal, select, udise_plus {UDISE+} bseap {AP SSC బోర్డు} cbse {CBSE} cisce {CISCE} apaar {APAAR} school_admin {పాఠశాల పరిపాలన} rte {RTE ప్రవేశాలు} other {పోర్టల్}} గడువు {days, plural, =0 {ఈరోజే} one {రేపు} other {# రోజుల్లో}} ముగుస్తుంది"
-      body: "{students, plural, =0 {పోర్టల్ క్యాలెండర్‌లో తేదీలు, పని ఎవరిదో చూడండి.} other {# మంది విద్యార్థుల్లో {ready} మంది సిద్ధంగా ఉన్నారు. గడువు చూడటానికి, సిద్ధంగా లేనివాటిని సరిచేయడానికి పోర్టల్ క్యాలెండర్ తెరవండి.}}"
+      body: "{students, plural, =0 {పోర్టల్ క్యాలెండర్‌లో తేదీలు, పని ఎవరిదో చూడండి.} other {# మంది విద్యార్థుల్లో {ready} మంది సిద్ధంగా ఉన్నారు. గడువు చూడటానికి, సిద్ధంగా లేనివాటిని సరిచేయడానికి పోర్టల్ క్యాలెండర్ తెరవండి.}} {overdue, plural, =0 {} other {# ఫాలో-అప్‌లు గడువు దాటాయి.}} {todo, plural, =0 {} other {# UDISE+ పనులు చాలా రోజులుగా పెండింగ్‌లో ఉన్నాయి.}}"
   # --- R3-1A privacy requests (ADR-0048; FR-DPDP-006): the daily due-date reminder, counts only.
   privacy.requests_due:
     params: [due, overdue]

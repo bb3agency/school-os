@@ -2672,6 +2672,34 @@ def admission_register_page(
     return templates.render_register(page)
 
 
+@dataclass(frozen=True, slots=True)
+class IssuedTransfer:
+    """An issued (not cancelled) original transfer certificate: ids, serial and date only."""
+
+    certificate_id: uuid.UUID
+    student_id: uuid.UUID
+    serial: str | None
+    issued_on: dt.date
+
+
+def issued_transfer_certificates(
+    session: Session, student_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, IssuedTransfer]:
+    """System read for the UDISE+ to-do list (``app.dq``, FO-03, FR-UDI-032): the issued
+    original TC of each student that has one. ``student_ids`` MUST come from the caller's own
+    scoped reads; no permission is applied here."""
+    rows = repo.transfer_certificates_of(session, list(student_ids))
+    return {
+        sid: IssuedTransfer(
+            certificate_id=row.id,
+            student_id=sid,
+            serial=row.serial,
+            issued_on=(row.issued_at or row.created_at).astimezone(IST).date(),
+        )
+        for sid, row in rows.items()
+    }
+
+
 # --- full data export and offboarding ------------------------------------------------------------
 
 
@@ -2716,6 +2744,7 @@ __all__ = [
     "CertificateNotIssued",
     "CertificateNotPending",
     "FormatChanged",
+    "IssuedTransfer",
     "NoCurrentYear",
     "NotRequester",
     "SelfApprovalForbidden",
@@ -2732,6 +2761,7 @@ __all__ = [
     "formats_catalog",
     "get_certificate",
     "get_verification",
+    "issued_transfer_certificates",
     "list_certificates",
     "mark_pdf_failed",
     "preview",

@@ -58,6 +58,8 @@ NUMERIC = {
     # R2-2E: UPI receipts not yet seen in the bank and credits needing a person.
     "unconfirmed",
     "credits",
+    # FO-03 (FR-UDI-038): UDISE+ to-do items waiting too long in the portal reminder.
+    "todo",
 }
 
 
