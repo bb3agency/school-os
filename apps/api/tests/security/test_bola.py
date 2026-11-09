@@ -216,6 +216,15 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
         "document_id": "01920000-0000-7000-8000-000000000001"
     },
     ("POST", "/api/v1/exams/{exam_id}/lock"): None,
+    # FT-06 school calendar (FR-CAL-*).
+    ("PUT", "/api/v1/academic-years/{year_id}/calendar"): {"weekly_off": [], "saturdays_off": []},
+    ("POST", "/api/v1/academic-years/{year_id}/calendar/entries"): {
+        "kind": "holiday",
+        "name": "Synthetic holiday",
+        "starts_on": "2026-12-25",
+        "ends_on": "2026-12-25",
+    },
+    ("DELETE", "/api/v1/academic-years/{year_id}/calendar/entries/{entry_id}"): None,
     ("POST", "/api/v1/exams/{exam_id}/unlock"): {"reason": "Synthetic correction"},
     ("POST", "/api/v1/students/{student_id}/flags"): {"indicator": "attendance"},
     ("POST", "/api/v1/insights/flags/{flag_id}/actions"): {"kind": "other"},
@@ -946,6 +955,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "notice_id": _b_notice,
     # M5: an exam, a flag and a behaviour note of school B.
     "exam_id": lambda w: _m5().b_exam(w),
+    # FT-06: a holiday of school B's calendar (FR-CAL-005).
+    "entry_id": lambda w: _m5().b_calendar_entry(w),
     "flag_id": lambda w: _m5().b_flag(w),
     "note_id": lambda w: _m5().b_note(w),
     # Tally connector (M6): an agent and a ledger of school B.
@@ -1060,6 +1071,7 @@ QUERY: dict[tuple[str, str], dict[str, str]] = {
     ("GET", "/api/v1/sections/{section_id}/attendance/month"): {"month": "2026-09"},
     ("GET", "/api/v1/imports/{import_id}/preset-mapping"): {"preset": "register-excel"},
     ("GET", "/api/v1/sections/{section_id}/join-slips"): {"categories": "notices"},
+    ("GET", "/api/v1/academic-years/{year_id}/calendar/month"): {"month": "2026-11"},
     **_disclosure().BOLA_QUERY,
 }
 

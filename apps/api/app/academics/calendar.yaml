@@ -1,0 +1,64 @@
+# School calendar defaults and holiday suggestions (FT-06; FR-CAL-001..FR-CAL-020; lead decision
+# D85). Versioned configuration shipped inside the package (read by app/academics/school_calendar.py;
+# CLAUDE.md invariant 13). Change together with tests/academics/test_calendar*.py.
+#
+# NOTHING HERE IS VERIFIED. Every value is `verified: false`: the dates are taken from the
+# Hindu, Christian and Islamic calendars as published for 2026-27 and from the usual pattern of
+# Andhra Pradesh school holidays, not from the AP School Education Department's academic calendar
+# (G.O.) for 2026-27, which was not checked (research report D3). A suggestion is only offered:
+# it becomes part of a school's calendar when a person adds it, and may change its dates first.
+version: 1
+
+limits:
+  max_entry_days: 92        # one entry (e.g. a vacation) spans at most this many days
+  max_entries_per_year: 300 # holidays, vacations and working days of one year, all classes
+  max_name_chars: 80
+
+# The weekly pattern a new calendar starts with (the school changes it on the calendar screen).
+# Weekdays: 0 = Monday .. 6 = Sunday. saturdays_off: which Saturdays of the month are off.
+default_pattern:
+  verified: false
+  source: "Common AP school practice (Sunday off; second Saturday off in state schools); unverified"
+  weekly_off: [6]
+  saturdays_off: [2]
+
+suggestions:
+  verified: false
+  source: >-
+    Festival dates for 2026-27 from published almanacs, vacation spans from the usual AP pattern.
+    Not checked against the AP School Education academic calendar 2026-27; the school confirms.
+  sets:
+    - key: national
+      label: National holidays
+      items:
+        - {key: independence_day_2026, name: Independence Day, kind: holiday,
+           starts_on: 2026-08-15, ends_on: 2026-08-15}
+        - {key: gandhi_jayanti_2026, name: Gandhi Jayanti, kind: holiday,
+           starts_on: 2026-10-02, ends_on: 2026-10-02}
+        - {key: republic_day_2027, name: Republic Day, kind: holiday,
+           starts_on: 2027-01-26, ends_on: 2027-01-26}
+    - key: andhra_pradesh
+      label: Andhra Pradesh festivals and vacations (unverified)
+      items:
+        - {key: milad_un_nabi_2026, name: Milad-un-Nabi, kind: holiday,
+           starts_on: 2026-08-26, ends_on: 2026-08-26}
+        - {key: sri_krishna_janmashtami_2026, name: Sri Krishna Janmashtami, kind: holiday,
+           starts_on: 2026-09-04, ends_on: 2026-09-04}
+        - {key: vinayaka_chavithi_2026, name: Vinayaka Chavithi, kind: holiday,
+           starts_on: 2026-09-14, ends_on: 2026-09-14}
+        - {key: dasara_vacation_2026, name: Dasara vacation, kind: vacation,
+           starts_on: 2026-10-11, ends_on: 2026-10-21}
+        - {key: deepavali_2026, name: Deepavali, kind: holiday,
+           starts_on: 2026-11-08, ends_on: 2026-11-08}
+        - {key: christmas_2026, name: Christmas, kind: holiday,
+           starts_on: 2026-12-25, ends_on: 2026-12-25}
+        - {key: sankranti_vacation_2027, name: Sankranti vacation, kind: vacation,
+           starts_on: 2027-01-10, ends_on: 2027-01-18}
+        - {key: maha_shivaratri_2027, name: Maha Shivaratri, kind: holiday,
+           starts_on: 2027-03-06, ends_on: 2027-03-06}
+        - {key: eid_ul_fitr_2027, name: Eid-ul-Fitr (Ramzan), kind: holiday,
+           starts_on: 2027-03-10, ends_on: 2027-03-10}
+        - {key: good_friday_2027, name: Good Friday, kind: holiday,
+           starts_on: 2027-03-26, ends_on: 2027-03-26}
+        - {key: ugadi_2027, name: Ugadi, kind: holiday,
+           starts_on: 2027-04-07, ends_on: 2027-04-07}

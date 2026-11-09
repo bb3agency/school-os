@@ -2013,6 +2013,44 @@ SPECS: dict[tuple[str, str], Builder] = {
         {"reason": "Synthetic correction after lock"},
         {},
     ),
+    # FT-06 school calendar (FR-CAL-*): school A's 2025-26 year (its current year keeps no
+    # calendar, so the attendance specs above mark any day).
+    ("GET", "/api/v1/academic-years/{year_id}/calendar"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/calendar",
+        None,
+        {},
+    ),
+    ("PUT", "/api/v1/academic-years/{year_id}/calendar"): lambda w, r, a: (
+        f"/api/v1/academic-years/{IN.world_calendar_year(w)}/calendar",
+        {"weekly_off": [], "saturdays_off": []},
+        {},
+    ),
+    ("GET", "/api/v1/academic-years/{year_id}/calendar/month"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/calendar/month?month=2026-11",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/academic-years/{year_id}/calendar/suggestions"): lambda w, r, a: (
+        f"/api/v1/academic-years/{w.a.ids['year']}/calendar/suggestions",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/academic-years/{year_id}/calendar/entries"): lambda w, r, a: (
+        f"/api/v1/academic-years/{IN.world_calendar_year(w)}/calendar/entries",
+        {
+            "kind": "holiday",
+            "name": "Matrix holiday",
+            "starts_on": (day := IN.world_calendar_day()),
+            "ends_on": day,
+        },
+        {},
+    ),
+    ("DELETE", "/api/v1/academic-years/{year_id}/calendar/entries/{entry_id}"): lambda w, r, a: (
+        f"/api/v1/academic-years/{IN.world_calendar_year(w)}/calendar/entries/"
+        f"{IN.world_calendar_entry(w)}",
+        None,
+        {},
+    ),
     ("GET", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/history"): lambda w, r, a: (
         _m5_marks(w, "/history"),
         None,
@@ -2719,6 +2757,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         "/api/v1/tasks",
         "/api/v1/circular-suggestions/{suggestion_id}/confirm",
         "/api/v1/exams",
+        "/api/v1/academic-years/{year_id}/calendar/entries",
         "/api/v1/students/{student_id}/flags",
         "/api/v1/insights/flags/{flag_id}/actions",
         "/api/v1/students/{student_id}/behaviour-notes",
@@ -2797,6 +2836,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         "/api/v1/tally/parties/{party_id}/links/{student_id}",
         "/api/v1/messaging/account",
         "/api/v1/dq/calendar/{event_key}",
+        "/api/v1/academic-years/{year_id}/calendar/entries/{entry_id}",
     ):
         return 204
     return 201 if method == "POST" and path in creates else 200

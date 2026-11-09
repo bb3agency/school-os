@@ -1005,6 +1005,27 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             sec=ids["section"],
             u=u["user"],
         )
+        # FT-06 (0088_school_calendar): the year's calendar and one class holiday.
+        _run(
+            c,
+            "INSERT INTO sis.school_calendars (id, tenant_id, academic_year_id, created_by, "
+            "updated_by) VALUES (:i, :t, :y, :u, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            y=ids["year1"],
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO sis.calendar_entries (id, tenant_id, academic_year_id, class_id, kind, "
+            "name, starts_on, ends_on, created_by) VALUES (:i, :t, :y, :c, 'holiday', "
+            "'Synthetic holiday', '2026-08-15', '2026-08-15', :u)",
+            i=uuid.uuid4(),
+            t=t,
+            y=ids["year1"],
+            c=ids["class"],
+            u=u["user"],
+        )
         # FT-01 (0084_exam_lock_enrol): one change of that mark.
         _run(
             c,

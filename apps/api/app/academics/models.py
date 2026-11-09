@@ -1,5 +1,5 @@
-"""Attendance, exams and marks tables (migrations 0035_student_insights, 0084_exam_lock_enrol;
-docs/05 §6.4).
+"""Attendance, exams, marks and school calendar tables (migrations 0035_student_insights,
+0084_exam_lock_enrol, 0088_school_calendar; docs/05 §6.4).
 
 Typed mappings for queries only; DDL (RLS, CHECKs, composite FKs, column grants, the offboarding
 purge policy) lives in the migration.
@@ -11,7 +11,8 @@ import datetime as dt
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, Integer, Numeric, Text, text
+from sqlalchemy import Boolean, Date, Integer, Numeric, SmallInteger, Text, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.model_base import Base
@@ -101,4 +102,48 @@ class ExamMarkHistory(Base):
     changed_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
 
 
-__all__ = ["AttendanceMark", "Exam", "ExamMark", "ExamMarkHistory"]
+class SchoolCalendar(Base):
+    """One academic year's weekly pattern (FT-06, FR-CAL-001)."""
+
+    __tablename__ = "school_calendars"
+    __table_args__ = {"schema": "sis"}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    academic_year_id: Mapped[uuid.UUID]
+    weekly_off: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger))
+    saturdays_off: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger))
+    created_by: Mapped[uuid.UUID]
+    updated_by: Mapped[uuid.UUID]
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    updated_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+
+
+class CalendarEntry(Base):
+    """A holiday, vacation or extra working day, whole school or one class (FR-CAL-002)."""
+
+    __tablename__ = "calendar_entries"
+    __table_args__ = {"schema": "sis"}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    academic_year_id: Mapped[uuid.UUID]
+    class_id: Mapped[uuid.UUID | None]
+    kind: Mapped[str] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text)
+    starts_on: Mapped[dt.date] = mapped_column(Date)
+    ends_on: Mapped[dt.date] = mapped_column(Date)
+    suggestion_key: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID]
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+
+
+__all__ = [
+    "AttendanceMark",
+    "CalendarEntry",
+    "Exam",
+    "ExamMark",
+    "ExamMarkHistory",
+    "SchoolCalendar",
+]

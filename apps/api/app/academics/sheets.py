@@ -24,7 +24,7 @@ import datetime as dt
 import re
 import unicodedata
 import uuid
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Final
@@ -304,10 +304,13 @@ def read_attendance(
     today: dt.date,
     cfg: AcademicsConfig | None = None,
     starts: Mapping[uuid.UUID, dt.date] | None = None,
+    closed: Collection[dt.date] = (),
 ) -> AttendanceSheet:
     """Parse an attendance sheet for dates ``first..last`` (the section's academic year), none
     after ``today`` (IST). ``starts``: explicit enrolment starts; a cell dated before a
-    student's start is an issue ``before_enrolment`` and is left out (FR-ATT-013)."""
+    student's start is an issue ``before_enrolment`` and is left out (FR-ATT-013). ``closed``:
+    days that are not working days in the school calendar; a cell on one is an issue
+    ``holiday`` and is left out (FT-06, FR-CAL-007)."""
     cfg = cfg or load_config()
     data = _materialise(rows, cfg)
     _refuse_aadhaar(data)
@@ -336,6 +339,8 @@ def read_attendance(
                 start = (starts or {}).get(student_id)
                 if start is not None and day < start:
                     issues.add(row[0], column, "before_enrolment")
+                elif day in closed:
+                    issues.add(row[0], column, "holiday")
                 else:
                     entries.append(AttendanceEntry(student_id, day, status))
     return AttendanceSheet(
