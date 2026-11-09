@@ -3404,7 +3404,9 @@ export interface paths {
         };
         /**
          * Fee Dues
-         * @description Students with overdue amounts, oldest due first (``finance.read``).
+         * @description Accounts with overdue amounts, oldest due first (``finance.read``): every open account of
+         *     the current and earlier years with its year; ``arrears_only`` keeps earlier years
+         *     (FR-FEE-031/032).
          */
         get: operations["fee_dues_api_v1_fees_dues_get"];
         put?: never;
@@ -3424,7 +3426,8 @@ export interface paths {
         };
         /**
          * Fee Dues Csv
-         * @description The dues list as CSV (``fee.report``, step-up). Audited like an export.
+         * @description The dues list as CSV with an academic year column (``fee.report``, step-up). Audited
+         *     like an export.
          */
         get: operations["fee_dues_csv_api_v1_fees_dues_csv_get"];
         put?: never;
@@ -4091,6 +4094,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fees/reports/left-with-dues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fee Left With Dues
+         * @description Students who left (withdrawn, TC issued or graduated) with an open balance
+         *     (``finance.read``). For management follow-up only: never printed on a TC and never
+         *     blocking one.
+         */
+        get: operations["fee_left_with_dues_api_v1_fees_reports_left_with_dues_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/reports/left-with-dues.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fee Left With Dues Csv
+         * @description The left-with-dues report as CSV (``fee.report``, step-up). Audited like an export.
+         */
+        get: operations["fee_left_with_dues_csv_api_v1_fees_reports_left_with_dues_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fees/reports/upi": {
         parameters: {
             query?: never;
@@ -4150,6 +4195,29 @@ export interface paths {
          *     and whether today is closed (any fee permission).
          */
         get: operations["fee_status_api_v1_fees_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/students/{student_id}/years": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Student Fee Years
+         * @description The student's open fee accounts, earlier years first (``fee.collect`` or
+         *     ``finance.read``). With ``split_amount`` (the clerk chose "oldest first across years"): how
+         *     much to take on each account, oldest year first; nothing is written, each part is its own
+         *     receipt. 422 ``split_amount`` (``not_positive``, ``above_outstanding``).
+         */
+        get: operations["student_fee_years_api_v1_fees_students__student_id__years_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5747,6 +5815,32 @@ export interface paths {
          *     ``If-Match``, ``W/"0"`` before the first save). Audited (field names).
          */
         put: operations["put_settings_api_v1_messaging_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/spend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Spend
+         * @description Messages and estimated Meta cost per month ("Messages and estimated Meta cost";
+         *     FR-MSG-032, FR-MSG-033): for each of the last ``months`` IST months (default 6, at most 13,
+         *     the message retention), counts by Meta pricing category and purpose (sent, charged, free,
+         *     not priced yet) and the estimated rupees incl. GST, from the pricing Meta reported on status
+         *     webhooks and the configured rates with the date they were checked (FR-MSG-031). No
+         *     recipient, phone number or text. ``message.read`` school-wide (a class teacher's
+         *     section-scoped grant is refused). The school pays Meta directly (owner decision D7).
+         */
+        get: operations["get_spend_api_v1_messaging_spend_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -10527,6 +10621,11 @@ export interface components {
             class_section: string | null;
             /** Display Name */
             display_name: string | null;
+            /**
+             * Earlier Years Due
+             * @default 0.00
+             */
+            earlier_years_due: string;
             /** Overdue */
             overdue: string;
             /**
@@ -10659,7 +10758,7 @@ export interface components {
              * Reason Code
              * @enum {string}
              */
-            reason_code: "late_fee_waiver" | "plan_change" | "concession_reversal" | "correction" | "other";
+            reason_code: "late_fee_waiver" | "plan_change" | "concession_reversal" | "correction" | "write_off" | "other";
         };
         /** AdjustmentOut */
         AdjustmentOut: {
@@ -10693,7 +10792,7 @@ export interface components {
              * Reason Code
              * @enum {string}
              */
-            reason_code: "late_fee_waiver" | "plan_change" | "concession_reversal" | "correction" | "other";
+            reason_code: "late_fee_waiver" | "plan_change" | "concession_reversal" | "correction" | "write_off" | "other";
             /**
              * Requested At
              * Format: date-time
@@ -14651,9 +14750,15 @@ export interface components {
         };
         /**
          * DuesOut
-         * @description Students with overdue amounts, oldest due first (FR-FEE-020).
+         * @description Accounts with overdue amounts, oldest due first (FR-FEE-020); every open account of the
+         *     current and earlier years (FR-FEE-031). ``students`` counts distinct students; the
+         *     ``arrears_*`` tiles cover earlier-year accounts only.
          */
         DuesOut: {
+            /** Arrears Students */
+            arrears_students: number;
+            /** Arrears Total */
+            arrears_total: string;
             /**
              * As Of
              * Format: date
@@ -14677,6 +14782,13 @@ export interface components {
         /** DuesRow */
         DuesRow: {
             /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /** Academic Year Label */
+            academic_year_label: string | null;
+            /**
              * Account Id
              * Format: uuid
              */
@@ -14689,6 +14801,8 @@ export interface components {
             class_section: string | null;
             /** Display Name */
             display_name: string | null;
+            /** Earlier Year */
+            earlier_year: boolean;
             /** Last Payment On */
             last_payment_on: string | null;
             /** Oldest Due On */
@@ -15408,6 +15522,12 @@ export interface components {
             /** Class Id */
             class_id?: string | null;
             /**
+             * Include Earlier Years
+             * @description Also remind about earlier-year dues (FM-01, FR-FEE-035; manual sends only): one message per student with the total of all its open accounts. Without it an earlier-year row answers 422 ``account_ids`` (``earlier_year``).
+             * @default false
+             */
+            include_earlier_years: boolean;
+            /**
              * Kind
              * @description ``reminder`` (FR-MSG-025) or ``payment_link`` ("Send payment link", FR-MSG-027): the same fee message, whose dues page offers "Pay online"; needs online payments connected (``payments_not_connected``) and is sent at most once a day per account and guardian, apart from reminders.
              * @default reminder
@@ -15435,6 +15555,12 @@ export interface components {
             all_matching: boolean;
             /** Class Id */
             class_id?: string | null;
+            /**
+             * Include Earlier Years
+             * @description Also remind about earlier-year dues (FM-01, FR-FEE-035; manual sends only): one message per student with the total of all its open accounts. Without it an earlier-year row answers 422 ``account_ids`` (``earlier_year``).
+             * @default false
+             */
+            include_earlier_years: boolean;
             /**
              * Kind
              * @description ``reminder`` (FR-MSG-025) or ``payment_link`` ("Send payment link", FR-MSG-027): the same fee message, whose dues page offers "Pay online"; needs online payments connected (``payments_not_connected``) and is sent at most once a day per account and guardian, apart from reminders.
@@ -17504,6 +17630,53 @@ export interface components {
              */
             kind: "none" | "flat_per_instalment" | "per_day";
         };
+        /** LeftWithDuesOut */
+        LeftWithDuesOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Rows */
+            rows: components["schemas"]["LeftWithDuesRow"][];
+            /** Students */
+            students: number;
+            /** Total Balance */
+            total_balance: string;
+            /** Written Off Total */
+            written_off_total: string;
+        };
+        /**
+         * LeftWithDuesRow
+         * @description A student who left (withdrawn, TC issued or graduated) with an open balance (FR-FEE-038).
+         *     Never printed on a TC and never blocking one (FR-FEE-030, D16).
+         */
+        LeftWithDuesRow: {
+            /** Accounts */
+            accounts: number;
+            /** Admission No */
+            admission_no: string | null;
+            /** Balance */
+            balance: string;
+            /** Display Name */
+            display_name: string | null;
+            /** Last Payment On */
+            last_payment_on: string | null;
+            /** Oldest Due On */
+            oldest_due_on: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "left" | "graduated";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Written Off */
+            written_off: string;
+        };
         /** LinkedStudentOut */
         LinkedStudentOut: {
             /** Admission No */
@@ -18266,6 +18439,44 @@ export interface components {
             utility_rate_inr: string;
             /** Version */
             version: number;
+        };
+        /**
+         * MessagingSpendOut
+         * @description Messages and estimated Meta cost per month (FR-MSG-032). No recipient, phone or text.
+         */
+        MessagingSpendOut: {
+            /**
+             * Auto Reply Days
+             * @description Automatic replies are counted only this many days back (their retention).
+             */
+            auto_reply_days: number;
+            /** Gst Percent */
+            gst_percent: string;
+            /**
+             * Months
+             * @description Newest month first, empty months included.
+             */
+            months: components["schemas"]["SpendMonthOut"][];
+            /**
+             * Next Rate Change
+             * Format: date
+             * @description The next 1 Jan, 1 Apr, 1 Jul or 1 Oct after the rates were checked.
+             */
+            next_rate_change: string;
+            /** Rates */
+            rates: components["schemas"]["SpendRateOut"][];
+            /**
+             * Rates Checked On
+             * Format: date
+             */
+            rates_checked_on: string;
+            /**
+             * Rates Recheck Due
+             * @description Meta may have changed its rates since they were checked (FR-MSG-031).
+             */
+            rates_recheck_due: boolean;
+            /** Service Free Per Month */
+            service_free_per_month: number;
         };
         /** MessagingTemplateOut */
         MessagingTemplateOut: {
@@ -19331,6 +19542,8 @@ export interface components {
             child_first_name: string;
             /** Class Name */
             class_name: string | null;
+            /** Earlier Years */
+            earlier_years: components["schemas"]["ParentEarlierYearOut"][];
             /** Instalments */
             instalments: components["schemas"]["ParentDueInstalmentOut"][];
             /** Late Fee Total */
@@ -19343,6 +19556,16 @@ export interface components {
             /** Total Due */
             total_due: string;
             upi: components["schemas"]["ParentUpiOut"] | null;
+        };
+        /**
+         * ParentEarlierYearOut
+         * @description What one earlier academic year still owes (FM-01, FR-FEE-039): its label and amount.
+         */
+        ParentEarlierYearOut: {
+            /** Due */
+            due: string;
+            /** Label */
+            label: string;
         };
         /**
          * ParentNoticeOut
@@ -23485,6 +23708,110 @@ export interface components {
             withdrawn_by_name: string | null;
         };
         /**
+         * SpendLineOut
+         * @description Messages of one month, Meta pricing category and purpose: counts and rupees only.
+         */
+        SpendLineOut: {
+            /**
+             * Billable
+             * @description Messages Meta reported as charged.
+             */
+            billable: number;
+            /**
+             * Estimated Cost Inr
+             * @description Rupees incl. GST (billable and pending).
+             */
+            estimated_cost_inr: string;
+            /**
+             * Free
+             * @description Messages Meta reported as free, or that failed.
+             */
+            free: number;
+            /**
+             * Pending
+             * @description Messages Meta has not priced yet (counted as charged).
+             */
+            pending: number;
+            /**
+             * Pricing Category
+             * @description Meta's pricing category (utility, service, marketing, authentication, ...); for a message Meta has not priced yet, utility for a template and service for a text.
+             */
+            pricing_category: string;
+            /**
+             * Purpose
+             * @description optin_confirm, school_notice, absence_alert, fee_reminder, fee_receipt, optin_stopped, or auto_reply (the daily automatic reply).
+             */
+            purpose: string;
+            /**
+             * Rate
+             * @description The configured rate used (utility_out_of_window, utility_in_window, service_above_free_tier, marketing); null when SchoolOS has no rate for the category.
+             */
+            rate: string | null;
+            /**
+             * Sent
+             * @description Messages handed to Meta.
+             */
+            sent: number;
+        };
+        /** SpendMonthOut */
+        SpendMonthOut: {
+            /** Billable */
+            billable: number;
+            /**
+             * Estimated Cost Inr
+             * @description Rupees incl. GST, paid by the school to Meta.
+             */
+            estimated_cost_inr: string;
+            /** Lines */
+            lines: components["schemas"]["SpendLineOut"][];
+            /**
+             * Month
+             * @description IST calendar month.
+             */
+            month: string;
+            /** Pending */
+            pending: number;
+            /** Sent */
+            sent: number;
+        };
+        /** SpendRateOut */
+        SpendRateOut: {
+            /**
+             * Inr
+             * @description Rupees per charged message before GST.
+             */
+            inr: string;
+            /**
+             * Rate
+             * @description utility_out_of_window, utility_in_window, ...
+             */
+            rate: string;
+            /**
+             * Used
+             * @description False for a category SchoolOS never sends (marketing).
+             */
+            used: boolean;
+            /**
+             * Verified
+             * @description Checked against Meta's INR rate card.
+             */
+            verified: boolean;
+        };
+        /**
+         * SplitPart
+         * @description How much of the amount to take on one account (oldest year first, FR-FEE-037): the
+         *     counter issues one receipt per part, each allocated oldest due first within its account.
+         */
+        SplitPart: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Amount */
+            amount: string;
+        };
+        /**
          * StaffMemberOut
          * @description One entry of the staff directory (e.g. choosing a class teacher): no contact details.
          */
@@ -23549,6 +23876,8 @@ export interface components {
             id: string;
             /** Instalment No */
             instalment_no: number;
+            /** Reason Code */
+            reason_code?: ("late_fee_waiver" | "plan_change" | "concession_reversal" | "correction" | "write_off" | "other") | null;
             /** Receipt Id */
             receipt_id: string | null;
             /** Receipt Number */
@@ -23975,6 +24304,31 @@ export interface components {
             section_id: string | null;
             /** Status */
             status: string;
+        };
+        /**
+         * StudentYearsOut
+         * @description The student's open fee accounts, earlier years first, and (when an amount was given) the
+         *     oldest-first split across them.
+         */
+        StudentYearsOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Earlier Years Due */
+            earlier_years_due: string;
+            /** Split */
+            split: components["schemas"]["SplitPart"][] | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Total Collectable */
+            total_collectable: string;
+            /** Years */
+            years: components["schemas"]["YearDue"][];
         };
         /** SubscriptionOut */
         SubscriptionOut: {
@@ -25952,6 +26306,34 @@ export interface components {
              * @description Entries created or changed
              */
             written: number;
+        };
+        /**
+         * YearDue
+         * @description One open fee account of a student at the counter, oldest year first (FR-FEE-036).
+         */
+        YearDue: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /** Academic Year Label */
+            academic_year_label: string | null;
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Balance */
+            balance: string;
+            /** Collectable */
+            collectable: string;
+            /** Earlier Year */
+            earlier_year: boolean;
+            /** Oldest Due On */
+            oldest_due_on: string | null;
+            /** Overdue */
+            overdue: string;
         };
     };
     responses: never;
@@ -33670,6 +34052,7 @@ export interface operations {
     fee_dues_api_v1_fees_dues_get: {
         parameters: {
             query?: {
+                arrears_only?: boolean;
                 class_id?: string | null;
                 section_id?: string | null;
             };
@@ -33715,6 +34098,7 @@ export interface operations {
     fee_dues_csv_api_v1_fees_dues_csv_get: {
         parameters: {
             query?: {
+                arrears_only?: boolean;
                 class_id?: string | null;
                 section_id?: string | null;
             };
@@ -35407,6 +35791,72 @@ export interface operations {
             };
         };
     };
+    fee_left_with_dues_api_v1_fees_reports_left_with_dues_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeftWithDuesOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    fee_left_with_dues_csv_api_v1_fees_reports_left_with_dues_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     upi_report_api_v1_fees_reports_upi_get: {
         parameters: {
             query?: {
@@ -35547,6 +35997,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeeStatusOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    student_fee_years_api_v1_fees_students__student_id__years_get: {
+        parameters: {
+            query?: {
+                split_amount?: number | string | null;
+            };
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentYearsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -39222,6 +39718,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessagingSettingsOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_spend_api_v1_messaging_spend_get: {
+        parameters: {
+            query?: {
+                months?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingSpendOut"];
                 };
             };
             /** @description ``module_unavailable`` on a dedicated host or with messaging off. */

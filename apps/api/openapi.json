@@ -397,6 +397,12 @@
             ],
             "title": "Display Name"
           },
+          "earlier_years_due": {
+            "default": "0.00",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Earlier Years Due",
+            "type": "string"
+          },
           "overdue": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
             "title": "Overdue",
@@ -738,6 +744,7 @@
               "plan_change",
               "concession_reversal",
               "correction",
+              "write_off",
               "other"
             ],
             "title": "Reason Code",
@@ -842,6 +849,7 @@
               "plan_change",
               "concession_reversal",
               "correction",
+              "write_off",
               "other"
             ],
             "title": "Reason Code",
@@ -11091,8 +11099,17 @@
         "type": "object"
       },
       "DuesOut": {
-        "description": "Students with overdue amounts, oldest due first (FR-FEE-020).",
+        "description": "Accounts with overdue amounts, oldest due first (FR-FEE-020); every open account of the\ncurrent and earlier years (FR-FEE-031). ``students`` counts distinct students; the\n``arrears_*`` tiles cover earlier-year accounts only.",
         "properties": {
+          "arrears_students": {
+            "title": "Arrears Students",
+            "type": "integer"
+          },
+          "arrears_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Arrears Total",
+            "type": "string"
+          },
           "as_of": {
             "format": "date",
             "title": "As Of",
@@ -11119,7 +11136,9 @@
           "as_of",
           "rows",
           "students",
-          "total_overdue"
+          "total_overdue",
+          "arrears_students",
+          "arrears_total"
         ],
         "title": "DuesOut",
         "type": "object"
@@ -11158,6 +11177,22 @@
       },
       "DuesRow": {
         "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "academic_year_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Academic Year Label"
+          },
           "account_id": {
             "format": "uuid",
             "title": "Account Id",
@@ -11200,6 +11235,10 @@
               }
             ],
             "title": "Display Name"
+          },
+          "earlier_year": {
+            "title": "Earlier Year",
+            "type": "boolean"
           },
           "last_payment_on": {
             "anyOf": [
@@ -11245,7 +11284,10 @@
           "overdue",
           "oldest_due_on",
           "balance",
-          "last_payment_on"
+          "last_payment_on",
+          "academic_year_id",
+          "academic_year_label",
+          "earlier_year"
         ],
         "title": "DuesRow",
         "type": "object"
@@ -12866,6 +12908,12 @@
             ],
             "title": "Class Id"
           },
+          "include_earlier_years": {
+            "default": false,
+            "description": "Also remind about earlier-year dues (FM-01, FR-FEE-035; manual sends only): one message per student with the total of all its open accounts. Without it an earlier-year row answers 422 ``account_ids`` (``earlier_year``).",
+            "title": "Include Earlier Years",
+            "type": "boolean"
+          },
           "kind": {
             "default": "reminder",
             "description": "``reminder`` (FR-MSG-025) or ``payment_link`` (\"Send payment link\", FR-MSG-027): the same fee message, whose dues page offers \"Pay online\"; needs online payments connected (``payments_not_connected``) and is sent at most once a day per account and guardian, apart from reminders.",
@@ -12929,6 +12977,12 @@
               }
             ],
             "title": "Class Id"
+          },
+          "include_earlier_years": {
+            "default": false,
+            "description": "Also remind about earlier-year dues (FM-01, FR-FEE-035; manual sends only): one message per student with the total of all its open accounts. Without it an earlier-year row answers 422 ``account_ids`` (``earlier_year``).",
+            "title": "Include Earlier Years",
+            "type": "boolean"
           },
           "kind": {
             "default": "reminder",
@@ -18873,6 +18927,136 @@
         "title": "LateFeeRule",
         "type": "object"
       },
+      "LeftWithDuesOut": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/LeftWithDuesRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          },
+          "total_balance": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Total Balance",
+            "type": "string"
+          },
+          "written_off_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Written Off Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "as_of",
+          "rows",
+          "students",
+          "total_balance",
+          "written_off_total"
+        ],
+        "title": "LeftWithDuesOut",
+        "type": "object"
+      },
+      "LeftWithDuesRow": {
+        "description": "A student who left (withdrawn, TC issued or graduated) with an open balance (FR-FEE-038).\nNever printed on a TC and never blocking one (FR-FEE-030, D16).",
+        "properties": {
+          "accounts": {
+            "title": "Accounts",
+            "type": "integer"
+          },
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "balance": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Balance",
+            "type": "string"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "last_payment_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Payment On"
+          },
+          "oldest_due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Due On"
+          },
+          "status": {
+            "enum": [
+              "left",
+              "graduated"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "written_off": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Written Off",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "admission_no",
+          "status",
+          "accounts",
+          "balance",
+          "oldest_due_on",
+          "last_payment_on",
+          "written_off"
+        ],
+        "title": "LeftWithDuesRow",
+        "type": "object"
+      },
       "LinkEnvelopeOut": {
         "additionalProperties": false,
         "description": "The parent page for the cookie's link (``/p/view``): which page it is, until when it\nworks, its language (the guardian's choice, else the school's parent language, else English:\nADR-0044), the school's name, and exactly one content block for its kind (R2-3H).",
@@ -20941,6 +21125,67 @@
           "version"
         ],
         "title": "MessagingSettingsOut",
+        "type": "object"
+      },
+      "MessagingSpendOut": {
+        "description": "Messages and estimated Meta cost per month (FR-MSG-032). No recipient, phone or text.",
+        "properties": {
+          "auto_reply_days": {
+            "description": "Automatic replies are counted only this many days back (their retention).",
+            "title": "Auto Reply Days",
+            "type": "integer"
+          },
+          "gst_percent": {
+            "title": "Gst Percent",
+            "type": "string"
+          },
+          "months": {
+            "description": "Newest month first, empty months included.",
+            "items": {
+              "$ref": "#/components/schemas/SpendMonthOut"
+            },
+            "title": "Months",
+            "type": "array"
+          },
+          "next_rate_change": {
+            "description": "The next 1 Jan, 1 Apr, 1 Jul or 1 Oct after the rates were checked.",
+            "format": "date",
+            "title": "Next Rate Change",
+            "type": "string"
+          },
+          "rates": {
+            "items": {
+              "$ref": "#/components/schemas/SpendRateOut"
+            },
+            "title": "Rates",
+            "type": "array"
+          },
+          "rates_checked_on": {
+            "format": "date",
+            "title": "Rates Checked On",
+            "type": "string"
+          },
+          "rates_recheck_due": {
+            "description": "Meta may have changed its rates since they were checked (FR-MSG-031).",
+            "title": "Rates Recheck Due",
+            "type": "boolean"
+          },
+          "service_free_per_month": {
+            "title": "Service Free Per Month",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "months",
+          "gst_percent",
+          "rates",
+          "rates_checked_on",
+          "next_rate_change",
+          "rates_recheck_due",
+          "service_free_per_month",
+          "auto_reply_days"
+        ],
+        "title": "MessagingSpendOut",
         "type": "object"
       },
       "MessagingTemplateOut": {
@@ -24214,6 +24459,13 @@
             ],
             "title": "Class Name"
           },
+          "earlier_years": {
+            "items": {
+              "$ref": "#/components/schemas/ParentEarlierYearOut"
+            },
+            "title": "Earlier Years",
+            "type": "array"
+          },
           "instalments": {
             "items": {
               "$ref": "#/components/schemas/ParentDueInstalmentOut"
@@ -24271,6 +24523,7 @@
           "child_first_name",
           "class_name",
           "as_of",
+          "earlier_years",
           "instalments",
           "total_due",
           "late_fee_total",
@@ -24279,6 +24532,27 @@
           "office_phone"
         ],
         "title": "ParentDuesOut",
+        "type": "object"
+      },
+      "ParentEarlierYearOut": {
+        "additionalProperties": false,
+        "description": "What one earlier academic year still owes (FM-01, FR-FEE-039): its label and amount.",
+        "properties": {
+          "due": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Due",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "due"
+        ],
+        "title": "ParentEarlierYearOut",
         "type": "object"
       },
       "ParentNoticeOut": {
@@ -35401,6 +35675,167 @@
         "title": "SnapshotOut",
         "type": "object"
       },
+      "SpendLineOut": {
+        "description": "Messages of one month, Meta pricing category and purpose: counts and rupees only.",
+        "properties": {
+          "billable": {
+            "description": "Messages Meta reported as charged.",
+            "title": "Billable",
+            "type": "integer"
+          },
+          "estimated_cost_inr": {
+            "description": "Rupees incl. GST (billable and pending).",
+            "title": "Estimated Cost Inr",
+            "type": "string"
+          },
+          "free": {
+            "description": "Messages Meta reported as free, or that failed.",
+            "title": "Free",
+            "type": "integer"
+          },
+          "pending": {
+            "description": "Messages Meta has not priced yet (counted as charged).",
+            "title": "Pending",
+            "type": "integer"
+          },
+          "pricing_category": {
+            "description": "Meta's pricing category (utility, service, marketing, authentication, ...); for a message Meta has not priced yet, utility for a template and service for a text.",
+            "title": "Pricing Category",
+            "type": "string"
+          },
+          "purpose": {
+            "description": "optin_confirm, school_notice, absence_alert, fee_reminder, fee_receipt, optin_stopped, or auto_reply (the daily automatic reply).",
+            "title": "Purpose",
+            "type": "string"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The configured rate used (utility_out_of_window, utility_in_window, service_above_free_tier, marketing); null when SchoolOS has no rate for the category.",
+            "title": "Rate"
+          },
+          "sent": {
+            "description": "Messages handed to Meta.",
+            "title": "Sent",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pricing_category",
+          "rate",
+          "purpose",
+          "sent",
+          "billable",
+          "free",
+          "pending",
+          "estimated_cost_inr"
+        ],
+        "title": "SpendLineOut",
+        "type": "object"
+      },
+      "SpendMonthOut": {
+        "properties": {
+          "billable": {
+            "title": "Billable",
+            "type": "integer"
+          },
+          "estimated_cost_inr": {
+            "description": "Rupees incl. GST, paid by the school to Meta.",
+            "title": "Estimated Cost Inr",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/SpendLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "month": {
+            "description": "IST calendar month.",
+            "pattern": "^[0-9]{4}-[0-9]{2}$",
+            "title": "Month",
+            "type": "string"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "sent",
+          "billable",
+          "pending",
+          "estimated_cost_inr",
+          "lines"
+        ],
+        "title": "SpendMonthOut",
+        "type": "object"
+      },
+      "SpendRateOut": {
+        "properties": {
+          "inr": {
+            "description": "Rupees per charged message before GST.",
+            "title": "Inr",
+            "type": "string"
+          },
+          "rate": {
+            "description": "utility_out_of_window, utility_in_window, ...",
+            "title": "Rate",
+            "type": "string"
+          },
+          "used": {
+            "description": "False for a category SchoolOS never sends (marketing).",
+            "title": "Used",
+            "type": "boolean"
+          },
+          "verified": {
+            "description": "Checked against Meta's INR rate card.",
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rate",
+          "inr",
+          "verified",
+          "used"
+        ],
+        "title": "SpendRateOut",
+        "type": "object"
+      },
+      "SplitPart": {
+        "description": "How much of the amount to take on one account (oldest year first, FR-FEE-037): the\ncounter issues one receipt per part, each allocated oldest due first within its account.",
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "amount"
+        ],
+        "title": "SplitPart",
+        "type": "object"
+      },
       "StaffMemberOut": {
         "description": "One entry of the staff directory (e.g. choosing a class teacher): no contact details.",
         "properties": {
@@ -35535,6 +35970,25 @@
           "instalment_no": {
             "title": "Instalment No",
             "type": "integer"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "late_fee_waiver",
+                  "plan_change",
+                  "concession_reversal",
+                  "correction",
+                  "write_off",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
           },
           "receipt_id": {
             "anyOf": [
@@ -36677,6 +37131,62 @@
           "match"
         ],
         "title": "StudentSummary",
+        "type": "object"
+      },
+      "StudentYearsOut": {
+        "description": "The student's open fee accounts, earlier years first, and (when an amount was given) the\noldest-first split across them.",
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "earlier_years_due": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Earlier Years Due",
+            "type": "string"
+          },
+          "split": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SplitPart"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "total_collectable": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Total Collectable",
+            "type": "string"
+          },
+          "years": {
+            "items": {
+              "$ref": "#/components/schemas/YearDue"
+            },
+            "title": "Years",
+            "type": "array"
+          }
+        },
+        "required": [
+          "student_id",
+          "as_of",
+          "years",
+          "earlier_years_due",
+          "total_collectable",
+          "split"
+        ],
+        "title": "StudentYearsOut",
         "type": "object"
       },
       "SubscriptionOut": {
@@ -41880,6 +42390,75 @@
           "unchanged"
         ],
         "title": "WriteResultOut",
+        "type": "object"
+      },
+      "YearDue": {
+        "description": "One open fee account of a student at the counter, oldest year first (FR-FEE-036).",
+        "properties": {
+          "academic_year_id": {
+            "format": "uuid",
+            "title": "Academic Year Id",
+            "type": "string"
+          },
+          "academic_year_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Academic Year Label"
+          },
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "balance": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Balance",
+            "type": "string"
+          },
+          "collectable": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Collectable",
+            "type": "string"
+          },
+          "earlier_year": {
+            "title": "Earlier Year",
+            "type": "boolean"
+          },
+          "oldest_due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Due On"
+          },
+          "overdue": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Overdue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "academic_year_id",
+          "academic_year_label",
+          "earlier_year",
+          "balance",
+          "overdue",
+          "collectable",
+          "oldest_due_on"
+        ],
+        "title": "YearDue",
         "type": "object"
       },
       "app__admin__schemas__MemberOut": {
@@ -55438,7 +56017,7 @@
     },
     "/api/v1/fees/dues": {
       "get": {
-        "description": "Students with overdue amounts, oldest due first (``finance.read``).",
+        "description": "Accounts with overdue amounts, oldest due first (``finance.read``): every open account of\nthe current and earlier years with its year; ``arrears_only`` keeps earlier years\n(FR-FEE-031/032).",
         "operationId": "fee_dues_api_v1_fees_dues_get",
         "parameters": [
           {
@@ -55473,6 +56052,16 @@
                 }
               ],
               "title": "Class Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "arrears_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Arrears Only",
+              "type": "boolean"
             }
           }
         ],
@@ -55530,7 +56119,7 @@
     },
     "/api/v1/fees/dues.csv": {
       "get": {
-        "description": "The dues list as CSV (``fee.report``, step-up). Audited like an export.",
+        "description": "The dues list as CSV with an academic year column (``fee.report``, step-up). Audited\nlike an export.",
         "operationId": "fee_dues_csv_api_v1_fees_dues_csv_get",
         "parameters": [
           {
@@ -55565,6 +56154,16 @@
                 }
               ],
               "title": "Class Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "arrears_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Arrears Only",
+              "type": "boolean"
             }
           }
         ],
@@ -58340,6 +58939,98 @@
         ]
       }
     },
+    "/api/v1/fees/reports/left-with-dues": {
+      "get": {
+        "description": "Students who left (withdrawn, TC issued or graduated) with an open balance\n(``finance.read``). For management follow-up only: never printed on a TC and never\nblocking one.",
+        "operationId": "fee_left_with_dues_api_v1_fees_reports_left_with_dues_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeftWithDuesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Fee Left With Dues",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/reports/left-with-dues.csv": {
+      "get": {
+        "description": "The left-with-dues report as CSV (``fee.report``, step-up). Audited like an export.",
+        "operationId": "fee_left_with_dues_csv_api_v1_fees_reports_left_with_dues_csv_get",
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "CSV file"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Fee Left With Dues Csv",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
     "/api/v1/fees/reports/upi": {
       "get": {
         "description": "UPI receipts per day: confirmed from the bank vs not yet (``fee.reconcile`` or\n``finance.read``). Default the last 30 days; at most a year.",
@@ -58583,6 +59274,94 @@
           }
         },
         "summary": "Fee Status",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/students/{student_id}/years": {
+      "get": {
+        "description": "The student's open fee accounts, earlier years first (``fee.collect`` or\n``finance.read``). With ``split_amount`` (the clerk chose \"oldest first across years\"): how\nmuch to take on each account, oldest year first; nothing is written, each part is its own\nreceipt. 422 ``split_amount`` (``not_positive``, ``above_outstanding``).",
+        "operationId": "student_fee_years_api_v1_fees_students__student_id__years_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "split_amount",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Split Amount"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentYearsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Student Fee Years",
         "tags": [
           "fees"
         ]
@@ -64385,6 +65164,79 @@
           }
         },
         "summary": "Put Settings",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/spend": {
+      "get": {
+        "description": "Messages and estimated Meta cost per month (\"Messages and estimated Meta cost\";\nFR-MSG-032, FR-MSG-033): for each of the last ``months`` IST months (default 6, at most 13,\nthe message retention), counts by Meta pricing category and purpose (sent, charged, free,\nnot priced yet) and the estimated rupees incl. GST, from the pricing Meta reported on status\nwebhooks and the configured rates with the date they were checked (FR-MSG-031). No\nrecipient, phone number or text. ``message.read`` school-wide (a class teacher's\nsection-scoped grant is refused). The school pays Meta directly (owner decision D7).",
+        "operationId": "get_spend_api_v1_messaging_spend_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "months",
+            "required": false,
+            "schema": {
+              "default": 6,
+              "maximum": 13,
+              "minimum": 1,
+              "title": "Months",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagingSpendOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get Spend",
         "tags": [
           "messaging"
         ]
