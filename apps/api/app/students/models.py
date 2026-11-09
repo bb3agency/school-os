@@ -82,6 +82,9 @@ class Enrollment(Base):
     roll_no: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, server_default=text("'active'"))
     started_on: Mapped[dt.date | None] = mapped_column(Date)
+    # FT-09 (0083): a real start date (given, the admission date inside the year, or a move);
+    # attendance before it is refused. Implicit starts are not checked.
+    started_on_explicit: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     ended_on: Mapped[dt.date | None] = mapped_column(Date)
     created_by: Mapped[uuid.UUID | None]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())

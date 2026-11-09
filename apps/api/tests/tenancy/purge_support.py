@@ -973,7 +973,7 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             v=ids["ver"],
         )
         # --- student timeline and early warning (M5, 0035_student_insights) ---------------
-        exam, flag = uuid.uuid4(), uuid.uuid4()
+        exam, flag, mark = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
         _run(
             c,
             "INSERT INTO sis.attendance_marks (id, tenant_id, student_id, section_id, on_date, "
@@ -998,9 +998,24 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             "INSERT INTO sis.exam_marks (id, tenant_id, exam_id, student_id, section_id, "
             "subject, max_marks, marks, recorded_by) VALUES (:i, :t, :e, :s, :sec, 'Maths', "
             "50, 20, :u)",
+            i=mark,
+            t=t,
+            e=exam,
+            s=ids["student"],
+            sec=ids["section"],
+            u=u["user"],
+        )
+        # FT-01 (0084_exam_lock_enrol): one change of that mark.
+        _run(
+            c,
+            "INSERT INTO sis.exam_mark_history (id, tenant_id, exam_id, mark_id, student_id, "
+            "section_id, subject, previous_max_marks, previous_marks, previous_absent, "
+            "new_max_marks, new_marks, new_absent, source, changed_by) VALUES (:i, :t, :e, :m, "
+            ":s, :sec, 'Maths', 50, 18, false, 50, 20, false, 'mark', :u)",
             i=uuid.uuid4(),
             t=t,
             e=exam,
+            m=mark,
             s=ids["student"],
             sec=ids["section"],
             u=u["user"],

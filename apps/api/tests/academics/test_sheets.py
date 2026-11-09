@@ -189,3 +189,25 @@ def test_normalised_headers_ignore_case_spaces_and_punctuation() -> None:
     assert sheets.normalise_header(" Adm. No ") == sheets.normalise_header("admno")
     assert sheets.normalise_header("ప్రవేశ సంఖ్య") == sheets.normalise_header("ప్రవేశసంఖ్య")
     assert sheets.normalise_key(" syn-001 ") == sheets.normalise_key("SYN-001")
+
+
+def test_FR_ATT_013_a_date_before_an_explicit_start_is_a_row_issue() -> None:
+    out = sheets.read_attendance(
+        _rows(
+            ["Adm No", "22/09/2026", "23/09/2026"],
+            ["SYN-001", "P", "P"],
+            ["SYN-002", "A", "A"],
+        ),
+        ROSTER,
+        first=FIRST,
+        last=LAST,
+        today=TODAY,
+        starts={A: dt.date(2026, 9, 23)},
+    )
+    assert [(i.row, i.column, i.code) for i in out.issues] == [(2, 2, "before_enrolment")]
+    got = {(e.student_id, e.on_date) for e in out.entries}
+    assert got == {
+        (A, dt.date(2026, 9, 23)),
+        (B, dt.date(2026, 9, 22)),
+        (B, dt.date(2026, 9, 23)),
+    }

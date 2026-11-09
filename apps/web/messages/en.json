@@ -7755,7 +7755,8 @@
       "next": "Next student",
       "keyboardHint": "Press Enter or the down arrow to go to the next student.",
       "discard": "Clear typed marks",
-      "changedBySomeone": "Someone else saved marks for this exam while you were typing, so nothing was saved. The table now shows their marks and your typed marks are kept. Check them, then save again."
+      "changedBySomeone": "Someone else saved marks for this exam while you were typing, so nothing was saved. The table now shows their marks and your typed marks are kept. Check them, then save again.",
+      "lockedWhileTyping": "This exam was locked while you were typing, so nothing was saved. Ask the principal to unlock it if the marks must change."
     },
     "import": {
       "title": "Add marks from a sheet",
@@ -7766,6 +7767,44 @@
       "subjectB": "Mathematics",
       "maxRow": "Maximum",
       "summary": "Read {entries, plural, one {# mark} other {# marks}} for {students, plural, one {# student} other {# students}} in {subjects, plural, one {# subject} other {# subjects}}."
+    },
+    "changedAfterLock": "Changed after lock",
+    "lock": {
+      "title": "Exam lock",
+      "openDescription": "Lock the exam once the marks are final, before results are shared.",
+      "lockedDescription": "The marks of this exam are final. Only the principal can unlock it.",
+      "openBadge": "Open for marks",
+      "lockedBadge": "Locked",
+      "lockedAt": "Locked on {when}",
+      "unlockedBecause": "Last unlocked because: {reason}",
+      "lockConsequence": "After locking, nobody can enter or import marks for this exam until the principal unlocks it.",
+      "lock": "Lock exam",
+      "lockedDone": "The exam is locked.",
+      "reason": "Why must the marks change?",
+      "reasonHint": "Kept with the exam and with every change made until it is locked again.",
+      "unlock": "Unlock exam",
+      "unlockedDone": "The exam is unlocked. Changes are kept in the history.",
+      "askPrincipal": "To correct a mark, ask the principal to unlock the exam.",
+      "bannerTitle": "This exam is locked",
+      "bannerBody": "Marks cannot be entered or imported. The principal can unlock it to make a correction."
+    },
+    "history": {
+      "title": "Changes to marks",
+      "description": "Every change to a saved mark, newest first.",
+      "empty": "No mark has been changed after it was first saved.",
+      "unnamed": "Name not recorded",
+      "absent": "AB",
+      "formerStaff": "Former staff member",
+      "afterLock": "After lock",
+      "columns": {
+        "student": "Student",
+        "subject": "Subject",
+        "before": "Before",
+        "after": "After",
+        "who": "Changed by",
+        "when": "When",
+        "reason": "Reason"
+      }
     }
   },
   "insights": {
@@ -8065,6 +8104,7 @@
         "student_missing": "No admission or roll number.",
         "subject_too_long": "The subject name is longer than 60 characters.",
         "unknown_student": "Not a student of this section.",
+        "before_enrolment": "Before the student joined this section.",
         "other": "Check this cell."
       }
     },
@@ -8098,6 +8138,7 @@
       "file_too_complex": "The file is too complex to read. Copy the values into a new sheet.",
       "not_utf8": "Save the CSV file as UTF-8 and try again.",
       "no_worksheet": "The file has no sheet with data.",
+      "before_enrolment": "A date is before the student joined this section. Remove that day for the student.",
       "other": "Check the values and try again."
     },
     "errors": {

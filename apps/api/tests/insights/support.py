@@ -344,6 +344,19 @@ def world_exam(w: Any) -> uuid.UUID:
     return value
 
 
+def world_fresh_exam(w: Any, *, locked: bool = False) -> uuid.UUID:
+    """A new exam of school A's current year (FT-01 matrix: one per call), locked if asked."""
+    actor = ctx(w.a, "principal")
+    day = min(academics.today_ist(), YEAR_END)
+    with tenant_session(w.a.tenant_id, actor.user_id) as db:
+        out = academics.create_exam(
+            db, actor, ExamCreate(name=f"Synthetic lock {uuid.uuid4().hex[:8]}", held_on=day)
+        )
+        if locked:
+            academics.lock_exam(db, actor, out.id)
+    return out.id
+
+
 def _b_principal(w: Any) -> UserContext:
     """School B's owner account acting with principal permissions (setup only)."""
     return ctx(w.b, "principal", w.b.people["owner"])

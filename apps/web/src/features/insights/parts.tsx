@@ -75,6 +75,7 @@ const PROBLEM_CODES = new Set([
   "not_in_section",
   "future_date",
   "date_out_of_range",
+  "before_enrolment",
   "duplicate_entry",
   "too_many_entries",
   "aadhaar_full_number_rejected",

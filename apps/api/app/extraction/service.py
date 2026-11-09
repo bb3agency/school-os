@@ -883,6 +883,9 @@ def _create_student(
                 roll_no=data.roll_no,
                 status=data.student_status,
             ),
+            # FT-09: a register page onboards the student; the enrolment starts on the
+            # admission date inside the year, else the year start (FR-ATT-010).
+            onboarding=True,
         )
     ids = [
         v.id for k in keys for v in student.values.get(k, []) if v.source == SOURCE and v.current

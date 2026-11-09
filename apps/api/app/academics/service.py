@@ -21,6 +21,19 @@ the roster only and returns entries and problems; it stores nothing. The file is
 own committed transaction BEFORE it is parsed, so a refused file (e.g. one holding a full
 Aadhaar number) never lingers (data minimisation).
 
+**Exam lock (FT-01; FR-MRK-008..FR-MRK-016).** ``exam.manage`` locks an exam; a locked exam
+refuses marks writes and marks-sheet previews (409 ``exam_locked``). Only the principal unlocks
+(``exam.unlock``, step-up MFA) with a reason; corrections after an unlock need no second person.
+Every change of a stored mark (after its first entry, locked or not) appends a row to
+``sis.exam_mark_history`` with the previous and new value, who, when and the reason, in the
+same transaction as the write; changes made after the exam was first locked are shown as
+"Changed after lock". Lock, unlock and marks writes of one exam serialise on the same advisory
+lock, so a write never slips past a lock.
+
+**Enrolment start (FT-09; FR-ATT-010..FR-ATT-016).** Attendance dated before a student's
+explicit enrolment start in the section (``students.ActiveEnrolment.started_on_explicit``) is
+refused (422 ``before_enrolment``; a per-row issue in sheets). Implicit starts are not checked.
+
 Nothing here is ever sent to an AI provider. Logs carry ids and counts only (invariant 5).
 """
 
@@ -41,7 +54,7 @@ from sqlalchemy.orm import Session
 from app.academics import repository as repo
 from app.academics import sheets
 from app.academics.config import load_config
-from app.academics.models import Exam, ExamMark
+from app.academics.models import Exam, ExamMark, ExamMarkHistory
 from app.academics.schemas import (
     AttendanceDayOut,
     AttendanceDayStudent,
@@ -52,9 +65,12 @@ from app.academics.schemas import (
     AttendanceWrite,
     ExamCreate,
     ExamOut,
+    ExamUnlockIn,
+    MarkChangeOut,
     MarkIn,
     MarkOut,
     MarksGridOut,
+    MarksHistoryOut,
     MarksSheetOut,
     MarksStudentOut,
     MarksWrite,
@@ -77,6 +93,7 @@ from app.core.records import RecordTable
 from app.core.redaction import contains_full_aadhaar
 from app.core.spreadsheet import FileKind, SpreadsheetError, raw_rows
 from app.documents import service as documents
+from app.identity import service as identity
 from app.ops import service as ops
 from app.students import service as students
 from app.tenancy import service as tenancy
@@ -88,6 +105,10 @@ log = get_logger(__name__)
 ATTENDANCE_RECORD: Final = "attendance.record"
 ATTENDANCE_READ: Final = "attendance.read"
 EXAM_MANAGE: Final = "exam.manage"
+EXAM_UNLOCK: Final = "exam.unlock"
+EXAM_LOCKED_CODE: Final = "exam_locked"
+BEFORE_ENROLMENT_CODE: Final = "before_enrolment"
+HISTORY_LIMIT: Final = 2000
 MARKS_RECORD: Final = "marks.record"
 MARKS_READ: Final = "marks.read"
 
@@ -225,6 +246,19 @@ def _roster(
     return sorted(out, key=lambda s: (_roll_key(s.roll_no), (s.full_name or "").casefold()))
 
 
+def _explicit_starts(
+    session: Session, student_ids: Collection[uuid.UUID], section_id: uuid.UUID
+) -> dict[uuid.UUID, dt.date]:
+    """FT-09 (FR-ATT-012): the explicit start date of each student's active enrolment in the
+    section. Implicit starts (defaulted dates) are left out: they are not checked."""
+    out: dict[uuid.UUID, dt.date] = {}
+    for sid, enrolments in students.active_enrolments(session, student_ids).items():
+        for e in enrolments:
+            if e.section_id == section_id and e.started_on_explicit and e.started_on is not None:
+                out[sid] = e.started_on
+    return out
+
+
 def _check_dates(
     errors: list[dict[str, str]], field: str, day: dt.date, year: AcademicYearOut, today: dt.date
 ) -> None:
@@ -313,7 +347,8 @@ def record_attendance(
 ) -> WriteResultOut:
     """Store a section's statuses for one or more dates, all or nothing (``attendance.record``;
     FR-ATT-002). 422 when a student is not in the section's roster, a date is in the future or
-    outside the section's academic year, or an entry repeats; and, for a scoped recorder, when
+    outside the section's academic year or before the student's explicit enrolment start
+    (``before_enrolment``, FR-ATT-012), or an entry repeats; and, for a scoped recorder, when
     the day is already recorded under another section (``recorded_in_another_section``); 412
     ``attendance_changed`` when an entry's ``expected_version`` is stale (XA-06).
     Audit ``attendance.recorded``."""
@@ -322,6 +357,7 @@ def record_attendance(
     if len(data.entries) > cfg.max_entries:
         _refuse([_error("entries", "too_many_entries")])
     roster = {s.student_id for s in _roster(session, ctx, sec.section, ATTENDANCE_RECORD)}
+    starts = _explicit_starts(session, roster, sec.section.id)
     today = today_ist()
     errors: list[dict[str, str]] = []
     seen: set[tuple[uuid.UUID, dt.date]] = set()
@@ -329,6 +365,9 @@ def record_attendance(
         if entry.student_id not in roster:
             errors.append(_error(f"entries.{i}.student_id", "not_in_section"))
         _check_dates(errors, f"entries.{i}.on_date", entry.on_date, sec.year, today)
+        start = starts.get(entry.student_id)
+        if start is not None and entry.on_date < start:
+            errors.append(_error(f"entries.{i}.on_date", BEFORE_ENROLMENT_CODE))
         key = (entry.student_id, entry.on_date)
         if key in seen:
             errors.append(_error(f"entries.{i}", "duplicate_entry"))
@@ -469,7 +508,9 @@ def preview_attendance_sheet(
     problems, nothing stored; the file is deleted once read. Audit ``attendance.sheet_read``."""
     with tenant_session(ctx.tenant_id, ctx.user_id) as session:
         sec = _section(session, ctx, section_id, ATTENDANCE_RECORD)
-        roster = _sheet_roster(session, ctx, sec, ATTENDANCE_RECORD)
+        members = _roster(session, ctx, sec.section, ATTENDANCE_RECORD)
+        roster = sheets.Roster.build((s.student_id, s.admission_no, s.roll_no) for s in members)
+        starts = _explicit_starts(session, [s.student_id for s in members], sec.section.id)
     blob, kind = _consume_sheet(ctx, data.document_id, "attendance.sheet_read", section_id)
     cfg = load_config()
     last = min(sec.year.ends_on, today_ist())
@@ -481,6 +522,7 @@ def preview_attendance_sheet(
             last=sec.year.ends_on,
             today=last,
             cfg=cfg,
+            starts=starts,
         )
     except (SpreadsheetError, sheets.SheetRefused) as exc:
         raise _sheet_refused(exc.code) from None
@@ -506,6 +548,10 @@ def _exam_out(exam: Exam) -> ExamOut:
         name=exam.name,
         held_on=exam.held_on,
         version=exam.version,
+        locked=exam.locked_at is not None,
+        locked_at=exam.locked_at,
+        unlocked_at=exam.unlocked_at,
+        unlock_reason=exam.unlock_reason,
     )
 
 
@@ -570,6 +616,87 @@ def _exam(session: Session, exam_id: uuid.UUID) -> Exam:
     return exam
 
 
+def _ensure_unlocked(exam: Exam) -> None:
+    """409 ``exam_locked`` for a locked exam (FR-MRK-009)."""
+    if exam.locked_at is not None:
+        raise Conflict(
+            "This exam is locked, so its marks cannot change. Ask the principal to unlock it.",
+            code=EXAM_LOCKED_CODE,
+        )
+
+
+def _exam_locked_for_change(session: Session, exam_id: uuid.UUID) -> Exam:
+    """The exam with its marks writes serialised (the advisory lock marks writes take) and its
+    row locked and re-read, so a lock, an unlock and a marks write never interleave."""
+    repo.lock_exam_marks(session, exam_id)
+    exam = repo.exam_for_update(session, exam_id)
+    if exam is None:
+        raise NotFound("Exam not found")
+    return exam
+
+
+def lock_exam(session: Session, ctx: UserContext, exam_id: uuid.UUID) -> ExamOut:
+    """Lock an exam's marks (``exam.manage``; FR-MRK-008): marks writes and sheet previews then
+    answer 409 ``exam_locked``. 409 ``exam_already_locked`` when it is locked. Audit
+    ``exam.locked`` in the same transaction."""
+    exam = _exam_locked_for_change(session, exam_id)
+    if exam.locked_at is not None:
+        raise Conflict("This exam is already locked.", code="exam_already_locked")
+    updated = repo.update_exam_lock(
+        session, exam.id, {"locked_at": dt.datetime.now(dt.UTC), "locked_by": ctx.user_id}
+    )
+    _audit(
+        session,
+        "exam.locked",
+        "exam",
+        exam.id,
+        {"academic_year_id": exam.academic_year_id, "relock": exam.unlocked_at is not None},
+    )
+    log.info("academics.exam_locked", resource_id=exam.id)
+    return _exam_out(updated)
+
+
+def unlock_exam(
+    session: Session, ctx: UserContext, exam_id: uuid.UUID, data: ExamUnlockIn
+) -> ExamOut:
+    """Unlock a locked exam so its marks can be corrected (``exam.unlock``: the principal only,
+    step-up MFA; FR-MRK-010) with a mandatory reason (no Aadhaar numbers, 422). Corrections made
+    while it stays unlocked need no second person; each is kept in the marks history with this
+    reason unless the write gives its own (FR-MRK-012). 409 ``exam_not_locked``. Audit
+    ``exam.unlocked`` in the same transaction (the reason stays on the exam, not in the audit
+    summary)."""
+    if contains_full_aadhaar(data.reason):
+        _refuse([_error("reason", AADHAAR_CODE)])
+    exam = _exam_locked_for_change(session, exam_id)
+    if exam.locked_at is None:
+        raise Conflict("This exam is not locked.", code="exam_not_locked")
+    locked_at = exam.locked_at
+    updated = repo.update_exam_lock(
+        session,
+        exam.id,
+        {
+            "locked_at": None,
+            "locked_by": None,
+            "unlocked_at": dt.datetime.now(dt.UTC),
+            "unlocked_by": ctx.user_id,
+            "unlock_reason": data.reason,
+        },
+    )
+    _audit(
+        session,
+        "exam.unlocked",
+        "exam",
+        exam.id,
+        {
+            "academic_year_id": exam.academic_year_id,
+            "locked_at": locked_at.isoformat(),
+            "reason_chars": len(data.reason),
+        },
+    )
+    log.info("academics.exam_unlocked", resource_id=exam.id)
+    return _exam_out(updated)
+
+
 # --- marks ----------------------------------------------------------------------------------------
 
 
@@ -595,6 +722,7 @@ def section_marks(
     exam = _exam(session, exam_id)
     roster = _roster(session, ctx, sec.section, MARKS_READ)
     rows = repo.exam_marks(session, exam.id, [s.student_id for s in roster])
+    after_lock = repo.marks_changed_after_lock(session, exam.id, [s.student_id for s in roster])
     by_student: dict[uuid.UUID, list[ExamMark]] = {}
     subjects: dict[str, None] = {}
     for r in rows:
@@ -614,6 +742,7 @@ def section_marks(
                         marks=m.marks,
                         absent=m.absent,
                         version=m.version,
+                        changed_after_lock=m.id in after_lock,
                     )
                     for m in by_student.get(s.student_id, [])
                 ],
@@ -624,6 +753,92 @@ def section_marks(
             for s in roster
         ],
     )
+
+
+def marks_history(
+    session: Session, ctx: UserContext, section_id: uuid.UUID, exam_id: uuid.UUID
+) -> MarksHistoryOut:
+    """Every change of the section's marks for one exam, newest first, at most
+    :data:`HISTORY_LIMIT` (``marks.read``; FR-MRK-013): previous and new value, who, when, the
+    reason and whether it was after the exam was first locked. Students outside the caller's
+    roster are left out."""
+    sec = _section(session, ctx, section_id, MARKS_READ)
+    exam = _exam(session, exam_id)
+    roster = {s.student_id: s for s in _roster(session, ctx, sec.section, MARKS_READ)}
+    rows = repo.mark_history(session, exam.id, list(roster), limit=HISTORY_LIMIT)
+    names = identity.members_for_users(session, {r.changed_by for r in rows})
+    return MarksHistoryOut(
+        section=sec.out,
+        exam=_exam_out(exam),
+        changes=[_change_out(r, roster[r.student_id], names) for r in rows],
+    )
+
+
+def _change_out(
+    row: ExamMarkHistory,
+    student: RosterStudentOut,
+    names: Mapping[uuid.UUID, tuple[uuid.UUID, str]],
+) -> MarkChangeOut:
+    who = names.get(row.changed_by)
+    return MarkChangeOut(
+        student=student,
+        subject=row.subject,
+        previous_max_marks=row.previous_max_marks,
+        previous_marks=row.previous_marks,
+        previous_absent=row.previous_absent,
+        new_max_marks=row.new_max_marks,
+        new_marks=row.new_marks,
+        new_absent=row.new_absent,
+        source="import" if row.source == "import" else "mark",
+        after_lock=row.after_lock,
+        reason=row.reason,
+        changed_by_name=who[1] if who else None,
+        changed_at=row.changed_at,
+    )
+
+
+def _history_rows(
+    exam: Exam,
+    section_id: uuid.UUID,
+    existing: Iterable[ExamMark],
+    data: MarksWrite,
+    ctx: UserContext,
+) -> list[dict[str, Any]]:
+    """FR-MRK-012: one history row per stored mark this write changes (new marks have none)."""
+    by_key = {(m.student_id, m.subject.casefold()): m for m in existing}
+    after_lock = exam.unlocked_at is not None
+    reason = data.reason or (exam.unlock_reason if after_lock else None)
+    rows: list[dict[str, Any]] = []
+    for e in data.entries:
+        old = by_key.get((e.student_id, e.subject.casefold()))
+        if old is None or (
+            old.max_marks == e.max_marks
+            and old.marks == e.marks
+            and old.absent == e.absent
+            and old.section_id == section_id
+        ):
+            continue
+        rows.append(
+            {
+                "id": new_id(),
+                "exam_id": exam.id,
+                "mark_id": old.id,
+                "student_id": e.student_id,
+                "section_id": section_id,
+                "subject": old.subject,
+                "previous_max_marks": old.max_marks,
+                "previous_marks": old.marks,
+                "previous_absent": old.absent,
+                "new_max_marks": e.max_marks,
+                "new_marks": e.marks,
+                "new_absent": e.absent,
+                "source": data.source,
+                "after_lock": after_lock,
+                "reason": reason,
+                "changed_by": ctx.user_id,
+            }
+        )
+    return rows
 
 
 def _marks_in_other_sections(
@@ -664,34 +879,15 @@ def _check_expected_mark_versions(existing: Iterable[ExamMark], entries: Sequenc
         )
 
 
-def record_marks(
-    session: Session,
-    ctx: UserContext,
-    section_id: uuid.UUID,
-    exam_id: uuid.UUID,
-    data: MarksWrite,
-) -> WriteResultOut:
-    """Store a section's marks for one exam, all or nothing (``marks.record``; FR-MRK-002). 422
-    when a student is not in the roster, marks exceed the maximum, absent papers carry marks,
-    a subject is too long or holds an Aadhaar-like number, or an entry repeats; and, for a scoped
-    recorder, when the paper is already recorded under another section
-    (``recorded_in_another_section``); 412 ``marks_changed`` when an entry's
-    ``expected_version`` is stale (YA-05). Subjects match
-    whatever their case: a paper already stored corrects in place under its first spelling.
-    Audit ``marks.recorded``."""
+def _check_mark_entries(
+    errors: list[dict[str, str]], entries: Sequence[MarkIn], roster: Collection[uuid.UUID]
+) -> set[str]:
+    """Per-entry checks of a marks write (FR-MRK-002) into ``errors``; the subjects written
+    (case-folded)."""
     cfg = load_config().marks
-    sec = _section(session, ctx, section_id, MARKS_RECORD)
-    exam = _exam(session, exam_id)
-    errors: list[dict[str, str]] = []
-    if exam.academic_year_id != sec.section.academic_year_id:
-        errors.append(_error("exam_id", "exam_other_year"))
-    if len(data.entries) > cfg.max_entries:
-        errors.append(_error("entries", "too_many_entries"))
-    _refuse(errors)
-    roster = {s.student_id for s in _roster(session, ctx, sec.section, MARKS_RECORD)}
     seen: set[tuple[uuid.UUID, str]] = set()
     subjects: set[str] = set()
-    for i, entry in enumerate(data.entries):
+    for i, entry in enumerate(entries):
         field = f"entries.{i}"
         if entry.student_id not in roster:
             errors.append(_error(f"{field}.student_id", "not_in_section"))
@@ -710,6 +906,39 @@ def record_marks(
         subjects.add(entry.subject.casefold())
     if len(subjects) > cfg.max_subjects:
         errors.append(_error("entries", "too_many_subjects"))
+    return subjects
+
+
+def record_marks(
+    session: Session,
+    ctx: UserContext,
+    section_id: uuid.UUID,
+    exam_id: uuid.UUID,
+    data: MarksWrite,
+) -> WriteResultOut:
+    """Store a section's marks for one exam, all or nothing (``marks.record``; FR-MRK-002). 422
+    when a student is not in the roster, marks exceed the maximum, absent papers carry marks,
+    a subject is too long or holds an Aadhaar-like number, or an entry repeats; and, for a scoped
+    recorder, when the paper is already recorded under another section
+    (``recorded_in_another_section``); 412 ``marks_changed`` when an entry's
+    ``expected_version`` is stale (YA-05); 409 ``exam_locked`` when the exam is locked
+    (FR-MRK-009). Subjects match whatever their case: a paper already stored corrects in place
+    under its first spelling. Every change of a stored mark is appended to the marks history in
+    the same transaction (FR-MRK-012). Audit ``marks.recorded``."""
+    cfg = load_config().marks
+    sec = _section(session, ctx, section_id, MARKS_RECORD)
+    exam = _exam(session, exam_id)
+    _ensure_unlocked(exam)  # fail fast; checked again under the exam's lock below
+    errors: list[dict[str, str]] = []
+    if data.reason is not None and contains_full_aadhaar(data.reason):
+        errors.append(_error("reason", AADHAAR_CODE))
+    if exam.academic_year_id != sec.section.academic_year_id:
+        errors.append(_error("exam_id", "exam_other_year"))
+    if len(data.entries) > cfg.max_entries:
+        errors.append(_error("entries", "too_many_entries"))
+    _refuse(errors)
+    roster = {s.student_id for s in _roster(session, ctx, sec.section, MARKS_RECORD)}
+    subjects = _check_mark_entries(errors, data.entries, roster)
     _refuse(errors)
     # A paper is one per exam, student and subject whatever its case ("MATHS" from a sheet
     # corrects "Maths" typed earlier): keep the spelling already stored for the student, else
@@ -717,7 +946,8 @@ def record_marks(
     spelling: dict[str, str] = {}
     for subject in repo.exam_subjects(session, exam.id):
         spelling.setdefault(subject.casefold(), subject)
-    repo.lock_exam_marks(session, exam.id)
+    exam = _exam_locked_for_change(session, exam.id)
+    _ensure_unlocked(exam)
     existing = repo.exam_marks(session, exam.id, {e.student_id for e in data.entries})
     stored = {(m.student_id, m.subject.casefold()): m.subject for m in existing}
     _refuse(_marks_in_other_sections(ctx, sec.section.id, existing, data.entries))
@@ -746,6 +976,8 @@ def record_marks(
         ],
     )
     written = inserted + updated
+    history = _history_rows(exam, sec.section.id, existing, data, ctx)
+    repo.insert_mark_history(session, history)
     _audit(
         session,
         "marks.recorded",
@@ -758,6 +990,8 @@ def record_marks(
             "inserted": inserted,
             "corrected": updated,
             "subjects": len(subjects),
+            "history": len(history),
+            "after_lock": exam.unlocked_at is not None,
         },
     )
     if written:
@@ -770,10 +1004,11 @@ def preview_marks_sheet(
     ctx: UserContext, section_id: uuid.UUID, exam_id: uuid.UUID, data: SheetIn
 ) -> MarksSheetOut:
     """Read a marks sheet for a section and exam (``marks.record``; FR-MRK-004): entries and
-    problems, nothing stored; the file is deleted once read. Audit ``marks.sheet_read``."""
+    problems, nothing stored; the file is deleted once read; 409 ``exam_locked`` for a locked
+    exam, before the file is read (FR-MRK-009). Audit ``marks.sheet_read``."""
     with tenant_session(ctx.tenant_id, ctx.user_id) as session:
         sec = _section(session, ctx, section_id, MARKS_RECORD)
-        _exam(session, exam_id)
+        _ensure_unlocked(_exam(session, exam_id))
         roster = _sheet_roster(session, ctx, sec, MARKS_RECORD)
     blob, kind = _consume_sheet(ctx, data.document_id, "marks.sheet_read", section_id)
     cfg = load_config()
@@ -877,7 +1112,7 @@ def export_records(session: Session) -> list[RecordTable]:
 
 
 _PURGE = purging.PurgeTables(
-    deleted=("sis.exam_marks", "sis.exams", "sis.attendance_marks"),
+    deleted=("sis.exam_mark_history", "sis.exam_marks", "sis.exams", "sis.attendance_marks"),
 )
 
 
@@ -899,7 +1134,10 @@ tenancy.register_data_owner(
 __all__ = [
     "ATTENDANCE_READ",
     "ATTENDANCE_RECORD",
+    "BEFORE_ENROLMENT_CODE",
+    "EXAM_LOCKED_CODE",
     "EXAM_MANAGE",
+    "EXAM_UNLOCK",
     "MARKS_READ",
     "MARKS_RECORD",
     "RECORDS_CHANGED_EVENT",
@@ -913,6 +1151,8 @@ __all__ = [
     "exam_results",
     "export_records",
     "list_exams",
+    "lock_exam",
+    "marks_history",
     "percent_of",
     "preview_attendance_sheet",
     "preview_marks_sheet",
@@ -923,4 +1163,5 @@ __all__ = [
     "subject_report",
     "tenant_data_counts",
     "today_ist",
+    "unlock_exam",
 ]
