@@ -305,7 +305,7 @@ def _draft_out(
         documents=_draft_documents(session, ctx, chosen),
         from_schoolos=_from_schoolos(session, fmt),
         missing=values.missing_required(fmt, inputs),
-        register=_register(session, fmt),
+        certificates=_register(session, fmt),
         expired_policy=compliance.disclosure_policy(),
         version=draft.version if draft else 0,
         updated_at=draft.updated_at if draft else None,

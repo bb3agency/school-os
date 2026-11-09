@@ -147,7 +147,9 @@ Request = tuple[str, dict[str, Any] | None, dict[str, str]]
 def b_certificate(admin: Engine, w: Any) -> uuid.UUID:
     """A certificate of school B (BOLA: school A's callers get 404)."""
     if "bola_compliance_certificate" not in w.b.ids:
-        w.b.ids["bola_compliance_certificate"] = certificate(admin, w.b, kind="other", label="B")
+        w.b.ids["bola_compliance_certificate"] = certificate(
+            admin, w.b, kind="other", label="School B certificate"
+        )
     value: uuid.UUID = w.b.ids["bola_compliance_certificate"]
     return value
 
@@ -181,3 +183,10 @@ def matrix_specs() -> dict[tuple[str, str], Any]:
 
 
 MATRIX_CREATES = frozenset({f"{BASE}/certificates"})
+
+# BOLA: valid bodies for the writes on school B's certificate (FR-COMP-018).
+BOLA_PREFIX = f"{BASE}/"
+BOLA_BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
+    ("PUT", f"{BASE}/certificates/{{certificate_id}}"): {"label": "Changed by A"},
+    ("POST", f"{BASE}/certificates/{{certificate_id}}:remove"): None,
+}

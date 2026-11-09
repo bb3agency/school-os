@@ -1045,12 +1045,33 @@ BODIES.update(_consents().BOLA_BODIES)
 PRIVACY_REQUESTS = "/api/v1/privacy/requests/{request_id}"
 
 
+def _compliance() -> ModuleType:
+    """tests/compliance/support.py (FC-01: a compliance certificate of school B)."""
+    name = "sos_test_compliance_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "compliance" / "support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+BODIES.update(_compliance().BOLA_BODIES)
+
+
 def _b_id(template: str, w: Any) -> uuid.UUID:
     """School B's object for ``template``: ``request_id`` is a privacy request on the privacy
     routes (R3-1A) and a break-glass request elsewhere."""
     if template.startswith(PRIVACY_REQUESTS):
         value: uuid.UUID = _privacy().b_request(w)
         return value
+    if template.startswith(_compliance().BOLA_PREFIX):
+        # FC-01: ``certificate_id`` is a compliance certificate on the compliance routes.
+        cert: uuid.UUID = _compliance().b_certificate(_ADMIN[0], w)
+        return cert
     return PARAM_TO_B[_param(template)](w)
 
 

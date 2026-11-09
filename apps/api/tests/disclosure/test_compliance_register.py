@@ -54,12 +54,12 @@ def test_FR_COMP_020_draft_shows_register_certificates(
     res = api.call(school.people["office_admin"], "GET", f"{BASE}/draft")
     assert res.status_code == 200, res.text
     body = res.json()
-    (fire,) = body["register"]["fire_safety"]
+    (fire,) = body["certificates"]["fire_safety"]
     assert fire["certificate_id"] == str(cid)
     assert fire["state"] == "expired"
     assert fire["document_id"] == str(doc)
     assert fire["publishable"] is True
-    assert "building_safety" not in body["register"]
+    assert "building_safety" not in body["certificates"]
     assert body["expired_policy"] == "warn"
 
 

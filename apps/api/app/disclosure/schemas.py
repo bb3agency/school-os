@@ -176,7 +176,7 @@ class DisclosureDraftOut(_Out):
         description="School and derived items by item key, as they are now (not frozen)."
     )
     missing: list[str] = Field(description="Required items still empty (publishing refuses).")
-    register: dict[str, list[RegisterCertificateOut]] = Field(
+    certificates: dict[str, list[RegisterCertificateOut]] = Field(
         default_factory=dict,
         description="Document items backed by the compliance register (FC-01): the current "
         "certificates by item key. An expired one warns before publishing (or refuses, by "
