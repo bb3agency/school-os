@@ -49,6 +49,8 @@ const OWN_CSP_PATHS: readonly RegExp[] = [
   // (FR-MSG-009), privacy notice previews and request letters (ADR-0048).
   /^\/bff\/api\/v1\/fees\/(receipts|refunds)\/[0-9a-f-]{36}\/print$/i,
   /^\/bff\/api\/v1\/fees\/reports\/daily\/print$/i,
+  // FM-06 (FR-FEE-046..056): tuition fee tax certificate print view.
+  /^\/bff\/api\/v1\/fees\/tax-certificates\/[0-9a-f-]{36}\/print$/i,
   /^\/bff\/api\/v1\/students\/[0-9a-f-]{36}\/apaar-consent\/form$/i,
   /^\/bff\/api\/v1\/sections\/[0-9a-f-]{36}\/(apaar-consent-forms|join-slips)$/i,
   /^\/bff\/api\/v1\/consents\/forms$/i,
