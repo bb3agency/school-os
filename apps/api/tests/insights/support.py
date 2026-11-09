@@ -35,7 +35,15 @@ from typing import Any
 from sqlalchemy import Engine, text
 
 from app.academics import service as academics
-from app.academics.schemas import AttendanceEntryIn, AttendanceWrite, ExamCreate, MarkIn, MarksWrite
+from app.academics.schemas import (
+    AttendanceEntryIn,
+    AttendanceWrite,
+    CalendarEntryIn,
+    CalendarPatternIn,
+    ExamCreate,
+    MarkIn,
+    MarksWrite,
+)
 from app.authz.context import UserContext
 from app.core.db import tenant_session
 from app.insights import service as insights
@@ -394,4 +402,71 @@ def b_note(w: Any) -> uuid.UUID:
             )
         w.b.ids["insights_note"] = out.id
     value: uuid.UUID = w.b.ids["insights_note"]
+    return value
+
+
+# --- school calendar (FT-06; FR-CAL-*): matrix and BOLA helpers ---------------------------------
+# The calendar lives on the PREVIOUS year (2025-26) so school A's current-year attendance tests
+# keep marking any day (a calendar refuses days off).
+
+
+def _calendar_year(school: Any, actor: UserContext) -> uuid.UUID:
+    year: uuid.UUID = school.ids["old_year"]
+    if "calendar_year" not in school.ids:
+        with tenant_session(school.tenant_id, actor.user_id) as db:
+            academics.set_pattern(
+                db, actor, year, CalendarPatternIn(weekly_off=[], saturdays_off=[])
+            )
+        school.ids["calendar_year"] = year
+    return year
+
+
+def world_calendar_year(w: Any) -> uuid.UUID:
+    """School A's 2025-26 year with a calendar (every day a working day)."""
+    return _calendar_year(w.a, ctx(w.a, "principal"))
+
+
+_CALENDAR_DAYS: list[int] = [0]
+
+
+def world_calendar_day() -> str:
+    """A fresh 2025-26 date per call (single-day entries never overlap)."""
+    _CALENDAR_DAYS[0] += 1
+    return (dt.date(2025, 6, 1) + dt.timedelta(days=_CALENDAR_DAYS[0])).isoformat()
+
+
+def world_calendar_entry(w: Any) -> uuid.UUID:
+    """A new holiday of school A's 2025-26 calendar (one per call)."""
+    actor = ctx(w.a, "principal")
+    year = world_calendar_year(w)
+    day = dt.date.fromisoformat(world_calendar_day())
+    with tenant_session(w.a.tenant_id, actor.user_id) as db:
+        out = academics.add_entry(
+            db,
+            actor,
+            year,
+            CalendarEntryIn(kind="holiday", name="Synthetic holiday", starts_on=day, ends_on=day),
+        )
+    return out.id
+
+
+def b_calendar_entry(w: Any) -> uuid.UUID:
+    """A holiday of school B's 2025-26 calendar."""
+    if "calendar_entry" not in w.b.ids:
+        actor = _b_principal(w)
+        year = _calendar_year(w.b, actor)
+        with tenant_session(w.b.tenant_id, actor.user_id) as db:
+            out = academics.add_entry(
+                db,
+                actor,
+                year,
+                CalendarEntryIn(
+                    kind="holiday",
+                    name="Synthetic B holiday",
+                    starts_on=dt.date(2025, 12, 25),
+                    ends_on=dt.date(2025, 12, 25),
+                ),
+            )
+        w.b.ids["calendar_entry"] = out.id
+    value: uuid.UUID = w.b.ids["calendar_entry"]
     return value

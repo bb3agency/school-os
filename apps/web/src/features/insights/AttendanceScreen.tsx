@@ -36,6 +36,7 @@ import { LoadGate, ProblemList, SectionPicker } from "./parts";
 import { SheetImport } from "./SheetImport";
 import { useUnsavedChangesWarning } from "@/features/sheets/unsaved";
 import { DialogCloseButton } from "@/components/ui/DialogCloseButton";
+import type { CalendarDay } from "@/features/school-calendar/data";
 
 /** One day of the register as a form: every student gets one status (US-1701). */
 function DayForm({
@@ -96,6 +97,7 @@ function DayForm({
     onUnsavedChange(unsaved);
   }, [onUnsavedChange, unsaved]);
   useEffect(() => () => onUnsavedChange(0), [onUnsavedChange]);
+  const tcal = useTranslations("schoolCalendar");
   // XA-05: closing, reloading or leaving the page asks first while statuses are unsaved.
   useUnsavedChangesWarning(unsaved > 0, t("unsavedLeave"));
 
@@ -136,6 +138,9 @@ function DayForm({
     }
   }
 
+  // FT-06 (FR-CAL-010): the day in the school calendar. Not in the generated client yet,
+  // so read through a local type until the lead regenerates it.
+  const dayOff = (day as typeof day & { calendar?: CalendarDay | null }).calendar ?? null;
   const changed = day.students.some(
     (row) => statuses[row.student.student_id] !== baseline[row.student.student_id],
   );
@@ -155,6 +160,13 @@ function DayForm({
 
   return (
     <form onSubmit={(event) => void save(event)} noValidate className="space-y-4">
+      {dayOff && !dayOff.working ? (
+        <Alert tone="warning" title={tcal("attendanceWarning.title")}>
+          {tcal("attendanceWarning.body", {
+            kind: dayOff.name ?? tcal(`dayKind.${dayOff.kind}`),
+          })}
+        </Alert>
+      ) : null}
       {!day.marked ? <Alert tone="info">{t("notMarkedYet")}</Alert> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-base text-ink" aria-live="polite">

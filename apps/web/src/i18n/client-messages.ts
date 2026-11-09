@@ -61,6 +61,7 @@ export const CLIENT_NAMESPACES = {
     "privacy",
     "readiness",
     "school",
+    "schoolCalendar",
     "schoolSettings",
     "sheets",
     "shell",

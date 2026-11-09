@@ -39,7 +39,6 @@ Nothing here is ever sent to an AI provider. Logs carry ids and counts only (inv
 
 from __future__ import annotations
 
-import calendar
 import datetime as dt
 import uuid
 from collections import Counter
@@ -51,8 +50,22 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from app.academics import calendar_service as cal_service
 from app.academics import repository as repo
 from app.academics import sheets
+from app.academics.calendar_service import (
+    CALENDAR_MANAGE,
+    CALENDAR_READ,
+    HOLIDAY_CODE,
+    AttendanceSummary,
+    add_entry,
+    attendance_summary,
+    calendar_month,
+    get_calendar,
+    remove_entry,
+    set_pattern,
+    suggestions,
+)
 from app.academics.config import load_config
 from app.academics.models import Exam, ExamMark, ExamMarkHistory
 from app.academics.schemas import (
@@ -286,9 +299,13 @@ def attendance_day(
     by_student = {r.student_id: r.status for r in rows}
     versions = {r.student_id: r.version for r in rows}
     shown = {s.student_id for s in roster}
+    cal = cal_service.year_calendar(session, sec.year)
     return AttendanceDayOut(
         section=sec.out,
         on_date=on_date,
+        calendar=(
+            cal_service.day_out(cal.day(on_date, sec.section.class_id)) if cal is not None else None
+        ),
         marked=bool(rows),
         students=[
             AttendanceDayStudent(
@@ -305,41 +322,75 @@ def attendance_day(
 def _month_bounds(month: str) -> tuple[dt.date, dt.date]:
     """First and last day of ``YYYY-MM``; 422 ``invalid_month`` outside the calendar (years 1
     to 9999)."""
-    year, mon = (int(p) for p in month.split("-"))
-    try:
-        first = dt.date(year, mon, 1)
-        last = dt.date(year, mon, calendar.monthrange(year, mon)[1])
-    except ValueError:
-        raise ValidationFailed([_error("month", "invalid_month")]) from None
-    return first, last
+    return cal_service.month_bounds(month)
 
 
 def attendance_month(
     session: Session, ctx: UserContext, section_id: uuid.UUID, month: str
 ) -> AttendanceMonthOut:
-    """A month of a section's register: school days (dates with any mark) x students
-    (``attendance.read``; FR-ATT-003; A4 print in the web)."""
+    """A month of a section's register (``attendance.read``; FR-ATT-003; A4 print in the web).
+    Without a calendar the school days are the dates with any mark; with one (FT-06,
+    FR-CAL-011) they are the working days up to today plus any marked date, and each student's
+    counts add ``not_marked`` (working days up to today, from their explicit start, unmarked)."""
     sec = _section(session, ctx, section_id, ATTENDANCE_READ)
     roster = _roster(session, ctx, sec.section, ATTENDANCE_READ)
     first, last = _month_bounds(month)
     rows = repo.section_marks(session, sec.section.id, first, last)
-    days = sorted({r.on_date for r in rows})
+    marked = {r.on_date for r in rows}
     by_student: dict[uuid.UUID, dict[str, str]] = {}
     for r in rows:
         by_student.setdefault(r.student_id, {})[r.on_date.isoformat()] = r.status
+    cal = cal_service.year_calendar(session, sec.year)
+    working = cal.working_days(first, last, sec.section.class_id) if cal is not None else []
+    today = today_ist()
+    open_days = [d for d in working if d <= today]
+    starts = (
+        _explicit_starts(session, [s.student_id for s in roster], sec.section.id)
+        if cal is not None
+        else {}
+    )
+
+    def counts(student_id: uuid.UUID) -> dict[str, int]:
+        days = by_student.get(student_id, {})
+        out = _counts(days.values())
+        if cal is not None:
+            start = starts.get(student_id)
+            out["not_marked"] = sum(
+                1 for d in open_days if d.isoformat() not in days and (start is None or d >= start)
+            )
+        return out
+
     return AttendanceMonthOut(
         section=sec.out,
         month=month,
-        school_days=days,
+        school_days=sorted(marked | set(open_days)),
+        calendar_set=cal is not None,
+        working_days=working,
         students=[
             AttendanceMonthStudent(
                 student=s,
                 days=by_student.get(s.student_id, {}),
-                counts=_counts(by_student.get(s.student_id, {}).values()),
+                counts=counts(s.student_id),
             )
             for s in roster
         ],
     )
+
+
+def _days_off(
+    session: Session, sec: _Section, entries: Iterable[AttendanceEntryIn]
+) -> set[dt.date]:
+    """FT-06 (FR-CAL-007): the dates among ``entries`` that are not working days for the
+    section's class; none when the year has no calendar."""
+    cal = cal_service.year_calendar(session, sec.year)
+    asked = {e.on_date for e in entries}
+    if cal is None or not asked:
+        return set()
+    return {
+        d.on_date
+        for d in cal.days(min(asked), max(asked), sec.section.class_id)
+        if not d.working and d.on_date in asked
+    }
 
 
 def record_attendance(
@@ -348,7 +399,8 @@ def record_attendance(
     """Store a section's statuses for one or more dates, all or nothing (``attendance.record``;
     FR-ATT-002). 422 when a student is not in the section's roster, a date is in the future or
     outside the section's academic year or before the student's explicit enrolment start
-    (``before_enrolment``, FR-ATT-012), or an entry repeats; and, for a scoped recorder, when
+    (``before_enrolment``, FR-ATT-012) or not a working day in the school calendar
+    (``holiday``, FR-CAL-007), or an entry repeats; and, for a scoped recorder, when
     the day is already recorded under another section (``recorded_in_another_section``); 412
     ``attendance_changed`` when an entry's ``expected_version`` is stale (XA-06).
     Audit ``attendance.recorded``."""
@@ -358,6 +410,7 @@ def record_attendance(
         _refuse([_error("entries", "too_many_entries")])
     roster = {s.student_id for s in _roster(session, ctx, sec.section, ATTENDANCE_RECORD)}
     starts = _explicit_starts(session, roster, sec.section.id)
+    closed = _days_off(session, sec, data.entries)
     today = today_ist()
     errors: list[dict[str, str]] = []
     seen: set[tuple[uuid.UUID, dt.date]] = set()
@@ -368,6 +421,8 @@ def record_attendance(
         start = starts.get(entry.student_id)
         if start is not None and entry.on_date < start:
             errors.append(_error(f"entries.{i}.on_date", BEFORE_ENROLMENT_CODE))
+        if entry.on_date in closed:
+            errors.append(_error(f"entries.{i}.on_date", HOLIDAY_CODE))
         key = (entry.student_id, entry.on_date)
         if key in seen:
             errors.append(_error(f"entries.{i}", "duplicate_entry"))
@@ -511,6 +566,16 @@ def preview_attendance_sheet(
         members = _roster(session, ctx, sec.section, ATTENDANCE_RECORD)
         roster = sheets.Roster.build((s.student_id, s.admission_no, s.roll_no) for s in members)
         starts = _explicit_starts(session, [s.student_id for s in members], sec.section.id)
+        cal = cal_service.year_calendar(session, sec.year)
+        closed = (
+            {
+                d.on_date
+                for d in cal.days(sec.year.starts_on, sec.year.ends_on, sec.section.class_id)
+                if not d.working
+            }
+            if cal is not None
+            else set()
+        )
     blob, kind = _consume_sheet(ctx, data.document_id, "attendance.sheet_read", section_id)
     cfg = load_config()
     last = min(sec.year.ends_on, today_ist())
@@ -523,6 +588,7 @@ def preview_attendance_sheet(
             today=last,
             cfg=cfg,
             starts=starts,
+            closed=closed,
         )
     except (SpreadsheetError, sheets.SheetRefused) as exc:
         raise _sheet_refused(exc.code) from None
@@ -1112,7 +1178,14 @@ def export_records(session: Session) -> list[RecordTable]:
 
 
 _PURGE = purging.PurgeTables(
-    deleted=("sis.exam_mark_history", "sis.exam_marks", "sis.exams", "sis.attendance_marks"),
+    deleted=(
+        "sis.exam_mark_history",
+        "sis.exam_marks",
+        "sis.exams",
+        "sis.attendance_marks",
+        "sis.calendar_entries",
+        "sis.school_calendars",
+    ),
 )
 
 
@@ -1135,21 +1208,29 @@ __all__ = [
     "ATTENDANCE_READ",
     "ATTENDANCE_RECORD",
     "BEFORE_ENROLMENT_CODE",
+    "CALENDAR_MANAGE",
+    "CALENDAR_READ",
     "EXAM_LOCKED_CODE",
     "EXAM_MANAGE",
     "EXAM_UNLOCK",
+    "HOLIDAY_CODE",
     "MARKS_READ",
     "MARKS_RECORD",
     "RECORDS_CHANGED_EVENT",
+    "AttendanceSummary",
     "DayMark",
     "ExamResult",
     "absent_students",
+    "add_entry",
     "attendance_day",
     "attendance_history",
     "attendance_month",
+    "attendance_summary",
+    "calendar_month",
     "create_exam",
     "exam_results",
     "export_records",
+    "get_calendar",
     "list_exams",
     "lock_exam",
     "marks_history",
@@ -1159,8 +1240,11 @@ __all__ = [
     "purge_tenant_data",
     "record_attendance",
     "record_marks",
+    "remove_entry",
     "section_marks",
+    "set_pattern",
     "subject_report",
+    "suggestions",
     "tenant_data_counts",
     "today_ist",
     "unlock_exam",

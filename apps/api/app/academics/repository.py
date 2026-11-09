@@ -11,12 +11,19 @@ import uuid
 from collections.abc import Collection, Mapping, Sequence
 from typing import Any
 
-from sqlalchemy import func, insert, literal_column, or_, select, text, update
+from sqlalchemy import delete, func, insert, literal_column, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.academics.models import AttendanceMark, Exam, ExamMark, ExamMarkHistory
+from app.academics.models import (
+    AttendanceMark,
+    CalendarEntry,
+    Exam,
+    ExamMark,
+    ExamMarkHistory,
+    SchoolCalendar,
+)
 from app.core.record_tables import dump_table
 from app.core.records import RecordTable
 
@@ -397,6 +404,90 @@ def marks_of_student(
     return [(r[0], r[1]) for r in rows], total
 
 
+# --- school calendar (FT-06; 0089_school_calendar) -----------------------------------------------
+
+
+def get_calendar(
+    session: Session, academic_year_id: uuid.UUID, *, for_update: bool = False
+) -> SchoolCalendar | None:
+    stmt = select(SchoolCalendar).where(SchoolCalendar.academic_year_id == academic_year_id)
+    if for_update:
+        stmt = stmt.with_for_update()
+    return session.scalars(stmt).one_or_none()
+
+
+def insert_calendar(session: Session, values: Mapping[str, Any]) -> SchoolCalendar:
+    """Insert a year's calendar; a concurrent insert of the same year wins and this one reads
+    it (``ON CONFLICT DO NOTHING``)."""
+    tenant_id = current_tenant_id(session)
+    stmt = (
+        pg_insert(SchoolCalendar)
+        .values(tenant_id=tenant_id, **values)
+        .on_conflict_do_nothing(constraint="school_calendars_year_key")
+    )
+    session.execute(stmt)
+    row = get_calendar(session, values["academic_year_id"], for_update=True)
+    if row is None:  # pragma: no cover - the row was just written in this transaction
+        raise RuntimeError("calendar row missing after write")
+    return row
+
+
+def update_calendar(
+    session: Session, calendar_id: uuid.UUID, values: Mapping[str, Any]
+) -> SchoolCalendar:
+    session.execute(
+        update(SchoolCalendar)
+        .where(SchoolCalendar.id == calendar_id)
+        .values(**values, version=SchoolCalendar.version + 1)
+    )
+    row = session.get(SchoolCalendar, calendar_id, populate_existing=True)
+    if row is None:  # pragma: no cover - the row was just written in this transaction
+        raise RuntimeError("calendar row missing after write")
+    return row
+
+
+def calendar_entries(session: Session, academic_year_id: uuid.UUID) -> list[CalendarEntry]:
+    return list(
+        session.scalars(
+            select(CalendarEntry)
+            .where(CalendarEntry.academic_year_id == academic_year_id)
+            .order_by(
+                CalendarEntry.starts_on, CalendarEntry.class_id.nulls_first(), CalendarEntry.id
+            )
+        )
+    )
+
+
+def insert_calendar_entry(session: Session, values: Mapping[str, Any]) -> CalendarEntry:
+    tenant_id = current_tenant_id(session)
+    session.execute(insert(CalendarEntry).values(tenant_id=tenant_id, **values))
+    row = session.get(CalendarEntry, values["id"])
+    if row is None:  # pragma: no cover - the row was just written in this transaction
+        raise RuntimeError("calendar row missing after write")
+    return row
+
+
+def delete_calendar_entry(session: Session, entry_id: uuid.UUID) -> None:
+    session.execute(delete(CalendarEntry).where(CalendarEntry.id == entry_id))
+    session.expire_all()
+
+
+def marks_between(
+    session: Session, first: dt.date, last: dt.date, class_section_ids: Collection[uuid.UUID] | None
+) -> int:
+    """Attendance marks dated ``first..last`` (of these sections; all when None)."""
+    stmt = (
+        select(func.count())
+        .select_from(AttendanceMark)
+        .where(AttendanceMark.on_date >= first, AttendanceMark.on_date <= last)
+    )
+    if class_section_ids is not None:
+        if not class_section_ids:
+            return 0
+        stmt = stmt.where(AttendanceMark.section_id.in_(class_section_ids))
+    return int(session.scalar(stmt) or 0)
+
+
 # --- full export (FR-ADM-001) ---------------------------------------------------------------------
 
 
@@ -421,30 +512,49 @@ def export_tables(session: Session) -> list[RecordTable]:
             name="exam_mark_history",
             order_by=("exam_id", "changed_at", "id"),
         ),
+        dump_table(
+            session,
+            SchoolCalendar.__table__,
+            name="school_calendars",
+            order_by=("academic_year_id",),
+        ),
+        dump_table(
+            session,
+            CalendarEntry.__table__,
+            name="calendar_entries",
+            order_by=("academic_year_id", "starts_on", "id"),
+        ),
     ]
 
 
 __all__ = [
     "attendance_by_month",
     "attendance_versions",
+    "calendar_entries",
     "current_tenant_id",
+    "delete_calendar_entry",
     "exam_for_update",
     "exam_marks",
     "exam_name_taken",
     "exam_subjects",
     "export_tables",
+    "get_calendar",
     "get_exam",
+    "insert_calendar",
+    "insert_calendar_entry",
     "insert_exam",
     "insert_mark_history",
     "list_exams",
     "lock_attendance_days",
     "lock_exam_marks",
     "mark_history",
+    "marks_between",
     "marks_changed_after_lock",
     "marks_of_student",
     "results_of",
     "section_marks",
     "student_marks",
+    "update_calendar",
     "update_exam_lock",
     "upsert_attendance",
     "upsert_marks",

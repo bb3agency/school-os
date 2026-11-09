@@ -1,5 +1,5 @@
-"""Attendance, exams and marks routes (docs/09 Attendance and marks; M5; US-1701..US-1703;
-FR-ATT-*, FR-MRK-*).
+"""Attendance, exams, marks and school calendar routes (docs/09 Attendance and marks; M5;
+US-1701..US-1703; FR-ATT-*, FR-MRK-*, FR-CAL-*).
 
 Every route declares its guard; class teachers hold the permissions for their sections only
 (07 §6.2 S) and the service answers 404 for any other section. Sheet previews store nothing:
@@ -20,6 +20,12 @@ from app.academics.schemas import (
     AttendanceMonthOut,
     AttendanceSheetOut,
     AttendanceWrite,
+    CalendarEntryAddedOut,
+    CalendarEntryIn,
+    CalendarMonthOut,
+    CalendarOut,
+    CalendarPatternIn,
+    CalendarSuggestionsOut,
     ExamCreate,
     ExamOut,
     ExamUnlockIn,
@@ -33,7 +39,7 @@ from app.academics.schemas import (
 )
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require, require_any
-from app.authz.http import IdempotencyDep, etag
+from app.authz.http import IdempotencyDep, OptionalIfMatch, etag
 
 router = APIRouter(prefix="/api/v1", tags=["attendance and marks"])
 
@@ -48,6 +54,8 @@ ExamUnlocker = Annotated[
     UserContext, Depends(require(service.EXAM_UNLOCK, scope="school", step_up=True))
 ]
 MarksReader = Annotated[UserContext, Depends(require(service.MARKS_READ))]
+CalendarReader = Annotated[UserContext, Depends(require(service.CALENDAR_READ))]
+CalendarManager = Annotated[UserContext, Depends(require(service.CALENDAR_MANAGE, scope="school"))]
 MarksRecorder = Annotated[UserContext, Depends(require(service.MARKS_RECORD))]
 
 
@@ -197,3 +205,93 @@ def preview_marks_sheet(
     and problems; stores no marks; the file is deleted once read. 409 ``exam_locked`` for a
     locked exam."""
     return service.preview_marks_sheet(ctx, section_id, exam_id, body)
+
+
+# --- school calendar (FT-06; FR-CAL-*) ---------------------------------------------------------
+
+
+@router.get("/academic-years/{year_id}/calendar", response_model=CalendarOut)
+def get_calendar(
+    ctx: CalendarReader, db: TenantDB, year_id: uuid.UUID, response: Response
+) -> CalendarOut:
+    """The year's school calendar: weekly pattern, holidays, vacations and extra working days
+    (``student.read_basic``; FR-CAL-001). Before it is set up: the default pattern with
+    ``set_up`` false. ``ETag`` carries the version (0 before set-up)."""
+    out = service.get_calendar(db, ctx, year_id)
+    response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.put("/academic-years/{year_id}/calendar", response_model=CalendarOut)
+def set_calendar_pattern(
+    *,
+    ctx: CalendarManager,
+    db: TenantDB,
+    year_id: uuid.UUID,
+    body: CalendarPatternIn,
+    version: OptionalIfMatch,
+    response: Response,
+) -> CalendarOut:
+    """Save the weekly pattern (``tenant.structure.manage``; FR-CAL-001). The first save sets
+    up the calendar: from then on attendance on a day off is refused (422 ``holiday``).
+    ``If-Match`` (``W/"0"`` before set-up) is honoured when sent: 412 ``calendar_changed``.
+    Audited ``calendar.set_up`` / ``calendar.pattern_changed``."""
+    out = service.set_pattern(db, ctx, year_id, body, expected_version=version)
+    response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.get("/academic-years/{year_id}/calendar/month", response_model=CalendarMonthOut)
+def calendar_month(
+    ctx: CalendarReader,
+    db: TenantDB,
+    year_id: uuid.UUID,
+    month: Annotated[Month, Query(description="YYYY-MM")],
+    class_id: Annotated[
+        uuid.UUID | None, Query(description="A class: its exceptions apply; default whole school")
+    ] = None,
+) -> CalendarMonthOut:
+    """Every date of a month with its kind (working, weekly off, holiday...) and the month's
+    working days (``student.read_basic``; FR-CAL-009)."""
+    return service.calendar_month(db, ctx, year_id, month, class_id)
+
+
+@router.get("/academic-years/{year_id}/calendar/suggestions", response_model=CalendarSuggestionsOut)
+def calendar_suggestions(
+    ctx: CalendarManager, db: TenantDB, year_id: uuid.UUID
+) -> CalendarSuggestionsOut:
+    """Unverified national and Andhra Pradesh holiday suggestions inside the year that are not
+    in the calendar yet (``tenant.structure.manage``; FR-CAL-013). The school checks each date
+    and adds the ones it keeps."""
+    return service.suggestions(db, ctx, year_id)
+
+
+@router.post(
+    "/academic-years/{year_id}/calendar/entries",
+    response_model=CalendarEntryAddedOut,
+    status_code=201,
+)
+def add_calendar_entry(
+    ctx: CalendarManager,
+    db: TenantDB,
+    year_id: uuid.UUID,
+    body: CalendarEntryIn,
+    idem: IdempotencyDep,
+) -> Response:
+    """Add a holiday, vacation or extra working day, for the whole school or one class
+    (``tenant.structure.manage``; FR-CAL-002, FR-CAL-003). 409 ``calendar_not_set_up``,
+    ``calendar_overlap``, ``suggestion_already_added``; 422 ``date_out_of_range``,
+    ``dates_reversed``, ``entry_too_long``, ``unknown_class``, ``unknown_suggestion``. The answer
+    says how many attendance marks already fall inside it. Accepts ``Idempotency-Key``. Audited
+    ``calendar.entry_added``."""
+    return idem.run(db, body, lambda: service.add_entry(db, ctx, year_id, body), status_code=201)
+
+
+@router.delete("/academic-years/{year_id}/calendar/entries/{entry_id}", status_code=204)
+def remove_calendar_entry(
+    ctx: CalendarManager, db: TenantDB, year_id: uuid.UUID, entry_id: uuid.UUID
+) -> Response:
+    """Remove a holiday, vacation or extra working day (``tenant.structure.manage``;
+    FR-CAL-005). Audited ``calendar.entry_removed``."""
+    service.remove_entry(db, ctx, year_id, entry_id)
+    return Response(status_code=204)

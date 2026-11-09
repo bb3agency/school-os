@@ -241,6 +241,7 @@
       "label": "Main",
       "home": "Home",
       "structure": "School structure",
+      "calendar": "School calendar",
       "users": "Users and roles",
       "billing": "Plan and billing",
       "audit": "Audit log",
@@ -11270,6 +11271,134 @@
       "record_class_required": {
         "title": "Choose a kind of record",
         "body": "Choose which kind of record the whole school must keep."
+      }
+    }
+  },
+  "schoolCalendar": {
+    "loadError": "The calendar could not be loaded. Reload the page to try again.",
+    "title": "School calendar",
+    "description": "Working days, holidays and vacations of the academic year. Attendance cannot be marked on a day off.",
+    "year": "Academic year",
+    "showFor": "Show for",
+    "wholeSchool": "Whole school",
+    "aClass": "One class",
+    "notSetUpTitle": "Calendar not set up yet",
+    "notSetUpManage": "Until you save the weekly pattern, attendance can be marked on any day. The grid shows the usual pattern as a suggestion.",
+    "notSetUpRead": "The office has not set up this year's calendar yet. Attendance can be marked on any day until then.",
+    "yearWorkingDays": "{count, plural, one {# working day} other {# working days}} in this academic year (whole school).",
+    "monthWorkingDays": "{count, plural, one {# working day} other {# working days}}",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "gridLabel": "Days of the month",
+    "gridHelp": "Use the arrow keys to move between days, Page Up and Page Down to change the month.",
+    "schoolDay": "School day",
+    "dayOff": "Day off",
+    "entriesTitle": "Holidays, vacations and working days",
+    "noEntries": "No holidays added yet. Add them yourself or check the suggestions below.",
+    "range": "{from} to {to}",
+    "weekday": {
+      "0": "Monday",
+      "1": "Tuesday",
+      "2": "Wednesday",
+      "3": "Thursday",
+      "4": "Friday",
+      "5": "Saturday",
+      "6": "Sunday"
+    },
+    "weekdayShort": {
+      "0": "Mon",
+      "1": "Tue",
+      "2": "Wed",
+      "3": "Thu",
+      "4": "Fri",
+      "5": "Sat",
+      "6": "Sun"
+    },
+    "saturday": {
+      "1": "First Saturday",
+      "2": "Second Saturday",
+      "3": "Third Saturday",
+      "4": "Fourth Saturday",
+      "5": "Fifth Saturday"
+    },
+    "dayKind": {
+      "working": "School day",
+      "working_day": "Extra working day",
+      "weekly_off": "Weekly off",
+      "saturday_off": "Saturday off",
+      "holiday": "Holiday",
+      "vacation": "Vacation",
+      "outside_year": "Outside the year"
+    },
+    "entryKind": {
+      "holiday": "Holiday",
+      "vacation": "Vacation",
+      "working_day": "Extra working day"
+    },
+    "pattern": {
+      "setUp": "Set up calendar",
+      "change": "Change weekly pattern",
+      "title": "Weekly pattern",
+      "description": "Choose the days the school is closed every week.",
+      "weeklyOff": "Closed every week on",
+      "saturdaysOff": "Saturdays off",
+      "save": "Save pattern",
+      "consequence": "From now on, attendance cannot be marked on a day off."
+    },
+    "add": {
+      "open": "Add holiday",
+      "title": "Add a holiday or working day",
+      "description": "A vacation can span up to 92 days. Choose a class only for an exception, such as an exam day.",
+      "suggestionNote": "Check the dates against the department's circular before adding. Change them if they differ.",
+      "kind": "Type",
+      "name": "Name",
+      "nameHint": "For example, Dasara vacation.",
+      "from": "From",
+      "to": "To",
+      "dateHint": "As {format}, for example {example}",
+      "dateInvalid": "Enter a real date as {format}, for example {example}.",
+      "toInvalid": "Enter a real date on or after the first day, as {format}.",
+      "appliesTo": "Applies to",
+      "appliesToHint": "Whole school, or one class as an exception.",
+      "save": "Add",
+      "holidayOnDay": "Make this day a holiday",
+      "workingOnDay": "Make this day a working day",
+      "marksWarning": "{count, plural, one {# attendance mark is} other {# attendance marks are}} already on these days. They no longer count in working-day totals."
+    },
+    "remove": {
+      "open": "Remove",
+      "title": "Remove from the calendar",
+      "description": "Remove {name} from this year's calendar?",
+      "confirm": "Remove",
+      "consequence": "The days go back to the weekly pattern."
+    },
+    "suggestions": {
+      "title": "Suggested holidays",
+      "unverifiedTitle": "Not checked against the official calendar",
+      "unverifiedBody": "These dates come from published almanacs and the usual Andhra Pradesh pattern. Check each one against the department's academic calendar before adding it.",
+      "none": "No more suggestions for this year.",
+      "check": "Check and add"
+    },
+    "attendanceWarning": {
+      "title": "Not a school day",
+      "body": "{kind} in the school calendar. Attendance cannot be saved for this day."
+    },
+    "errors": {
+      "calendar_overlap": {
+        "title": "Dates already used",
+        "body": "Another holiday, vacation or working day covers some of these dates. Remove it or choose other dates."
+      },
+      "calendar_not_set_up": {
+        "title": "Set up the calendar first",
+        "body": "Save the weekly pattern, then add holidays."
+      },
+      "calendar_changed": {
+        "title": "Changed meanwhile",
+        "body": "Someone else changed the calendar. The page shows the latest; try again."
+      },
+      "suggestion_already_added": {
+        "title": "Already added",
+        "body": "This suggestion is already in the calendar."
       }
     }
   },
