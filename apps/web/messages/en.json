@@ -8855,7 +8855,8 @@
         "absence_alert": "Absence alert",
         "fee_reminder": "Fee reminder",
         "fee_receipt": "Fee receipt",
-        "optin_stopped": "Stop confirmation"
+        "optin_stopped": "Stop confirmation",
+        "school_closure": "School closure"
       },
       "languages": {
         "en": "English",
@@ -9201,6 +9202,105 @@
       "noteRates": "Meta's rates were checked on {date}.",
       "noteRatesUnverified": "Rates were last checked on {date} from published summaries, not yet against Meta's rupee rate card.",
       "noteService": "Since 1 October 2026 Meta charges every utility message, also when the parent wrote first, and replies above {free} a month. Automatic replies are counted for the last {days} days only."
+    },
+    "reach": {
+      "open": "Who WhatsApp reaches",
+      "title": "Who WhatsApp reaches",
+      "description": "How many students have at least one guardian who gets WhatsApp messages, section by section, and which families to follow up.",
+      "category": "Messages about",
+      "summary": "{reached} of {students} students reached ({percent}%)",
+      "listNote": "This is a list to follow up with families, not a score for staff. Phone numbers are not shown here.",
+      "coverageCaption": "Students reached per section",
+      "reachedCell": "{reached} ({percent}%)",
+      "seeMissing": "See who is missing in {section}",
+      "allReached": "Everyone reached",
+      "emptyTitle": "No students in your sections",
+      "emptyBody": "Students appear here once they are enrolled in this year's sections.",
+      "unavailableTitle": "WhatsApp is not offered here",
+      "unavailableBody": "WhatsApp messages are not available for this school.",
+      "missingTitle": "Not reached in {section}",
+      "missingDescription": "Students whom no WhatsApp message of this kind reaches, and why for each guardian.",
+      "missingCaption": "Students not reached in {section}",
+      "missingEmptyTitle": "Everyone in this section is reached",
+      "missingEmptyBody": "At least one guardian of every student gets these messages.",
+      "printMissing": "Print join slips for these families",
+      "truncated": "Only the first 2,000 students are listed.",
+      "nameHidden": "Name not shown to you",
+      "noGuardian": "No guardian on record",
+      "primary": "primary",
+      "columns": {
+        "section": "Section",
+        "students": "Students",
+        "reached": "Reached",
+        "optedIn": "Guardians who agreed",
+        "noMobile": "No mobile number",
+        "action": "Follow up",
+        "student": "Student",
+        "guardians": "Guardians and why"
+      },
+      "followUp": {
+        "title": "Families to follow up",
+        "description": "Students this notice did not reach. Not opened means sent {hours} hours ago and neither read on WhatsApp nor opened on the parent page. Nothing is sent again by itself.",
+        "caption": "Students to follow up",
+        "outcome": "What happened",
+        "emptyTitle": "Nobody to follow up",
+        "emptyBody": "Every student's family got and opened this notice, or it is still on its way.",
+        "outcomes": {
+          "opened": "Opened",
+          "pending": "On its way",
+          "not_sent": "Not sent",
+          "failed": "Failed",
+          "not_opened": "Not opened"
+        }
+      }
+    },
+    "closures": {
+      "open": "Urgent closure message",
+      "title": "Urgent closure message",
+      "description": "Tell parents on WhatsApp that the school is closed, for example after a cyclone warning or a Collector's order. Only the principal can send it.",
+      "formTitle": "Send a closure message",
+      "formDescription": "The message goes to every guardian who agreed to school notices. You will be asked to confirm your sign-in.",
+      "audience": "Who gets it",
+      "audiences": {
+        "school": "The whole school",
+        "sections": "Chosen sections"
+      },
+      "sectionCount": "{count, plural, one {# section} other {# sections}}",
+      "from": "Closed on",
+      "to": "Closed until (optional)",
+      "toHint": "Leave empty for one day. At most 7 days.",
+      "reason": "Reason",
+      "reasons": {
+        "weather": "Heavy rain or a storm warning",
+        "government_order": "An order from the government",
+        "local_situation": "The local situation",
+        "other": "Unavoidable reasons"
+      },
+      "check": "Check the message",
+      "messageLabel": "Parents will get this message:",
+      "recipients": "{recipients} messages to {guardians} guardians.",
+      "sendsNow": "It goes out now.",
+      "sendsAt": "It goes out at {when}.",
+      "window": "Closure messages go out between {start} and {end}, also during quiet hours, never later.",
+      "cost": "Estimated Meta cost: {cost} (the school pays Meta).",
+      "recent": "{count, plural, one {# closure message was} other {# closure messages were}} sent recently.",
+      "blocked": "This message cannot be sent now. Check WhatsApp settings.",
+      "send": "{count, plural, one {Send to # guardian} other {Send to # guardians}}",
+      "queued": "{count, plural, one {# message is on its way.} other {# messages are on their way.}}",
+      "principalOnly": "Only the principal can send an urgent closure message.",
+      "recentTitle": "Recent closure messages",
+      "uses": "{count, plural, one {# closure message} other {# closure messages}} in the last {days} days.",
+      "range": "{from} to {to}",
+      "emptyTitle": "No closure messages yet",
+      "emptyBody": "Closure messages the principal sends appear here with their delivery counts.",
+      "unavailableTitle": "WhatsApp is not offered here",
+      "unavailableBody": "WhatsApp messages are not available for this school.",
+      "columns": {
+        "dates": "Closed",
+        "reason": "Reason",
+        "audience": "Sent to",
+        "sentAt": "Sent at"
+      }
     }
   },
   "fees": {
