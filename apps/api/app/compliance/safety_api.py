@@ -76,8 +76,8 @@ def list_check_entries(
 @router.post("/checks/entries", response_model=ComplianceCheckOut, status_code=201)
 def record_check(ctx: Manager, db: TenantDB, body: CheckCreate, idem: IdempotencyDep) -> Response:
     """Log a drill or check (counts and a short note; never student names). Permission
-    ``compliance.manage``. Errors (422): ``unknown_kind``, ``label_required``,
-    ``label_not_allowed``, ``done_in_future``, ``drill_fields_not_allowed``,
+    ``compliance.manage``. Errors (422): ``unknown_check_kind``, ``check_label_required``,
+    ``check_label_not_allowed``, ``done_in_future``, ``drill_fields_not_allowed``,
     ``document_not_found``, ``leader_not_active``, ``aadhaar_full_number_rejected``. Accepts
     ``Idempotency-Key``."""
     return idem.run(

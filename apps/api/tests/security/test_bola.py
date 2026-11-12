@@ -1035,6 +1035,9 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "correction_id": lambda w: _udise().b_request(_ADMIN[0], w),
     # FA-05 (FR-BRF-002): a stored weekly brief of school B.
     "brief_id": lambda w: _b_brief(_ADMIN[0], w),
+    # FC-09/FC-10: a safety check entry and a policy of school B (_safety, below).
+    "check_id": lambda w: _safety().b_id(_ADMIN[0], w, "/api/v1/compliance/checks/"),
+    "policy_id": lambda w: _safety().b_id(_ADMIN[0], w, "/api/v1/compliance/policies/"),
 }
 
 

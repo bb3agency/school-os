@@ -141,16 +141,16 @@ def test_FR_COMP_048_refused_inputs(api: Any, school: Any, admin_engine: Engine)
         "drill_fields_not_allowed",
         "document_not_found",
         "leader_not_active",
-        "label_not_allowed",
+        "check_label_not_allowed",
     } <= _codes(res)
     res = api.call(
         office, "POST", f"{CHECKS}/entries", json={"kind": "other", "done_on": "2026-11-01"}
     )
-    assert "label_required" in _codes(res)
+    assert "check_label_required" in _codes(res)
     res = api.call(
         office, "POST", f"{CHECKS}/entries", json={"kind": "lift_check", "done_on": "2026-11-01"}
     )
-    assert "unknown_kind" in _codes(res)
+    assert "unknown_check_kind" in _codes(res)
 
 
 def test_FR_COMP_049_remove_an_entry_logged_by_mistake(

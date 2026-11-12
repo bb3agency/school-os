@@ -47,7 +47,10 @@ export type ErrorNamespace =
   | "schoolCalendar"
   | "udiseFollowup"
   | "udise"
-  | "compliance";
+  | "compliance"
+  | "complianceChecks"
+  | "compliancePolicies"
+  | "myPolicies";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

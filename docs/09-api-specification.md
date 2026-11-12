@@ -910,6 +910,28 @@ Module `app/compliance` (`app/compliance/api.py`). The school's own certificates
 
 The disclosure draft (`GET /disclosure/draft`) gains `certificates` (item key → the register's current certificates: `certificate_id`, `kind`, `kind_label`, `valid_until`, `state`, `document_id`, `publishable`) and `expired_policy` (`warn` | `refuse`); `POST /disclosure/publish` answers 422 `certificate_expired` when the policy is `refuse` (FR-COMP-020..022). Notification template `compliance.certificate.expiring` (resource type `compliance_certificate`). **New error codes:** `unknown_kind`, `label_required`, `label_not_allowed`, `renews_not_allowed`, `renews_not_found`, `certificate_not_current`, `certificate_expired`.
 
+### Safety checks and policies (FC-09, FC-10, wave F3; docs/03 §3.37.1; built 2026-11-12)
+
+Module `app/compliance` (`app/compliance/safety_api.py`). Office routes use the FC-01 permissions (`compliance.read` reads, `compliance.manage` writes; school-wide, no step-up). The member routes `/compliance/my-policies*` need only a signed-in member (implicit `session.authenticated`) and answer 404 for a policy not asked of the caller.
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET | `/compliance/checks` | `compliance.read` | `statuses` (`kind`, `kind_label`, `every_months`, `drill`, `state` `overdue`/`never`/`due_soon`/`ok`/`logged`, `last_done_on`, `next_due`, `days_left`, `last_entry_id`), `counts`, `recent` (50 entries), `kinds` (`verified: false`), `due_soon_days`, `today`, `leaders` (active members; `compliance.manage` only) (FR-COMP-050) |
+| GET | `/compliance/checks/entries?kind=` | `compliance.read` | Recorded entries, newest first, at most 200 (FR-COMP-049) |
+| POST | `/compliance/checks/entries` | `compliance.manage` | Body `{kind, label?, done_on, led_by_membership_id?, participants_count?, duration_minutes?, result?, observations?, document_id?}` → 201 `ComplianceCheckOut` + `ETag`. `Idempotency-Key`. 422 `unknown_check_kind`, `check_label_required`, `check_label_not_allowed`, `done_in_future`, `drill_fields_not_allowed`, `document_not_found`, `leader_not_active`, `aadhaar_full_number_rejected` |
+| POST | `/compliance/checks/entries/{check_id}:remove` | `compliance.manage` | Logged by mistake; `If-Match`; 409 `check_removed`, 412 |
+| GET | `/compliance/policies` | `compliance.read` | `items` (`CompliancePolicyOut`: `title`, `document`, `current_version_id`, `ack_roles` `{role, name}`, `review_due`, `review_state`, `days_left`, `last_reviewed_on`, `status`, `targeted`, `acknowledged`, `ack_requested_at`, `version`), `counts` `{overdue, due_soon, pending_acks}`, `roles`, `review_months`, `today` (FR-COMP-058) |
+| POST | `/compliance/policies` | `compliance.manage` | Body `{title, document_id, review_due?, ack_roles[], notify}` → 201 + `ETag`. `Idempotency-Key`. 422 `policy_document_not_ready`, `review_in_past`, `unknown_role`, `too_many_roles`, `aadhaar_full_number_rejected` |
+| GET | `/compliance/policies/{policy_id}` | `compliance.read` | The policy and `members` (`membership_id`, `display_name`, `roles`, `acknowledged_at`, `acknowledged_earlier`), not yet acknowledged first; `ETag` |
+| PUT | `/compliance/policies/{policy_id}` | `compliance.manage` | Every field `{title, document_id, review_due, ack_roles, status}` (`retired` retires); `If-Match`; 412; 422 as when adding |
+| POST | `/compliance/policies/{policy_id}:review` | `compliance.manage` | Body `{next_review_due?}`; `If-Match`; 409 `policy_retired`, 412, 422 `review_in_past` |
+| POST | `/compliance/policies/{policy_id}:request-acknowledgement` | `compliance.manage` | → `{notified}`; once per member, version and day; 409 `policy_retired`, `policy_document_not_ready` |
+| GET | `/compliance/my-policies` | signed-in member | `items` (`id`, `title`, `current_version_id`, `acknowledged_at`, `needs_ack`), `pending` |
+| GET | `/compliance/my-policies/{policy_id}/file` | signed-in member | `{url, expires_at, document_version_id}` (5 minutes); 409 `policy_document_not_ready` |
+| POST | `/compliance/my-policies/{policy_id}:acknowledge` | signed-in member | Body `{document_version_id}` (the version opened) → `MyPolicyOut`; a repeat changes nothing; 409 `policy_version_changed` |
+
+Notification templates `compliance.check.due` (resource type `compliance_check`), `compliance.policy.review_due` (`compliance_policy`) and `compliance.policy.acknowledge` (`compliance_policy_ack`). **New error codes:** `unknown_check_kind`, `check_label_required`, `check_label_not_allowed`, `done_in_future`, `drill_fields_not_allowed`, `leader_not_active`, `check_removed`, `policy_document_not_ready`, `review_in_past`, `too_many_roles`, `policy_retired`, `policy_version_changed`.
+
 ## 5. Examples
 
 ### 5.1 Search students

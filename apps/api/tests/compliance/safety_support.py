@@ -206,6 +206,8 @@ MATRIX_CREATES = frozenset({f"{CHECKS}/entries", POLICIES})
 # BOLA: school B's objects on these routes (checked before the certificate prefix).
 BOLA_PREFIXES = (f"{CHECKS}/", f"{POLICIES}/", f"{MINE}/")
 BOLA_BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
+    ("POST", f"{CHECKS}/entries/{{check_id}}:remove"): None,
+    ("POST", f"{POLICIES}/{{policy_id}}:request-acknowledgement"): None,
     ("PUT", f"{POLICIES}/{{policy_id}}"): {
         "title": "Changed by A",
         "document_id": str(uuid.uuid4()),

@@ -242,19 +242,19 @@ def entries(session: Session, ctx: UserContext, *, kind: str | None = None) -> C
 
 def record(session: Session, ctx: UserContext, data: CheckCreate) -> ComplianceCheckOut:
     """Log a drill or check (``compliance.manage``; FR-COMP-048). Errors (422):
-    ``unknown_kind``, ``label_required``, ``label_not_allowed``, ``done_in_future``,
-    ``drill_fields_not_allowed``, ``document_not_found``, ``leader_not_active``,
-    ``aadhaar_full_number_rejected``."""
+    ``unknown_check_kind``, ``check_label_required``, ``check_label_not_allowed``,
+    ``done_in_future``, ``drill_fields_not_allowed``, ``document_not_found``,
+    ``leader_not_active``, ``aadhaar_full_number_rejected``."""
     cat = cfg.checks()
     day = today(session)
     errors: list[dict[str, str]] = []
     kind = cat.kinds.get(data.kind)
     if kind is None:
-        errors.append(_error("kind", "unknown_kind"))
+        errors.append(_error("kind", "unknown_check_kind"))
     if data.kind == cfg.OTHER and (data.label is None or len(data.label) < 3):
-        errors.append(_error("label", "label_required"))
+        errors.append(_error("label", "check_label_required"))
     if data.kind != cfg.OTHER and data.label is not None:
-        errors.append(_error("label", "label_not_allowed"))
+        errors.append(_error("label", "check_label_not_allowed"))
     if data.done_on > day:
         errors.append(_error("done_on", "done_in_future"))
     if kind is not None and not kind.drill and data.kind != cfg.OTHER:
