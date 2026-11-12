@@ -3188,6 +3188,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         "/api/v1/knowledge/verified-answers",
         "/api/v1/knowledge/memories",
         "/api/v1/students/{student_id}/certificates",
+        "/api/v1/tc-requests",  # FO-09
         "/api/v1/certificates/{certificate_id}/duplicates",
         "/api/v1/certificates/{certificate_id}/verification",
         "/api/v1/tasks",
