@@ -214,6 +214,7 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | insights.note (M5: write behaviour notes) | — | ✓ | — | — | — | — | S | — | — |
 | insights.act (M5: record actions on flags, raise and close flags) | — | ✓ | — | — | — | — | S | — | — |
 | insights.manage (M5: reassign flags, set thresholds within bounds, erase notes or flags) | — | ✓ᴿ | — | — | — | — | — | — | — |
+| insights.counts_read (FT-13: early-warning follow-up counts for the whole school, no names, flags or notes; management, PRV-004; D86) | ✓ | — | — | — | — | — | — | — | — |
 | attendance.record (M5: mark and import attendance) | — | ✓ | ✓ | — | — | — | S | — | — |
 | attendance.read (M5: attendance registers) | — | ✓ | ✓ | — | — | — | S | — | — |
 | exam.manage (M5: add exams to the year; FT-01: lock an exam's marks) | — | ✓ | — | — | — | ✓ | — | — | — |
@@ -222,6 +223,8 @@ Legend: ✓ = school-wide · S = limited to own classes/sections · ✓ᴿ = req
 | marks.read (M5: see marks) | — | ✓ | — | — | — | ✓ | S | — | — |
 | year_result.read (FT-08: annual results, held-back suggestions, UDISE+ progression sheet; school-wide only) | — | ✓ | ✓ | — | — | ✓ | — | — | — |
 | year_result.confirm (FT-08: confirm each student's annual result; detained needs a reason) | — | ✓ | — | — | — | — | — | — | — |
+| completeness.read (FT-14: attendance and marks entry completeness per section, counts and the class teacher it waits on; never a teacher score or ranking; D86) | — | ✓ | — | — | — | ✓ | — | — | — |
+| completeness.remind (FT-14: in-app reminder to a section's class teacher; refused while reminders are off, the default; D86) | — | ✓ | — | — | — | — | — | — | — |
 | tally.device.manage (M6: enrol the Tally edge agent with a one-time code, revoke it; ADR-0032 Proposed, behind a flag) | ✓ᴿ | — | — | — | — | — | — | — | — |
 | tally.configure (M6: choose Tally ledger groups, link Tally ledgers to students; ADR-0032 Proposed, behind a flag) | ✓ | ✓ | — | — | ✓ | — | — | — | — |
 | breakglass.approve | ✓ᴿ | ✓ᴿ | — | — | — | — | — | — | — |
