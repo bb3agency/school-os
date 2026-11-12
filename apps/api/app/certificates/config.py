@@ -101,6 +101,16 @@ class ChoiceLabel(_Frozen):
     te: str = Field(min_length=1, max_length=120)
 
 
+class TcRequestsSpec(_Frozen):
+    """The TC request log (FO-09; FR-CERT-026..FR-CERT-045). ``verified`` stays false until the
+    product owner confirms the number of days (lead default D86)."""
+
+    overdue_after_days: int = Field(ge=1, le=90)
+    verified: bool
+    source: str = Field(min_length=1, max_length=300)
+    channels: tuple[Literal["paper", "phone", "in_person", "other"], ...] = Field(min_length=1)
+
+
 class CertificatesConfig(_Frozen):
     version: int = Field(ge=1)
     template_version: str = Field(pattern=r"^v[0-9]{1,3}$")
@@ -111,6 +121,7 @@ class CertificatesConfig(_Frozen):
     document_acl_roles: tuple[str, ...] = Field(min_length=1)
     download_url_ttl_s: int = Field(ge=1, le=300)
     register_max_rows: int = Field(ge=1, le=100_000)
+    tc_requests: TcRequestsSpec
     types: dict[str, TypeSpec]
     choice_labels: dict[str, ChoiceLabel]
     detail_labels: dict[str, ChoiceLabel]
@@ -160,6 +171,7 @@ __all__ = [
     "CertificateType",
     "CertificatesConfig",
     "InputSpec",
+    "TcRequestsSpec",
     "TypeSpec",
     "format_serial",
     "load_config",

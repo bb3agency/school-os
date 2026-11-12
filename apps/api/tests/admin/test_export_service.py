@@ -263,6 +263,8 @@ EXPECTED_TABLES = {
     "compliance_policy_acks",
     # FC-07 (0101_inspection_packs): the inspection pack log.
     "inspection_packs",
+    # FO-09 (0102_tc_requests): the TC request log.
+    "tc_requests",
     "fees_receipt_cancellations",
     "fees_refunds",
     "fees_day_closes",

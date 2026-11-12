@@ -299,6 +299,7 @@ def test_PRV_016_downgrade_refuses_while_redacted_pages_exist_and_round_trips_ot
         "0099_knowledge_gaps",  # FA-06 knowledge gaps
         "0100_closure_reopen",  # FP-02 closure parent page and reopening message (D86)
         "0101_inspection_packs",  # FC-07/FO-12 inspection readiness packs
+        "0102_tc_requests",  # FO-09 TC request log
     }
     with pytest.raises(DBAPIError, match="irreversible: redacted register pages exist"):
         command.downgrade(cfg, "0017_exports")

@@ -7177,6 +7177,22 @@
       "verification_code_unavailable": {
         "title": "కోడ్ తయారు కాలేదు",
         "body": "కొద్దిసేపటి తర్వాత మళ్లీ ప్రయత్నించండి."
+      },
+      "tc_request_open_exists": {
+        "title": "This student already has an open TC request",
+        "body": "Open the request in the list instead of logging a new one."
+      },
+      "tc_request_wrong_status": {
+        "title": "This request has moved on",
+        "body": "Reload the list to see where it is now."
+      },
+      "tc_request_certificate_pending": {
+        "title": "A TC for this request is waiting for approval",
+        "body": "Withdraw the TC or ask the principal to reject it, then cancel the request."
+      },
+      "tc_request_certificate_not_issued": {
+        "title": "The TC for this request is no longer issued",
+        "body": "Open the certificate to see why, then prepare the TC again."
       }
     },
     "detail": {
@@ -7418,7 +7434,85 @@
       "saved": "సేవ్ అయింది."
     },
     "more": "మరిన్ని",
-    "chipOneStudent": "ఒక విద్యార్థి"
+    "chipOneStudent": "ఒక విద్యార్థి",
+    "tcRequests": {
+      "nav": "TC requests",
+      "title": "TC requests",
+      "description": "Transfer certificate requests that reached the office on paper, by phone or in person. Log each one, prepare the TC from it and record when it was handed over.",
+      "crumbHome": "Home",
+      "crumbCertificates": "Certificates",
+      "colReceived": "Received",
+      "colStudent": "Student",
+      "colStatus": "Status",
+      "colDays": "Days open",
+      "days": "{count, plural, one {# day} other {# days}}",
+      "overdue": "Overdue",
+      "overdueTitle": "{count, plural, one {# request is overdue} other {# requests are overdue}}",
+      "overdueBody": "These were received more than {days} days ago and the TC is not ready yet. A TC must not delay the pupil's admission elsewhere.",
+      "overdueUnverified": "The number of days is a default your school has not confirmed yet.",
+      "showOverdue": "Show overdue requests",
+      "duesNote": "Unpaid fees never stop or delay a TC. Staff who see fees find the balance on the request as information only.",
+      "filter": "Show",
+      "filters": {
+        "overdue": "Overdue",
+        "received": "Received",
+        "in_preparation": "In preparation",
+        "ready": "Ready to collect",
+        "issued": "Handed over",
+        "cancelled": "Cancelled"
+      },
+      "status": {
+        "received": "Received",
+        "in_preparation": "In preparation",
+        "ready": "Ready to collect",
+        "issued": "Handed over",
+        "cancelled": "Cancelled"
+      },
+      "channels": {
+        "paper": "Letter or form",
+        "phone": "Phone call",
+        "in_person": "In person",
+        "other": "Other"
+      },
+      "reasons": {
+        "parent_request": "At the request of the parent",
+        "parent_transferred": "Parent transferred",
+        "course_completed": "Completed the course",
+        "other": "Other"
+      },
+      "stepReceived": "Logged on {date} by {who}",
+      "stepPreparing": "Being prepared since {date} by {who}",
+      "stepReady": "Issued on {date} by {who}",
+      "stepIssued": "Handed over on {date} by {who}",
+      "stepCancelled": "Cancelled on {date} by {who}",
+      "someone": "a staff member",
+      "openTc": "Open the TC",
+      "prepareTc": "Prepare the TC",
+      "markPreparing": "Mark as being prepared",
+      "handOver": "Record hand-over",
+      "handOverTitle": "Record that the TC was handed over",
+      "handOverBody": "The transfer certificate of {name} was given to the parent or the pupil.",
+      "cancel": "Cancel request",
+      "cancelTitle": "Cancel this TC request",
+      "cancelBody": "The request for {name} is closed. The pupil stays on the rolls unless a TC is issued.",
+      "cancelConsequence": "A cancelled request cannot be opened again. Log a new request if the parent asks again.",
+      "cancelReason": "Why is it cancelled?",
+      "cancelReasonHint": "At least {min} characters. Staff can read this; do not enter Aadhaar numbers.",
+      "log": "Log a request",
+      "logTitle": "Log a TC request",
+      "logBody": "Record a request that came on paper, by phone or in person. The day it was received becomes the TC's application date.",
+      "changeStudent": "Change student",
+      "receivedOn": "Received on",
+      "receivedOnHint": "The day the office got the request.",
+      "channel": "How it came",
+      "leavingDate": "Leaving date asked for",
+      "leavingReason": "Reason for leaving",
+      "optional": "Optional",
+      "emptyTitle": "No TC requests",
+      "emptyBody": "Requests logged by the office appear here.",
+      "emptyBodyIssuer": "Log a request when a parent asks for a transfer certificate.",
+      "showMore": "Show more"
+    }
   },
   "circulars": {
     "nav": "సర్క్యులర్లు",
@@ -13075,7 +13169,9 @@
       "useLabel": "{field} కోసం SchoolOS విలువను వాడండి",
       "source": {
         "year_result": "నిర్ధారించిన వార్షిక ఫలితం",
-        "attendance_register": "నేటి వరకు హాజరు రిజిస్టర్"
+        "attendance_register": "నేటి వరకు హాజరు రిజిస్టర్",
+        "tc_request": "the TC request log",
+        "conduct_certificate": "the last conduct certificate"
       }
     },
     "promotion": {

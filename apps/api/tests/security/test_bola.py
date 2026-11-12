@@ -178,6 +178,8 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/certificates/{certificate_id}/verification/withdraw"): {
         "reason": "Synthetic BOLA verification reason"
     },
+    # FO-09: moving another school's TC request is 404.
+    ("POST", "/api/v1/tc-requests/{tc_request_id}/status"): {"status": "in_preparation"},
     # M4: circulars (document ids), suggestions, tasks and notices of school B are 404.
     ("POST", "/api/v1/circulars/{document_id}/read"): {},
     ("POST", "/api/v1/circulars/{document_id}/review"): {},
@@ -335,6 +337,8 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/certificates/{certificate_id}/duplicates"),
         ("POST", "/api/v1/certificates/{certificate_id}/withdraw"),
         ("POST", "/api/v1/certificates/{certificate_id}/render"),
+        # FO-09: moving a TC request needs certificate.issue too.
+        ("POST", "/api/v1/tc-requests/{tc_request_id}/status"),
         # M5: attendance, marks and insights are not owner permissions (08 PRV-004).
         ("GET", "/api/v1/sections/{section_id}/attendance"),
         ("GET", "/api/v1/sections/{section_id}/attendance/month"),
@@ -692,6 +696,27 @@ def _b_certificate(w: Any) -> uuid.UUID:
     return value
 
 
+def _b_tc_request(w: Any) -> uuid.UUID:
+    """A TC request of school B (FO-09; logged through the real service by the B owner acting
+    with the office admin's permissions)."""
+    if "bola_tc_request" not in w.b.ids:
+        _b_certificate(w)  # loads tests/certificates/support.py
+        from app.certificates import tc_requests
+        from app.certificates.schemas import TcRequestIn
+
+        cert = sys.modules["sos_test_certificates_support"]
+        out = cert.call(
+            w.b,
+            w.b.people["owner"],
+            "office_admin",
+            tc_requests.log_request,
+            TcRequestIn(student_id=cert.student(w.b), received_on=cert.today(), channel="paper"),
+        )
+        w.b.ids["bola_tc_request"] = out.id
+    value: uuid.UUID = w.b.ids["bola_tc_request"]
+    return value
+
+
 def _circ() -> ModuleType:
     """tests/circulars/support.py (circulars, tasks and notices through the real services)."""
     name = "sos_test_circulars_support"
@@ -992,6 +1017,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "answer_id": _b_verified_answer,
     # Certificates (US-1101): an issued certificate of school B.
     "certificate_id": _b_certificate,
+    # FO-09: a TC request of school B.
+    "tc_request_id": _b_tc_request,
     # Circulars, tasks and notices (M4): a suggestion, a task and a notice of school B.
     "suggestion_id": _b_suggestion,
     "task_id": _b_task,

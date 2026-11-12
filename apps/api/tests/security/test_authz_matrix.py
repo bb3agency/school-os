@@ -1110,6 +1110,47 @@ def _cert_path(suffix: str = "") -> Builder:
     return build
 
 
+# --- FO-09: the TC request log (FR-CERT-026..FR-CERT-045) ---------------------------------
+
+
+def _tc_request(w: Any, *, fresh: bool = False) -> Any:
+    """A TC request of school A logged by the office admin (shared unless ``fresh``)."""
+    if fresh or "matrix_tc_request" not in w.a.ids:
+        from app.certificates import tc_requests
+        from app.certificates.schemas import TcRequestIn
+
+        cert = _cert()
+        out = cert.call(
+            w.a,
+            w.a.people["office_admin"],
+            "office_admin",
+            tc_requests.log_request,
+            TcRequestIn(student_id=_cert_student(w), received_on=cert.today(), channel="paper"),
+        )
+        if fresh:
+            return out
+        w.a.ids["matrix_tc_request"] = out
+    return w.a.ids["matrix_tc_request"]
+
+
+def _tc_request_log(w: Any, r: str, a: Engine) -> Request:
+    body = {
+        "student_id": str(_cert_student(w)),
+        "received_on": _cert().today().isoformat(),
+        "channel": "phone",
+    }
+    return "/api/v1/tc-requests", body, {}
+
+
+def _tc_request_move(w: Any, r: str, a: Engine) -> Request:
+    out = _tc_request(w, fresh=True)
+    return (
+        f"/api/v1/tc-requests/{out.id}/status",
+        {"status": "in_preparation"},
+        {"If-Match": f'W/"{out.version}"'},
+    )
+
+
 # --- R2-1A: verification codes (ADR-0045; FR-CERT-023): add needs a certificate without one ---
 
 _VERIFY_REASON = {"reason": "Synthetic matrix verification reason"}
@@ -1932,6 +1973,15 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # FO-09: the TC request log.
+    ("GET", "/api/v1/tc-requests"): lambda w, r, a: ("/api/v1/tc-requests", None, {}),
+    ("POST", "/api/v1/tc-requests"): _tc_request_log,
+    ("GET", "/api/v1/tc-requests/{tc_request_id}"): lambda w, r, a: (
+        f"/api/v1/tc-requests/{_tc_request(w).id}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/tc-requests/{tc_request_id}/status"): _tc_request_move,
     ("GET", "/api/v1/certificates/{certificate_id}/verification"): _cert_path("/verification"),
     ("POST", "/api/v1/certificates/{certificate_id}/verification"): _cert_without_code,
     ("POST", "/api/v1/certificates/{certificate_id}/verification/withdraw"): (_cert_withdraw_code),
@@ -3256,6 +3306,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         "/api/v1/knowledge/verified-answers",
         "/api/v1/knowledge/memories",
         "/api/v1/students/{student_id}/certificates",
+        "/api/v1/tc-requests",  # FO-09
         "/api/v1/certificates/{certificate_id}/duplicates",
         "/api/v1/certificates/{certificate_id}/verification",
         "/api/v1/tasks",

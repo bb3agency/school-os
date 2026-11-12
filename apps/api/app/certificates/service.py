@@ -48,7 +48,7 @@ from app.apaar import service as apaar
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.authz.http import Page, decode_cursor, encode_cursor
-from app.certificates import codes, qr, templates
+from app.certificates import codes, qr, tc_request_hooks, templates
 from app.certificates import formats as tc_formats
 from app.certificates import repository as repo
 from app.certificates.config import (
@@ -957,12 +957,19 @@ def _input_suggestions(
     confirmed annual result and the attendance register. Only inputs the layout has, and only
     choices it accepts; the person may change them, and nothing is filled in silently."""
     inputs = record.layout.inputs
+    today = _today(session)
+    found_all: list[tuple[str, str, str]] = [
+        (f.key, f.value, f.source)
+        for f in academics.tc_suggestions(session, student_id, today=today)
+    ]
+    # FO-09 (FR-CERT-028, FR-CERT-029): the open TC request and the latest conduct certificate.
+    found_all.extend(tc_request_hooks.suggestions(session, student_id, today))
     out: list[TcInputSuggestion] = []
-    for found in academics.tc_suggestions(session, student_id, today=_today(session)):
-        spec = inputs.get(found.key)
-        if spec is None or (spec.kind == "choice" and found.value not in spec.choices):
+    for key, value, source in found_all:
+        spec = inputs.get(key)
+        if spec is None or (spec.kind == "choice" and value not in spec.choices):
             continue
-        out.append(TcInputSuggestion(key=found.key, value=found.value, source=found.source))
+        out.append(TcInputSuggestion.model_validate({"key": key, "value": value, "source": source}))
     return out
 
 
@@ -1761,6 +1768,14 @@ def _issue(
             session, row.student_id, left_on=leaving, certificate_id=row.id
         )
         withdrawn = len(result.enrollment_ids)
+        # FO-09 (FR-CERT-032): the TC request log follows, in this transaction.
+        tc_request_hooks.on_tc_issued(
+            session,
+            student_id=row.student_id,
+            certificate_id=row.id,
+            membership_id=ctx.membership_id,
+            at=now,
+        )
     _audit(
         session,
         action="certificate.issued",
@@ -1830,6 +1845,15 @@ def request_certificate(
             "format_key": record.layout.format_key,
         },
     )
+    if spec.ends_enrolment:
+        # FO-09 (FR-CERT-031): the student's open TC request is now in preparation.
+        tc_request_hooks.on_tc_prepared(
+            session,
+            student_id=student_id,
+            certificate_id=row.id,
+            membership_id=ctx.membership_id,
+            at=row.requested_at,
+        )
     if spec.requires_approval:
         _notify(
             session,
@@ -1980,6 +2004,7 @@ def reject(
         resource_id=row.id,
         summary={"student_id": row.student_id, "certificate_type": row.certificate_type},
     )
+    tc_request_hooks.on_tc_dropped(session, certificate_id=row.id)  # FO-09 (FR-CERT-033)
     _notify(session, row, "certificate.rejected", [row.requested_by])
     log.info("certificate.rejected", resource_type="certificate", resource_id=row.id)
     return _one(session, ctx, row)
@@ -2003,6 +2028,7 @@ def withdraw(
         resource_id=row.id,
         summary={"student_id": row.student_id, "certificate_type": row.certificate_type},
     )
+    tc_request_hooks.on_tc_dropped(session, certificate_id=row.id)  # FO-09 (FR-CERT-033)
     return _one(session, ctx, row)
 
 
@@ -2051,6 +2077,7 @@ def cancel(
             "document_archived": archived,
         },
     )
+    tc_request_hooks.on_tc_dropped(session, certificate_id=row.id)  # FO-09 (FR-CERT-033)
     log.info("certificate.cancelled", resource_type="certificate", resource_id=row.id)
     return _one(session, ctx, row)
 
@@ -2713,7 +2740,12 @@ def export_records(session: Session) -> list[RecordTable]:
 # Certificates and serial counters (FR-PLT-005, ADR-0029). Registered with app.tenancy at
 # import; purged before students, documents and the academic structure they reference.
 _PURGE = purging.PurgeTables(
-    deleted=("sis.certificate_verifications", "sis.certificates", "sis.certificate_counters")
+    deleted=(
+        "sis.tc_requests",
+        "sis.certificate_verifications",
+        "sis.certificates",
+        "sis.certificate_counters",
+    )
 )
 
 

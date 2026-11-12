@@ -290,6 +290,9 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         # R2-1A (ADR-0045): TC formats and a certificate's verification code.
         ("GET", "/api/v1/certificates/formats"): CERT_READERS,
         ("GET", "/api/v1/certificates/{certificate_id}/verification"): CERT_READERS,
+        # FO-09: the TC request log (the service applies the student scope per request).
+        ("GET", "/api/v1/tc-requests"): CERT_READERS,
+        ("GET", "/api/v1/tc-requests/{tc_request_id}"): CERT_READERS,
         # Task assignees (FR-TASK-002, FR-CIR-004): whoever creates tasks or confirms suggested
         # deadlines picks an owner; the service requires a school-wide grant of either.
         ("GET", "/api/v1/task-assignees"): ("task.manage", ("circular.review",), False),

@@ -1594,6 +1594,10 @@ Transport bands, hostel and optional activities charged per student on top of th
 
 **Guardians (`sis.guardians`).** Planned column `preferred_language text NULL CHECK (preferred_language IN ('en','te'))` (ADR-0044 decision 4). Phone stays C3 (encrypted, blind index `guardians_phone_bidx`); changing a phone revokes the guardian's open public handles and requires a new opt-in (the number is a new recipient).
 
+### 15.4a TC request log (`sis`; FO-09, migration `0102_tc_requests`, FR-CERT-026..045)
+
+- **`sis.tc_requests`** (C2): `student_id` → `sis.students`, `status` (`received`, `in_preparation`, `ready`, `issued` = handed over, `cancelled`), `received_on` (the TC's application date), `channel` (`paper`, `phone`, `in_person`, `other`), `leaving_date`, `leaving_reason` (the TC's choices), `certificate_id` → `sis.certificates` (required from `ready`), and for each step `*_by` → `core.memberships` and `*_at`; `cancel_reason` 10..1000. At most one open request per student (partial unique `tc_requests_one_open`). Nothing about the person who asked (least personal data). RLS ENABLE + FORCE, `offboarding_purge`; `sos_app` updates only the workflow columns and never deletes. Record class `certificates` (official record, life of the school); in the full export (`tc_requests`), the purge (before `sis.certificates`) and the student's access report.
+
 ### 15.4 Certificate verification (`sis`; ADR-0045, FR-CERT-015..025)
 
 - **`sis.certificate_verifications`** (C1): `certificate_id` → `sis.certificates` (unique while not withdrawn), `code` (16 characters, the printed code; not secret once printed), `handle_id` → `core.public_handles`, `created_reason` (`issued`, `duplicate`, `added_later`), `withdrawn_at`, `withdrawn_by`, `withdraw_reason`, `check_count`, `last_checked_at`. Column UPDATE grants: withdrawal and check counters only.
