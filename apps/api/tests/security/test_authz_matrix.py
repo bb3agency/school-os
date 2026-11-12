@@ -3188,6 +3188,23 @@ def _export_packs() -> ModuleType:
 SPECS.update(_export_packs().matrix_specs())
 
 
+def _safety() -> ModuleType:
+    """tests/compliance/safety_support.py (FC-09 checks, FC-10 policies of school A)."""
+    name = "sos_test_compliance_safety_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "compliance" / "safety_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_safety().matrix_specs())
+
+
 def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one answer per route family
     creates = {
         "/api/v1/users",
@@ -3271,6 +3288,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         | _consents().MATRIX_CREATES
         | _compliance().MATRIX_CREATES
         | _export_packs().MATRIX_CREATES
+        | _safety().MATRIX_CREATES
     ):
         return 201
     if (method, path) in _privacy().MATRIX_STATUS:

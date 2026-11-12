@@ -2201,7 +2201,16 @@
       "unknown_kind": "Choose a certificate from the list.",
       "renews_not_allowed": "Only an 'other' certificate names the one it renews.",
       "renews_not_found": "The certificate it renews was changed. Reload the page.",
-      "certificate_expired": "This certificate has expired. Record the renewed one before publishing."
+      "certificate_expired": "This certificate has expired. Record the renewed one before publishing.",
+      "done_in_future": "The date can't be in the future.",
+      "drill_fields_not_allowed": "Only drills take a number of people and minutes. Leave this empty.",
+      "leader_not_active": "This person is no longer an active member. Choose someone else.",
+      "check_label_required": "Type the name of the check.",
+      "check_label_not_allowed": "Only an 'other' check takes a name.",
+      "unknown_check_kind": "Choose a check from the list.",
+      "policy_document_not_ready": "Choose a PDF in Documents with the purpose policy that has finished its virus scan.",
+      "review_in_past": "Choose a date after today.",
+      "too_many_roles": "Choose fewer roles."
     },
     "api": {
       "year_result_changed": {
@@ -13369,5 +13378,207 @@
     "open": "Still open",
     "outcomes": "{count} closed, by outcome",
     "footnote": "Counts only. They are for supporting students, never for judging a student or a teacher."
+  },
+  "complianceChecks": {
+    "nav": "Safety checks",
+    "title": "Safety drills and checks",
+    "description": "Fire drills, extinguisher refills, electrical, water and CCTV checks: when each was last done and when the next is due.",
+    "logButton": "Log a check",
+    "noPermissionTitle": "You can't see the safety checks",
+    "noPermissionBody": "Ask the principal or the office admin if you need to see them.",
+    "unverifiedTitle": "Suggested frequencies",
+    "unverifiedBody": "How often each check is done is common practice, not a rule we have checked. Do them as often as your board, fire officer or management asks.",
+    "privacyNote": "Record counts and short notes only. Never type a student's name and never upload photos that show children's faces.",
+    "counts": {
+      "overdue": "Overdue",
+      "never": "Never logged",
+      "dueSoon": "Due within {days} days"
+    },
+    "colCheck": "Check",
+    "colStatus": "Status",
+    "colLastDone": "Last done",
+    "colActions": "Actions",
+    "every": "{months, plural, one {Every month} other {Every # months}}",
+    "noFrequency": "No fixed frequency",
+    "dueOn": "Due {date}",
+    "daysLeft": "{days, plural, =0 {today} one {in # day} other {in # days}}",
+    "daysAgo": "{days, plural, one {# day ago} other {# days ago}}",
+    "never": "Not logged yet",
+    "state": {
+      "ok": "Up to date",
+      "due_soon": "Due soon",
+      "overdue": "Overdue",
+      "never": "Never logged",
+      "logged": "Logged"
+    },
+    "emptyTitle": "No checks for this school",
+    "emptyBody": "No check in the list applies to your school's board.",
+    "logAria": "Log {name}",
+    "recentTitle": "Latest entries",
+    "recentEmptyTitle": "Nothing logged yet",
+    "recentEmptyBody": "Log a drill or check after it is done; reminders start after the first entry.",
+    "colDate": "Date",
+    "colPeople": "People and time",
+    "colResult": "Result",
+    "colNotes": "Notes",
+    "colReport": "Report",
+    "people": "{count, plural, one {# person} other {# people}}",
+    "minutes": "{minutes, plural, one {# minute} other {# minutes}}",
+    "result": {
+      "ok": "No issues",
+      "action_needed": "Action needed"
+    },
+    "reportHidden": "Report not visible to you",
+    "remove": "Remove",
+    "removeAria": "Remove the entry {name} of {date}",
+    "removeDialog": {
+      "title": "Remove this entry?",
+      "confirm": "Remove entry",
+      "consequence": "It stays in the history as removed and no longer counts for the due date."
+    },
+    "form": {
+      "title": "Log a check",
+      "description": "Record a drill or check that was done.",
+      "kind": "Check",
+      "choose": "Choose a check",
+      "label": "Name of the check",
+      "doneOn": "Done on",
+      "ledBy": "Led by",
+      "nobody": "Not recorded",
+      "participants": "People who took part",
+      "duration": "Minutes taken",
+      "durationHint": "For an evacuation drill: from the alarm until everyone was out.",
+      "result": "Result",
+      "observations": "What was found",
+      "observationsHint": "Up to 500 characters. Do not type names.",
+      "document": "Report",
+      "documentHint": "A report or certificate already in Documents.",
+      "noDocument": "No report",
+      "loading": "Loading documents...",
+      "record": "Log check"
+    },
+    "errors": {
+      "check_removed": {
+        "title": "This entry was already removed",
+        "body": "Reload the page to see the latest log."
+      }
+    }
+  },
+  "compliancePolicies": {
+    "nav": "Policies",
+    "title": "School policies",
+    "description": "Child protection, anti-bullying, safety and other policies: when each is due for review and which staff have read it.",
+    "addButton": "Add a policy",
+    "noPermissionTitle": "You can't see the policy library",
+    "noPermissionBody": "Ask the principal or the office admin if you need to see it.",
+    "unverifiedTitle": "Yearly review",
+    "unverifiedBody": "A review every {months} months is common practice, not a rule we have checked. Set the date your management or board asks for.",
+    "counts": {
+      "overdue": "Reviews overdue",
+      "dueSoon": "Reviews due soon",
+      "pending": "Acknowledgements missing"
+    },
+    "colPolicy": "Policy",
+    "colReview": "Next review",
+    "colAcknowledged": "Read by staff",
+    "colActions": "Actions",
+    "acknowledged": "{done} of {total}",
+    "noTargets": "No staff asked",
+    "notReady": "Document not ready",
+    "retired": "Retired",
+    "reviewState": {
+      "ok": "Up to date",
+      "due_soon": "Review due soon",
+      "overdue": "Review overdue"
+    },
+    "emptyTitle": "No policies yet",
+    "emptyBody": "Upload the policy as a PDF in Documents (purpose: policy), then add it here and choose who must read it.",
+    "view": "View",
+    "viewAria": "View {name}",
+    "review": "Mark reviewed",
+    "reviewAria": "Mark {name} reviewed",
+    "edit": "Edit",
+    "editAria": "Edit {name}",
+    "reviewDialog": {
+      "title": "Mark this policy reviewed?",
+      "nextReview": "Next review",
+      "nextReviewHint": "Leave empty for {months} months from today.",
+      "confirm": "Mark reviewed"
+    },
+    "form": {
+      "addTitle": "Add a policy",
+      "editTitle": "Edit {name}",
+      "description": "The policy must be a PDF in Documents with the purpose policy. Staff read that exact version.",
+      "title": "Name",
+      "document": "Policy document",
+      "choose": "Choose a document",
+      "loading": "Loading documents...",
+      "reviewDue": "Next review",
+      "reviewDueHint": "Leave empty for {months} months from today.",
+      "roles": "Who must read it",
+      "rolesHint": "Everyone with one of these roles is asked to read and confirm it.",
+      "add": "Add policy",
+      "save": "Save"
+    },
+    "detail": {
+      "back": "School policies",
+      "document": "Document",
+      "openDocument": "Open in Documents",
+      "reviewDue": "Next review",
+      "lastReviewed": "Last reviewed",
+      "notReviewed": "Not reviewed yet",
+      "askedRoles": "Asked to read",
+      "askAgain": "Remind staff who have not read it",
+      "askedResult": "{count, plural, =0 {Everyone has already been reminded today.} one {# person was reminded.} other {# people were reminded.}}",
+      "retire": "Retire policy",
+      "reactivate": "Make active again",
+      "retireConsequence": "Staff no longer see it under Policies to read. Their acknowledgements are kept.",
+      "membersTitle": "Staff asked to read it",
+      "membersEmpty": "No staff member has the roles asked.",
+      "colName": "Name",
+      "colRoles": "Roles",
+      "colStatus": "Read this version",
+      "notYet": "Not yet",
+      "earlier": "Read an earlier version",
+      "readOn": "Read on {date}",
+      "notFoundTitle": "Policy not found",
+      "notFoundBody": "It may belong to another school or the link is wrong."
+    },
+    "errors": {
+      "policy_retired": {
+        "title": "This policy is retired",
+        "body": "Make it active again before reviewing it or reminding staff."
+      },
+      "policy_document_not_ready": {
+        "title": "The policy document is not ready",
+        "body": "Upload a PDF version in Documents and wait for the virus scan to finish."
+      }
+    }
+  },
+  "myPolicies": {
+    "nav": "Policies to read",
+    "title": "Policies to read",
+    "description": "School policies you are asked to read. Open each one, read it, then confirm.",
+    "emptyTitle": "Nothing to read",
+    "emptyBody": "When the school asks you to read a policy, it appears here.",
+    "pending": "{count, plural, =0 {You have read every policy asked of you.} one {# policy to read} other {# policies to read}}",
+    "open": "Open policy",
+    "openAria": "Open {name}",
+    "opened": "Opened. Read it in the new tab, then confirm here.",
+    "confirm": "I have read this version",
+    "confirmAria": "Confirm that you have read {name}",
+    "readOn": "Read on {date}",
+    "notReady": "Not ready to read yet",
+    "toRead": "To read",
+    "errors": {
+      "policy_version_changed": {
+        "title": "The policy was updated",
+        "body": "A newer version was added since you opened it. Open it again and read the new version."
+      },
+      "policy_document_not_ready": {
+        "title": "The policy is not ready to read",
+        "body": "Ask the office to check the document, then try again later."
+      }
+    }
   }
 }

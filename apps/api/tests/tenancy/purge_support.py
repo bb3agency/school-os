@@ -1063,6 +1063,40 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             s=renewed,
             u=u["user"],
         )
+        # --- FC-09/FC-10 (0098_drills_policies): a drill, a policy and an acknowledgement ----
+        _run(
+            c,
+            "INSERT INTO ops.compliance_checks (id, tenant_id, kind, done_on, participants_count, "
+            "led_by_membership_id, document_id, recorded_by) VALUES (:i, :t, 'fire_drill', "
+            "current_date - 3, 250, :m, :d, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            m=ids["m1"],
+            d=ids["doc"],
+            u=u["user"],
+        )
+        policy_id = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.compliance_policies (id, tenant_id, title, document_id, ack_roles, "
+            "review_due, created_by) VALUES (:i, :t, 'Child protection policy', :d, "
+            "ARRAY['teacher'], current_date + 300, :u)",
+            i=policy_id,
+            t=t,
+            d=ids["doc"],
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.compliance_policy_acks (id, tenant_id, policy_id, "
+            "document_version_id, membership_id, user_id) VALUES (:i, :t, :p, :v, :m, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            p=policy_id,
+            v=ids["ver"],
+            m=ids["m1"],
+            u=u["user"],
+        )
         # --- student timeline and early warning (M5, 0035_student_insights) ---------------
         exam, flag, mark = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
         _run(

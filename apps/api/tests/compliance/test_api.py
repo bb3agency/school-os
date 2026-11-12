@@ -363,6 +363,6 @@ def test_FR_COMP_016_register_is_in_the_full_export(school: Any, admin_engine: E
 
     cid = S.certificate(admin_engine, school)
     with tenant_session(school.tenant_id) as db:
-        (table,) = service.export_records(db)
-    assert table.name == "compliance_certificates"
+        tables = {t.name: t for t in service.export_records(db)}
+    table = tables["compliance_certificates"]
     assert str(cid) in str(table.rows)

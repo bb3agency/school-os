@@ -1,0 +1,28 @@
+# School policy library (FC-10; FR-COMP-056..FR-COMP-070; docs/05 §16.10). Versioned
+# configuration read by app/compliance/safety_config.py (invariant 13).
+#
+# verified: false. Yearly review is common practice for child-protection, anti-bullying, safety,
+# privacy and code-of-conduct policies (docs/research/2026-11-features/compliance-safety.md FC-10;
+# MoE School Safety and Security Guidelines 2021, secondary source); no rule found that fixes
+# the interval. The school types its own next review date; this is only the default.
+#
+# review_months  the default next review date: this many months after the policy is added or
+#                last reviewed.
+# reminders      lead days before the review date: one in-app notice per lead day to the holders
+#                of compliance.manage (0: on the day). Then again every `overdue_every_days`
+#                days while the review is overdue (lead decision D86).
+# due_soon_days  a review is "due soon" this many days before its date.
+# max_roles      how many roles one policy may ask to acknowledge.
+#
+# Acknowledgements are by signed-in staff only (no paper sheets, no staff without a login: that
+# needs the staff register, FC-04). Each acknowledgement names the exact document version read.
+version: 1
+verified: false
+source: "docs/research/2026-11-features/compliance-safety.md FC-10 (secondary sources, 2026-11-09); review interval is common practice, not a rule"
+
+review_months: 12
+reminders:
+  lead_days: [30, 7, 0]
+  overdue_every_days: 30
+due_soon_days: 30
+max_roles: 20

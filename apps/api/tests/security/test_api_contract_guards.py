@@ -522,6 +522,11 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/disclosure/link/rotate"): "a state change (step-up, audited): a repeat "
     "only issues another link and revokes the previous one",
     ("POST", "/api/v1/fleet/heartbeat"): "machine route; nonce and timestamp make it replay-safe",
+    # FC-10 (FR-COMP-064, FR-COMP-067): both are repeat-safe by design.
+    ("POST", "/api/v1/compliance/policies/{policy_id}:request-acknowledgement"): "notices are "
+    "deduplicated per member, version and day; a repeat notifies no one again",
+    ("POST", "/api/v1/compliance/my-policies/{policy_id}:acknowledge"): "insert-only, unique per "
+    "member, policy and version; a repeat changes nothing",
     # FM-03 (FR-TALLY-022): the vouchers a file carries are recorded once (UNIQUE key); a
     # repeat carries none of them as new and is audited again like any download.
     ("POST", "/api/v1/tally/vouchers/export"): "a download; already exported vouchers are "

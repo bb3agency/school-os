@@ -111,6 +111,15 @@ office; the office or principal marks it done.
    see. It does not guess.
 5. Tell us if the answer helped with **Was this answer helpful?**.
 
+## 8. School policies to read
+
+When the school asks you to read a policy (child protection, anti-bullying, safety), a notice
+appears and the policy is listed under **Policies to read**.
+
+1. Select **Open policy** and read it in the new tab.
+2. Come back and select **I have read this version**. The office sees that you have read it.
+3. If the school uploads a new version, you are asked to read it again.
+
 ## If something goes wrong
 
 - "You can't see attendance" or "You can't see marks": your account has no class role or no section.

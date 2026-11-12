@@ -14,7 +14,7 @@ from typing import Any, Final
 from celery import shared_task
 from celery.schedules import crontab
 
-from app.compliance import service
+from app.compliance import checks, policies, service
 from app.core.db import context_free_session
 from app.core.logging import get_logger
 from app.tenancy import service as tenancy
@@ -29,14 +29,20 @@ def reminders_all() -> dict[str, int]:
     with context_free_session() as session:
         tenant_ids = tenancy.list_tenant_ids(session, TENANT_STATUSES)
     totals = {"tenants": len(tenant_ids), "reminded": 0, "failed": 0}
+    # FC-09 (FR-COMP-051) safety check and FC-10 (FR-COMP-061) policy review reminders run in
+    # the same job, each sender in its own transaction.
+    senders = (service.send_reminders, checks.send_reminders, policies.send_reminders)
     for tenant_id in tenant_ids:
-        try:
-            totals["reminded"] += service.send_reminders(tenant_id)
-        except Exception as exc:  # this school only; tomorrow's run retries
-            totals["failed"] += 1
-            log.warning(
-                "compliance.reminders.failed", tenant_id=tenant_id, error_code=type(exc).__name__
-            )
+        for send in senders:
+            try:
+                totals["reminded"] += send(tenant_id)
+            except Exception as exc:  # this school and sender only; tomorrow's run retries
+                totals["failed"] += 1
+                log.warning(
+                    "compliance.reminders.failed",
+                    tenant_id=tenant_id,
+                    error_code=type(exc).__name__,
+                )
     log.info("compliance.reminders", count=totals["reminded"], failed=totals["failed"])
     return totals
 

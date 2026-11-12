@@ -553,6 +553,26 @@ export function SchoolShell({
           icon: "checkCircle",
         },
         {
+          // FC-09: safety drills and periodic checks (fire drills, extinguishers, CCTV).
+          href: "/compliance/checks",
+          label: t("complianceChecks.nav"),
+          permission: "compliance.read",
+          icon: "checkCircle",
+        },
+        {
+          // FC-10: the school's policy library (review dates, who has read each policy).
+          href: "/compliance/policies",
+          label: t("compliancePolicies.nav"),
+          permission: "compliance.read",
+          icon: "file",
+        },
+        {
+          // FC-10 (FR-COMP-063): policies the signed-in member is asked to read; any member.
+          href: "/compliance/acknowledge",
+          label: t("myPolicies.nav"),
+          icon: "file",
+        },
+        {
           // R3-1C (US-2901, ADR-0051): the CBSE Appendix IX disclosure, CBSE schools only.
           href: "/settings/disclosure",
           label: t("disclosure.nav"),

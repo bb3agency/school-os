@@ -64,6 +64,11 @@ const LINKS: Record<string, (id: string, item: LinkSource) => string> = {
   weekly_brief: (id) => `/brief?week=${id}`,
   // FC-01 (FR-COMP-011): a school certificate lapses soon or has lapsed.
   compliance_certificate: () => "/compliance",
+  // FC-09 (FR-COMP-051): a safety check falls due soon or is overdue.
+  compliance_check: () => "/compliance/checks",
+  // FC-10 (FR-COMP-061): a policy review is due; (FR-COMP-064) a member is asked to read one.
+  compliance_policy: (id) => `/compliance/policies/${id}`,
+  compliance_policy_ack: () => "/compliance/acknowledge",
   // R2-1B (FR-FEE-026): a waiting fee request opens the approvals inbox; a decided one opens the
   // student's fee account, where the maker reads the decision and its reason (WF-01).
   fee_request: (_id, item) => {
