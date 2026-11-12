@@ -1853,6 +1853,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/compliance/inspection-packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Inspection Packs
+         * @description The packs the office made, newest first (permission ``compliance.read``).
+         */
+        get: operations["list_inspection_packs_api_v1_compliance_inspection_packs_get"];
+        put?: never;
+        /**
+         * Generate Inspection Pack
+         * @description Make a pack: each item's state is kept as it is now, with the academic year, the visit
+         *     date and the registers chosen (choosing registers needs ``register.read``, 403 otherwise).
+         *     Permission ``compliance.manage``. Errors (422): ``unknown_pack``, ``unknown_register``,
+         *     ``academic_year_not_found``. Audited (``compliance.inspection_pack.generated``). Accepts
+         *     ``Idempotency-Key``.
+         */
+        post: operations["generate_inspection_pack_api_v1_compliance_inspection_packs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/inspection-packs/{pack_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Inspection Pack
+         * @description One pack as it was made (permission ``compliance.read``).
+         */
+        get: operations["get_inspection_pack_api_v1_compliance_inspection_packs__pack_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/inspection-packs/{pack_id}/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inspection Pack Index
+         * @description The pack's index as an A4 print page: school, authority, visit date, summary counts and
+         *     one row per item with its state, details and who fixes it (permission ``compliance.read``;
+         *     no personal data).
+         */
+        get: operations["inspection_pack_index_api_v1_compliance_inspection_packs__pack_id__index_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/inspection-readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Inspection Readiness
+         * @description Every inspection pack for the school's boards (DEO/MEO, APSERMC, CBSE, fire department;
+         *     ``verified: false``) with each item's state now: certificates from the register, registers,
+         *     the Appendix IX page, the parents' privacy notice, the DPDP checklist, and evidence not
+         *     tracked in SchoolOS. Permission ``compliance.read``.
+         */
+        get: operations["get_inspection_readiness_api_v1_compliance_inspection_readiness_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/compliance/my-policies": {
         parameters: {
             query?: never;
@@ -22578,6 +22671,217 @@ export interface components {
              */
             since: string;
         };
+        /** InspectionPackCountsOut */
+        InspectionPackCountsOut: {
+            /**
+             * Attention
+             * @description expiring, no copy or incomplete
+             * @default 0
+             */
+            attention: number;
+            /**
+             * Left Out
+             * @description registers not chosen for this pack
+             * @default 0
+             */
+            left_out: number;
+            /**
+             * Missing
+             * @description expired or missing
+             * @default 0
+             */
+            missing: number;
+            /**
+             * Not Tracked
+             * @default 0
+             */
+            not_tracked: number;
+            /**
+             * Ready
+             * @default 0
+             */
+            ready: number;
+        };
+        /** InspectionPackCreate */
+        InspectionPackCreate: {
+            /**
+             * Academic Year Id
+             * @description The registers' academic year (default: the current one).
+             */
+            academic_year_id?: string | null;
+            /** Pack Key */
+            pack_key: string;
+            /**
+             * Registers
+             * @description Item keys of the pack's registers to include (student lists: needs register.read). Registers not chosen print as left out.
+             */
+            registers?: string[];
+            /**
+             * Visit On
+             * @description The inspection date, if known.
+             */
+            visit_on?: string | null;
+        };
+        /** InspectionPackDetailOut */
+        InspectionPackDetailOut: {
+            /** Academic Year Id */
+            academic_year_id: string | null;
+            /** Academic Year Label */
+            academic_year_label: string | null;
+            /** Authority */
+            authority: string;
+            counts: components["schemas"]["InspectionPackCountsOut"];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Generated By Name */
+            generated_by_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Items */
+            items: components["schemas"]["InspectionPackItemOut"][];
+            /** Pack Key */
+            pack_key: string;
+            /** Pack Label */
+            pack_label: string;
+            /** Pack Version */
+            pack_version: number;
+            /** Registers */
+            registers: string[];
+            /** Verified */
+            verified: boolean;
+            /** Visit On */
+            visit_on: string | null;
+        };
+        /** InspectionPackItemOut */
+        InspectionPackItemOut: {
+            /** Applicable */
+            applicable?: number | null;
+            /** Certificate Id */
+            certificate_id?: string | null;
+            /** Done */
+            done?: number | null;
+            /**
+             * Feature
+             * @description not_tracked: the research id that would add this evidence.
+             */
+            feature?: string | null;
+            /**
+             * Fix By
+             * @description The role that usually fixes a gap (from the pack file).
+             */
+            fix_by: string;
+            /**
+             * Has Copy
+             * @description certificate: a copy in Documents.
+             */
+            has_copy?: boolean | null;
+            /**
+             * Included
+             * @description register: chosen when the pack was made (None: live view).
+             */
+            included?: boolean | null;
+            /** Issued On */
+            issued_on?: string | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @description certificate: the catalogue kind.
+             */
+            kind?: string | null;
+            /** Label */
+            label: string;
+            /** Note */
+            note?: string | null;
+            /** Notice Id */
+            notice_id?: string | null;
+            /** Published At */
+            published_at?: string | null;
+            /** Register View */
+            register_view?: ("admission_withdrawal" | "transfer_certificates" | "certificates") | null;
+            /** Snapshot Id */
+            snapshot_id?: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "certificate" | "register" | "disclosure" | "privacy_notice" | "dpdp_readiness" | "not_tracked";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ready" | "expiring" | "no_copy" | "incomplete" | "expired" | "missing" | "left_out" | "not_tracked";
+            /** Valid Until */
+            valid_until?: string | null;
+        };
+        /** InspectionPackOut */
+        InspectionPackOut: {
+            /** Academic Year Id */
+            academic_year_id: string | null;
+            /** Academic Year Label */
+            academic_year_label: string | null;
+            /** Authority */
+            authority: string;
+            counts: components["schemas"]["InspectionPackCountsOut"];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Generated By Name */
+            generated_by_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Pack Key */
+            pack_key: string;
+            /** Pack Label */
+            pack_label: string;
+            /** Pack Version */
+            pack_version: number;
+            /** Registers */
+            registers: string[];
+            /** Verified */
+            verified: boolean;
+            /** Visit On */
+            visit_on: string | null;
+        };
+        /** InspectionPackReadinessOut */
+        InspectionPackReadinessOut: {
+            /** Authority */
+            authority: string;
+            counts: components["schemas"]["InspectionPackCountsOut"];
+            /** Items */
+            items: components["schemas"]["InspectionPackItemOut"][];
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Note */
+            note: string;
+        };
+        /** InspectionReadinessOut */
+        InspectionReadinessOut: {
+            /** Packs */
+            packs: components["schemas"]["InspectionPackReadinessOut"][];
+            /** Source */
+            source: string;
+            /**
+             * Verified
+             * @description false: the lists are a SchoolOS proposal, unconfirmed.
+             */
+            verified: boolean;
+            /** Version */
+            version: number;
+        };
         /**
          * InstalmentIn
          * @description One instalment: its number, label (``Term 1``), due date inside the academic year and the
@@ -38250,6 +38554,206 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_inspection_packs_api_v1_compliance_inspection_packs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionPackOut"][];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    generate_inspection_pack_api_v1_compliance_inspection_packs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InspectionPackCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionPackDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_inspection_pack_api_v1_compliance_inspection_packs__pack_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pack_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionPackDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    inspection_pack_index_api_v1_compliance_inspection_packs__pack_id__index_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pack_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 index */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_inspection_readiness_api_v1_compliance_inspection_readiness_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionReadinessOut"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
