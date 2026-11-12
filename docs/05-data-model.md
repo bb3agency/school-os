@@ -1541,6 +1541,14 @@ Transport bands, hostel and optional activities charged per student on top of th
 - `fin.adjustments.addon_assignment_id` and reason `addon_removal` (CHECK `adjustments_addon_removal_shape`: the reason iff the assignment, a head and `amount < 0`; partial unique index `adjustments_one_addon_removal` per assignment and instalment while pending or approved).
 - Both tables: RLS ENABLE + FORCE `tenant_isolation`, `offboarding_purge` for `sos_purger`, nothing for `sos_platform`, no DELETE for `sos_app`; record class `financial_records` (C2); full data export (`fees_addons`, `fees_addon_assignments`); purged by the `fees` data owner after ledger entries and adjustments.
 
+### 15.1c Cheque and bank transfer matching (`fin`; FM-08, FR-FEE-126..150; migration `0101_bank_matching`)
+
+- `fin.bank_statement_lines.cheque_no` (6 digits) and `transfer_ref` (6-35 letters and digits): insert-only bank facts read from the statement (no UPDATE grant for `sos_app`); partial index on `(tenant_id, cheque_no)`.
+- `match_kind` of lines and confirmations also allows `cheque_exact` and `transfer_exact`.
+- `fin.upi_confirmations` (name kept) now confirms issued `upi_qr`, `cheque` and `bank_transfer` receipts. Trigger `upi_confirmations_check` (replaced): the UTR rule for UPI receipts only; a line with a cheque number confirms only the cheque receipt with that number (`upi_confirmations_cheque_differs`); a returned cheque is never confirmed (`upi_confirmations_cheque_returned`).
+- `fin.cheque_status_events` (append-only): `receipt_id`, `status` `deposited` / `cleared` / `returned` (unique per receipt and status), `event_date`, `source` `manual` / `statement` (`statement_line_id` iff statement; statement only for `cleared`), `cancellation_id` (composite FK to `fin.receipt_cancellations`; iff returned, and that request has reason `cheque_dishonoured`), `recorded_by`, `recorded_at`. Trigger `cheque_status_events_check`: cheque receipts only, order deposited -> cleared -> returned, a statement `cleared` needs its confirmation. RLS ENABLE + FORCE `tenant_isolation`, `offboarding_purge` for `sos_purger`, nothing for `sos_platform`; record class `financial_records` (C2, 8 years); full data export `fees_cheque_status_events`; purged first by the `fees` data owner.
+- Downgrade refuses while a cheque or bank transfer confirmation exists (the 0060 checks cannot hold it).
+
 ### 15.2 Online payments (`fin`; ADR-0042, FR-PAY-*)
 
 | Table | Class | Key columns and rules |
