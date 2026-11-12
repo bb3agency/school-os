@@ -256,6 +256,8 @@ routes:
   GET /api/v1/fees/reports/registers/download: [exports]
   GET /api/v1/fees/reports/ageing/download: [exports]
   GET /api/v1/fees/reports/year-end-pack: [exports]
+  # FM-10 fee structure notice: the print view (one page per class)
+  GET /api/v1/fees/structure-notice/print: [render]
   # support tickets
   POST /api/v1/support/tickets: [support_tickets]
   POST /api/v1/platform/support/tickets: [support_tickets]
