@@ -103,8 +103,11 @@ office; the office or principal marks it done.
 1. Open **Ask the school** (or **Ask the school** on **Home**).
 2. Type a question, for example "How many students are in Class VII-B?" or "Which students in
    Class VII-B have open record problems?", and select **Ask**. Ask the school answers from the
-   school's documents, student counts and record problems; it does not read attendance or
-   marks yet, so open **Attendance** or **Marks** for those.
+   school's documents, student counts, record problems, readiness counts and attendance
+   counts of your own sections ("What was the attendance of my section this week?"). It gives
+   numbers only, never one child's attendance, and shows no figure for a section of fewer than
+   5 students. It does not read marks yet, so open **Marks** for those, and **Attendance** for a
+   child's days.
 3. Check the **Sources** under the answer. You only get answers from your own sections and the
    documents you may see.
 4. "Not found in the school records you can access" means SchoolOS did not find it in what you may

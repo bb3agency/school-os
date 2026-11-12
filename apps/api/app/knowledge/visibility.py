@@ -25,6 +25,12 @@ modules' services (the same rules as the UI and the record tools):
   (``task.read``; the caller's own task, or any for a school-wide ``task.read_all`` /
   ``task.manage`` holder; a task linked to a circular only while the caller may still open that
   circular), and ``list_due_tasks`` still offered to the caller (fail closed).
+- ``readiness`` / ``attendance`` / ``compliance`` (D86; FA-04, FC-11): aggregates of
+  ``get_readiness_summary``, ``get_attendance_summary`` and ``list_compliance_status``, checked
+  exactly like ``count`` / ``fee`` (tool still offered, same scope fingerprint).
+- ``certificate`` (D86; FA-04): ``certificates.service.get_certificate`` under the caller's
+  certificate reach (404 outside it), in a status the tool reports, and ``get_certificates``
+  still offered to the caller.
 - ``conversation``: one of the caller's own conversations that is not deleted, the cited question
   in it, and every source that question's answer cited (the passage repeats that answer).
 
@@ -38,6 +44,7 @@ import uuid
 from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Final
 
+from app.certificates import service as certificates
 from app.changes import service as changes
 from app.core.errors import DomainError
 from app.documents import service as documents
@@ -46,6 +53,7 @@ from app.knowledge import repository as repo
 from app.knowledge import sources
 from app.knowledge.config.tools import load_tools_config
 from app.knowledge.sealed import cited_sources_of
+from app.knowledge.tools.certificates import SHOWN as CERTIFICATE_STATUSES
 from app.knowledge.tools.due import task_reader
 from app.knowledge.tools.students import ROW_FIELDS
 from app.students import service as students
@@ -59,6 +67,13 @@ READ_SENSITIVE: Final = "student.read_sensitive"
 COUNT_TOOL: Final = "count_students"
 FEE_TOOL: Final = "get_fee_dues"
 TASK_TOOL: Final = "list_due_tasks"
+CERTIFICATE_TOOL: Final = "get_certificates"
+AGGREGATE_TOOLS: Final = {
+    "readiness": "get_readiness_summary",
+    "attendance": "get_attendance_summary",
+    "compliance": "list_compliance_status",
+}
+"""D86 (FA-04, FC-11): aggregate sources, checked like ``count`` / ``fee``."""
 
 
 class SourceVisibility:
@@ -110,7 +125,7 @@ class SourceVisibility:
 
     # --- checks ---------------------------------------------------------------------------------
 
-    def _check(self, source: str) -> bool:  # noqa: PLR0911 - one return per source kind
+    def _check(self, source: str) -> bool:  # noqa: PLR0911, PLR0912 - one return per source kind
         try:
             ref = sources.parse(source)
         except ValueError:
@@ -144,6 +159,14 @@ class SourceVisibility:
                         and TASK_TOOL in self._tool_names()
                         and reader.visible(self._session, self._ctx, ref.object_id)
                     )
+                case "readiness" | "attendance" | "compliance":
+                    tool = AGGREGATE_TOOLS[ref.kind]
+                    return tool in self._tool_names() and self._same_scope(tool, ref)
+                case "certificate":
+                    if CERTIFICATE_TOOL not in self._tool_names():
+                        return False
+                    found = certificates.get_certificate(self._session, self._ctx, ref.object_id)
+                    return found.status in CERTIFICATE_STATUSES
         except DomainError:
             return False
         return False  # pragma: no cover - every SourceKind is matched above

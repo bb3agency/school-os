@@ -36,10 +36,18 @@ WHITELIST: Final = frozenset(
         # D74 (lead decision 2026-11-08, amending ADR-0008): open tasks and circular deadlines
         # due in a date range, the caller's own unless they hold task.read_all school-wide.
         "list_due_tasks",
+        # D86 (lead decision 2026-11-12, PO to confirm; amending ADR-0008): FA-04 readiness and
+        # attendance counts and one student's certificates; FC-11 the compliance register.
+        "get_readiness_summary",
+        "get_attendance_summary",
+        "get_certificates",
+        "list_compliance_status",
     }
 )
 """ADR-0008 / docs/06 §7 (+ ADR-0032 for get_fee_dues, ADR-0034 for
-search_my_conversations, D74 for list_due_tasks). The only tools the model may call."""
+search_my_conversations, D74 for list_due_tasks, D86 for get_readiness_summary,
+get_attendance_summary, get_certificates and list_compliance_status). The only tools the model
+may call."""
 
 
 class ToolConfig(ConfigModel):
@@ -65,9 +73,11 @@ class ToolConfig(ConfigModel):
     """``search_my_conversations``: how many of the caller's newest conversations are searched."""
     """Words that make a search prefer the latest documents (recency boost, docs/06 §6)."""
     default_days: int | None = Field(default=None, ge=1, le=31)
-    """``list_due_tasks``: days after the first date a range without an end covers (D74)."""
+    """``list_due_tasks``: days after the first date a range without an end covers (D74);
+    ``get_attendance_summary``: days ending on the last date a range without a start covers."""
     max_days: int | None = Field(default=None, ge=1, le=31)
-    """``list_due_tasks``: the longest range one call reads; longer ones are cut (D74)."""
+    """``list_due_tasks`` / ``get_attendance_summary``: the longest range one call reads; longer
+    ones are cut (D74, FA-04)."""
 
     @model_validator(mode="after")
     def _field_keys(self) -> ToolConfig:

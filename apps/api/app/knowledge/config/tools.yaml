@@ -117,3 +117,43 @@ tools:
     max_results: 30                    # tasks per call; the passage says when more are due
     default_days: 7                    # to_date defaults to from_date + 7 days
     max_days: 31                       # longer ranges are cut and the passage says so
+  # FA-04 / FC-11 (lead decision D86 2026-11-12, PO to confirm; amending ADR-0008): counts and one
+  # student's certificates only, each through the owning module's service under the caller's
+  # UserContext. Never a list of children, never early-warning data (invariant 14).
+  get_readiness_summary:
+    description: >-
+      Board and portal readiness (UDISE+, BSEAP SSC, CBSE, CISCE, APAAR, ...) of the students
+      the user can access, for one readiness profile or for every profile of the school: per
+      class, how many are ready, waiting for the parent, waiting for the school, or blocked
+      (needs a decision). Numbers only, never names: use list_findings for the students behind
+      a figure. Quote the figures exactly as given, with the as-of date.
+    permission: dq.readiness.read
+    max_results: 5                     # profiles per call (the readiness overview's limit)
+  get_attendance_summary:
+    description: >-
+      Attendance of the sections the user can access over a date range (IST dates YYYY-MM-DD;
+      by default the 7 days ending today, at most 31 days): per section the share of marks that
+      were present or late, the students on the roll and the days marked, and the total. Numbers
+      only, never a child's name or own attendance; small sections are not shown. Use for "which
+      sections had attendance below 75% this week". Quote percentages exactly as given.
+    permission: attendance.read
+    small_cell_min: 5                  # sections with fewer students show no figure
+    default_days: 7                    # without from_date: the 7 days ending on to_date
+    max_days: 31                       # longer ranges are cut and the passage says so
+  get_certificates:
+    description: >-
+      Certificates of ONE student the user can access (pass the ID from find_students):
+      transfer, bonafide, study and conduct certificates, each with its type, serial number,
+      issue date and status (issued, cancelled, or requested and waiting for approval). Use for
+      "was a TC issued to this student, and when". No reasons or certificate contents. When
+      nothing is returned, say no certificate was found in school records.
+    permission: certificate.read
+    max_results: 20                    # certificates per student, newest first
+  list_compliance_status:
+    description: >-
+      The school's own compliance certificates (fire NOC, building safety, recognition,
+      affiliation, water and sanitation, and any the school added): for each, whether it is
+      valid, expiring soon, expired, missing or has no expiry date, and the valid-until date.
+      Use for "when does our fire NOC expire" or "which certificates have expired". Quote dates
+      exactly as given.
+    permission: compliance.read

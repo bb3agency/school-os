@@ -35,6 +35,10 @@ HREFS: Final = {
     "fee": "/fees",
     "conversation": "/ask/c/{id}#m-{query_id}",
     "task": "/tasks",
+    "readiness": "/findings/readiness",
+    "attendance": "/attendance",
+    "certificate": "/certificates/{id}",
+    "compliance": "/compliance",
 }
 """App-relative screens per source kind (no locale prefix); ``count`` has none."""
 

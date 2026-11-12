@@ -47,6 +47,10 @@ PERFECT = Metrics(
     due_leakage_count=0,
     due_citation_validity=1.0,
     due_task_recall=1.0,
+    status_items=11,
+    status_leakage_count=0,
+    status_citation_validity=1.0,
+    status_recall=1.0,
     ctx_items=54,
     ctx_recall_at_5_plain=0.7,
     ctx_recall_at_5_contextual=1.0,
@@ -120,6 +124,10 @@ def test_FR_KB_010_SEC_018_SEC_019_hard_gates_are_exactly_the_documented_ones() 
         # may see only their own, and every task stated is cited from a passage given.
         ("due_leakage_count", "==", 0),
         ("due_citation_validity", ">=", 1.0),
+        # School status questions (D86; FA-04, FC-11 tools): nothing outside the asker's
+        # permission or scope, no small section, no other student or school; every fact cited.
+        ("status_leakage_count", "==", 0),
+        ("status_citation_validity", ">=", 1.0),
         # Contextual retrieval and reranking (docs/06 §13.6): nothing restricted is retrieved
         # or sent to a reranker, in any variant.
         ("ctx_leakage_count", "==", 0),

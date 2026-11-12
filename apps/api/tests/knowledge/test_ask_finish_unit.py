@@ -152,6 +152,11 @@ def test_FR_KB_042_every_source_kind_has_its_screen_or_none() -> None:
         sources.conversation_question(i, q): f"/ask/c/{i}#m-{q}",
         sources.student_count(i, scope=scope): None,
         sources.task(i): "/tasks",  # D74
+        # D86 (FA-04, FC-11)
+        sources.readiness(i, scope=scope): "/findings/readiness",
+        sources.attendance(i, scope=scope): "/attendance",
+        sources.certificate(i): f"/certificates/{i}",
+        sources.compliance(i, scope=scope): "/compliance",
     }
     for uri, href in cases.items():
         assert href_for(sources.parse(uri)) == href, uri

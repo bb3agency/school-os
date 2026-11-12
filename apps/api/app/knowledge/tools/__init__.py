@@ -18,6 +18,10 @@ over ``documents.service``), ``students`` (``find_students``, ``get_student_fact
 ``findings`` (``list_findings`` over ``dq.service``), ``fees`` (``get_fee_dues`` over
 ``tally.service``, M6, behind the school's Tally connector flag; ADR-0032 Proposed), ``due``
 (``list_due_tasks`` over ``circulars.service`` through a registered reader, D74) and
-``registry`` (the tools described in ``tools.yaml``, offered per caller permission). The whole
-whitelist is built.
+``registry`` (the tools described in ``tools.yaml``, offered per caller permission). D86 (FA-04,
+FC-11): ``readiness`` (``get_readiness_summary`` over ``dq.service``), ``attendance``
+(``get_attendance_summary`` over ``academics.service``, counts only, small sections hidden),
+``certificates`` (``get_certificates`` over ``certificates.service``, one student) and
+``compliance`` (``list_compliance_status`` over ``compliance.service``). None reads
+``insights`` (invariant 14). The whole whitelist is built.
 """
