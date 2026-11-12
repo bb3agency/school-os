@@ -214,6 +214,20 @@ export function SchoolShell({
           permission: ["export.board", "export.portal", "student.export", "export.read_all"],
           icon: "file",
         },
+        {
+          // FO-06 (FR-EXP-009..019): enrolment statistics in the UDISE+ table shapes.
+          href: "/exports/enrolment-statistics",
+          label: t("enrolmentStats.nav"),
+          permission: "export.portal",
+          icon: "file",
+        },
+        {
+          // FO-11 (FR-EXP-020..028): scheme verification attendance lists and certificates.
+          href: "/exports/scheme-packs",
+          label: t("schemePacks.nav"),
+          permission: ["attendance.read", "certificate.issue"],
+          icon: "file",
+        },
       ],
     },
     {

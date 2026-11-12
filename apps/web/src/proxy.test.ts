@@ -268,6 +268,9 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       "/bff/api/v1/consents/forms",
       "/bff/api/v1/privacy/templates/notice_parents/preview",
       `/bff/api/v1/privacy/requests/${id}/letters/acknowledgement`,
+      // FO-06, FO-11: enrolment statistics sheet and scheme attendance list.
+      "/bff/api/v1/reports/enrolment-statistics/print",
+      "/bff/api/v1/scheme-packs/attendance/print",
     ]) {
       const response = proxy(request(path));
       expect(response.headers.get("content-security-policy"), path).toBeNull();
@@ -283,6 +286,8 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       "/bff/api/v1/consents/summary",
       "/bff/api/v1/privacy/templates/notice_parents/pdf",
       `/bff/api/v1/privacy/requests/${id}`,
+      "/bff/api/v1/reports/enrolment-statistics",
+      "/bff/api/v1/scheme-packs/attendance",
     ]) {
       expect(proxy(request(path)).headers.get("content-security-policy"), path).toContain(
         "default-src 'self'",

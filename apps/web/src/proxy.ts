@@ -59,6 +59,9 @@ const OWN_CSP_PATHS: readonly RegExp[] = [
   /^\/bff\/api\/v1\/privacy\/requests\/[0-9a-f-]{36}\/letters\/[a-z_]{1,40}$/i,
   // FO-02 (FR-UDI-007): the UDISE+ correction request letter to the MEO.
   /^\/bff\/api\/v1\/dq\/udise-corrections\/[0-9a-f-]{36}\/letter$/i,
+  // FO-06 (FR-EXP-013) enrolment statistics and FO-11 (FR-EXP-022) scheme attendance list.
+  /^\/bff\/api\/v1\/reports\/enrolment-statistics\/print$/i,
+  /^\/bff\/api\/v1\/scheme-packs\/attendance\/print$/i,
 ];
 
 function isNonLocalised(pathname: string): boolean {
