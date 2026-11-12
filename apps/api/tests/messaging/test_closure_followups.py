@@ -64,7 +64,8 @@ def _reopen_paths(closure_id: str) -> tuple[str, str]:
 
 
 def _day(days: int) -> str:
-    return (S.today() + dt.timedelta(days=days)).isoformat()
+    day: dt.date = S.today() + dt.timedelta(days=days)
+    return day.isoformat()
 
 
 def _idem() -> dict[str, str]:
