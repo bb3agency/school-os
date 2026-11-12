@@ -1068,6 +1068,17 @@ Three tenant tables (RLS ENABLE + FORCE with `tenant_isolation`, the ADR-0029 `o
 - **Offboarding**: `knowledge` deletes `kb.user_memories`, `kb.user_memory_settings`, …, `kb.queries`, `kb.conversations` (children first).
 - **No data migration**: titles need the school's key, which only the application holds, and the migrator cannot read rows under FORCE RLS; earlier questions get conversations from the daily job. **Downgrade** drops the three tables and the new columns (lossy: titles, summaries, memory, citation details, follow-ups; the query log itself is kept) and restores the metering and route CHECKs as `NOT VALID`. Round trip: `tests/knowledge/test_conversations_migration.py`.
 
+#### 6.6 Knowledge gaps as built (migration `0100_knowledge_gaps`; FA-06, FR-KB-081..095)
+
+Two tenant tables (RLS ENABLE + FORCE with `tenant_isolation`, the ADR-0029 `offboarding_purge` policy and `sos_purger` SELECT, DELETE, composite FKs only, no `definer_access`). `sos_readonly` has nothing on them; `sos_platform` has nothing on them.
+
+- **`kb.knowledge_gaps`**: a group of repeated questions Ask could not answer. `question_ciphertext` (ONE sample question, redacted before encryption by `knowledge.gaps.gap_question`; AES-256-GCM under the tenant DEK, AAD `tenant|kb.knowledge_gaps|question_ciphertext|id`), `question_hmac` (32 bytes, tenant HMAC key, purpose `kb_gap`, over the normalised redacted text: the grouping key), `key_version`, `language`, counts `not_found_count`, `unchecked_count`, `not_helpful_count` (CHECK: at least one), `first_seen_at` ≤ `last_seen_at`, `status` `open` / `closed` / `dismissed` (closed and dismissed carry `closed_by` membership and `closed_at`; closed carries `resolution` `verified_answer` or `document`, with `verified_answer_id` / `document_id`, each `ON DELETE SET NULL` of that column). Partial unique index: one `open` gap per `(tenant_id, question_hmac)`. No user, membership of the asker or query id.
+- **`kb.knowledge_gap_queries`**: `(tenant_id, query_id)` primary key, `gap_id`, `signal` (`not_found` / `unchecked` / `not_helpful`), `collected_at`: which logged question was counted into which gap (the collection job's idempotency). Both FKs `ON DELETE CASCADE` (the 180-day query purge and the gap purge remove the marks).
+- **Retention** (§13): 90 days after last asked (open) or closed/dismissed, daily `knowledge.purge_gaps`; the school may shorten it to 30 days (`kb_gaps` in `app/admin/retention.yaml`); legal holds on record class `ask_gaps` keep them.
+- **Key rotation (SEC-012)**: census entry `kb.knowledge_gaps.question_ciphertext`, re-encryptor `kb_gaps` (the HMAC is left as it is: a rotation that replaces the HMAC key only starts new groups).
+- **Offboarding**: `knowledge` deletes `kb.knowledge_gap_queries` and `kb.knowledge_gaps` first. Not in the full export (no record about a person; a redacted, pooled working list). Not in a member's access report (no asker is kept).
+- **Downgrade** drops both tables (lossy: the open gaps and how they were closed).
+
 ## 7. Audit and ops schemas
 
 ### 7.1 Audit (ADR-0011 as amended by ADR-0013)

@@ -134,6 +134,16 @@ As built (FR-DOC-007, FR-KB-030, PRV-016; full erasure chain in docs/08 §7). De
 
 Everything derived from a document or record about students (chunks, embeddings, contextual headers, AI metadata, cached embeddings, cached answers, conversation summaries) is personal data and is deleted with its source (docs/08 §7, "Derived AI data is personal data", with the as-built status and open gaps).
 
+### 4.8.1 As built: knowledge gaps (FA-06; FR-KB-081..095)
+
+The library improves from what Ask could not answer. `app/knowledge/gaps.py`:
+
+- **Signals** come from the query log only, never from the model: `not_found` answers, `search_only` answers with no error code (the answer could not be checked against its sources), and answers marked "not helpful". Budget, switch-off, rate-limit and outage fallbacks are not gaps; nor are refusals and memory instructions.
+- **Collection** (`knowledge.collect_gaps`, every 60 minutes, per school): decrypts each new question, redacts it (`core.redaction.redact` plus the log redactions, then every run of 3+ digits masked, cut to 300 characters), groups it by a tenant-keyed HMAC of the normalised redacted text, and stores one redacted sample encrypted. Look-back 48 hours, never more than the retention. No asker is kept or shown; no question text is logged.
+- **Closing**: a person with `kb.verified_answer.manage` writes a verified answer from the gap (the same service and checks as any verified answer: citations quote current versions of documents they can read), links the missing document (one they can read), or dismisses it. A verified answer written from a gap is then retrieved exactly like any other (§6 SQL filter: every cited document must be visible to the asker) and cited as `sos://verified/{id}` with its verification date; the verified-answers screen shows who verified it.
+- **Retention**: 90 days (school may shorten to 30); `knowledge.purge_gaps` daily. Config: `app/knowledge/config/gaps.yaml` (`verified: false`; lead decision D86).
+- **Not built**: topic labels from a model (the report's grouping by topic); exact grouping of the redacted text is used instead. A privacy review of this new use of the query log (docs/08 §7) is an owner action.
+
 ### 4.9 As built: ingestion and chunking (M2 package K5)
 
 - *Trigger (outbox, FR-OPS-004).* `documents` has no "version ready" outbox event; it calls `READY_HOOKS` in the scan's transaction and `ACL_CHANGED_HOOKS` in `set_acl`'s. `knowledge/ingestion/hooks.py` appends hooks that enqueue `kb.version.ready` and `kb.document.acl_changed` in that same transaction, **only while `SOS_KB_ENABLED` is on**, routed to `knowledge.ingest_version` and `knowledge.refresh_acl` (`app/knowledge/tasks.py`, queue `ingest`; `knowledge.*` routed to `ingest` in the worker). Extract, chunk and embed run in one task: chunk text never travels through the broker, and the per-tenant embeddings cache makes a retry cheap; a split onto `embed` needs a staging table. Tasks retry with backoff (max 5) and raise `PipelineNotConfigured` until the composition root calls `ingestion.runtime.configure(...)`.
