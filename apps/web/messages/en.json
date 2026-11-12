@@ -2458,7 +2458,13 @@
       "completeTitle": "You have signed in again",
       "completeBody": "Go back to the SchoolOS window. Your action continues there. You can close this window.",
       "closeWindow": "Close this window"
-    }
+    },
+    "review_not_after_today": "Choose a review date after today.",
+    "review_too_far": "Choose a review date within the next 60 days.",
+    "reminders_off": "Reminders are switched off for this school.",
+    "no_class_teacher": "This section has no class teacher to remind. Set one in the school structure.",
+    "already_complete": "Nothing is missing for this section any more.",
+    "exam_required": "Choose the exam first."
   },
   "auth": {
     "signedInAs": "Signed in as {name}",
@@ -7946,7 +7952,9 @@
       "closeReason": "Closed because",
       "profile": "Open the student's profile",
       "logTitle": "What has been done",
-      "logDescription": "Oldest first. Notes are seen only by people who can act on this flag."
+      "logDescription": "Oldest first. Notes are seen only by people who can act on this flag.",
+      "reviewOn": "Next review",
+      "reviewDue": "Review due"
     },
     "log": {
       "kind": {
@@ -7974,7 +7982,9 @@
       "actedOn": "When",
       "note": "Note (optional)",
       "noteHint": "Up to 1,000 characters. Kept encrypted and seen only by the class teacher and the principal.",
-      "consequence": "The action is added to the flag's log. Nothing on the student's record changes."
+      "consequence": "The action is added to the flag's log. Nothing on the student's record changes.",
+      "reviewOn": "Next review (optional)",
+      "reviewHint": "When to look at this again, up to {days} days ahead. The owner is reminded in the app that day."
     },
     "close": {
       "open": "Close the flag",
@@ -8182,7 +8192,9 @@
       "no_current_year": {
         "title": "No current academic year",
         "body": "Ask the office admin to set the current academic year in Settings, then try again."
-      }
+      },
+      "review_not_after_today": "Choose a review date after today.",
+      "review_too_far": "Choose a review date within the next 60 days."
     }
   },
   "tally": {
@@ -13056,5 +13068,65 @@
         "body": "Reload the page and check the certificate before trying again."
       }
     }
+  },
+  "completeness": {
+    "nav": "Entry progress",
+    "title": "Attendance and marks entry",
+    "description": "How much of today's attendance and each exam's marks is entered, per section, and whose entry it waits on. Counts only.",
+    "noPermissionTitle": "You can't see entry progress",
+    "noPermissionBody": "The principal and the exam coordinator see this page.",
+    "section": "Section",
+    "waitingOn": "Waiting on",
+    "action": "Action",
+    "nobody": "Nobody",
+    "noClassTeacher": "No class teacher set",
+    "ofStudents": "{entered} of {students}",
+    "remind": "Send a reminder",
+    "remindSection": "Send a reminder for {section}",
+    "reminded": "Reminder sent",
+    "alreadyReminded": "Already reminded",
+    "footnote": "This shows how complete each section's entry is. It is not a measure of any teacher's work.",
+    "status": {
+      "label": "Status",
+      "complete": "Complete",
+      "partial": "Partly entered",
+      "not_taken": "Not taken",
+      "not_started": "Not started",
+      "missing": "Missing",
+      "day_off": "No school",
+      "no_students": "No students"
+    },
+    "attendance": {
+      "title": "Attendance",
+      "date": "Date",
+      "taken": "Attendance taken in {taken} of {of} sections",
+      "breakdown": "{partial} partly entered, {notTaken} not taken, {dayOff} with no school that day.",
+      "marked": "Students marked",
+      "tableLabel": "Attendance per section, table, scrolls sideways"
+    },
+    "marks": {
+      "title": "Marks",
+      "exam": "Exam",
+      "chooseExam": "Choose an exam",
+      "summary": "{exam}: marks complete in {complete} of {of} sections",
+      "locked": "This exam is locked.",
+      "noSubjects": "No marks are entered for this exam yet.",
+      "tableLabel": "Marks per section and subject, table, scrolls sideways"
+    }
+  },
+  "followUpCounts": {
+    "nav": "Follow-up counts",
+    "title": "Student follow-up counts",
+    "description": "How the school follows up early-warning flags, as numbers for the whole school. No names and no student details.",
+    "noPermissionTitle": "You can't see follow-up counts",
+    "noPermissionBody": "Management sees these counts. Flags stay with the class teacher and the principal.",
+    "since": "Since {date}",
+    "raised": "Flags raised",
+    "onTime": "{count} acted on by the due date",
+    "overdue": "Overdue, nobody acted",
+    "reviewDue": "Reviews due",
+    "open": "Still open",
+    "outcomes": "{count} closed, by outcome",
+    "footnote": "Counts only. They are for supporting students, never for judging a student or a teacher."
   }
 }
