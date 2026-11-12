@@ -8658,7 +8658,8 @@
       "parent_notice": "Notice from the school",
       "parent_receipt": "Fee receipt",
       "parent_dues": "Fees due",
-      "parent_optin": "School messages on WhatsApp"
+      "parent_optin": "School messages on WhatsApp",
+      "parent_closure": "School closed"
     },
     "view": {
       "validUntil": "This link works until {date}."
@@ -9421,7 +9422,22 @@
         "dates": "Closed",
         "reason": "Reason",
         "audience": "Sent to",
-        "sentAt": "Sent at"
+        "sentAt": "Sent at",
+        "reopening": "Reopening"
+      },
+      "noticeText": "Order text for parents (optional)",
+      "noticeTextHint": "Shown only on the page the message links to, not in the WhatsApp message. Plain text, at most 1000 characters. Never type an Aadhaar number.",
+      "pageNote": "The message has a See details button. It opens a page with the dates, the reason and the order text, until 7 days after the last closed day.",
+      "reopen": {
+        "action": "Send a reopening message",
+        "title": "School reopens",
+        "description": "Tell the same parents when the school opens again. One reopening message per closure; the same sending hours apply.",
+        "date": "School reopens on",
+        "check": "Check the reopening message",
+        "cancel": "Close",
+        "sent": "Reopening message sent",
+        "reopensOn": "Reopens {date}",
+        "none": "No reopening message yet"
       }
     }
   },

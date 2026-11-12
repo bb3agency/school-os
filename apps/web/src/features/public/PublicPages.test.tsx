@@ -409,3 +409,51 @@ describe("payment return page", () => {
     expect(container.textContent).toContain("could not find this payment");
   });
 });
+
+describe("closure page (FP-02 follow-up, FR-PUB-013)", () => {
+  const closure: LinkEnvelope = {
+    ...frame,
+    kind: "parent_closure",
+    closure: {
+      closed_from: "2026-11-13",
+      closed_to: "2026-11-14",
+      reason: "heavy rain or a storm warning",
+      notice_text:
+        "As per the District Collector's order dated 12/11/2026, all schools stay closed.\n\nStay safe indoors.",
+      reopens_on: null,
+    },
+  };
+
+  it("shows the dates, the reason and the order text, read-only", () => {
+    const { container } = render(<LinkFrame envelope={closure} />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("School closed");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The school is closed from 13/11/2026 to 14/11/2026.",
+    );
+    expect(container.textContent).toContain("Reason: heavy rain or a storm warning.");
+    expect(container.textContent).toContain("District Collector's order dated 12/11/2026");
+    expect(container.querySelectorAll(".public-prose p")).toHaveLength(2);
+    expect(container.querySelector("form")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("says when the school reopens, and one-day closures say 'closed on'", () => {
+    const base = closure.closure!;
+    const { container } = render(
+      <LinkFrame
+        envelope={{
+          ...closure,
+          closure: {
+            ...base,
+            closed_to: "2026-11-13",
+            notice_text: null,
+            reopens_on: "2026-11-14",
+          },
+        }}
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("The school is closed on 13/11/2026.");
+    expect(screen.getByRole("status")).toHaveTextContent("The school reopens on 14/11/2026.");
+    expect(container.textContent).not.toContain("Message from the school");
+  });
+});
