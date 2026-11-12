@@ -1135,6 +1135,30 @@ The school's own certificates (fire NOC, building safety, occupancy, recognition
 
 *As built (wave F2, FC-01, 2026-11-09):* FR-COMP-001..022 are built and tested (`apps/api/tests/compliance/`, `apps/api/tests/disclosure/test_compliance_register.py`, `apps/web/src/features/compliance/compliance.test.ts`). FC-07 inspection readiness packs (FR-COMP-023..030) are not built.
 
+### 3.38 Demo school and sales kit (FR-DEMO) (FA-12, wave F3)
+
+A synthetic demo school for sales demonstrations on a laptop and a 10-minute demo script (docs/research/2026-11-features/ai-platform.md FA-12; `app/devtools/demo.py`, `demo_seeder.py`, `seed_demo.py`; [docs/guides/demo-school.md](guides/demo-school.md)). Developer tooling only: no route, permission, table or migration. Invariant 11 applies in full.
+
+| ID | Requirement | Verify |
+|---|---|---|
+| FR-DEMO-001 | `python -m app.devtools.seed_demo` MUST seed exactly one school, "Sunrise Synthetic Demo School", boards BSEAP and CBSE (no class map), from the synthetic generator's plan (`build_plan`), so staff, students and documents carry the generator's markers and `make synthetic-check` finds it. *(Lead decision D86, PO to confirm: one school with both boards shows the SSC/UDISE+ wedge and the CBSE disclosure.)* | T |
+| FR-DEMO-002 | Every name, e-mail, reference number and typed value of the demo school MUST be fictional: the school name says "Synthetic" and "Demo", e-mails are under `.example.invalid`, certificate numbers start `DEMO/`, the disclosure draft has no contact items (no phone or e-mail invented). | T |
+| FR-DEMO-003 | The demo MUST be deterministic for `(seed, generation)` (default seed `20270201`) and idempotent: a re-run completes the live generation and creates nothing that exists (summary `created` empty, same counts). | T |
+| FR-DEMO-004 | `--reset` (`make demo-reset`) MUST delete the live demo school through the offboarding purge (`tenancy.begin_offboarding`, `purge_tenant`, `verify_tenant_purged`; fails when anything remains; the audit chain is retained as for any offboarded school) and seed the next generation `demo-g<n+1>-a`. Only schools whose code matches `demo-g<n>-a` and whose ID is the generator's UUIDv5 for that code may be touched. *(Lead decision D86, PO to confirm: a new generation rather than reusing the purged school's ID, because an offboarded school cannot return to active.)* | T |
+| FR-DEMO-005 | The demo school MUST get the generator's students (400 by default, `--students`), guardians, enrolments, planted mismatches, register pages and circulars (`--no-documents` skips them), Class X fees and messaging rows exactly as `make seed-synthetic`; stdout is one JSON summary with IDs, codes and counts only. | T |
+| FR-DEMO-006 | Earlier-year dues: a 2025-26 Class IX plan MUST be charged to six of today's Class X students through a past enrolment that is then closed as `completed` on 30 April 2026, so their 2025-26 accounts stay open with dues (FR-FEE-031). | T |
+| FR-DEMO-007 | Add-on fees: transport Band 1 and Band 2 on one head and an optional activity fee MUST be assigned to picked Class X students from instalment 1 through `fees.service` (FR-FEE-081..088). | T |
+| FR-DEMO-008 | UDISE+ follow-ups: after one data-quality run over the school, slips MUST be recorded as given for up to four parents and correction requests as sent 20 days ago for up to two MEO fixes on the SSC 2027 readiness profile, so the follow-up page shows waiting and overdue items (FR-UDI-021..027). | T |
+| FR-DEMO-009 | Compliance register: building safety (valid), fire NOC (expiring within 30 days), water safety (expired) and trust registration (no expiry), dated relative to the day of the run, the principal as renewal owner (FR-COMP-004). | T |
+| FR-DEMO-010 | School calendar 2026-27: Sundays and second Saturdays off and four entries (two vacations, one holiday, one extra working day) through `academics.service` (FR-CAL-001..003). Demo dates, not an official calendar. | T |
+| FR-DEMO-011 | Weekly brief: last week's brief MUST be built once through `brief.service.build_week` (FR-BRF). | T |
+| FR-DEMO-012 | CBSE disclosure: a draft with fictional typed values MUST be saved through `disclosure.service.put_draft`; nothing is published (publishing stays a live, step-up action). | T |
+| FR-DEMO-013 | `make seed-demo` and `make demo-reset` MUST run the demo seeder with the same host environment as `make seed-synthetic` (`scripts/dev.py --demo-only`; `DEMO_ARGS`). | T |
+| FR-DEMO-014 | The demo seeder MUST refuse (exit 2, nothing imported or written) unless `SOS_ENV` is `local` or `ci`, with the same check as `seed-synthetic` (`seed_synthetic.allowed`); settings that fail validation are a refusal; `--reset` is refused the same way. | T |
+| FR-DEMO-015 | There MUST be no demo environment and no relaxed guard: a hosted demo (`SOS_ENV=demo`, its guards, upload and import limits) needs an ADR and the owner's hosting decision (D2) first. The sales kit is documentation only and states no price beyond the public pricing page. | I |
+
+*As built (wave F3, FA-12, 2026-11-12):* FR-DEMO-001..014 are built and tested (`apps/api/tests/devtools/test_demo_plan.py`, `test_seed_demo.py`); the demo script is [docs/guides/demo-school.md](guides/demo-school.md). Not built: year-end results in the demo (the generator has no exams or marks), the demo deployment, the "Board readiness" and DPDP landing pages, the `/pricing` calculator and the association handouts (owner decisions and ADR first).
+
 ---
 
 ## 4. Non-functional requirements
