@@ -36,6 +36,7 @@ import {
   type PlanApply,
 } from "./data";
 import { FeesGate, NoAccess } from "./parts";
+import { StructureNoticeCard } from "./StructureNotice";
 
 const headSchema = z.object({
   code: z
@@ -899,6 +900,10 @@ export function SetupScreen() {
                 }
               </FeesGate>
             </Card>
+            {/* FM-10 (FR-FEE-113..124): the year's fee structure notice and the change. */}
+            {years.status === "ready" && classes.status === "ready" ? (
+              <StructureNoticeCard years={years.data.data} classes={classes.data.data} />
+            ) : null}
             {editing && years.status === "ready" && classes.status === "ready" ? (
               <PlanEditor
                 heads={rows}

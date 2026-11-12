@@ -35,6 +35,13 @@ You cannot see student identity details beyond what fees need.
 If a plan changes mid-year, make a **New version**, activate it, then **Propose differences**: each
 student's change becomes an adjustment that a second person approves.
 
+Before activating the new year's plans, open **Fee structure notice** on **Fee setup**. **Change
+against last year** shows each class and head: new, removed, changed, the amounts and the change
+in percent; increases above the school's review level (10% unless you type another value for the
+view) are flagged. It is the school's own check, not a legal limit. **Print notice** gives one A4
+page per class (heads, total for the year, instalments, late fee) for the notice board; a class
+whose plan is still a draft is marked DRAFT.
+
 ## 2. Every day: the counter
 
 1. Open **Collect fees**. Press **/** or **F2** for the search box.

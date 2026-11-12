@@ -170,9 +170,10 @@ def _late_fee_text(rule: dict[str, object]) -> str:
     return words.none
 
 
-def _ordered_classes(session: Session) -> list[tuple[uuid.UUID, str]]:
+def _ordered_classes(session: Session) -> list[tuple[uuid.UUID, str, bool]]:
+    """(id, label, archived) of the school's classes in their order."""
     return [
-        (k.id, k.display_en)
+        (k.id, k.display_en, k.archived_at is not None)
         for k in sorted(tenancy.list_classes(session), key=lambda k: (k.sort_order, k.code))
     ]
 
@@ -201,10 +202,11 @@ def structure_notice(
     words = load_config().notice
     out: list[FeeStructureNoticeClass] = []
     missing: list[str] = []
-    for cid, label in classes:
+    for cid, label, archived in classes:
         found = plans.get(cid)
         if found is None:
-            missing.append(label)
+            if not archived:
+                missing.append(label)
             continue
         out.append(
             FeeStructureNoticeClass(
@@ -299,7 +301,7 @@ def structure_changes(
     current = _class_plans(session, year.id, ("active", "draft"))
     before = _class_plans(session, previous[0], ("active",)) if previous else {}
     rows: list[FeeStructureClassChange] = []
-    for cid, label in _ordered_classes(session):
+    for cid, label, _ in _ordered_classes(session):
         now, then = current.get(cid), before.get(cid)
         if now is None and then is None:
             continue

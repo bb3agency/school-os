@@ -52,6 +52,9 @@ const OWN_CSP_PATHS: readonly RegExp[] = [
   /^\/bff\/api\/v1\/fees\/reports\/(daily|collections)\/print$/i,
   // FM-06 (FR-FEE-046..056): tuition fee tax certificate print view.
   /^\/bff\/api\/v1\/fees\/tax-certificates\/[0-9a-f-]{36}\/print$/i,
+  // FM-07 (FR-FEE-107): the family payment hand-over slip; FM-10 (FR-FEE-115): the fee
+  // structure notice (each answer carries its own policy of hashed style blocks).
+  /^\/bff\/api\/v1\/fees\/(family-payments\/slip|structure-notice\/print)$/i,
   /^\/bff\/api\/v1\/students\/[0-9a-f-]{36}\/apaar-consent\/form$/i,
   /^\/bff\/api\/v1\/sections\/[0-9a-f-]{36}\/(apaar-consent-forms|join-slips)$/i,
   /^\/bff\/api\/v1\/consents\/forms$/i,

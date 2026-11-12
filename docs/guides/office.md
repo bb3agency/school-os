@@ -162,6 +162,14 @@ A wrong receipt is never edited. Open it on **Receipts** and select **Request ca
 principal or accountant approves. If "Today's collection is closed" appears, the accountant has
 closed the day; receipts start again tomorrow.
 
+**Brothers and sisters paying together.** If the student shares a parent or guardian with other
+children on their student records, a **Family** box lists them with what each owes now. Type the
+amount paid for each child (or **Fill in everything due**), choose cash, cheque or bank transfer
+and select **Save receipts**: one receipt is saved for each child, all together. Then print each
+receipt or the **hand-over slip** that lists them all. UPI is not offered there: take each child's
+UPI payment on its own receipt with its own UTR. A child who is missing from the box is not linked
+to the same guardian; add the guardian on that child's record.
+
 Office admins can also **Request concession** on a student's fee account; a second person approves.
 
 ## 6. Parent notices and WhatsApp
