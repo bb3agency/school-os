@@ -363,6 +363,8 @@ def test_FR_COMP_016_register_is_in_the_full_export(school: Any, admin_engine: E
 
     cid = S.certificate(admin_engine, school)
     with tenant_session(school.tenant_id) as db:
-        (table,) = service.export_records(db)
+        # FC-07 (FR-COMP-043): the inspection pack log comes after the register.
+        table, packs_table = service.export_records(db)
     assert table.name == "compliance_certificates"
+    assert packs_table.name == "inspection_packs"
     assert str(cid) in str(table.rows)
