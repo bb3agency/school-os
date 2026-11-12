@@ -55,6 +55,10 @@ def build_report(
         fee_cases=data.fees,
         due_adapter=stub,
         due_cases=data.due,
+        # D86 status set: adapters without ask_status (the app-fake bridge, not built yet) leave
+        # the status_* metrics unmeasured, so their gates fail (missing evidence is not a pass).
+        status_adapter=stub if hasattr(stub, "ask_status") else None,
+        status_cases=data.status,
         ctx=stub,
         ctx_set=data.contextual,
         ctx_fast=suite == "fast",

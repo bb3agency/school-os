@@ -1,6 +1,6 @@
 {
   "adapter": "stub-perfect",
-  "dataset_sha256": "828c4017438995bac08f68477a32f221b43995badd9b3551da3899d7a8c39078",
+  "dataset_sha256": "0650e91bdf2ed49f1cc6997793f8d2a6c3a64fb19893a327cdee951ae3629aef",
   "metrics": {
     "answer_correctness": 1.0,
     "answer_correctness_items": 24,
@@ -83,6 +83,10 @@
     "recall_at_10": 1.0,
     "refusal_correctness": 1.0,
     "retrieval_latency_p95_ms": 223.0,
+    "status_citation_validity": 1.0,
+    "status_items": 11,
+    "status_leakage_count": 0,
+    "status_recall": 1.0,
     "unsupported_high_severity_count": 0,
     "unsupported_sentence_rate": 0.0
   },

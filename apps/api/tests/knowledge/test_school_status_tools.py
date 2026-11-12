@@ -210,3 +210,34 @@ def test_invariant_9_every_new_tool_refuses_without_its_permission_before_readin
     assert out.is_error
     assert out.blocks == ()
     assert tool.spec.input_schema["additionalProperties"] is False
+
+
+STAFF_ROLES = frozenset(
+    {
+        "owner",
+        "principal",
+        "office_admin",
+        "office_staff",
+        "accountant",
+        "exam_coordinator",
+        "class_teacher",
+        "teacher",
+    }
+)
+
+
+def test_FR_KB_079_the_eval_role_table_is_the_role_matrix() -> None:
+    """``sos_evals.status.GRANTS`` (who may use each tool, and how far) equals ``roles.yaml``:
+    the tool's permission together with ``kb.ask``, scoped or school-wide."""
+    from app.authz.catalog import system_roles
+    from sos_evals.status import GRANTS
+
+    tools = load_tools_config().tools
+    for tool, grants in GRANTS.items():
+        permission = tools[tool].permission
+        actual: dict[str, str] = {}
+        for role, template in system_roles().items():
+            grant, ask = template.grant(permission), template.grant("kb.ask")
+            if role in STAFF_ROLES and grant is not None and ask is not None:
+                actual[role] = "scoped" if grant.scoped else "school"
+        assert actual == dict(grants), tool

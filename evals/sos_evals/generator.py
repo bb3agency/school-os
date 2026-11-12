@@ -32,6 +32,8 @@ from sos_evals.fees import FeeCase
 from sos_evals.judge import CalibrationItem
 from sos_evals.judge_cases import build as build_judge_calibration
 from sos_evals.schema import CATEGORIES, Asker, Category, CorpusItem, EvalItem, Locale, Role
+from sos_evals.status import StatusCase
+from sos_evals.status_cases import CASES as STATUS_CASES
 from sos_evals.synthetic import (
     B_DOCS,
     CLASS_DOCS,
@@ -803,6 +805,7 @@ def _jsonl(
     | Sequence[CtxDocument | CtxQuestion]
     | Sequence[ConversationCase]
     | Sequence[DueCase]
+    | Sequence[StatusCase]
     | Sequence[ExtractionCase]
     | Sequence[CalibrationItem],
 ) -> str:
@@ -826,6 +829,7 @@ def render() -> dict[str, str]:
     files["contextual.jsonl"] = _jsonl(rows)
     files["conversations.jsonl"] = _jsonl(CONVERSATION_CASES)
     files["due.jsonl"] = _jsonl(DUE_CASES)
+    files["status.jsonl"] = _jsonl(STATUS_CASES)
     files["extraction.jsonl"] = _jsonl(EXTRACTION_CASES)
     files["judge_calibration.jsonl"] = _jsonl(build_judge_calibration(corpus))
     return files
