@@ -254,6 +254,7 @@ EXPECTED_TABLES = {
     "fees_addon_assignments",
     # FP-02 (0093_msg_reach_closure): urgent closure messages.
     "messaging_closures",
+    "messaging_closure_reopenings",
     # FC-01 (0096_compliance_register): the school's certificate register.
     "compliance_certificates",
     "fees_receipt_cancellations",

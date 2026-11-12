@@ -225,6 +225,8 @@ routes:
   POST /api/v1/fees/reminders/preview: [search]
   # FP-02: a closure preview reads every guardian of the school
   POST /api/v1/messaging/closures/preview: [search]
+  # FP-02 follow-up: a reopening preview reads the closure's guardians the same way
+  POST /api/v1/messaging/closures/{closure_id}/reopening/preview: [search]
   # FM-03: the Tally voucher file reads a period's receipts, cancellations, refunds and demand
   GET /api/v1/tally/vouchers/preview: [search]
   POST /api/v1/tally/vouchers/export: [exports]

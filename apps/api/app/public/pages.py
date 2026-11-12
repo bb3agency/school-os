@@ -6,7 +6,7 @@ school's ``tenant_session`` (RLS) on a handle already re-read by
 :func:`app.public.service.load_handle`, and reads ONLY through other modules' public services:
 ``circulars.service`` (the notice), ``fees.service`` (receipt, dues, payment links, UPI),
 ``students.service`` (the guardian's links, the child's first name and class, the guardian's
-language) and ``messaging.service`` (the opt-in state, the office phone).
+language) and ``messaging.service`` (the opt-in state, the office phone, the closure page).
 
 The page shows exactly ADR-0046 decision 2 for its kind; every response is an explicit allowlist
 (``app.public.schemas``). Anything that does not open a page raises
@@ -40,6 +40,7 @@ from app.public.config import PARENT_TARGET_TYPES, ParentKind, is_parent_kind, r
 from app.public.guards import PublicNotFound
 from app.public.schemas import (
     LanguageChoice,
+    ParentClosureOut,
     ParentDocumentLinkOut,
     ParentDocumentPreparingOut,
     ParentDueInstalmentOut,
@@ -313,6 +314,26 @@ def optin(session: Session, handle: HandleView) -> ParentOptinOut:
     )
 
 
+def closure(session: Session, handle: HandleView, language: Language) -> ParentClosureOut:
+    """FP-02 follow-up (FR-PUB-013): the closure message's read-only page: dates, the reason
+    phrase in ``language``, the principal's order text and the reopening date (once sent).
+    404 for a link without a guardian, another target type, or a closure that is gone (the
+    13-month retention) or while WhatsApp messages are not offered here."""
+    closure_id = target(handle, "parent_closure")
+    if handle.guardian_id is None:
+        raise PublicNotFound()
+    page = messaging.closure_page(session, closure_id, language)
+    if page is None:
+        raise PublicNotFound()
+    return ParentClosureOut(
+        closed_from=page.closed_from,
+        closed_to=page.closed_to,
+        reason=page.reason,
+        notice_text=page.notice_text,
+        reopens_on=page.reopens_on,
+    )
+
+
 def set_language(session: Session, handle: HandleView, choice: LanguageChoice) -> ParentOptinOut:
     """The parent's message language (ADR-0044 decision 4; FR-LANG-003). Never processed while
     the school is suspended (owner decision D31: the guard's resolver already refuses an opt-in
@@ -329,6 +350,7 @@ def set_language(session: Session, handle: HandleView, choice: LanguageChoice) -
 
 __all__ = [
     "PaymentLinkRefused",
+    "closure",
     "document",
     "dues",
     "notice",

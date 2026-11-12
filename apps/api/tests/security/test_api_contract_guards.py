@@ -443,6 +443,9 @@ RESPONSE_FIELD_ALLOWLIST = {
     "digest",
     # FP-02 (FR-MSG-048): a digest of who would get the closure message; it grants nothing.
     "app.messaging.sends.schemas.ClosurePreviewOut.preview_token": "closure preview digest",
+    # FP-02 follow-up (FR-MSG-060): the same for "the school reopens".
+    "app.messaging.sends.schemas.ClosureReopeningPreviewOut.preview_token": "reopening preview "
+    "digest",
     "app.identity.schemas.PermissionOut.key": "permission key",
     "app.identity.schemas.RoleOut.key": "role key",
     "app.platform.schemas.FlagOut.key": "feature flag key",
@@ -572,6 +575,8 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/fees/reminders/preview"): "computes counts (R2-3J); stores and sends nothing",
     ("POST", "/api/v1/messaging/closures/preview"): "computes counts (FP-02); stores and sends "
     "nothing",
+    ("POST", "/api/v1/messaging/closures/{closure_id}/reopening/preview"): "computes counts "
+    "(FP-02 follow-up); stores and sends nothing",
     ("POST", "/api/v1/messaging/templates/sync"): "re-reads Meta; creating is idempotent per "
     "template name",
     ("POST", "/api/v1/messaging/join-slips"): "a print view; each print makes new single-use "

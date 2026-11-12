@@ -16,7 +16,7 @@ from app.core.record_tables import dump_table
 from app.core.records import RecordTable
 from app.messaging.models import Message
 from app.messaging.repository import current_tenant_id
-from app.messaging.sends.models import Broadcast, Closure, SendRun
+from app.messaging.sends.models import Broadcast, Closure, ClosureReopening, SendRun
 
 # --- broadcasts -------------------------------------------------------------------------------
 
@@ -296,6 +296,32 @@ def count_closures(session: Session, *, since: dt.datetime) -> int:
     )
 
 
+# --- FP-02 follow-up: reopening messages (0106_closure_reopen) ----------------------------------
+
+
+def insert_reopening(session: Session, **values: Any) -> ClosureReopening:
+    row = ClosureReopening(tenant_id=current_tenant_id(session), **values)
+    session.add(row)
+    session.flush()
+    return row
+
+
+def get_reopening(session: Session, reopening_id: uuid.UUID) -> ClosureReopening | None:
+    return session.scalars(
+        select(ClosureReopening).where(ClosureReopening.id == reopening_id)
+    ).first()
+
+
+def reopenings_of(
+    session: Session, closure_ids: Collection[uuid.UUID]
+) -> dict[uuid.UUID, ClosureReopening]:
+    """The reopening message of each closure that has one."""
+    if not closure_ids:
+        return {}
+    stmt = select(ClosureReopening).where(ClosureReopening.closure_id.in_(list(closure_ids)))
+    return {row.closure_id: row for row in session.scalars(stmt)}
+
+
 def source_status_counts(
     session: Session, purpose: str, source_ids: Collection[uuid.UUID]
 ) -> dict[uuid.UUID, dict[str, int]]:
@@ -330,12 +356,27 @@ def purge_broadcasts(session: Session, before: dt.datetime) -> int:
     return int(getattr(result, "rowcount", 0) or 0)
 
 
+def purge_reopenings(session: Session, before: dt.datetime) -> int:
+    """Reopening messages older than ``before`` whose messages are gone (13 months)."""
+    has_messages = exists().where(
+        Message.purpose == "school_reopening", Message.source_id == ClosureReopening.id
+    )
+    result = session.execute(
+        delete(ClosureReopening).where(ClosureReopening.sent_at < before, ~has_messages)
+    )
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 def purge_closures(session: Session, before: dt.datetime) -> int:
-    """Closures older than ``before`` whose messages are gone (13 months, docs/05 §13)."""
+    """Closures older than ``before`` whose messages and reopening are gone (13 months,
+    docs/05 §13)."""
     has_messages = exists().where(
         Message.purpose == "school_closure", Message.source_id == Closure.id
     )
-    result = session.execute(delete(Closure).where(Closure.sent_at < before, ~has_messages))
+    has_reopening = exists().where(ClosureReopening.closure_id == Closure.id)
+    result = session.execute(
+        delete(Closure).where(Closure.sent_at < before, ~has_messages, ~has_reopening)
+    )
     return int(getattr(result, "rowcount", 0) or 0)
 
 
@@ -349,6 +390,7 @@ def export_tables(session: Session) -> list[RecordTable]:
         dump_table(session, Broadcast.__table__, name="messaging_broadcasts"),
         dump_table(session, SendRun.__table__, name="messaging_send_runs"),
         dump_table(session, Closure.__table__, name="messaging_closures"),
+        dump_table(session, ClosureReopening.__table__, name="messaging_closure_reopenings"),
     ]
 
 
@@ -363,18 +405,22 @@ __all__ = [
     "get_broadcast",
     "get_closure",
     "get_message",
+    "get_reopening",
     "guardians_sent_notice",
     "insert_broadcast",
     "insert_closure",
+    "insert_reopening",
     "list_broadcasts",
     "list_closures",
     "messages_of_run",
     "purge_broadcasts",
     "purge_closures",
     "purge_previews",
+    "purge_reopenings",
     "purge_runs",
     "queued_count",
     "recent_runs",
+    "reopenings_of",
     "sent_since",
     "set_message",
     "source_status_counts",

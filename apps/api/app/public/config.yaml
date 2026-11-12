@@ -10,6 +10,10 @@ lifetimes_days:
   parent_receipt: 90
   parent_dues: 7
   parent_optin: 7
+  # FP-02 follow-up (FR-PUB-014; lead decision D86, PO to confirm): a closure message's page
+  # works until this many days after the closure's last day (from the end of that IST day),
+  # whenever the message went out.
+  parent_closure: 7
 
 # Expired parent handles are deleted this many days after expiry (FR-PUB-006). The database
 # refuses anything sooner than 30 (policy purge_expired_only, migration 0055).

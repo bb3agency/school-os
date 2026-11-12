@@ -52,6 +52,19 @@ class ParentNoticeOut(_Out):
     has_pdf: bool
 
 
+class ParentClosureOut(_Out):
+    """FP-02 follow-up (FR-PUB-013, FR-MSG-057): the closure message's page, read-only: the
+    closure dates, the reason phrase in the page's language, the order text the principal typed
+    (``None`` when none) and the reopening date once a "school reopens" message was sent.
+    Nothing about a child or a guardian (the school name is on the envelope)."""
+
+    closed_from: dt.date
+    closed_to: dt.date
+    reason: str
+    notice_text: str | None
+    reopens_on: dt.date | None
+
+
 class ParentReceiptLineOut(_Out):
     label: str
     head_name: str
@@ -156,6 +169,7 @@ class LinkEnvelopeOut(_Out):
     receipt: ParentReceiptOut | None = None
     dues: ParentDuesOut | None = None
     optin: ParentOptinOut | None = None
+    closure: ParentClosureOut | None = None
 
 
 class ParentDocumentLinkOut(_Out):
@@ -207,6 +221,7 @@ __all__ = [
     "LinkEnvelopeOut",
     "LinkExchangeIn",
     "LinkExchangeOut",
+    "ParentClosureOut",
     "ParentDocumentLinkOut",
     "ParentDocumentPreparingOut",
     "ParentDueInstalmentOut",
