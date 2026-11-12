@@ -269,6 +269,11 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/messages/{message_id}/revoke-link"): None,
     # R2-3J: another school's receipt or notice is 404 like a random id.
     ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"): None,
+    # FM-08: another school's (cheque) receipt is 404 like a random id.
+    ("POST", "/api/v1/fees/cheques/{receipt_id}/returned"): {
+        "returned_on": "2026-11-01",
+        "reason": "Returned by the bank",
+    },
     ("POST", "/api/v1/notices/{notice_id}/withdraw"): {
         "reason": "The date in this notice was wrong"
     },
