@@ -346,6 +346,8 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/exams/{exam_id}/lock"),
         ("POST", "/api/v1/exams/{exam_id}/unlock"),
         ("GET", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/history"),
+        # FT-14 (D86): completeness is the principal's and the exam coordinator's.
+        ("GET", "/api/v1/completeness/exams/{exam_id}"),
         # FT-08 (D85): year-end results are not owner permissions.
         ("GET", "/api/v1/sections/{section_id}/year-results"),
         ("POST", "/api/v1/sections/{section_id}/year-results"),

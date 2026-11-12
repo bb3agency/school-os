@@ -66,6 +66,13 @@ from app.academics.calendar_service import (
     set_pattern,
     suggestions,
 )
+from app.academics.completeness import (
+    COMPLETENESS_READ,
+    COMPLETENESS_REMIND,
+    attendance_completeness,
+    marks_completeness,
+    send_completeness_reminder,
+)
 from app.academics.config import load_config
 from app.academics.models import Exam, ExamMark, ExamMarkHistory
 from app.academics.schemas import (
@@ -1221,6 +1228,8 @@ __all__ = [
     "BEFORE_ENROLMENT_CODE",
     "CALENDAR_MANAGE",
     "CALENDAR_READ",
+    "COMPLETENESS_READ",
+    "COMPLETENESS_REMIND",
     "EXAM_LOCKED_CODE",
     "EXAM_MANAGE",
     "EXAM_UNLOCK",
@@ -1235,6 +1244,7 @@ __all__ = [
     "ExamResult",
     "absent_students",
     "add_entry",
+    "attendance_completeness",
     "attendance_day",
     "attendance_history",
     "attendance_month",
@@ -1248,6 +1258,7 @@ __all__ = [
     "held_back",
     "list_exams",
     "lock_exam",
+    "marks_completeness",
     "marks_history",
     "percent_of",
     "preview_attendance_sheet",
@@ -1259,6 +1270,7 @@ __all__ = [
     "record_marks",
     "remove_entry",
     "section_marks",
+    "send_completeness_reminder",
     "set_pattern",
     "subject_report",
     "suggestions",
