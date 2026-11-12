@@ -59,6 +59,8 @@ const OWN_CSP_PATHS: readonly RegExp[] = [
   /^\/bff\/api\/v1\/privacy\/requests\/[0-9a-f-]{36}\/letters\/[a-z_]{1,40}$/i,
   // FO-02 (FR-UDI-007): the UDISE+ correction request letter to the MEO.
   /^\/bff\/api\/v1\/dq\/udise-corrections\/[0-9a-f-]{36}\/letter$/i,
+  // FA-08 (FR-DQ-051, FR-DQ-054): the fix-owner letters to parents and to the board office.
+  /^\/bff\/api\/v1\/dq\/readiness\/[a-z0-9][a-z0-9-]{0,63}\/(parent-letters|board-letter)$/i,
 ];
 
 function isNonLocalised(pathname: string): boolean {

@@ -196,6 +196,13 @@ export function SchoolShell({
           icon: "file",
         },
         {
+          // FA-08 (FR-DQ-049..060): fix-owner letters to parents and the board office.
+          href: "/findings/fix-letters",
+          label: t("fixLetters.nav"),
+          permission: "dq.readiness.manage",
+          icon: "file",
+        },
+        {
           href: "/change-requests",
           label: t("changeRequests.nav"),
           permission: ["student.identity_change.request", "student.identity_change.approve"],

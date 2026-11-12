@@ -3900,6 +3900,75 @@
     "chipSection": "Chosen section",
     "chipOneStudent": "One student"
   },
+  "fixLetters": {
+    "nav": "Letters to fix owners",
+    "title": "Letters to parents and the board",
+    "description": "Print the letters that ask a parent to update Aadhaar, or the board office to correct a registration, from the differences the readiness check found. Then record that they were given.",
+    "readinessCrumb": "Board and portal readiness",
+    "aboutTitle": "Letters from the school's records, not AI",
+    "aboutBody": "Each letter is a fixed template filled from the school's records. A letter asks for a correction; nothing in the school's records changes here. The letter to the MEO for UDISE+ corrections is on its own page:",
+    "udiseLink": "UDISE+ corrections to the MEO",
+    "noPermissionTitle": "You cannot print these letters",
+    "noPermissionBody": "Ask the office admin or the principal: this needs permission to run readiness checks.",
+    "profile": "Check",
+    "profiles": {
+      "bseap-ssc-2027": "AP SSC March 2027",
+      "apaar": "APAAR ID"
+    },
+    "unverifiedTitle": "Format not yet confirmed",
+    "unverifiedBody": "These letters follow the public guidance we could find. Show them to your office once and tell us if a different format is wanted.",
+    "parentAbout": "One letter per student. It names the detail, the value in the school's record and what differs. It never shows the Aadhaar number or the Aadhaar details.",
+    "boardAbout": "One letter listing every board registration correction. It goes outside the school, so the principal prints it after signing in again.",
+    "noneTitle": "No letters needed",
+    "noneParent": "Aadhaar agrees with the school's records for every student this check covers.",
+    "noneBoard": "The board registration agrees with the school's records for every student this check covers.",
+    "noSection": "No section",
+    "printSection": "Print letters for this section",
+    "printOne": "Print letter",
+    "newTab": "opens in a new tab",
+    "recipient": "Address the letter to",
+    "prepareBoard": "Prepare the board letter",
+    "checking": "Checking your sign-in…",
+    "openBoard": "Open the board letter",
+    "askPrincipal": "The principal or the office admin prints this letter.",
+    "colStudent": "Student",
+    "colFields": "Details to correct",
+    "colSent": "Last given or sent",
+    "colAction": "Letter",
+    "notShown": "Student outside your classes",
+    "notSent": "Not yet",
+    "emptyTitle": "No students",
+    "emptyBody": "No student needs this letter.",
+    "sent": {
+      "confirm": "Record",
+      "date": "Date",
+      "consequence": "This adds a step to each student's follow-up. It does not change any record.",
+      "parent_aadhaar": {
+        "trigger": "Record letters given",
+        "title": "Record letters given to parents",
+        "description": "{count, plural, one {# student's parent} other {# students' parents}} got the letter. The follow-up then shows the parent as contacted by letter."
+      },
+      "board_registration": {
+        "trigger": "Record letter sent",
+        "title": "Record the board letter as sent",
+        "description": "The letter for {count, plural, one {# student} other {# students}} went to the board office. The follow-up then shows the request as sent by letter."
+      }
+    },
+    "errors": {
+      "nothing_to_print": {
+        "title": "Nothing left to print",
+        "body": "No open difference is left for this letter. Reload the page."
+      },
+      "no_open_fix": {
+        "title": "Some differences changed",
+        "body": "Some students no longer need this letter. Reload the page and try again."
+      },
+      "too_many": {
+        "title": "Too many students",
+        "body": "Print one section at a time."
+      }
+    }
+  },
   "readiness": {
     "nav": "Board readiness",
     "title": "Board readiness",

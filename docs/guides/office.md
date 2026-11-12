@@ -104,6 +104,21 @@ fix what is not ready: the board takes its data from UDISE+.
 4. Import the UDISE+ student list again later: each line shows **Corrected** or **Still wrong**.
    Then select **Mark done** (or **Mark rejected**).
 
+**Letters to fix owners** prints the other letters a readiness difference needs (FA-08). They are
+fixed templates filled from the school's records, not written by AI, and nothing in the records
+changes:
+
+1. **Letters to parents (Aadhaar update)**: one letter per student whose Aadhaar card does not
+   match the school's record. It names the detail, the value in the school's record and what
+   differs, and asks the parent to update Aadhaar at an Aadhaar centre and bring a copy back by a
+   date. It never shows the Aadhaar number or the Aadhaar details. Select **Print letters for this
+   section** or **Print letter** for one student, then, after handing them out, **Record letters
+   given**: the follow-up list then shows the parent as contacted by letter.
+2. **Letter to the board office**: the board registration corrections in one table. The principal
+   or office admin chooses who it is addressed to, selects **Prepare the board letter** (it asks
+   you to confirm it's you) and **Open the board letter**; after sending it, **Record letter
+   sent**.
+
 **Importing the UDISE+ student list.** Upload the Excel file as downloaded from the UDISE+ Student
 Module; you do not need to add an admission number column. SchoolOS finds each row's student by
 PEN, then by the same name, date of birth and class. **Matched by** says how. A row marked

@@ -27,6 +27,7 @@ from app.disclosure.api import router as disclosure_router
 from app.documents.api import router as documents_router
 from app.dq.api import router as dq_router
 from app.dq.api import tasks_router as dq_tasks_router
+from app.dq.fix_letter_api import router as dq_fix_letter_router
 from app.dq.followup_api import router as dq_followup_router
 from app.dq.udise_api import router as udise_router
 from app.exports.api import router as exports_router
@@ -101,6 +102,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(udise_router)  # FO-02 UDISE+ correction requests (before dq paths)
     app.include_router(dq_router)
     app.include_router(dq_followup_router)
+    app.include_router(dq_fix_letter_router)  # FA-08 fix-owner letters
     # R3-1D (FR-RDY-010): link a circular task to a portal calendar event.
     app.include_router(dq_tasks_router)
     app.include_router(platform_tenant_router)
