@@ -17,6 +17,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
+    field_validator,
     model_validator,
 )
 
@@ -361,6 +362,20 @@ class ClosureIn(_In):
     closed_from: dt.date
     closed_to: dt.date | None = None
     reason: ClosureReasonCode
+    notice_text: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="FP-02 follow-up (FR-MSG-056): the order text for the closure's parent page "
+        "(plain text, at most 1000 characters). Never in the WhatsApp message.",
+    )
+
+    @field_validator("notice_text")
+    @classmethod
+    def _plain_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = unicodedata.normalize("NFC", value).replace("\r\n", "\n").strip()
+        return text or None
 
     @model_validator(mode="after")
     def _audience(self) -> ClosureIn:
@@ -400,6 +415,54 @@ class ClosurePreviewOut(_Out):
     recent_closures: int = Field(description="Closure messages sent in the last uses_window_days.")
 
 
+class ClosureReopeningIn(_In):
+    """FP-02 follow-up (FR-MSG-059, FR-MSG-060): "the school reopens on <date>" to the closure's
+    audience (the whole school or its sections, as they are now)."""
+
+    reopens_on: dt.date
+
+
+class ClosureReopeningConfirmIn(ClosureReopeningIn):
+    """Send the previewed reopening message (``Idempotency-Key``; step-up). The preview token
+    pins who gets it (409 ``preview_stale`` when that changed)."""
+
+    preview_token: str = Field(min_length=8, max_length=80)
+
+
+class ClosureReopeningPreviewOut(_Out):
+    preview_token: str
+    closure_id: uuid.UUID
+    reopens_on: dt.date
+    guardians: int
+    recipients: int
+    skipped: dict[str, int] = Field(description="Guardians left out by reason.")
+    languages: dict[str, int]
+    language_fallbacks: int
+    estimated_cost_inr: str
+    message_en: str = Field(description="The English message parents will get.")
+    sends_at: dt.datetime | None = Field(
+        description="When sending starts: null = now; otherwise the next opening of the closure "
+        "window."
+    )
+    window_start: dt.time
+    window_end: dt.time
+    blocked_reason: str | None
+
+
+class ClosureReopeningOut(_Out):
+    id: uuid.UUID
+    closure_id: uuid.UUID
+    reopens_on: dt.date
+    recipients: int
+    queued: int
+    skipped: dict[str, int]
+    languages: dict[str, int]
+    estimated_cost_inr: str
+    counts: dict[str, int] = Field(description="Messages by status now.")
+    sent_by: uuid.UUID
+    sent_at: dt.datetime
+
+
 class ClosureOut(_Out):
     id: uuid.UUID
     whole_school: bool
@@ -415,6 +478,10 @@ class ClosureOut(_Out):
     counts: dict[str, int] = Field(description="Messages by status now.")
     sent_by: uuid.UUID
     sent_at: dt.datetime
+    notice_text: str | None = None
+    reopening: ClosureReopeningOut | None = Field(
+        default=None, description='The "school reopens" message, once sent (FR-MSG-064).'
+    )
 
 
 class ClosurePage(_Out):
@@ -443,6 +510,10 @@ __all__ = [
     "ClosureOut",
     "ClosurePage",
     "ClosurePreviewOut",
+    "ClosureReopeningConfirmIn",
+    "ClosureReopeningIn",
+    "ClosureReopeningOut",
+    "ClosureReopeningPreviewOut",
     "CoverageOut",
     "FeeReminderPreviewOut",
     "FeeReminderSelectionIn",

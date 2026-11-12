@@ -121,8 +121,10 @@ templates:
   # FP-02 (FR-MSG-047; ADR-0043 amendment of 2026-11-09): the urgent closure message. Utility
   # (a safety update about the child's school day; Meta decides the category at review). Sent
   # only by the principal, also inside quiet hours (06:00-21:30 IST window, config closures).
+  # Version 2 (FP-02 follow-up, FR-MSG-057; D86): a "See details" button to the closure's
+  # read-only parent page (parent_closure link). Needs Meta's approval per school again.
   school_closure:
-    version: 1
+    version: 2
     purpose: school_closure
     category: utility
     optin_category: notices
@@ -130,13 +132,34 @@ templates:
       - {name: school_name, max_length: 60}
       - {name: dates, max_length: 40}
       - {name: reason, max_length: 80}
+    buttons: [url]
+    en:
+      reviewed: true
+      body: "Urgent update from {{1}}: the school will be closed on {{2}} because of {{3}}. Tap the button below for details."
+      url_label: See details
+    te:
+      reviewed: false
+      body: "అత్యవసర సమాచారం ({{1}}): {{3}} కారణంగా {{2}} న పాఠశాల మూసి ఉంటుంది. వివరాల కోసం కింద ఉన్న బటన్ నొక్కండి."
+      url_label: వివరాలు చూడండి
+
+  # FP-02 follow-up (FR-MSG-059; ADR-0043 amendment of 2026-11-12, D86): "the school reopens"
+  # after a closure message. Same rules as the closure: utility, notices opt-in, the principal
+  # only with step-up, the closure window (06:00-21:30 IST). Needs Meta's approval per school.
+  school_reopening:
+    version: 1
+    purpose: school_reopening
+    category: utility
+    optin_category: notices
+    variables:
+      - {name: school_name, max_length: 60}
+      - {name: date, max_length: 20}
     buttons: []
     en:
       reviewed: true
-      body: "Urgent update from {{1}}: the school will be closed on {{2}} because of {{3}}. Please contact the school office if you have questions."
+      body: "Update from {{1}}: the school will reopen on {{2}}. Please contact the school office if you have questions."
     te:
       reviewed: false
-      body: "అత్యవసర సమాచారం ({{1}}): {{3}} కారణంగా {{2}} న పాఠశాల మూసి ఉంటుంది. ప్రశ్నలు ఉంటే దయచేసి పాఠశాల కార్యాలయాన్ని సంప్రదించండి."
+      body: "సమాచారం ({{1}}): పాఠశాల {{2}} న మళ్ళీ తెరుచుకుంటుంది. ప్రశ్నలు ఉంటే దయచేసి పాఠశాల కార్యాలయాన్ని సంప్రదించండి."
 
 texts:
   optin_stopped:

@@ -18,7 +18,7 @@ from sqlalchemy import Engine, text
 from app.core.db import tenant_session
 from app.identity.service_token import SERVICE_TOKEN_HEADER, issue_service_token
 from app.public import service
-from app.public.config import PARENT_TARGET_TYPES, HandleKind
+from app.public.config import PARENT_TARGET_TYPES, TARGET_DATED_KINDS, HandleKind
 from app.public.guards import PUBLIC_TOKEN_HEADER
 
 TESTS = Path(__file__).resolve().parents[1]
@@ -65,8 +65,12 @@ def issue(
 ) -> service.IssuedHandle:
     """A handle of ``school``. A ``parent_notice`` without ``target_id`` points at a fresh
     approved synthetic notice (R2-3H: the page shows it); other kinds default to the target
-    type their page expects (``PARENT_TARGET_TYPES``) and a random target id."""
+    type their page expects (``PARENT_TARGET_TYPES``) and a random target id. A target-dated
+    kind (``parent_closure``) gets an expiry a week from now (FR-PUB-014)."""
     owner = school.people["owner"]
+    expires_at = (
+        dt.datetime.now(dt.UTC) + dt.timedelta(days=7) if kind in TARGET_DATED_KINDS else None
+    )
     with tenant_session(school.tenant_id, owner.user_id if by_owner else None) as db:
         if kind == "parent_notice" and target_id is None:
             target_id = approved_notice(db, owner.user_id)
@@ -78,6 +82,7 @@ def issue(
             guardian_id=guardian_id,
             key=key,
             created_by=owner.user_id if by_owner else None,
+            expires_at=expires_at,
         )
 
 

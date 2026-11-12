@@ -1,5 +1,5 @@
 """Public parent-link routes (docs/09 §4 "Public"; ADR-0046, ADR-0047; FR-PUB-001, FR-PUB-008,
-FR-PUB-010..012).
+FR-PUB-010..013).
 
 Called only by the web BFF's ``(public)`` route group with its service token and no user token
 (:func:`app.public.guards.require_public_handle`); each route is listed in
@@ -11,8 +11,9 @@ after the resolve still wins. Every key that does not open a page gets the same 
   on 200, sets the ``__Host-sos_parent`` cookie until ``expires_at`` and answers 303 to
   ``/p/view``. Not a view (link previews end here).
 - ``GET /public/links/current``: the cookie's page: kind, expiry, language, school name and the
-  content block of its kind (R2-3H, ``app.public.pages``). Counts a view; the first one is
-  audited. A link whose content cannot be shown is the same 404 (and not counted).
+  content block of its kind (R2-3H, ``app.public.pages``; FP-02 follow-up: the closure page).
+  Counts a view; the first one is audited. A link whose content cannot be shown is the same
+  404 (and not counted).
 - ``GET /public/links/current/document``: the notice or receipt PDF (presigned, at most 5 min);
   202 ``preparing`` while the worker renders an expired notice PDF again (D71).
 - ``POST /public/links/current/pay``: "Pay online" on a dues link: creates or reuses the payment
@@ -131,6 +132,8 @@ def _envelope(caller: PublicCaller) -> LinkEnvelopeOut:
             content["receipt"] = pages.receipt(session, handle)
         elif kind == "parent_dues":
             content["dues"] = pages.dues(session, handle)
+        elif kind == "parent_closure":
+            content["closure"] = pages.closure(session, handle, language)
         else:
             content["optin"] = pages.optin(session, handle)
         name = tenancy.school_display_name(session)

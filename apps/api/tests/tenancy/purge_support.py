@@ -1002,13 +1002,24 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
         )
         # --- FP-02 urgent closure messages (0093_msg_reach_closure) -------------------------
+        closure = uuid.uuid4()
         _run(
             c,
             "INSERT INTO msg.closures (id, tenant_id, whole_school, closed_from, closed_to, "
-            "reason_code, sent_by) VALUES (:i, :t, true, current_date, current_date, "
-            "'weather', :u)",
+            "reason_code, sent_by, notice_text) VALUES (:i, :t, true, current_date, "
+            "current_date, 'weather', :u, 'Synthetic closure order text')",
+            i=closure,
+            t=t,
+            u=u["user"],
+        )
+        # --- FP-02 follow-up: the reopening message of that closure (0100_closure_reopen) ----
+        _run(
+            c,
+            "INSERT INTO msg.closure_reopenings (id, tenant_id, closure_id, reopens_on, sent_by) "
+            "VALUES (:i, :t, :c, current_date + 1, :u)",
             i=uuid.uuid4(),
             t=t,
+            c=closure,
             u=u["user"],
         )
         # --- CBSE disclosure (R3-1C, 0065_disclosure): a draft, a snapshot and its document --

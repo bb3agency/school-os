@@ -24,8 +24,12 @@ HandleKind = Literal[
     "meta_waba",
     # R3-1C (ADR-0051 amends ADR-0047 decision 1): the CBSE Appendix IX disclosure page.
     "school_disclosure",
+    # FP-02 follow-up (ADR-0046 amendment of 2026-11-12, D86): the closure message's page.
+    "parent_closure",
 ]
-ParentKind = Literal["parent_notice", "parent_receipt", "parent_dues", "parent_optin"]
+ParentKind = Literal[
+    "parent_notice", "parent_receipt", "parent_dues", "parent_optin", "parent_closure"
+]
 WebhookProvider = Literal["razorpay", "meta"]
 
 HANDLE_KINDS: Final[tuple[HandleKind, ...]] = get_args(HandleKind)
@@ -38,7 +42,11 @@ PARENT_TARGET_TYPES: Final[dict[ParentKind, str]] = {
     "parent_receipt": "fee_receipt",  # fin.receipts.id
     "parent_dues": "fee_account",  # fin.student_fee_accounts.id
     "parent_optin": "guardian",  # the guardian's id (same as guardian_id)
+    "parent_closure": "school_closure",  # msg.closures.id (FP-02 follow-up, D86)
 }
+# Parent kinds whose expiry is counted from a date of the target, not from the issue: a closure
+# link works until lifetimes_days after the closure's last day (FR-PUB-014); the issuer passes it.
+TARGET_DATED_KINDS: Final[frozenset[str]] = frozenset({"parent_closure"})
 # The database refuses to delete expired handles sooner (policy purge_expired_only, 0055).
 MIN_PURGE_AFTER_DAYS: Final = 30
 
@@ -116,6 +124,7 @@ __all__ = [
     "MIN_PURGE_AFTER_DAYS",
     "PARENT_KINDS",
     "PARENT_TARGET_TYPES",
+    "TARGET_DATED_KINDS",
     "WEBHOOK_PROVIDERS",
     "HandleKind",
     "ParentKind",

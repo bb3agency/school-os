@@ -27,6 +27,7 @@ import uuid
 from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Any, Final
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
@@ -44,6 +45,7 @@ from app.public.config import (
     HANDLE_KINDS,
     PARENT_KINDS,
     PARENT_TARGET_TYPES,
+    TARGET_DATED_KINDS,
     HandleKind,
     ParentKind,
     is_parent_kind,
@@ -59,6 +61,7 @@ _CODE: Final = re.compile(r"^[a-z][a-z_]{1,39}$")
 # Kinds whose key the service generates; the others are given by the caller (a certificate code
 # made by app.certificates, a WABA id from the provider).
 _GENERATED: Final = frozenset({*PARENT_KINDS, "razorpay_route", "school_disclosure"})
+_IST: Final = ZoneInfo("Asia/Kolkata")
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +138,21 @@ def _check_code(name: str, value: str) -> None:
 # --- issue ------------------------------------------------------------------------------------
 
 
+def _expiry(session: Session, kind: HandleKind, given: dt.datetime | None) -> dt.datetime | None:
+    """A handle's expiry: the given one for target-dated parent kinds (in the future), the
+    kind's lifetime from now for the other parent kinds, none for the rest."""
+    if (given is not None) != (kind in TARGET_DATED_KINDS):
+        raise ValueError(f"{kind} links take an explicit expiry exactly when target-dated")
+    if given is not None:
+        if given <= repo.now(session):
+            raise ValueError("a link must expire in the future")
+        return given
+    if not is_parent_kind(kind):
+        return None
+    parent_kind: ParentKind = kind  # type: ignore[assignment]
+    return repo.now(session) + rules().lifetime(parent_kind)
+
+
 def issue_handle(
     session: Session,
     *,
@@ -145,6 +163,7 @@ def issue_handle(
     key: str | None = None,
     created_by: uuid.UUID | None = None,
     message_id: uuid.UUID | None = None,
+    expires_at: dt.datetime | None = None,
 ) -> IssuedHandle:
     """Create a handle for the current school (``tenant_session``) and audit it.
 
@@ -156,7 +175,9 @@ def issue_handle(
     passes the key (a certificate code, a WABA id); they never expire. ``created_by`` is the
     member who caused the issue (``None`` for system jobs). Raises :class:`HandleKeyInUse`
     (409) when the key already belongs to a handle of that kind in any school (fails closed,
-    nothing is revealed about which)."""
+    nothing is revealed about which). ``expires_at``: required for the target-dated parent kinds
+    (``parent_closure``: the end of the closure plus its lifetime; FR-PUB-014), refused for
+    every other kind; it must be in the future."""
     if kind not in HANDLE_KINDS:
         raise ValueError(f"unknown public handle kind {kind!r}")
     _check_code("target_type", target_type)
@@ -174,10 +195,7 @@ def issue_handle(
                 [{"field": "key", "code": "invalid_format", "message_key": "errors.invalid"}]
             )
         returned = None
-    expires_at: dt.datetime | None = None
-    if parent:
-        parent_kind: ParentKind = kind  # type: ignore[assignment]
-        expires_at = repo.now(session) + rules().lifetime(parent_kind)
+    expires_at = _expiry(session, kind, expires_at)
     handle_id = new_id()
     savepoint = session.begin_nested()
     try:
@@ -215,6 +233,16 @@ def issue_handle(
     return IssuedHandle(handle_id=row.id, kind=kind, key=returned, expires_at=expires_at)
 
 
+def dated_link_expiry(kind: ParentKind, last_day: dt.date) -> dt.datetime:
+    """When a target-dated parent link stops working: the end of ``last_day`` (IST) plus the
+    kind's ``lifetimes_days`` (``parent_closure``: 7 days after the closure's last day;
+    FR-PUB-014)."""
+    if kind not in TARGET_DATED_KINDS:
+        raise ValueError(f"{kind} links expire by their lifetime from the issue")
+    end_of_day = dt.datetime.combine(last_day + dt.timedelta(days=1), dt.time(0), tzinfo=_IST)
+    return end_of_day + rules().lifetime(kind)
+
+
 def issue_parent_link(
     session: Session,
     *,
@@ -223,10 +251,12 @@ def issue_parent_link(
     guardian_id: uuid.UUID,
     message_id: uuid.UUID | None = None,
     created_by: uuid.UUID | None = None,
+    expires_at: dt.datetime | None = None,
 ) -> IssuedHandle:
     """A parent link with the target type its page expects (``PARENT_TARGET_TYPES``; R2-3H
-    pages, R2-3G sends): a notice, receipt, fee account or (opt-in) the guardian itself, always
-    for one guardian (FR-PUB-005). The link is ``f"{SOS_PUBLIC_BASE_URL}/p/{issued.key}"``."""
+    pages, R2-3G sends): a notice, receipt, fee account, (opt-in) the guardian itself or (FP-02
+    follow-up) a closure, always for one guardian (FR-PUB-005). The link is
+    ``f"{SOS_PUBLIC_BASE_URL}/p/{issued.key}"``. ``expires_at`` only for ``parent_closure``."""
     if kind not in PARENT_KINDS:
         raise ValueError(f"{kind!r} is not a parent link kind")
     if kind == "parent_optin" and target_id != guardian_id:
@@ -239,6 +269,7 @@ def issue_parent_link(
         guardian_id=guardian_id,
         created_by=created_by,
         message_id=message_id,
+        expires_at=expires_at,
     )
 
 
@@ -438,6 +469,7 @@ __all__ = [
     "HandleView",
     "IssuedHandle",
     "ResolvedHandle",
+    "dated_link_expiry",
     "issue_handle",
     "issue_parent_link",
     "load_handle",

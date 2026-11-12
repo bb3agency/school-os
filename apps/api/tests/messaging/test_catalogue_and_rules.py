@@ -33,6 +33,7 @@ def test_FR_MSG_005_catalogue_is_utility_only() -> None:
         "fee_reminder",
         "fee_receipt",
         "school_closure",  # FP-02 (FR-MSG-047): a safety update, utility
+        "school_reopening",  # FP-02 follow-up (FR-MSG-059): the school reopens, utility
     }
     assert {t.category for t in templates.values()} == {"utility"}
 

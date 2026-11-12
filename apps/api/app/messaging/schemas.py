@@ -41,6 +41,7 @@ MessagePurpose = Literal[
     "fee_receipt",
     "optin_stopped",
     "school_closure",
+    "school_reopening",
 ]
 
 

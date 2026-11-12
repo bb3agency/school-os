@@ -20,6 +20,8 @@ def test_FR_PUB_006_lifetimes_are_the_owner_decided_ones() -> None:
         "parent_receipt": 90,
         "parent_dues": 7,
         "parent_optin": 7,
+        # FP-02 follow-up (FR-PUB-014, D86): days after the closure's last day.
+        "parent_closure": 7,
     }
     assert cfg.purge_after_days == 30
     assert set(cfg.webhook_providers) == {"razorpay", "meta"}

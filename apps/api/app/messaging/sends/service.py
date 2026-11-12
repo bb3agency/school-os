@@ -106,15 +106,28 @@ REMINDER_TOKEN_PREFIX: Final = "fr_"  # noqa: S105 - a preview digest prefix, no
 MANUAL_ALLOWED: Final = frozenset({"fee_reminder", "fee_receipt"})
 TOKEN_PREFIX: Final = "bp_"  # noqa: S105 - a preview id prefix, not a secret
 SENDING_PURPOSES: Final = frozenset(
-    {"school_notice", "absence_alert", "fee_reminder", "fee_receipt", "school_closure"}
+    {
+        "school_notice",
+        "absence_alert",
+        "fee_reminder",
+        "fee_receipt",
+        "school_closure",
+        "school_reopening",
+    }
 )
+# FP-02: purposes sent in the closure window (06:00-21:30 IST) instead of quiet hours.
+CLOSURE_WINDOW_PURPOSES: Final = frozenset({"school_closure", "school_reopening"})
 # Parent link kind per purpose (ADR-0046). The target type is the R2-3H pages' contract
 # (app.public.config.PARENT_TARGET_TYPES, applied by public.service.issue_parent_link); the
 # message's source is the link's target (notice, fee account, receipt).
-LINKS: Final[dict[str, Literal["parent_notice", "parent_dues", "parent_receipt"]]] = {
+LINKS: Final[
+    dict[str, Literal["parent_notice", "parent_dues", "parent_receipt", "parent_closure"]]
+] = {
     "school_notice": "parent_notice",
     "fee_reminder": "parent_dues",
     "fee_receipt": "parent_receipt",
+    # FP-02 follow-up (FR-MSG-057, FR-PUB-014): the closure's read-only page.
+    "school_closure": "parent_closure",
 }
 _SWITCH: Final = {
     "school_notice": "notices_enabled",
@@ -123,6 +136,8 @@ _SWITCH: Final = {
     "fee_receipt": "fee_receipts_enabled",
     # FP-02: the urgent closure message is a notice to parents (FR-MSG-051).
     "school_closure": "notices_enabled",
+    # FP-02 follow-up: and so is "the school reopens" (FR-MSG-062).
+    "school_reopening": "notices_enabled",
 }
 
 ops.register_outbox_route(SEND_EVENT, SEND_TASK)
@@ -1248,6 +1263,22 @@ def _notice_live(session: Session, notice_id: uuid.UUID) -> bool:
     return notice is not None and notice.approved
 
 
+def _closure_live(
+    session: Session, message: Message, now: dt.datetime
+) -> tuple[bool, dt.datetime | None]:
+    """Whether a closure or reopening message still makes sense at ``now`` (a closure whose last
+    day has passed, or a reopening whose day has passed, is too late: FR-MSG-050, FR-MSG-063),
+    and when a closure message's parent link expires (FR-PUB-014)."""
+    today = rules.ist_today(now)
+    if message.purpose == "school_closure":
+        closure = repo.get_closure(session, message.source_id)
+        if closure is None or closure.closed_to < today:
+            return False, None
+        return True, public.dated_link_expiry("parent_closure", closure.closed_to)
+    reopening = repo.get_reopening(session, message.source_id)
+    return reopening is not None and reopening.reopens_on >= today, None
+
+
 def _claim(  # noqa: PLR0911 - one return per outcome
     session: Session, message_id: uuid.UUID, now: dt.datetime, started: dt.datetime
 ) -> _Claim | str:
@@ -1274,11 +1305,12 @@ def _claim(  # noqa: PLR0911 - one return per outcome
         return _skip(session, message, "too_late")
     quiet_start = settings.quiet_start if settings else dt.time(21, 0)
     quiet_end = settings.quiet_end if settings else dt.time(7, 0)
-    if message.purpose == "school_closure":
+    link_expires: dt.datetime | None = None
+    if message.purpose in CLOSURE_WINDOW_PURPOSES:
         # FP-02 (FR-MSG-050, ADR-0043 amendment, D85): the closure window replaces quiet
-        # hours (06:00-21:30 IST by default); a closure whose last day has passed is too late.
-        closure = repo.get_closure(session, message.source_id)
-        if closure is None or closure.closed_to < rules.ist_today(now):
+        # hours (06:00-21:30 IST by default).
+        live, link_expires = _closure_live(session, message, now)
+        if not live:
             return _skip(session, message, "too_late")
         window = load_config().closures
         opens = rules.closure_next_open(
@@ -1322,6 +1354,7 @@ def _claim(  # noqa: PLR0911 - one return per outcome
             target_id=message.source_id,
             guardian_id=message.guardian_id,
             message_id=message.id,
+            expires_at=link_expires,
         )
         key, handle_id = issued.key, issued.handle_id
         values["public_handle_id"] = handle_id
@@ -1402,9 +1435,16 @@ def purge_expired(tenant_id: uuid.UUID) -> dict[str, int]:
         )
         old = now - dt.timedelta(days=cfg.retention.messages_days)
         broadcasts = repo.purge_broadcasts(session, old)
+        reopenings = repo.purge_reopenings(session, old)
         closures = repo.purge_closures(session, old)
         runs = repo.purge_runs(session, rules.ist_today(old))
-    return {"previews": previews, "broadcasts": broadcasts, "closures": closures, "runs": runs}
+    return {
+        "previews": previews,
+        "broadcasts": broadcasts,
+        "reopenings": reopenings,
+        "closures": closures,
+        "runs": runs,
+    }
 
 
 __all__ = [

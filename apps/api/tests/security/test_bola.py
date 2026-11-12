@@ -10,6 +10,7 @@ invariant 3, docs/12 §4.3-4.4).
 from __future__ import annotations
 
 import contextlib
+import datetime as dt
 import importlib.util
 import re
 import sys
@@ -1040,6 +1041,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     # FC-09/FC-10: a safety check entry and a policy of school B (_safety, below).
     "check_id": lambda w: _safety().b_id(_ADMIN[0], w, "/api/v1/compliance/checks/"),
     "policy_id": lambda w: _safety().b_id(_ADMIN[0], w, "/api/v1/compliance/policies/"),
+    # FP-02 follow-up (FR-MSG-060): an urgent closure message of school B.
+    "closure_id": lambda w: _b_closure(_ADMIN[0], w),
 }
 
 
@@ -1058,6 +1061,47 @@ def _b_brief(admin: Engine, w: Any) -> uuid.UUID:
         w.b.ids["bola_brief"] = brief_id
     value: uuid.UUID = w.b.ids["bola_brief"]
     return value
+
+
+def _b_closure(admin: Engine, w: Any) -> uuid.UUID:
+    """An urgent closure message of school B (today only; no messages)."""
+    if "bola_closure" not in w.b.ids:
+        closure_id = uuid.uuid4()
+        with admin.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO msg.closures (id, tenant_id, whole_school, closed_from, "
+                    "closed_to, reason_code, sent_by) VALUES (:i, :t, true, current_date, "
+                    "current_date, 'weather', :u)"
+                ),
+                {"i": closure_id, "t": w.b.tenant_id, "u": w.b.people["owner"].user_id},
+            )
+        w.b.ids["bola_closure"] = closure_id
+    value: uuid.UUID = w.b.ids["bola_closure"]
+    return value
+
+
+# message.closure.send is the principal's only (D85).
+ACTOR.update(
+    dict.fromkeys(
+        (
+            ("POST", "/api/v1/messaging/closures/{closure_id}/reopening/preview"),
+            ("POST", "/api/v1/messaging/closures/{closure_id}/reopening"),
+        ),
+        "principal",
+    )
+)
+BODIES.update(
+    {
+        ("POST", "/api/v1/messaging/closures/{closure_id}/reopening/preview"): {
+            "reopens_on": (dt.datetime.now(dt.UTC).date() + dt.timedelta(days=1)).isoformat()
+        },
+        ("POST", "/api/v1/messaging/closures/{closure_id}/reopening"): {
+            "reopens_on": (dt.datetime.now(dt.UTC).date() + dt.timedelta(days=1)).isoformat(),
+            "preview_token": "ro_" + "0" * 40,
+        },
+    }
+)
 
 
 def _id_routes() -> list[tuple[str, str]]:

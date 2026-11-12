@@ -148,6 +148,9 @@ class ClosureConfig(_Model):
     max_days: int = Field(ge=1, le=31)
     # Shown on the principal's screen: closure messages sent in the last this many days.
     uses_window_days: int = Field(ge=7, le=366)
+    # FP-02 follow-up (FR-MSG-060): the "school reopens" date may be at most this many days
+    # after the day following the closure's last day (a closure extended by a few days).
+    reopen_max_days_after: int = Field(ge=0, le=30)
     reasons: dict[ClosureReason, ClosureReasonText]
 
     @model_validator(mode="after")

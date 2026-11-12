@@ -9,7 +9,8 @@ import { parentLanguage, type ParentLanguage } from "./messages";
 
 /**
  * `/p/view`: the cookie's link, re-resolved by the API on every request (FR-PUB-010), with the
- * content of its kind (R2-3H: notice, receipt, dues or opt-in; ADR-0046 decision 2). Only the
+ * content of its kind (R2-3H: notice, receipt, dues or opt-in; ADR-0046 decision 2; FP-02
+ * follow-up: the closure message's read-only page). Only the
  * parent cookie is read (never a staff session cookie, even where both share a local origin).
  * Every failure is the uniform expired page; a 429 or an unreachable API is "busy" so the page
  * can say so without naming anything. The forms on the page carry a CSRF token bound to the
@@ -18,23 +19,47 @@ import { parentLanguage, type ParentLanguage } from "./messages";
 
 const CURRENT_PATH = "/api/v1/public/links/current";
 
-export type LinkPage = Omit<components["schemas"]["LinkEnvelopeOut"], "language"> & {
+/**
+ * FP-02 follow-up (FR-PUB-013; D86): the closure message's read-only page. Hand-written until
+ * the lead regenerates the client; then it is `components["schemas"]["ParentClosureOut"]` and
+ * `LinkEnvelopeOut` carries `closure` and the `parent_closure` kind itself.
+ */
+export interface ParentClosure {
+  closed_from: string;
+  closed_to: string;
+  reason: string;
+  notice_text: string | null;
+  reopens_on: string | null;
+}
+
+type Envelope = components["schemas"]["LinkEnvelopeOut"];
+
+export type LinkPage = Omit<Envelope, "language" | "kind"> & {
+  kind: Envelope["kind"] | "parent_closure";
   language: ParentLanguage;
+  closure?: ParentClosure | null;
 };
 
 export type LinkView =
   { state: "ok"; envelope: LinkPage; csrf: string } | { state: "expired" } | { state: "busy" };
 
-const KINDS = new Set(["parent_notice", "parent_receipt", "parent_dues", "parent_optin"]);
+const KINDS = new Set([
+  "parent_notice",
+  "parent_receipt",
+  "parent_dues",
+  "parent_optin",
+  "parent_closure",
+]);
 const CONTENT: Record<string, keyof LinkPage> = {
   parent_notice: "notice",
   parent_receipt: "receipt",
   parent_dues: "dues",
   parent_optin: "optin",
+  parent_closure: "closure",
 };
 
-function isEnvelope(value: unknown): value is components["schemas"]["LinkEnvelopeOut"] {
-  const v = value as Partial<components["schemas"]["LinkEnvelopeOut"]> | null;
+function isEnvelope(value: unknown): value is Omit<LinkPage, "language"> & { language: string } {
+  const v = value as Partial<LinkPage> | null;
   if (
     typeof v?.kind !== "string" ||
     !KINDS.has(v.kind) ||

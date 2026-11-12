@@ -2786,8 +2786,41 @@ SPECS.update(
             None,
             {},
         ),
+        # FP-02 follow-up (FR-MSG-059..063): a closure of school A that started today.
+        ("POST", "/api/v1/messaging/closures/{closure_id}/reopening/preview"): lambda w, r, a: (
+            f"/api/v1/messaging/closures/{_closure_row(w, a)}/reopening/preview",
+            {"reopens_on": _closure_day()},
+            {},
+        ),
+        # A digest that is not the preview's: the guard passed, the service says 409.
+        ("POST", "/api/v1/messaging/closures/{closure_id}/reopening"): lambda w, r, a: (
+            f"/api/v1/messaging/closures/{_closure_row(w, a)}/reopening",
+            {"reopens_on": _closure_day(), "preview_token": "ro_" + "0" * 40},
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
     }
 )
+
+
+def _closure_row(w: Any, a: Engine) -> uuid.UUID:
+    """A synthetic closure of school A (today only), inserted once (FP-02 follow-up)."""
+    if "closure" not in _SENDS:
+        closure = uuid.uuid4()
+        with a.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO msg.closures (id, tenant_id, whole_school, closed_from, "
+                    "closed_to, reason_code, sent_by) VALUES (:i, :t, true, :d, :d, 'weather', :u)"
+                ),
+                {
+                    "i": closure,
+                    "t": w.a.tenant_id,
+                    "d": dt.datetime.now(dt.UTC).date(),
+                    "u": w.a.people["owner"].user_id,
+                },
+            )
+        _SENDS["closure"] = closure
+    return _SENDS["closure"]
 
 
 # --- R2-3J: manual fee reminders, a receipt on WhatsApp, notice withdrawal ---------------------
@@ -3312,7 +3345,10 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"),
     ):
         return 409  # guard passed; a stale digest / nobody to send to (R2-3J)
-    if (method, path) == ("POST", "/api/v1/messaging/closures"):
+    if (method, path) in (
+        ("POST", "/api/v1/messaging/closures"),
+        ("POST", "/api/v1/messaging/closures/{closure_id}/reopening"),
+    ):
         return 409  # guard passed; the digest is not the preview's (FP-02)
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)

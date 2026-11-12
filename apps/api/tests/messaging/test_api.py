@@ -91,7 +91,8 @@ def test_FR_MSG_003_manual_token_connect_disconnect_and_audit(
     assert out["mode"] == "manual_token"
     assert out["currency_state"] == "confirmed_inr"
     assert out["default_daily_cap"] == 225  # TIER_250 minus 10% (D25)
-    assert len(out["templates"]) == 12  # six templates (FP-02 closure), English and Telugu
+    # seven templates (FP-02 closure and its reopening message), English and Telugu
+    assert len(out["templates"]) == 14
     assert token not in res.text
     again = api.call(owner, "POST", "/api/v1/messaging/account/manual", json=body)
     assert again.status_code == 409
