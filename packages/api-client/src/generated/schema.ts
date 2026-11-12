@@ -12738,6 +12738,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tc-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tc Requests
+         * @description The TC request log of students you can see, newest received first, with the number of
+         *     overdue requests (``overdue=true`` lists only those; read, issue or approve permission;
+         *     FR-CERT-035..FR-CERT-037).
+         */
+        get: operations["list_tc_requests_api_v1_tc_requests_get"];
+        put?: never;
+        /**
+         * Log Tc Request
+         * @description Log a transfer certificate request that reached the office on paper, by phone or in
+         *     person (permission ``certificate.issue``; FR-CERT-026, FR-CERT-027). Accepts
+         *     ``Idempotency-Key``. Errors: ``tc_request_open_exists`` (409); ``date_in_future`` (422).
+         */
+        post: operations["log_tc_request_api_v1_tc_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tc-requests/{tc_request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tc Request
+         * @description One TC request with its steps; the fee note for holders of ``finance.read`` (information
+         *     only, never a blocker: D16); returns ``ETag`` (read, issue or approve permission).
+         */
+        get: operations["get_tc_request_api_v1_tc_requests__tc_request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tc-requests/{tc_request_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Tc Request Status
+         * @description Start preparing the TC, record that the ready TC was handed over, or cancel the request
+         *     with a reason (permission ``certificate.issue``, ``If-Match``; FR-CERT-030, FR-CERT-034).
+         *     Errors: ``tc_request_wrong_status``, ``tc_request_certificate_pending``,
+         *     ``tc_request_certificate_not_issued`` (409).
+         */
+        post: operations["change_tc_request_status_api_v1_tc_requests__tc_request_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant": {
         parameters: {
             query?: never;
@@ -32227,15 +32299,188 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "promotion" | "working_days" | "days_attended";
+            key: "promotion" | "working_days" | "days_attended" | "application_date" | "leaving_date" | "leaving_reason" | "conduct";
             /**
              * Source
-             * @description year_result: the confirmed annual result; attendance_register: days marked in the register up to today
+             * @description year_result: the confirmed annual result; attendance_register: days marked in the register up to today; tc_request: the open TC request in the request log (FO-09: the day it was received is the application date); conduct_certificate: the student's latest issued conduct certificate
              * @enum {string}
              */
-            source: "year_result" | "attendance_register";
+            source: "year_result" | "attendance_register" | "tc_request" | "conduct_certificate";
             /** Value */
             value: string;
+        };
+        /**
+         * TcRequestIn
+         * @description Log a TC request that reached the office on paper, by phone or in person (FR-CERT-026).
+         *     ``received_on`` (not in the future) becomes the TC's application date; ``leaving_date`` and
+         *     ``leaving_reason`` are what the parent asked for and are suggested on the TC. Nothing about
+         *     the person who asked is stored (least personal data).
+         */
+        TcRequestIn: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "paper" | "phone" | "in_person" | "other";
+            /** Leaving Date */
+            leaving_date?: string | null;
+            /** Leaving Reason */
+            leaving_reason?: ("parent_request" | "parent_transferred" | "course_completed" | "other") | null;
+            /**
+             * Received On
+             * Format: date
+             */
+            received_on: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * TcRequestList
+         * @description A page of the request log, newest received first, with the school's overdue count among
+         *     the requests the caller can see (FR-CERT-035, FR-CERT-037).
+         */
+        TcRequestList: {
+            /** Data */
+            data: components["schemas"]["TcRequestOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Overdue After Days */
+            overdue_after_days: number;
+            /** Overdue Count */
+            overdue_count: number;
+            /**
+             * Overdue Verified
+             * @description false: the number of days is a default not yet confirmed by the school.
+             */
+            overdue_verified: boolean;
+        };
+        /**
+         * TcRequestOut
+         * @description One TC request with its steps (who and when), how long it has been open and whether it is
+         *     overdue (FR-CERT-035..FR-CERT-038). Staff names are members' display names; the student's
+         *     name and admission number are the record's current values (C2).
+         */
+        TcRequestOut: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Hand Over */
+            can_hand_over: boolean;
+            /** Can Prepare */
+            can_prepare: boolean;
+            /** Cancel Reason */
+            cancel_reason: string | null;
+            /** Cancelled At */
+            cancelled_at: string | null;
+            /** Cancelled By */
+            cancelled_by: string | null;
+            /** Cancelled By Name */
+            cancelled_by_name: string | null;
+            /** Certificate Id */
+            certificate_id: string | null;
+            /** Certificate Serial */
+            certificate_serial: string | null;
+            /** Certificate Status */
+            certificate_status: ("pending" | "issued" | "rejected" | "withdrawn" | "cancelled") | null;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "paper" | "phone" | "in_person" | "other";
+            /**
+             * Class Label
+             * @description The class and section the student is in now.
+             */
+            class_label: string | null;
+            /**
+             * Days Open
+             * @description Days from the day received to the day the TC was ready (or to today while it is still received or in preparation).
+             */
+            days_open: number;
+            /** @description Outstanding fees, information only (FR-CERT-025, D16): only on one request read by a holder of finance.read school-wide while fees are on; never blocks the TC. */
+            fee_note?: components["schemas"]["TcFeeNote"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Issued At */
+            issued_at: string | null;
+            /** Issued By */
+            issued_by: string | null;
+            /** Issued By Name */
+            issued_by_name: string | null;
+            /** Leaving Date */
+            leaving_date: string | null;
+            /** Leaving Reason */
+            leaving_reason: ("parent_request" | "parent_transferred" | "course_completed" | "other") | null;
+            /**
+             * Overdue
+             * @description Still received or in preparation more than overdue_after_days after it was received.
+             */
+            overdue: boolean;
+            /** Preparing At */
+            preparing_at: string | null;
+            /** Preparing By */
+            preparing_by: string | null;
+            /** Preparing By Name */
+            preparing_by_name: string | null;
+            /** Ready At */
+            ready_at: string | null;
+            /** Ready By */
+            ready_by: string | null;
+            /** Ready By Name */
+            ready_by_name: string | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /**
+             * Received By
+             * Format: uuid
+             */
+            received_by: string;
+            /** Received By Name */
+            received_by_name: string | null;
+            /**
+             * Received On
+             * Format: date
+             */
+            received_on: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "received" | "in_preparation" | "ready" | "issued" | "cancelled";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * TcRequestStatusIn
+         * @description Move a request on (FR-CERT-030..FR-CERT-034): ``in_preparation`` (from received),
+         *     ``issued`` (handed over; from ready) or ``cancelled`` (from any open state, with a 10..1000
+         *     character ``reason``). ``ready`` is set by SchoolOS when the request's TC is issued.
+         */
+        TcRequestStatusIn: {
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "in_preparation" | "issued" | "cancelled";
         };
         /**
          * TemplateCreate
@@ -64372,6 +64617,194 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_tc_requests_api_v1_tc_requests_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                overdue?: boolean;
+                status?: ("received" | "in_preparation" | "ready" | "issued" | "cancelled") | null;
+                student_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TcRequestList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    log_tc_request_api_v1_tc_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TcRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TcRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_tc_request_api_v1_tc_requests__tc_request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tc_request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TcRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    change_tc_request_status_api_v1_tc_requests__tc_request_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tc_request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TcRequestStatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TcRequestOut"];
                 };
             };
             /** @description Validation Error */
