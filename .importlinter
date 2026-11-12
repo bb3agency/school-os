@@ -1859,6 +1859,9 @@ source_modules =
 forbidden_modules =
     app.compliance.repository
     app.compliance.models
+    # FC-09/FC-10 safety check log and policy library (0099_drills_policies)
+    app.compliance.safety_repository
+    app.compliance.safety_models
 allow_indirect_imports = True
 
 # The catalogue and its date rules stay pure (no DB, web or feature modules).
@@ -1867,6 +1870,7 @@ name = compliance config stays pure (no DB, web or feature modules)
 type = forbidden
 source_modules =
     app.compliance.config
+    app.compliance.safety_config
 forbidden_modules =
     sqlalchemy
     fastapi

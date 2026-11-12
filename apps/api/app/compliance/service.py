@@ -40,7 +40,9 @@ from app.audit import service as audit
 from app.authz.context import UserContext
 from app.compliance import config as cfg
 from app.compliance import repository as repo
+from app.compliance import safety_repository as safety_repo
 from app.compliance.models import ComplianceCertificate as Row
+from app.compliance.policies import subject_report
 from app.compliance.schemas import (
     CertificateCreate,
     CertificateDetailOut,
@@ -645,11 +647,20 @@ def refuse_expired(items: Iterable[str]) -> None:
 
 
 def export_records(session: Session) -> list[RecordTable]:
-    """The school's register for its full data export (FR-COMP-016)."""
-    return repo.export_tables(session)
+    """The school's register for its full data export (FR-COMP-016), and the safety check log,
+    policies and acknowledgements (FC-09, FC-10; FR-COMP-055, FR-COMP-069)."""
+    return [*repo.export_tables(session), *safety_repo.export_tables(session)]
 
 
-_PURGE = purging.PurgeTables(deleted=("ops.compliance_certificates",))
+_PURGE = purging.PurgeTables(
+    deleted=(
+        # FC-10 / FC-09 (0099_drills_policies): acknowledgements before their policies.
+        "ops.compliance_policy_acks",
+        "ops.compliance_policies",
+        "ops.compliance_checks",
+        "ops.compliance_certificates",
+    )
+)
 
 
 def tenant_data_counts(session: Session) -> dict[str, int]:
@@ -681,6 +692,7 @@ __all__ = [
     "register",
     "remove",
     "send_reminders",
+    "subject_report",
     "summary",
     "tenant_data_counts",
     "today",

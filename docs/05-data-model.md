@@ -1461,6 +1461,9 @@ A school's owner or principal (`tenant.settings.manage`, step-up) changes the pe
 | School structure, settings and keys (years, classes, sections, `core.tenant_keys`, field definitions, WhatsApp set-up) | Life of the school | No personal data; keys destroyed at offboarding (crypto-shredding) |
 | Disclosure snapshots (`ops.disclosure_snapshots`) | Life of the school | The record of what was published; view counts 90 days |
 | School compliance certificates (`ops.compliance_certificates`) | Life of the school | The school's own certificates and their renewals; no personal data (FC-01) |
+| Safety drills and periodic checks (`ops.compliance_checks`) | Life of the school | Counts and short notes, never student names; entries logged by mistake are kept as removed (FC-09) |
+| School policy library (`ops.compliance_policies`) | Life of the school | The school's policies, review dates and the roles asked to read them; no personal data (FC-10) |
+| Policy acknowledgements (`ops.compliance_policy_acks`) | Life of the school | Append-only: which member read which document version and when (staff personal data, C1; in the member's access report; FC-10) |
 | RTE admissions / claims (`sis.rte_*`; not scheduled) | Admissions: as the student record; claims and lines: 8 years after the financial year (D21) | |
 | Portal calendar dates and reminders (`ops.portal_*`) | 2 academic years | Configuration and idempotency, no personal data |
 | Weekly management briefs (`ops.weekly_briefs`; FA-05) | 104 weeks (2 years) | School-level counts only; older weeks are deleted by the Monday job (`keep_weeks` in `app/brief/config.yaml`) |
@@ -1736,6 +1739,16 @@ Offboarding owner `brief` (before `notifications`, `offboarding.yaml`).
 | Table | Class | Key columns and rules |
 |---|---|---|
 | `ops.compliance_certificates` | C1 (no personal data) | `kind` (a key of `app/compliance/catalogue.yaml`; `other` carries `label` 3-120, CHECK `compliance_certificates_label`), `reference_no` (1-80), `issued_by` (1-200), `valid_from`, `valid_until` (NULL = no expiry; CHECK from <= until), `document_id` (composite FK to `kb.documents`, `ON DELETE SET NULL (document_id)`), `owner_membership_id` (composite FK to `core.memberships`), `notes` (1-500), `status` CHECK (`current`,`superseded`,`removed`) with `superseded_by` (composite FK to itself, DEFERRABLE INITIALLY DEFERRED)/`superseded_at` and `removed_by`/`removed_at` set exactly for their status, `last_reminded_lead` (-1 after the expiry notice, else the lead day)/`last_reminded_on`, `recorded_by`, `created_at`, `updated_at`, `version`. Partial unique index `compliance_certificates_one_current (tenant_id, kind) WHERE status = 'current' AND kind <> 'other'`. `sos_app` SELECT, INSERT and UPDATE of the editable and workflow columns; never DELETE. Offboarding owner `compliance` (before documents and identity); record class `compliance_certificates`; in the full export |
+
+### 16.10 Safety checks and the policy library (`ops`; FC-09, FC-10, FR-COMP-046..070; `0099_drills_policies`)
+
+| Table | Class | Key columns and rules |
+|---|---|---|
+| `ops.compliance_checks` | C1 (no personal data) | One drill or periodic check the school logged. `kind` (a key of `app/compliance/checks.yaml`; `other` carries `label` 3-120), `done_on`, `led_by_membership_id` (composite FK to `core.memberships`), `participants_count` (0-20000) and `duration_minutes` (0-1440; drill kinds only, checked by the service), `result` CHECK (`ok`,`action_needed`), `observations` (1-500; the form says never to type names), `document_id` (composite FK to `kb.documents`, `ON DELETE SET NULL (document_id)`), `status` CHECK (`recorded`,`removed`) with `removed_by`/`removed_at`, `last_reminded_lead`/`last_reminded_on` (the reminder job's idempotency on the latest entry of a kind), `recorded_by`, `version`. `sos_app` SELECT, INSERT and UPDATE of the workflow columns only; never DELETE. Record class `safety_checks` |
+| `ops.compliance_policies` | C1 (no personal data) | A school policy: `title` (3-120), `document_id` (composite FK to `kb.documents`, `ON DELETE SET NULL`; a clean PDF of purpose `policy`, checked by the service), `ack_roles text[]` (role keys whose members must acknowledge; at most 50), `review_due`, `last_reviewed_on`, `status` CHECK (`active`,`retired`) with `retired_by`/`retired_at`, `ack_requested_at`, `last_reminded_lead`/`last_reminded_on`, `created_by`, `version`. Record class `school_policies` |
+| `ops.compliance_policy_acks` | C1 (staff personal data) | **Append-only** (trigger `compliance_policy_acks_append_only`; DELETE only by the offboarding purge; `sos_app` SELECT and INSERT only). `policy_id` (composite FK), `document_version_id` (the exact `kb.document_versions` id read; no FK, kept as recorded), `membership_id` (composite FK to `core.memberships`), `user_id`, `acknowledged_at`. UNIQUE `compliance_policy_acks_once (tenant_id, policy_id, document_version_id, membership_id)`. Record class `policy_acknowledgements` (erasure: kept as the school's record); in the member's access report |
+
+All three: offboarding owner `compliance` (acknowledgements, policies, checks, then certificates); in the full export.
 
 ### 16.7 Classification, export and offboarding (as built)
 

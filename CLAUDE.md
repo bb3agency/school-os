@@ -84,7 +84,9 @@ apps/api/app/
                  template catalogue, guardian opt-ins, STOP, signed webhooks, delivery log
   compliance/    the school's own certificates (fire NOC, building safety, recognition, affiliation, water and
                  sanitation): register with renewals, expiry reminders, the items it backs on the CBSE disclosure
-                 (catalogue.yaml, verified: false; FC-01)
+                 (catalogue.yaml, verified: false; FC-01); safety drills and periodic checks log (checks.py,
+                 checks.yaml; FC-09); policy library with review dates and staff acknowledgement (policies.py,
+                 policies.yaml; FC-10)
   disclosure/    CBSE Appendix IX disclosure (R3-1C; ADR-0051): format file, draft, frozen snapshots,
                  public handle kind school_disclosure, /public/disclosure/{key} routes, HTML/PDF files
   platform/      control plane: operators, school provisioning, plans, subscriptions, invoices,
@@ -92,7 +94,7 @@ apps/api/app/
                  support tickets, SchoolOS incidents (incidents.py; ADR-0050), platform audit (DB role
                  sos_platform; routes /api/v1/platform/*)
   devtools/      synthetic data generator (make seed-synthetic; local/ci only)
-apps/api/migrations/  Alembic revisions 0001_baseline … 0096_compliance_register (linear chain; `alembic heads` shows the current head)
+apps/api/migrations/  Alembic revisions 0001_baseline … 0099_drills_policies (linear chain; `alembic heads` shows the current head)
 apps/api/tests/  tests per module (tests/<module>/) + cross-module suites (tests/security/, tests/migrations/, tests/api/, tests/deploy/)
 apps/api/openapi.json  committed OpenAPI document (make openapi; freshness test)
 apps/worker/     Celery entrypoint (sos_worker.celery_app; imports app.* tasks and beat schedules)

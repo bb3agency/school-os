@@ -1153,12 +1153,33 @@ def _compliance() -> ModuleType:
 BODIES.update(_compliance().BOLA_BODIES)
 
 
+def _safety() -> ModuleType:
+    """tests/compliance/safety_support.py (FC-09/FC-10: a check entry and a policy of school B)."""
+    name = "sos_test_compliance_safety_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "compliance" / "safety_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+BODIES.update(_safety().BOLA_BODIES)
+
+
 def _b_id(template: str, w: Any) -> uuid.UUID:
     """School B's object for ``template``: ``request_id`` is a privacy request on the privacy
     routes (R3-1A) and a break-glass request elsewhere."""
     if template.startswith(PRIVACY_REQUESTS):
         value: uuid.UUID = _privacy().b_request(w)
         return value
+    if template.startswith(_safety().BOLA_PREFIXES):
+        # FC-09/FC-10: ``check_id`` is a check entry, ``policy_id`` a policy of school B.
+        found: uuid.UUID = _safety().b_id(_ADMIN[0], w, template)
+        return found
     if template.startswith(_compliance().BOLA_PREFIX):
         # FC-01: ``certificate_id`` is a compliance certificate on the compliance routes.
         cert: uuid.UUID = _compliance().b_certificate(_ADMIN[0], w)
