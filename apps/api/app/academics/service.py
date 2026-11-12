@@ -387,6 +387,70 @@ def attendance_month(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class PeriodAttendance:
+    """One student's marks over a period (FO-11): counts per status, no dates."""
+
+    student: RosterStudentOut
+    present: int
+    late: int
+    absent: int
+    leave: int
+
+
+@dataclass(frozen=True, slots=True)
+class SectionPeriodAttendance:
+    """A section's attendance counts over a period (FO-11, FR-EXP-020)."""
+
+    section: RecordSectionOut
+    year: AcademicYearOut
+    first: dt.date
+    last: dt.date
+    students: list[PeriodAttendance]
+
+
+def attendance_period(
+    session: Session, ctx: UserContext, section_id: uuid.UUID, first: dt.date, last: dt.date
+) -> SectionPeriodAttendance:
+    """Each current student's attendance counts in a section between ``first`` and ``last``
+    (inclusive), in roll-number order: the scheme verification lists of ``app.exports`` (FO-11,
+    FR-EXP-020). ``attendance.read`` in the section's scope (404 outside it) and
+    ``student.read_basic`` (the roster). 422 ``invalid_period`` when ``first`` is after
+    ``last``, ``date_out_of_range`` outside the section's academic year, ``future_date`` after
+    today. Counts only; the caller decides what a percentage means (no eligibility here)."""
+    sec = _section(session, ctx, section_id, ATTENDANCE_READ)
+    errors: list[dict[str, str]] = []
+    if first > last:
+        errors.append(_error("from_date", "invalid_period"))
+    else:
+        today = today_ist()
+        _check_dates(errors, "from_date", first, sec.year, today)
+        _check_dates(errors, "to_date", last, sec.year, today)
+    if errors:
+        raise ValidationFailed(
+            errors, detail="Choose a period inside the academic year, up to today."
+        )
+    roster = _roster(session, ctx, sec.section, ATTENDANCE_READ)
+    found: dict[uuid.UUID, Counter[str]] = {}
+    for row in repo.section_marks(session, sec.section.id, first, last):
+        found.setdefault(row.student_id, Counter())[row.status] += 1
+    students_out: list[PeriodAttendance] = []
+    for s in roster:
+        c = found.get(s.student_id, Counter())
+        students_out.append(
+            PeriodAttendance(
+                student=s,
+                present=c.get("present", 0),
+                late=c.get("late", 0),
+                absent=c.get("absent", 0),
+                leave=c.get("leave", 0),
+            )
+        )
+    return SectionPeriodAttendance(
+        section=sec.out, year=sec.year, first=first, last=last, students=students_out
+    )
+
+
 def _days_off(
     session: Session, sec: _Section, entries: Iterable[AttendanceEntryIn]
 ) -> set[dt.date]:
@@ -1233,11 +1297,14 @@ __all__ = [
     "AttendanceSummary",
     "DayMark",
     "ExamResult",
+    "PeriodAttendance",
+    "SectionPeriodAttendance",
     "absent_students",
     "add_entry",
     "attendance_day",
     "attendance_history",
     "attendance_month",
+    "attendance_period",
     "attendance_summary",
     "calendar_month",
     "confirm_results",
