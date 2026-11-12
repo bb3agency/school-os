@@ -194,11 +194,23 @@ class TcInputSuggestion(_Out):
     "From SchoolOS" next to the input, which the person may change. Never filled in silently:
     the request still carries what the person typed or accepted."""
 
-    key: Literal["promotion", "working_days", "days_attended"]
+    key: Literal[
+        "promotion",
+        "working_days",
+        "days_attended",
+        "application_date",
+        "leaving_date",
+        "leaving_reason",
+        "conduct",
+    ]
     value: str = Field(max_length=20)
-    source: Literal["year_result", "attendance_register"] = Field(
-        description="year_result: the confirmed annual result; attendance_register: days "
-        "marked in the register up to today"
+    source: Literal["year_result", "attendance_register", "tc_request", "conduct_certificate"] = (
+        Field(
+            description="year_result: the confirmed annual result; attendance_register: days "
+            "marked in the register up to today; tc_request: the open TC request in the request "
+            "log (FO-09: the day it was received is the application date); conduct_certificate: "
+            "the student's latest issued conduct certificate"
+        )
     )
 
 
@@ -395,6 +407,102 @@ class PublicCertificateOut(_Out):
     content: CertificateContent | None
 
 
+# --- TC request log (FO-09; FR-CERT-026..FR-CERT-045) ---------------------------------------------
+
+TcRequestStatus = Literal["received", "in_preparation", "ready", "issued", "cancelled"]
+TcRequestChannel = Literal["paper", "phone", "in_person", "other"]
+LeavingReason = Literal["parent_request", "parent_transferred", "course_completed", "other"]
+
+
+class TcRequestIn(_In):
+    """Log a TC request that reached the office on paper, by phone or in person (FR-CERT-026).
+    ``received_on`` (not in the future) becomes the TC's application date; ``leaving_date`` and
+    ``leaving_reason`` are what the parent asked for and are suggested on the TC. Nothing about
+    the person who asked is stored (least personal data)."""
+
+    student_id: uuid.UUID
+    received_on: dt.date
+    channel: TcRequestChannel
+    leaving_date: dt.date | None = None
+    leaving_reason: LeavingReason | None = None
+
+
+class TcRequestStatusIn(_In):
+    """Move a request on (FR-CERT-030..FR-CERT-034): ``in_preparation`` (from received),
+    ``issued`` (handed over; from ready) or ``cancelled`` (from any open state, with a 10..1000
+    character ``reason``). ``ready`` is set by SchoolOS when the request's TC is issued."""
+
+    status: Literal["in_preparation", "issued", "cancelled"]
+    reason: Note | None = None
+
+
+class TcRequestOut(_Out):
+    """One TC request with its steps (who and when), how long it has been open and whether it is
+    overdue (FR-CERT-035..FR-CERT-038). Staff names are members' display names; the student's
+    name and admission number are the record's current values (C2)."""
+
+    id: uuid.UUID
+    student_id: uuid.UUID
+    student_name: str | None
+    admission_no: str | None
+    class_label: str | None = Field(description="The class and section the student is in now.")
+    status: TcRequestStatus
+    received_on: dt.date
+    channel: TcRequestChannel
+    leaving_date: dt.date | None
+    leaving_reason: LeavingReason | None
+    certificate_id: uuid.UUID | None
+    certificate_status: Status | None
+    certificate_serial: str | None
+    received_by: uuid.UUID
+    received_by_name: str | None
+    received_at: dt.datetime
+    preparing_by: uuid.UUID | None
+    preparing_by_name: str | None
+    preparing_at: dt.datetime | None
+    ready_by: uuid.UUID | None
+    ready_by_name: str | None
+    ready_at: dt.datetime | None
+    issued_by: uuid.UUID | None
+    issued_by_name: str | None
+    issued_at: dt.datetime | None
+    cancelled_by: uuid.UUID | None
+    cancelled_by_name: str | None
+    cancelled_at: dt.datetime | None
+    cancel_reason: str | None
+    days_open: int = Field(
+        ge=0,
+        description="Days from the day received to the day the TC was ready (or to today while "
+        "it is still received or in preparation).",
+    )
+    overdue: bool = Field(
+        description="Still received or in preparation more than overdue_after_days after it "
+        "was received."
+    )
+    fee_note: TcFeeNote | None = Field(
+        default=None,
+        description="Outstanding fees, information only (FR-CERT-025, D16): only on one request "
+        "read by a holder of finance.read school-wide while fees are on; never blocks the TC.",
+    )
+    can_prepare: bool
+    can_hand_over: bool
+    can_cancel: bool
+    version: int
+
+
+class TcRequestList(_Out):
+    """A page of the request log, newest received first, with the school's overdue count among
+    the requests the caller can see (FR-CERT-035, FR-CERT-037)."""
+
+    data: list[TcRequestOut]
+    next_cursor: str | None
+    overdue_count: int = Field(ge=0)
+    overdue_after_days: int = Field(ge=1)
+    overdue_verified: bool = Field(
+        description="false: the number of days is a default not yet confirmed by the school."
+    )
+
+
 __all__ = [
     "ApproveIn",
     "Blocker",
@@ -421,6 +529,12 @@ __all__ = [
     "ReasonIn",
     "RegisterKind",
     "Status",
+    "TcRequestChannel",
+    "TcRequestIn",
+    "TcRequestList",
+    "TcRequestOut",
+    "TcRequestStatus",
+    "TcRequestStatusIn",
     "VerificationOut",
     "VerificationReasonIn",
     "VerificationStatus",

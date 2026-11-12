@@ -1063,6 +1063,18 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             s=renewed,
             u=u["user"],
         )
+        # --- FO-09 (0097_tc_requests): a TC request linked to the pending TC ---------------
+        _run(
+            c,
+            "INSERT INTO sis.tc_requests (id, tenant_id, student_id, status, received_on, "
+            "channel, certificate_id, received_by, preparing_by, preparing_at) VALUES "
+            "(:i, :t, :s, 'in_preparation', '2026-06-01', 'paper', :cert, :m, :m, now())",
+            i=uuid.uuid4(),
+            t=t,
+            s=ids["student2"],
+            cert=ids["cert2"],
+            m=ids["m1"],
+        )
         # --- student timeline and early warning (M5, 0035_student_insights) ---------------
         exam, flag, mark = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
         _run(

@@ -13,6 +13,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.certificates import repository as repo
+from app.certificates import tc_requests_repository as tc_repo
 from app.certificates.config import load_config
 from app.core.report_format import cap_rows, fmt_count, fmt_date, humanise
 from app.core.subjects import MAX_SECTION_ROWS, ReportSection, Subject
@@ -27,6 +28,7 @@ COLUMNS = (
     "Duplicate",
     "Times checked online",
 )
+TC_REQUEST_COLUMNS = ("Received on", "How it was received", "Status", "Ready on")
 
 
 def _label(certificate_type: str) -> str:
@@ -35,12 +37,13 @@ def _label(certificate_type: str) -> str:
 
 
 def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
-    """The student's certificates, newest first; [] for other subject kinds or none held."""
+    """The student's certificates and TC requests (FO-09), newest first; [] for other subject
+    kinds or none held."""
     if subject.kind != "student":
         return []
     found, total = repo.certificates_of_student(session, subject.id, limit=MAX_SECTION_ROWS)
     if total == 0:
-        return []
+        return _tc_requests(session, subject.id)
     rows = [
         (
             _label(c.certificate_type),
@@ -54,11 +57,33 @@ def subject_report(session: Session, subject: Subject) -> list[ReportSection]:
         for c, checks in found
     ]
     kept, note = cap_rows(rows, total)
-    return [
+    sections = [
         ReportSection(
             class_key=CLASS_KEY,
             title="Certificates",
             columns=COLUMNS,
+            rows=tuple(kept),
+            note=note,
+        )
+    ]
+    return sections + _tc_requests(session, subject.id)
+
+
+def _tc_requests(session: Session, student_id: uuid.UUID) -> list[ReportSection]:
+    """FO-09: the student's TC requests (when received, how, status); never staff text."""
+    found = tc_repo.requests_of_student(session, student_id, limit=MAX_SECTION_ROWS + 1)
+    if not found:
+        return []
+    rows = [
+        (fmt_date(r.received_on), humanise(r.channel), humanise(r.status), fmt_date(r.ready_at))
+        for r in found
+    ]
+    kept, note = cap_rows(rows, len(rows))
+    return [
+        ReportSection(
+            class_key=CLASS_KEY,
+            title="Transfer certificate requests",
+            columns=TC_REQUEST_COLUMNS,
             rows=tuple(kept),
             note=note,
         )

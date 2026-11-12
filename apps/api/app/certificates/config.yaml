@@ -40,6 +40,19 @@ download_url_ttl_s: 300
 # Register print views (FR-REG-001..004): the most rows one view may show.
 register_max_rows: 5000
 
+# TC request log (FO-09; FR-CERT-026..FR-CERT-045). Requests arrive on paper, by phone or in
+# person and staff log them. A request still received or in preparation more than
+# `overdue_after_days` days after the day it was received is shown as overdue (principal's list).
+# Lead default (D86, PO to confirm): 7 days. Not a legal limit: no AP rule giving a number of days
+# was found (an AP proceedings order only says a TC may not delay admission elsewhere, RTE Act
+# s.5; docs/research/2026-11-features/office-portals.md FO-09). A TC is never withheld for dues
+# (owner decision D16): the fee note stays information only.
+tc_requests:
+  overdue_after_days: 7
+  verified: false
+  source: "Lead default D86; RTE Act s.5 (no day limit found); BO-04 (under 5 minutes per TC)"
+  channels: [paper, phone, in_person, other]
+
 # Values printed on a certificate come from the canonical record (BR-01). Only C1/C2 attributes
 # may be listed (FR-CERT-009: no Aadhaar data, no restricted C3 attributes; checked at load).
 types:

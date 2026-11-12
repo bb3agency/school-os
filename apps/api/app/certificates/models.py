@@ -1,4 +1,5 @@
-"""``sis.certificates``, ``sis.certificate_counters`` (migration 0033_certificates) and
+"""``sis.certificates``, ``sis.certificate_counters`` (migration 0033_certificates),
+``sis.tc_requests`` (0097_tc_requests) and
 ``sis.certificate_verifications`` (0056_certificate_verifications); docs/05 §5.7, §15.4.
 
 Describes the tables for typed queries only; DDL (RLS, CHECKs, the frozen-row and append-only
@@ -96,5 +97,41 @@ class CertificateVerification(Base):
     withdraw_reason: Mapped[str | None] = mapped_column(Text)
     check_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     last_checked_at: Mapped[dt.datetime | None]
+    updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+
+
+TC_REQUEST_STATUSES = ("received", "in_preparation", "ready", "issued", "cancelled")
+TC_REQUEST_OPEN = ("received", "in_preparation", "ready")
+
+
+class TcRequest(Base):
+    """One transfer certificate request logged by the office (FO-09; migration 0097_tc_requests;
+    FR-CERT-026..FR-CERT-045). Column UPDATE grants: the workflow columns only."""
+
+    __tablename__ = "tc_requests"
+    __table_args__ = (UniqueConstraint("tenant_id", "id"), {"schema": "sis"})
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    student_id: Mapped[uuid.UUID]
+    status: Mapped[str] = mapped_column(Text, server_default=text("'received'"))
+    received_on: Mapped[dt.date]
+    channel: Mapped[str] = mapped_column(Text)
+    leaving_date: Mapped[dt.date | None]
+    leaving_reason: Mapped[str | None] = mapped_column(Text)
+    certificate_id: Mapped[uuid.UUID | None]
+    received_by: Mapped[uuid.UUID]
+    received_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    preparing_by: Mapped[uuid.UUID | None]
+    preparing_at: Mapped[dt.datetime | None]
+    ready_by: Mapped[uuid.UUID | None]
+    ready_at: Mapped[dt.datetime | None]
+    issued_by: Mapped[uuid.UUID | None]
+    issued_at: Mapped[dt.datetime | None]
+    cancelled_by: Mapped[uuid.UUID | None]
+    cancelled_at: Mapped[dt.datetime | None]
+    cancel_reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))

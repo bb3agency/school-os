@@ -256,6 +256,8 @@ EXPECTED_TABLES = {
     "messaging_closures",
     # FC-01 (0096_compliance_register): the school's certificate register.
     "compliance_certificates",
+    # FO-09 (0097_tc_requests): the TC request log.
+    "tc_requests",
     "fees_receipt_cancellations",
     "fees_refunds",
     "fees_day_closes",

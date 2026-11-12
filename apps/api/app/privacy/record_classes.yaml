@@ -156,7 +156,8 @@ classes:
   certificates:
     label: Issued certificates
     owner: certificates
-    tables: [sis.certificates, sis.certificate_counters, sis.certificate_verifications]
+    tables: [sis.certificates, sis.certificate_counters, sis.certificate_verifications,
+             sis.tc_requests]
     classification: C2
     docs_row: Issued certificates and their counters
     retention: Life of the school (official record)
