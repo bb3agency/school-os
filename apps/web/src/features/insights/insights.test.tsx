@@ -80,6 +80,8 @@ function flag(overrides: Partial<Flag> = {}): Flag {
     raised_on: "2026-09-24",
     due_on: "2026-10-01",
     overdue: true,
+    review_on: null,
+    review_due: false,
     actioned: false,
     first_action_at: null,
     closed_at: null,
@@ -115,6 +117,7 @@ const SUMMARY: Summary = {
   not_actioned: 1,
   overdue: 1,
   open: 2,
+  review_due: 0,
 };
 
 function settings(): Settings {

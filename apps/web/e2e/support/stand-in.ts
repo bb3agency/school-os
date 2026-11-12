@@ -446,6 +446,8 @@ const INSIGHT_FLAG = {
   raised_on: "2026-09-24",
   due_on: "2026-10-01",
   overdue: false,
+  review_on: null,
+  review_due: false,
   actioned: true,
   first_action_at: "2026-09-25T05:00:00Z",
   closed_at: null,
@@ -482,6 +484,7 @@ const INSIGHT_SUMMARY = {
   not_actioned: 1,
   overdue: 1,
   open: 2,
+  review_due: 0,
 } satisfies components["schemas"]["InsightSummaryOut"];
 type RuleOut = components["schemas"]["SettingsOut"]["rules"][number];
 const rule = (
