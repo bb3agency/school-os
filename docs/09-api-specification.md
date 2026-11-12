@@ -598,6 +598,19 @@ Control-plane edits take `If-Match` as an **optional** precondition (house patte
 
 These routes are not mounted when `SOS_DEPLOYMENT_MODE=dedicated` (requests get 404). The route-enumeration test accepts exactly one guard per route: `require()` (tenant routes; `session.authenticated` for member-only routes), `require_platform()` (only under `/api/v1/platform/`) or `require_fleet_signature()` (only the heartbeat); only `/healthz` and `/readyz` are public.
 
+#### TC request log (FO-09, wave F3; FR-CERT-026..FR-CERT-045; built 2026-11-12)
+
+Staff log TC requests that reached the office on paper, by phone or in person (no parent page, ADR-0046). No new permissions. ᴿ none.
+
+| Method | Path | Guard |
+|---|---|---|
+| GET | `/tc-requests?status=&overdue=&student_id=&limit=&cursor=` → `TcRequestList {data, next_cursor, overdue_count, overdue_after_days, overdue_verified}` | `certificate.read`, `.issue` or `.approve` (`require_any`; student scope per row) |
+| POST | `/tc-requests` `{student_id, received_on, channel: paper\|phone\|in_person\|other, leaving_date?, leaving_reason?}` → 201 `TcRequestOut`, `Location`, `ETag` | `certificate.issue` (`Idempotency-Key`); 409 `tc_request_open_exists`; 422 `date_in_future` |
+| GET | `/tc-requests/{tc_request_id}` → `TcRequestOut` (steps with who and when, linked TC status and serial, `days_open`, `overdue`, `fee_note` for `finance.read` holders, `can_prepare`, `can_hand_over`, `can_cancel`), `ETag` | as the list |
+| POST | `/tc-requests/{tc_request_id}/status` `{status: in_preparation\|issued\|cancelled, reason?}` | `certificate.issue` (`If-Match`); 409 `tc_request_wrong_status`, `tc_request_certificate_pending`, `tc_request_certificate_not_issued`; 422 reason 10..1000 |
+
+`ready` is set by SchoolOS when the request's TC is issued; preparing a TC links the open request (`in_preparation`); a rejected, withdrawn or cancelled TC returns it to `in_preparation`. The TC preview's `input_suggestions` gain keys `application_date`, `leaving_date`, `leaving_reason` (source `tc_request`) and `conduct` (source `conduct_certificate`). Overdue: still received or in preparation more than `tc_requests.overdue_after_days` (config, 7, `verified: false`) after the day received. Dues never block (D16).
+
 ### R2 planned endpoints (not built; ADR-0042..ADR-0047; docs/03 §3.18-§3.25)
 
 Conventions as above: `Idempotency-Key` on creating POSTs, `If-Match` on changes, cursor pages, problem+json, no personal data in URLs (searches by `POST …/search`), audit in the same transaction. ᴿ = step-up. Permissions are the planned keys of docs/07 §6.7. Hidden modules (`fees` off, alongside mode, messaging on a dedicated host) answer `404 module_hidden` / `404 module_unavailable`.
