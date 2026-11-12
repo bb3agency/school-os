@@ -11,7 +11,8 @@ import { useTeluguEnabled } from "@/i18n/LanguagesProvider";
 import type { FieldErrors } from "@/lib/forms";
 import { containsAadhaarNumber } from "@/lib/aadhaar";
 import { text } from "@/lib/validation";
-import { ASK_KEYS, useKnowledgeApi, type VerifiedAnswer } from "./data";
+import type { QueryKey } from "@tanstack/react-query";
+import { ASK_KEYS, useKnowledgeApi, type VerifiedAnswer, type VerifiedAnswerBody } from "./data";
 
 /** Same shape as the API's SourceUri (schemas.py); the API accepts only `sos://doc` here. */
 const DOC_SOURCE = /^sos:\/\/doc\/[0-9a-f-]{36}\/v\d+#p\d+$/;
@@ -153,12 +154,18 @@ export function VerifiedAnswerDialog({
   triggerVariant = "secondary",
   triggerSize = "md",
   onSaved,
+  submit,
+  invalidate = [],
 }: {
   draft: VerifiedDraft | null;
   triggerLabel: string;
   triggerVariant?: "primary" | "secondary" | "ghost";
   triggerSize?: "sm" | "md";
   onSaved?: (answer: VerifiedAnswer) => void;
+  /** Save another way (a knowledge gap's answer route, FA-06); default: create one. */
+  submit?: (data: VerifiedAnswerBody) => Promise<unknown>;
+  /** More queries to refresh after saving. */
+  invalidate?: readonly QueryKey[];
 }) {
   const t = useTranslations("ask.verified");
   const api = useKnowledgeApi();
@@ -178,9 +185,13 @@ export function VerifiedAnswerDialog({
         ...(telugu ? {} : { language: "en" }),
       })}
       fieldMap={verifiedFieldMap}
-      invalidate={[ASK_KEYS.verifiedAll]}
-      submit={(data, key) => api.createVerified(data, key)}
-      {...(onSaved ? { onSuccess: onSaved } : {})}
+      invalidate={[ASK_KEYS.verifiedAll, ...invalidate]}
+      submit={(data, key): Promise<unknown> =>
+        submit ? submit(data) : api.createVerified(data, key)
+      }
+      {...(onSaved && !submit
+        ? { onSuccess: (result: unknown) => onSaved(result as VerifiedAnswer) }
+        : {})}
       errorNamespace="ask"
     >
       {(errors) => (

@@ -1093,6 +1093,31 @@ Faithfulness and answer correctness from a calibrated judge, and a register-phot
 | FR-KB-062 | A new extraction provider adapter (FA-01) MUST pass the extraction hard gates on this set before it is selectable outside local/ci. | I |
 
 *As built (wave F2, FA-07, 2026-11-09):* FR-KB-051..056 and 058..061 are built and tested (`evals/tests/test_judge.py`, `evals/tests/test_extraction.py`, `evals/tests/test_gates.py`, `apps/api/tests/knowledge/test_eval_bridge.py::test_FR_KB_06*`/`_055_*`, `apps/api/tests/extraction/test_read_page.py`). Stub-perfect: agreement 1.0, faithfulness 1.0, correctness 1.0; extraction unmasked 0, redaction recall 1.0, field accuracy 0.981, row recall 1.0. The live judge (057) and provider selection (062) wait for D2 and FA-01. Not built here: the notice-draft faithfulness eval and the scanned-circular OCR set of FA-07 items 3 and 5. FR-KB-063..065 are reserved for them.
+
+#### Knowledge gaps (FR-KB-081..095) (FA-06, wave F3)
+
+Questions Ask could not answer, turned into verified answers and missing documents (docs/research/2026-11-features/ai-platform.md FA-06). Module `app/knowledge` (`gaps.py`, `gaps_api.py`, `config/gaps.yaml`), tables `kb.knowledge_gaps`, `kb.knowledge_gap_queries` (`0099_knowledge_gaps`). Docs: docs/05 §6.6, docs/06 §8.1, docs/09 Knowledge gaps.
+
+| ID | Requirement | Verify |
+|---|---|---|
+| FR-KB-081 | The system MUST collect knowledge gaps from the query log only: questions answered "not found" (`status = not_found`), questions that came back search-only because the answer could not be checked (`status = search_only` with no error code), and answers marked "not helpful". Budget, switch-off, rate-limit and outage fallbacks, refusals and memory instructions MUST NOT count. Each logged question MUST be counted once (`kb.knowledge_gap_queries`). | T |
+| FR-KB-082 | A gap MUST keep only one sample question, redacted before it is stored (`core.redaction.redact` and the log redactions, then every run of 3+ digits masked; cut to 300 characters) and encrypted under the school's key; no asker, membership, query id, answer, prompt or completion is stored with it or shown. *(Lead decision D86, PO to confirm: redacted text, not topic labels only.)* | T |
+| FR-KB-083 | Questions MUST be grouped by a tenant-keyed HMAC of the normalised redacted text (case, spacing and punctuation ignored); never a bare hash. | T |
+| FR-KB-084 | At most one gap per question key is open; a question asked again after its gap was closed or dismissed MUST open a new gap. | T |
+| FR-KB-085 | `GET /knowledge/gaps` (`kb.verified_answer.manage`) MUST list open gaps most asked first, closed and dismissed ones newest first, with counts per signal and first/last asked dates; other roles 403, another school's gaps never listed (RLS). | T |
+| FR-KB-086 | Viewing gaps MUST be audited (`kb.gaps.viewed`, status and counts only), as it shows other people's (redacted) questions. *(Lead decision D86, PO to confirm.)* | T |
+| FR-KB-087 | `POST /knowledge/gaps/{id}/verified-answer` (`If-Match`) MUST create the verified answer through the same service as `POST /knowledge/verified-answers` (citations quoting current versions of documents the caller can read, personal-number screen, `kb.verified_answer.created`) and close the gap with it in one transaction. The answer is then a source like any other: searched only for people who can read every document it cites, shown with who verified it and when (invariant 8). | T |
+| FR-KB-088 | `POST /knowledge/gaps/{id}/close` MUST close a gap with the document that was missing (active, readable by the caller, C3 only with `student.read_sensitive`; 422 `gap_document_not_found`) or dismiss it; audited `kb.gap.closed` / `kb.gap.dismissed` (ids, codes, counts) in the same transaction. | T |
+| FR-KB-089 | Closing with an existing verified answer MUST require an active answer whose every cited document the caller can read (422 `gap_answer_not_usable`). | T |
+| FR-KB-090 | `GET /knowledge/gaps/summary` MUST return counts only: open gaps by signal and gaps closed with an answer, with a document, or dismissed per IST month (this month and the two before), and the retention in days. | T |
+| FR-KB-091 | Gaps MUST be deleted 90 days after they were last asked (open) or closed/dismissed by the daily `knowledge.purge_gaps` job; a school MAY shorten this to 30 days (`app/admin/retention.yaml` `kb_gaps`); a legal hold on `ask_gaps` keeps them (ADR-0059). *(Lead decision D86, PO to confirm.)* | T |
+| FR-KB-092 | The collection job (`knowledge.collect_gaps`, every 60 minutes) MUST look back at most 48 hours and never further than the retention, so a purged gap is never rebuilt from the 180-day query log. | T |
+| FR-KB-093 | Both jobs MUST run per school in its own `tenant_session`; a failing school is logged by id and error type and retried on the next run. | T |
+| FR-KB-094 | The gap question column MUST be in the SEC-012 key-rotation census with a re-encryptor (`kb_gaps`). | T |
+| FR-KB-095 | No question text MAY appear in logs, traces or audit summaries of the gap jobs and routes (invariant 5). | T |
+
+*As built (wave F3, FA-06, 2026-11-12):* FR-KB-081..095 are built and tested (`apps/api/tests/knowledge/test_gaps_api.py`, `apps/api/tests/knowledge/test_gaps_unit.py`). Not built: topic labels from a model over the question (the report's item 1 grouping by topic; a model call per question for a report is not needed while exact grouping works), and the privacy review of this new use of the query log (docs/08 §7), which stays an owner action.
+
 ### 3.33 Year-end progression pack (FR-YRE-001..020) (FT-08, wave F2)
 
 Results → promotion → UDISE+ progression → TC, typed once (docs/research/2026-11-features/teaching-academics.md FT-08). Module `app/academics` (`year_end.py`), table `sis.year_results` (`0090_year_end`; docs/05 §6.4), permissions `year_result.read` / `year_result.confirm` (docs/07 §6.2), routes docs/09 "Year-end results", web `/[locale]/year-end`. Integration points: FT-06 school calendar (working days), FT-03 assessment schemes (the pass formula), FO-01/FO-03 UDISE+ follow-up (the progression blanks as findings or to-do items).

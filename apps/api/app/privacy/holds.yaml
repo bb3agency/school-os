@@ -38,6 +38,7 @@ retention_jobs:
   notifications.purge_read: {record_class: notifications, scope: class}
   knowledge.purge_queries: {record_class: ask_history, scope: class}
   knowledge.purge_memories: {record_class: ask_memory, scope: class}
+  knowledge.purge_gaps: {record_class: ask_gaps, scope: class}
   insights.purge_expired.notes: {record_class: behaviour_notes, scope: student}
   insights.purge_expired.flags: {record_class: early_warning, scope: student}
   public.purge_handles: {record_class: public_links, scope: class}

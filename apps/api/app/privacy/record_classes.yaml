@@ -120,6 +120,18 @@ classes:
     erasure: allowed
     source: Typed by staff members
 
+  ask_gaps:
+    label: Questions "Ask the school" could not answer
+    owner: knowledge
+    tables: [kb.knowledge_gaps, kb.knowledge_gap_queries]
+    classification: C2
+    docs_row: "`kb.knowledge_gaps`, `kb.knowledge_gap_queries` (FA-06)"
+    retention: 90 days after last asked or closed (the school may shorten it)
+    basis: So that the people who keep the school's library can add missing answers and documents; redacted, without who asked.
+    # Not erased per person: a gap holds no asker; the marks go with the query log (cascade).
+    erasure: allowed_after_retention
+    source: Made by SchoolOS from staff questions (redacted)
+
   ask_memory:
     label: What "Ask the school" remembers for a staff member
     owner: knowledge

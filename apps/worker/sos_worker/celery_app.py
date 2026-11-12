@@ -245,6 +245,9 @@ def create_celery() -> Celery:
             "knowledge.purge_orphan_vectors": {"queue": "maintenance"},
             # Audit W3-10: a budget settlement the spend store refused, retried from the outbox.
             "knowledge.settle_spend": {"queue": "maintenance"},
+            # FA-06: knowledge gaps (collect from the query log, purge by retention).
+            "knowledge.collect_gaps": {"queue": "maintenance"},
+            "knowledge.purge_gaps": {"queue": "maintenance"},
             "knowledge.*": {"queue": "ingest"},
             # M4 (FR-CIR-002): circular reading through the knowledge gateway, next to the
             # ingestion that triggers it; notice PDFs/PNGs on the Chromium workers

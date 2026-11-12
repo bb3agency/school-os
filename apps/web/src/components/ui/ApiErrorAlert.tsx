@@ -25,6 +25,7 @@ export type ErrorNamespace =
   | "ask"
   | "insights"
   | "ask.verified"
+  | "ask.gaps"
   | "school.audit"
   | "circulars"
   | "tasks"

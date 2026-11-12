@@ -68,6 +68,7 @@ from app.knowledge import (
     circular_ai,
     composition,
     conversations,
+    gaps,
     keys,
     memory,
     policy,
@@ -2114,6 +2115,8 @@ __all__ = [
 key_rotation.register_reencryptor("kb_queries", reencrypt_queries_batch)
 key_rotation.register_reencryptor("kb_conversations", keys.reencrypt_conversations_batch)
 key_rotation.register_reencryptor("kb_memories", keys.reencrypt_memories_batch)
+# FA-06 (0099_knowledge_gaps): the redacted sample question of each knowledge gap.
+key_rotation.register_reencryptor("kb_gaps", gaps.reencrypt_batch)
 
 
 # --- query log retention (docs/05 §13, docs/08 §7; FR-ADM-002 shows it) -------------------------
@@ -2324,6 +2327,8 @@ def export_records(session: Session, *, include_sensitive: bool) -> list[RecordT
 # them as sos_purger (children before parents) inside the school's tenant_session.
 _PURGE = purging.PurgeTables(
     deleted=(
+        "kb.knowledge_gap_queries",  # FA-06 (0100): before the gaps, queries and answers
+        "kb.knowledge_gaps",
         "kb.user_memories",
         "kb.user_memory_settings",
         "kb.document_chunks",

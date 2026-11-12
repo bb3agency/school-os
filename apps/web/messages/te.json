@@ -5685,7 +5685,8 @@
       "label": "పాఠశాలను అడగండి విభాగాలు",
       "ask": "అడగండి",
       "search": "పత్రాలను వెతకండి",
-      "verified": "ధృవీకరించిన సమాధానాలు"
+      "verified": "ధృవీకరించిన సమాధానాలు",
+      "gaps": "Unanswered questions"
     },
     "form": {
       "question": "మీ ప్రశ్న",
@@ -6150,6 +6151,89 @@
       },
       "nextBudgetBilling": "నెల మారినప్పుడు పూర్తి జవాబులు తిరిగి వస్తాయి. ముందే కావాలంటే, పెద్ద జవాబుల బండిల్ గురించి SchoolOS సపోర్ట్‌ను అడగండి.",
       "dismiss": "మూసివేయండి: {title}"
+    },
+    "gaps": {
+      "title": "Unanswered questions",
+      "description": "Questions Ask could not answer, most asked first. Write a verified answer or add the missing document so the next person gets an answer.",
+      "noAccessTitle": "You can't see unanswered questions",
+      "noAccessBody": "Only people who manage verified answers (usually the principal and office admin) can see this page.",
+      "privacyNote": "Each question is shown with numbers, phone numbers and emails hidden, and never with who asked it. Questions are kept for a short time only.",
+      "uploadDocument": "Upload a document",
+      "summaryLabel": "Unanswered questions in numbers",
+      "openGaps": "Open questions",
+      "notFound": "Answered “not found”",
+      "notHelpful": "Not helpful or not checked",
+      "uncheckedHint": "{count, plural, =0 {None could not be checked} one {# could not be checked} other {# could not be checked}}",
+      "closedThisMonth": "Fixed this month",
+      "retention": "Kept for {days} days",
+      "statusFilter": "Show",
+      "status": {
+        "open": "Open",
+        "closed": "Fixed",
+        "dismissed": "Dismissed"
+      },
+      "listLabel": "Unanswered questions",
+      "questionUnreadable": "Question not available",
+      "asked": "{count, plural, one {Asked # time} other {Asked # times}}",
+      "signal": {
+        "not_found": "{count} not found",
+        "unchecked": "{count} not checked",
+        "not_helpful": "{count} not helpful"
+      },
+      "seen": "First asked {first} · last asked {last}",
+      "closedWithAnswer": "Fixed with a verified answer",
+      "closedWithDocument": "Fixed with a document",
+      "dismissedNote": "Dismissed",
+      "closedBy": "by {name}",
+      "openDocument": "Open the document",
+      "actionsFor": "For the question: {question}",
+      "writeAnswer": "Write a verified answer",
+      "linkDocument": "Fixed by a document",
+      "linkDocumentTitle": "Mark as fixed by a document",
+      "linkDocumentBody": "Upload the missing document first (Documents), then paste its page link here. Ask will find it once it is indexed.",
+      "linkDocumentConfirm": "Mark as fixed",
+      "documentField": "Document link",
+      "documentHint": "Paste the address of the document's page, for example from the Documents list.",
+      "dismiss": "Dismiss",
+      "dismissTitle": "Dismiss this question?",
+      "dismissBody": "Use this for questions the school's records should not answer. If people ask it again, it shows here again.",
+      "dismissConfirm": "Dismiss",
+      "empty": {
+        "open": {
+          "title": "No unanswered questions",
+          "body": "When Ask can't answer a question, or someone marks an answer not helpful, it shows here."
+        },
+        "closed": {
+          "title": "Nothing fixed yet",
+          "body": "Questions you fix with a verified answer or a document show here."
+        },
+        "dismissed": {
+          "title": "Nothing dismissed",
+          "body": "Questions you dismiss show here."
+        }
+      },
+      "errors": {
+        "knowledge_gap_closed": {
+          "title": "Already fixed",
+          "body": "Someone fixed or dismissed this question already. Close this and reload the page."
+        },
+        "gap_document_not_found": {
+          "title": "Document not found",
+          "body": "Check the link. You can only use a document you can open, and it must not be archived."
+        },
+        "gap_answer_not_usable": {
+          "title": "Answer can't be used",
+          "body": "The verified answer is retired or cites a document you can't open. Write a new answer instead."
+        },
+        "not_found": {
+          "title": "Question not found",
+          "body": "It may have been removed after its retention period. Reload the page."
+        },
+        "precondition_failed": {
+          "title": "Changed somewhere else",
+          "body": "This was changed in another window. Reload the page and try again."
+        }
+      }
     }
   },
   "marketing": {
