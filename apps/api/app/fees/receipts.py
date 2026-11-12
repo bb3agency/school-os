@@ -35,6 +35,7 @@ from app.fees import _common as c
 from app.fees import ledger, links, setup, templates
 from app.fees import repository as repo
 from app.fees import upi_repository as upi_repo
+from app.fees.bank_matching_repository import cheque_status_of
 from app.fees.models import Receipt, ReceiptCancellation, Refund, StudentFeeAccount
 from app.fees.money import group_indian, in_words, spread, total
 from app.fees.schemas import (
@@ -515,9 +516,10 @@ def receipt_out(session: Session, row: Receipt) -> ReceiptOut:
         version=row.version,
         bank_confirmed_at=(
             upi_repo.confirmation_times(session, [row.id]).get(row.id)
-            if row.mode == "upi_qr"
+            if row.mode in ("upi_qr", "cheque", "bank_transfer")
             else None
         ),
+        cheque_status=cheque_status_of(session, row),
     )
 
 

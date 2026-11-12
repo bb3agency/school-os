@@ -13,7 +13,9 @@ entity expansion, CSV width bombs and formula evaluation are handled there: SEC-
   (UTR: a 12-digit group of a UPI narration, else a 12-digit reference column) or another bank
   reference, and the narration with every digit run of 9+ digits (account, card, mobile,
   Aadhaar-like numbers and the UTR itself) masked to its last 4 digits, the local part of UPI IDs
-  and e-mail addresses masked, and the rest cut to ``narration_max_length``.
+  and e-mail addresses masked, and the rest cut to ``narration_max_length``;
+- for credits that are not UPI credits, the cheque number and the NEFT/RTGS/IMPS reference
+  (FM-08, :mod:`app.fees.bank_matching_config`).
 
 Nothing here logs. Account numbers, holder names, balances and debit lines are never returned.
 """
@@ -30,6 +32,7 @@ from typing import Final, Literal
 
 from app.core.redaction import contains_grouped_aadhaar, redact
 from app.core.spreadsheet import Cell, display_text
+from app.fees.bank_matching_config import bank_facts, load_bank_matching_config
 from app.fees.upi_config import Preset, UpiConfig, normalise_heading
 
 RefKind = Literal["utr", "reference", "none"]
@@ -71,6 +74,9 @@ class ParsedLine:
     ref_kind: RefKind
     reference: str | None
     narration: str | None  # masked (see the module docstring)
+    # FM-08 (FR-FEE-126): read from the raw narration before masking; never an account number.
+    cheque_no: str | None = None
+    transfer_ref: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -391,7 +397,12 @@ class _Reading:
             self.issues.append(Issue(row_no, "date", "date_out_of_range"))
             return
         narration = _text(cells, cols.narration)
-        ref_kind, reference = find_reference(narration, _text(cells, cols.reference), self.cfg)
+        raw_reference = _text(cells, cols.reference)
+        ref_kind, reference = find_reference(narration, raw_reference, self.cfg)
+        is_upi = bool(narration and re.search(self.cfg.utr.upi_marker, narration))
+        cheque_no, transfer_ref = bank_facts(
+            narration, raw_reference, is_upi=is_upi, cfg=load_bank_matching_config()
+        )
         self.lines.append(
             ParsedLine(
                 line_no=row_no,
@@ -400,6 +411,8 @@ class _Reading:
                 ref_kind=ref_kind,
                 reference=reference,
                 narration=mask_narration(narration, self.cfg),
+                cheque_no=cheque_no,
+                transfer_ref=transfer_ref,
             )
         )
 

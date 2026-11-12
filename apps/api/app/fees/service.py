@@ -37,6 +37,7 @@ from app.fees import (
     approvals,
     arrears,
     ask,
+    bank_matching,
     ledger,
     online,
     parent_pages,
@@ -51,6 +52,7 @@ from app.fees import (
     upi,
 )
 from app.fees import addons_repository as addon_repo
+from app.fees import bank_matching_repository as bm_repo
 from app.fees import late_fees as late
 from app.fees import online_repository as orepo
 from app.fees import repository as repo
@@ -177,6 +179,12 @@ ignore_line = statements.ignore
 rematch = statements.rematch
 upi_exceptions = statements.exceptions
 erase_statement_narrations = statements.erase_old_narrations
+
+# FM-08 cheque status and the deposit list (FR-FEE-131..140; app.fees.api_bank_matching)
+list_cheques = bank_matching.list_cheques
+mark_cheques_deposited = bank_matching.mark_deposited
+mark_cheque_returned = bank_matching.mark_returned
+cheque_deposit_slip_page = bank_matching.deposit_slip_page
 
 
 # --- data contract for other modules (R2-2F Ask, R2-3G sending, R2-3H parent pages) -------------
@@ -500,6 +508,7 @@ def export_records(session: Session) -> list[RecordTable]:
         *upi_repo.export_tables(session),
         *trepo.export_tables(session),
         *addon_repo.export_tables(session),
+        *bm_repo.export_tables(session),
     ]
 
 
@@ -511,6 +520,8 @@ _PURGE = purging.PurgeTables(
     deleted=(
         # FM-06 (0083_fee_tax_cert): certificates reference students, members and documents
         "fin.tax_certificates",
+        # FM-08 (0101_bank_matching): cheque events reference receipts, lines, cancellations
+        "fin.cheque_status_events",
         # R2-2E (0060_fees_upi): confirmations and statement lines reference receipts
         "fin.upi_confirmations",
         "fin.bank_statement_lines",

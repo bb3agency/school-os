@@ -9,7 +9,8 @@ other modules use ``app.fees.service``.
   5,000 transaction rows refused). Only credits are stored; the narration is masked and then
   encrypted with the school's DEK and erased after 90 days. The same file is read once; the same
   credit (reference, amount, date) of an overlapping statement is stored once.
-- **Proposals, never postings.** Matching rules (``upi.yaml``) only propose: the exact UTR and
+- **Proposals, never postings.** Matching rules (``upi.yaml``; for cheques and bank transfers
+  ``bank_matching.yaml``, FM-08, :mod:`app.fees.bank_matching`) only propose: the exact UTR and
   amount of an issued, unconfirmed UPI receipt (pre-selected), or, for a credit without a UTR,
   the single unconfirmed UPI receipt of the same amount near the value date (not pre-selected).
   A person confirms (bulk allowed); each confirmation is a row in ``fin.upi_confirmations``
@@ -43,7 +44,7 @@ from app.core.logging import get_logger
 from app.core.spreadsheet import CSV_MIME, XLSX_MIME, FileKind, SpreadsheetError, raw_rows
 from app.documents import service as documents
 from app.fees import _common as c
-from app.fees import upi
+from app.fees import bank_matching, upi
 from app.fees import upi_repository as repo
 from app.fees.models import Receipt
 from app.fees.statements_parse import ParsedLine, StatementRefused, parse_statement
@@ -234,6 +235,8 @@ def import_statement(ctx: UserContext, data: StatementImportIn) -> StatementImpo
                         "amount": line.amount,
                         "ref_kind": line.ref_kind,
                         "utr_or_ref": line.reference,
+                        "cheque_no": line.cheque_no,
+                        "transfer_ref": line.transfer_ref,
                         "narration_ciphertext": _encrypt(session, line_id, line.narration),
                         "match_status": "proposed" if receipt_id else "unmatched",
                         "match_kind": kind,
@@ -310,11 +313,14 @@ def _proposals(
                 continue
             out[index] = (receipt.id, "utr_exact")
             taken.add(receipt.id)
+    # FM-08 (FR-FEE-127): cheque number / transfer reference with amount, for the other lines.
+    out.update(bank_matching.propose(session, [(i, x) for i, x in lines if i not in out], taken))
     near = rules.amount_date
     if near.enabled:
         wanted: dict[uuid.UUID, list[int]] = {}
         for index, line in lines:
-            if _ref_kind(line) == "utr":
+            # A cheque or bank transfer credit is never a UPI payment (FM-08).
+            if _ref_kind(line) == "utr" or index in out or line.cheque_no or line.transfer_ref:
                 continue
             day = line.value_date
             candidates = [
@@ -389,7 +395,11 @@ def _import_out(session: Session, row: BankStatementImport) -> StatementImportOu
 
 def _receipt_ref(r: Receipt) -> ReceiptRef:
     student = r.content.get("student") or {}
+    details = r.mode_details or {}
     return ReceiptRef(
+        mode=r.mode,
+        cheque_number=details.get("cheque_number"),
+        transfer_reference=details.get("reference"),
         id=r.id,
         receipt_number=r.receipt_number,
         receipt_date=r.receipt_date,
@@ -422,11 +432,13 @@ def _exception(  # noqa: PLR0911 - one return per exception kind
     receipt: Receipt | None,
     by_utr: dict[str, list[Receipt]],
     confirmed: set[uuid.UUID],
+    returned: set[uuid.UUID],
 ) -> tuple[str | None, Receipt | None]:
     """Why a line needs a person (computed when read, so always current), and the receipt it
-    conflicts with."""
+    conflicts with. A confirmed cheque the bank returned afterwards is expected to be cancelled
+    (FM-08): not an exception."""
     if line.match_status == "confirmed":
-        if receipt is not None and receipt.status == "cancelled":
+        if receipt is not None and receipt.status == "cancelled" and receipt.id not in returned:
             return "confirmed_receipt_cancelled", None
         return None, None
     if line.match_status != "unmatched":
@@ -457,11 +469,12 @@ def lines_out(session: Session, lines: Sequence[BankStatementLine]) -> list[Stat
     confirmed = repo.confirmed_receipt_ids(
         session, [r.id for group in by_utr.values() for r in group]
     )
+    returned = _returned_cheques(session, receipts.values())
     names = identity.member_display_names(session, c.unique_ids(x.decided_by for x in lines))
     out = []
     for x in lines:
         receipt = receipts.get(x.receipt_id) if x.receipt_id else None
-        code, conflict = _exception(x, receipt, by_utr, confirmed)
+        code, conflict = _exception(x, receipt, by_utr, confirmed, returned)
         out.append(
             StatementLineOut(
                 id=x.id,
@@ -471,6 +484,8 @@ def lines_out(session: Session, lines: Sequence[BankStatementLine]) -> list[Stat
                 amount=x.amount,
                 ref_kind=x.ref_kind,
                 utr_or_ref=x.utr_or_ref,
+                cheque_no=x.cheque_no,
+                transfer_ref=x.transfer_ref,
                 narration=_narration(session, x),
                 narration_erased=x.narration_erased_at is not None,
                 match_status=x.match_status,
@@ -516,22 +531,33 @@ def get_statement(
 # --- decisions ------------------------------------------------------------------------------------
 
 
-def _check_pair(line: BankStatementLine, receipt: Receipt | None) -> str | None:
-    """Why ``line`` cannot confirm ``receipt`` (the database checks the same), else ``None``."""
-    if receipt is None or receipt.mode != "upi_qr":
+def _check_pair(session: Session, line: BankStatementLine, receipt: Receipt | None) -> str | None:
+    """Why ``line`` cannot confirm ``receipt`` (the database checks the same), else ``None``.
+    UPI, cheque and bank transfer receipts are confirmed from the bank (FM-08)."""
+    if receipt is None or receipt.mode not in _CONFIRMABLE_MODES:
         return "receipt_not_confirmable"
     if receipt.status != "issued":
         return "receipt_cancelled"
     if receipt.amount != line.amount:
         return "amount_mismatch"
-    if line.ref_kind == "utr" and line.utr_or_ref != receipt.utr:
-        return "utr_differs"
-    return None
+    if receipt.mode == "upi_qr":
+        if line.ref_kind == "utr" and line.utr_or_ref != receipt.utr:
+            return "utr_differs"
+        return None
+    return bank_matching.bank_facts_conflict(session, line, receipt)
+
+
+_CONFIRMABLE_MODES: Final = frozenset({"upi_qr", *bank_matching.BANK_MODES})
+
+
+def _returned_cheques(session: Session, receipts: Collection[Receipt]) -> set[uuid.UUID]:
+    return bank_matching.returned_ids(session, [r.id for r in receipts if r.mode == "cheque"])
 
 
 def _confirm_line(
-    session: Session, ctx: UserContext, line: BankStatementLine, receipt_id: uuid.UUID, kind: str
+    session: Session, ctx: UserContext, line: BankStatementLine, receipt: Receipt, kind: str
 ) -> None:
+    receipt_id = receipt.id
     now = c.now(session)
     with upi.db_errors():
         repo.insert_confirmation(
@@ -556,6 +582,7 @@ def _confirm_line(
                 "decided_at": now,
             },
         )
+        bank_matching.after_confirm(session, ctx, line, receipt)
 
 
 def _unpropose(session: Session, line: BankStatementLine) -> None:
@@ -590,14 +617,14 @@ def confirm(
             skipped.append(ConfirmSkipped(line_id=line.id, code="not_proposed"))
             continue
         receipt = repo.receipt_for_update(session, line.receipt_id)
-        problem = _check_pair(line, receipt)
+        problem = _check_pair(session, line, receipt)
         if problem is None and repo.confirmation_of_receipt(session, line.receipt_id) is not None:
             problem = "receipt_already_confirmed"
-        if problem is not None:
+        if problem is not None or receipt is None:
             _unpropose(session, line)
-            skipped.append(ConfirmSkipped(line_id=line.id, code=problem))
+            skipped.append(ConfirmSkipped(line_id=line.id, code=problem or "not_found"))
             continue
-        _confirm_line(session, ctx, line, line.receipt_id, line.match_kind)
+        _confirm_line(session, ctx, line, receipt, line.match_kind)
         confirmed += 1
     c.record(
         session,
@@ -618,7 +645,11 @@ def _load_line(session: Session, line_id: uuid.UUID) -> BankStatementLine:
 
 
 _PAIR_MESSAGES: Final = {
-    "receipt_not_confirmable": "Only an issued UPI receipt can be confirmed from the bank.",
+    "receipt_not_confirmable": "Only an issued UPI, cheque or bank transfer receipt can be "
+    "confirmed from the bank.",
+    "cheque_number_differs": "The bank credit carries a different cheque number than the receipt, "
+    "so they are not matched. Check the receipt; a wrong receipt is cancelled and issued again.",
+    "cheque_returned": "This cheque was returned by the bank, so it cannot be confirmed.",
     "receipt_cancelled": "This receipt is cancelled. Choose the receipt issued in its place.",
     "amount_mismatch": "The bank credit and the receipt have different amounts, so they are not "
     "matched. Check the receipt; a wrong receipt is cancelled and issued again.",
@@ -631,10 +662,11 @@ _PAIR_MESSAGES: Final = {
 def match(
     session: Session, ctx: UserContext, line_id: uuid.UUID, data: MatchIn
 ) -> StatementLineOut:
-    """A person matches one credit with one UPI receipt and confirms it (``fee.reconcile``): for
-    a credit no rule could match, or a confirmed credit whose receipt was cancelled and issued
-    again. The pair must agree (same amount; the same UTR when the bank shows one): 409 otherwise,
-    never corrected. Repeating the same match is harmless."""
+    """A person matches one credit with one UPI, cheque or bank transfer receipt and confirms it
+    (``fee.reconcile``): for a credit no rule could match, or a confirmed credit whose receipt
+    was cancelled and issued again. The pair must agree (same amount; the same UTR or cheque
+    number when the bank shows one): 409 otherwise, never corrected. Repeating the same match
+    is harmless."""
     c.require_on(session, ctx)
     c.require_school_wide(ctx, c.RECONCILE)
     line = _load_line(session, line_id)
@@ -650,7 +682,7 @@ def match(
     receipt = repo.receipt_for_update(session, data.receipt_id)
     if receipt is None:
         raise NotFound("Receipt not found")
-    problem = _check_pair(line, receipt)
+    problem = _check_pair(session, line, receipt)
     if problem is None and repo.confirmation_of_receipt(session, receipt.id) is not None:
         problem = "receipt_already_confirmed"
     if problem is not None:
@@ -661,7 +693,7 @@ def match(
             raise Conflict(_PAIR_MESSAGES["receipt_already_confirmed"], code="receipt_taken")
         _unpropose(session, repo.get_line(session, holder.id, lock=True) or holder)
     kind = line.match_kind if line.receipt_id == receipt.id and line.match_kind else "manual"
-    _confirm_line(session, ctx, line, receipt.id, kind)
+    _confirm_line(session, ctx, line, receipt, kind)
     c.record(
         session,
         action="fee.upi.confirmed",

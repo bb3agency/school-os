@@ -18,7 +18,8 @@ from pydantic import BeforeValidator, Field, StringConstraints
 from app.fees.schemas import Money, _In, _nfc, _Out
 
 MatchStatus = Literal["unmatched", "proposed", "confirmed", "ignored"]
-MatchKind = Literal["utr_exact", "amount_date", "manual"]
+# FM-08 (FR-FEE-127): cheque number + amount, bank transfer reference + amount.
+MatchKind = Literal["utr_exact", "amount_date", "manual", "cheque_exact", "transfer_exact"]
 RefKind = Literal["utr", "reference", "none"]
 IgnoreReason = Literal["not_a_fee", "recorded_elsewhere", "duplicate_credit", "other"]
 LineException = Literal[
@@ -125,6 +126,10 @@ class ReceiptRef(_Out):
     utr: str | None
     student_name: str
     class_section: str
+    # FM-08 (FR-FEE-126): UPI, cheque and bank transfer receipts are confirmed from the bank.
+    mode: str = "upi_qr"
+    cheque_number: str | None = None
+    transfer_reference: str | None = None
 
 
 class StatementLineOut(_Out):
@@ -135,6 +140,9 @@ class StatementLineOut(_Out):
     amount: Money
     ref_kind: RefKind
     utr_or_ref: str | None
+    # FM-08 (FR-FEE-126): bank facts read from the statement for cheque and transfer matching.
+    cheque_no: str | None = None
+    transfer_ref: str | None = None
     narration: str | None = Field(description="Masked; null once erased (90 days)")
     narration_erased: bool
     match_status: MatchStatus

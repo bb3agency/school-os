@@ -251,6 +251,8 @@ routes:
   POST /api/v1/fees/tax-certificates/bulk: [heavy_jobs]
   # FM-04 accountant and management reports: the print view, downloads and the year-end pack
   GET /api/v1/fees/reports/collections/print: [render]
+  # FM-08 (FR-FEE-136): the cheque deposit list print view.
+  GET /api/v1/fees/cheques/deposit-slip/print: [render]
   GET /api/v1/fees/reports/collections/download: [exports]
   GET /api/v1/fees/reports/dcb/download: [exports]
   GET /api/v1/fees/reports/registers/download: [exports]

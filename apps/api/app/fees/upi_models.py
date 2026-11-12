@@ -67,6 +67,9 @@ class BankStatementLine(Base):
     amount: Mapped[Decimal] = mapped_column(MONEY)
     ref_kind: Mapped[str] = mapped_column(Text)
     utr_or_ref: Mapped[str | None] = mapped_column(Text)
+    # FM-08 (0101_bank_matching): insert-only bank facts for cheque and transfer matching.
+    cheque_no: Mapped[str | None] = mapped_column(Text)
+    transfer_ref: Mapped[str | None] = mapped_column(Text)
     narration_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
     narration_erased_at: Mapped[dt.datetime | None]
     match_status: Mapped[str] = mapped_column(Text, server_default=sql_text("'unmatched'"))
