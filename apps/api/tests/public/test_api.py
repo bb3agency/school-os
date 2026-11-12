@@ -87,7 +87,8 @@ def test_FR_PUB_008_current_gives_the_frame_and_counts_views(
     body = first.json()
     # Field allowlist (FR-PUB-009): nothing about the student, guardian or other schools.
     assert set(body) == {
-        "kind", "expires_at", "language", "school_name", "notice", "receipt", "dues", "optin"
+        "kind", "expires_at", "language", "school_name", "notice", "receipt", "dues", "optin",
+        "closure",  # FP-02 follow-up (FR-PUB-013): null on every other kind
     }  # fmt: skip
     assert body["receipt"] is None
     assert body["dues"] is None
