@@ -910,6 +910,18 @@ Module `app/compliance` (`app/compliance/api.py`). The school's own certificates
 
 The disclosure draft (`GET /disclosure/draft`) gains `certificates` (item key → the register's current certificates: `certificate_id`, `kind`, `kind_label`, `valid_until`, `state`, `document_id`, `publishable`) and `expired_policy` (`warn` | `refuse`); `POST /disclosure/publish` answers 422 `certificate_expired` when the policy is `refuse` (FR-COMP-020..022). Notification template `compliance.certificate.expiring` (resource type `compliance_certificate`). **New error codes:** `unknown_kind`, `label_required`, `label_not_allowed`, `renews_not_allowed`, `renews_not_found`, `certificate_not_current`, `certificate_expired`.
 
+### Inspection readiness packs (FC-07 + FO-12, wave F3; docs/03 §3.37 FR-COMP-024..045; built 2026-11-12)
+
+Module `app/compliance` (`packs_api.py`, `packs.py`, `packs_catalogue.yaml`, `verified: false`). Per authority (DEO/MEO, APSERMC, CBSE, fire department) what SchoolOS holds and what is missing; making a pack keeps each item's state and prints an index. School-level facts only. No new permission.
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET | `/compliance/inspection-readiness` | `compliance.read` | `{verified, source, version, packs: [{key, label, authority, note, counts, items}]}`; item `{key, label, source, state, fix_by, note?, feature?, kind?, certificate_id?, valid_until?, has_copy?, register_view?, included?, snapshot_id?, published_at?, notice_id?, issued_on?, done?, applicable?}`; `state` `ready`/`expiring`/`no_copy`/`incomplete`/`expired`/`missing`/`left_out`/`not_tracked` |
+| GET | `/compliance/inspection-packs` | `compliance.read` | Packs made, newest first (`InspectionPackOut`: pack key, label, authority, version, `verified`, year, `visit_on`, `registers`, `counts`, `generated_at`, `generated_by_name`) |
+| POST | `/compliance/inspection-packs` | `compliance.manage` | Body `{pack_key, academic_year_id?, visit_on?, registers?: [item key]}` → 201 `InspectionPackDetailOut` (+ `items`); `Idempotency-Key`; registers need `register.read` (403); 422 `unknown_pack`, `unknown_register`, `academic_year_not_found`; audited `compliance.inspection_pack.generated` |
+| GET | `/compliance/inspection-packs/{pack_id}` | `compliance.read` | One pack as made; another school's 404 |
+| GET | `/compliance/inspection-packs/{pack_id}/index` | `compliance.read` | A4 HTML index (`text/html`, CSP with one hashed style block, `no-store`); the BFF keeps the API's CSP (`OWN_CSP_PATHS`) |
+
 ## 5. Examples
 
 ### 5.1 Search students

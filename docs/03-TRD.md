@@ -1106,7 +1106,7 @@ A weekly, counts-only brief for the school's owner and principal (docs/research/
 
 ### 3.37 School compliance certificates (FR-COMP) (FC-01, wave F2)
 
-The school's own certificates (fire NOC, building safety, occupancy, recognition, RTE recognition, CBSE affiliation, NOC, DEO certificate, society registration, water and sanitation): a register with renewal history, expiry reminders and the CBSE Appendix IX link (docs/research/2026-11-features/compliance-safety.md FC-01; module `app/compliance`; migration `0096_compliance_register`; docs/05 §16.9; docs/09 "Compliance certificates"). School-level facts, no personal data. FR-COMP-023..030 are reserved for FC-07 inspection readiness packs.
+The school's own certificates (fire NOC, building safety, occupancy, recognition, RTE recognition, CBSE affiliation, NOC, DEO certificate, society registration, water and sanitation): a register with renewal history, expiry reminders and the CBSE Appendix IX link (docs/research/2026-11-features/compliance-safety.md FC-01; module `app/compliance`; migration `0096_compliance_register`; docs/05 §16.9; docs/09 "Compliance certificates"). School-level facts, no personal data. FR-COMP-024..045 are FC-07 / FO-12 inspection readiness packs (wave F3, below).
 
 | ID | Requirement | Verify |
 |---|---|---|
@@ -1133,7 +1133,39 @@ The school's own certificates (fire NOC, building safety, occupancy, recognition
 | FR-COMP-021 | Publishing Appendix IX while a certificate the register holds for an item has expired MUST warn on the draft and record the items in the `disclosure.published` audit summary (`expired_certificates`). | T |
 | FR-COMP-022 | With `disclosure: refuse` in the catalogue, publishing MUST answer 422 `certificate_expired` naming the items. Default `warn`. *(Lead decision D85, PO to confirm.)* | T |
 
-*As built (wave F2, FC-01, 2026-11-09):* FR-COMP-001..022 are built and tested (`apps/api/tests/compliance/`, `apps/api/tests/disclosure/test_compliance_register.py`, `apps/web/src/features/compliance/compliance.test.ts`). FC-07 inspection readiness packs (FR-COMP-023..030) are not built.
+*As built (wave F2, FC-01, 2026-11-09):* FR-COMP-001..022 are built and tested (`apps/api/tests/compliance/`, `apps/api/tests/disclosure/test_compliance_register.py`, `apps/web/src/features/compliance/compliance.test.ts`). FC-07 inspection readiness packs are FR-COMP-024..045 below.
+
+
+#### Inspection readiness packs (FC-07 merged with FO-12, wave F3)
+
+Before a DEO/MEO, APSERMC, CBSE or fire department visit the office sees, per authority, which items SchoolOS holds and which are missing, then makes a pack: a printable index plus the files it lists, printed from their own screens (docs/research/2026-11-features/compliance-safety.md FC-07, office-portals.md FO-12; `app/compliance/packs*.py`, `packs_catalogue.yaml`; migration `0098_inspection_packs`; docs/05 §16.9; docs/09 "Inspection readiness packs"). School-level facts: no student or staff data in a pack.
+
+| ID | Requirement | Verify |
+|---|---|---|
+| FR-COMP-024 | Packs per authority (DEO/MEO, APSERMC, CBSE, fire department) and their items MUST live in the versioned `app/compliance/packs_catalogue.yaml` with `verified: false` and a source note; each item maps to one source (`certificate` kind of `catalogue.yaml`, `register`, `disclosure`, `privacy_notice`, `dpdp_readiness`, `not_tracked` with the research id). A bad file MUST stop the API at start-up. | T |
+| FR-COMP-025 | A pack MUST apply to a school with one of its boards (none: every school); a certificate item MUST follow its kind's boards (e.g. the APSERMC pack lists state recognition for a State Board school and the CBSE affiliation for a CBSE school). | T |
+| FR-COMP-026 | `GET /compliance/inspection-readiness` (`compliance.read`) MUST list every pack for the school with each item's state now and counts (ready, attention, missing, not tracked). | T |
+| FR-COMP-027 | A certificate item MUST take the FC-01 register's current certificate: `missing` when none, `expired`, `no_copy` when held without a copy in Documents, `expiring`, else `ready`. | T |
+| FR-COMP-028 | The Appendix IX item MUST be `ready` (with the publish date) while a snapshot is live, read through `disclosure.service`, else `missing`. | T |
+| FR-COMP-029 | The privacy notice item MUST be `ready` (with the date given) once a parents' notice is recorded, read through `privacy.service`, else `missing`. | T |
+| FR-COMP-030 | The DPDP item MUST show the readiness checklist's done of applicable (`ready` when all are done, else `incomplete`); not legal advice. | T |
+| FR-COMP-031 | Evidence SchoolOS does not hold yet (committees FC-05, staff safety FC-04, drills and safety checks FC-09) MUST show as "not tracked in SchoolOS" with the feature id, counted apart, never as missing. | T |
+| FR-COMP-032 | `POST /compliance/inspection-packs` (`compliance.manage`, `Idempotency-Key`) MUST keep each item's state as it is now in `ops.inspection_packs` with the pack key, version, label, authority, academic year (default: the current one), optional visit date and the registers chosen; later changes MUST NOT alter a made pack. | T |
+| FR-COMP-033 | Making a pack MUST answer 422 `unknown_pack` (not a pack for the school), `unknown_register` (not a register of that pack) or `academic_year_not_found` (another school's or no such year). | T |
+| FR-COMP-034 | Registers (student lists) MUST be in a pack only when chosen, and only by holders of `register.read` (403 otherwise); registers not chosen MUST be `left_out`. The register print views keep their own MFA step-up and `register.viewed` audit. *(Lead decision D86, PO to confirm.)* | T |
+| FR-COMP-035 | Making a pack MUST be audited in the same transaction (`compliance.inspection_pack.generated`: pack key, version, year id, register keys, counts); if the audit fails no pack is kept. | T |
+| FR-COMP-036 | A pack MUST hold item keys, sources, states, fix-by roles, dates and record ids only: no student or staff data, no free text. | T |
+| FR-COMP-037 | `ops.inspection_packs` MUST be a tenant table under invariant 1 (RLS ENABLE + FORCE, composite FK to `core.academic_years`), append-only for `sos_app` (SELECT and INSERT). | T |
+| FR-COMP-038 | `GET /compliance/inspection-packs/{id}/index` (`compliance.read`) MUST answer an A4 HTML page with one style block allowed by hash (`default-src 'none'`), no scripts, links or images, every value escaped and Aadhaar-masked. | T |
+| FR-COMP-039 | The index MUST show the school, the authority, visit date, academic year, when the pack was made, the summary counts, the "not yet confirmed" note while `verified: false`, and one row per item with its state, details, where it is kept and who fixes it, with signature lines. | T |
+| FR-COMP-040 | The BFF MUST leave the index's CSP to the API (`apps/web/src/proxy.ts` `OWN_CSP_PATHS`), and only for that path. | T |
+| FR-COMP-041 | `GET /compliance/inspection-packs` (`compliance.read`) MUST list the packs made, newest first (at most `log_limit`, 50), with who made them. | T |
+| FR-COMP-042 | `GET /compliance/inspection-packs/{id}` MUST show one pack as it was made; another school's pack MUST answer 404 on every route, the same as a random id. | T |
+| FR-COMP-043 | The full data export MUST include `inspection_packs`; record class `inspection_packs` (C1, no personal data, life of the school); the offboarding purge (module `compliance`) removes them. | T |
+| FR-COMP-044 | No new permission: readiness, the log and the index need `compliance.read`; making a pack `compliance.manage`; school-wide, no step-up (no personal data). *(Lead decision D86, PO to confirm.)* | T |
+| FR-COMP-045 | The web MUST offer "Prepare for an inspection" (`/compliance/inspection`: pack chooser, item states with where to print each, make the pack, print the index, packs made), keyboard-usable at 1366×768, and a certificate card (expired, expiring, not recorded; counts only) on the office and principal homes for holders of `compliance.read`. *(Lead decision D86, PO to confirm.)* | T |
+
+*As built (wave F3, FC-07 + FO-12, 2026-11-12):* FR-COMP-024..045 are built and tested (`apps/api/tests/compliance/test_packs_api.py`, `test_packs_config.py`, `apps/web/src/features/compliance/packs.test.tsx`, the home card in `apps/web/src/features/school/school.test.tsx`). Not built: one combined PDF of every file (the office prints the index and each item from its screen; a bundle would need the export pipeline and PDF renderer), items the school adds itself, an inspection log with the inspector's office or name (the pack's authority and visit date only), committees, staff safety and drills (FC-05, FC-04, FC-09: shown as not tracked).
 
 ---
 
