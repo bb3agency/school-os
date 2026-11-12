@@ -52,6 +52,8 @@ const OWN_CSP_PATHS: readonly RegExp[] = [
   /^\/bff\/api\/v1\/fees\/reports\/(daily|collections)\/print$/i,
   // FM-06 (FR-FEE-046..056): tuition fee tax certificate print view.
   /^\/bff\/api\/v1\/fees\/tax-certificates\/[0-9a-f-]{36}\/print$/i,
+  // FM-08 (FR-FEE-136): the list of cheques deposited on a day, for the bank's pay-in slip.
+  /^\/bff\/api\/v1\/fees\/cheques\/deposit-slip\/print$/i,
   /^\/bff\/api\/v1\/students\/[0-9a-f-]{36}\/apaar-consent\/form$/i,
   /^\/bff\/api\/v1\/sections\/[0-9a-f-]{36}\/(apaar-consent-forms|join-slips)$/i,
   /^\/bff\/api\/v1\/consents\/forms$/i,
