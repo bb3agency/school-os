@@ -18,7 +18,7 @@ import {
 import { CitedPageButton, ResolveSourceLink } from "./ResolveSource";
 import { ASK_PERM } from "./data";
 
-export type AskTab = "ask" | "search" | "verified";
+export type AskTab = "ask" | "search" | "verified" | "gaps";
 
 /** Ask / Search documents / Verified answers, each a URL (works without JS). */
 export function AskTabs({ active }: { active: AskTab }) {
@@ -28,6 +28,8 @@ export function AskTabs({ active }: { active: AskTab }) {
     ...(can(ASK_PERM.ask) ? [{ id: "ask", href: "/ask", label: t("ask") }] : []),
     ...(can(ASK_PERM.search) ? [{ id: "search", href: "/ask/search", label: t("search") }] : []),
     ...(can(ASK_PERM.ask) ? [{ id: "verified", href: "/ask/verified", label: t("verified") }] : []),
+    // FA-06: questions Ask could not answer, for the people who keep the library.
+    ...(can(ASK_PERM.manageVerified) ? [{ id: "gaps", href: "/ask/gaps", label: t("gaps") }] : []),
   ];
   if (items.length < 2) return null;
   return <TabNav label={t("label")} items={items} activeId={active} />;
