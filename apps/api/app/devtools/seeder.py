@@ -514,7 +514,7 @@ def _seed_students(plan: TenantPlan, summary: TenantSummary, options: StudentOpt
         _seed_fees_messaging(plan, summary)
 
 
-def _actor(plan: TenantPlan, role: str) -> finance_seeder.Actor:
+def actor(plan: TenantPlan, role: str) -> finance_seeder.Actor:
     spec = next(s for s in plan.staff if s.role == role and s.ordinal == 1)
     with tenant_session(plan.tenant_id) as session:
         member = _members_by_email(session).get(spec.email)
@@ -527,7 +527,7 @@ def _seed_fees_messaging(plan: TenantPlan, summary: TenantSummary) -> None:
     """Fee heads, plan, accounts, receipts (one cancelled, one part refunded) and, when messaging
     is available, its settings, opt-outs and a skipped receipt message per receipt."""
     actors = finance_seeder.Actors(
-        accountant=_actor(plan, "accountant"), principal=_actor(plan, "principal")
+        accountant=actor(plan, "accountant"), principal=actor(plan, "principal")
     )
     try:
         created = finance_seeder.seed_fees_and_messaging(plan, actors)
