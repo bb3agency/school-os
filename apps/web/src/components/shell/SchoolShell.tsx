@@ -84,6 +84,13 @@ export function SchoolShell({
         { href: "/", label: t("school.nav.home"), exact: true, icon: "home" },
         // FA-05 (FR-BRF-001): the weekly management brief, owner and principal only.
         { href: "/brief", label: t("brief.nav"), permission: "brief.read", icon: "chart" },
+        {
+          // FT-13 (FR-EW-026): early-warning follow-up counts for management, no names.
+          href: "/follow-up-counts",
+          label: t("followUpCounts.nav"),
+          permission: "insights.counts_read",
+          icon: "flag",
+        },
       ],
     },
     {
@@ -146,6 +153,13 @@ export function SchoolShell({
           label: t("marks.nav"),
           permission: ["marks.read", "marks.record", "exam.manage"],
           icon: "chart",
+        },
+        {
+          // FT-14 (FR-ATT-024): attendance and marks entry completeness per section.
+          href: "/completeness",
+          label: t("completeness.nav"),
+          permission: "completeness.read",
+          icon: "clipboard",
         },
         {
           // FT-08 (FR-YRE-019): year-end results and the UDISE+ progression sheet.

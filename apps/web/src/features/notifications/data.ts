@@ -76,6 +76,8 @@ const LINKS: Record<string, (id: string, item: LinkSource) => string> = {
   },
   // R3-1D (FR-RDY-006; ADR-0053): a portal window is closing (resource id: the academic year).
   portal_calendar: () => "/findings/calendar",
+  // FT-14 (FR-ATT-023, FR-MRK-023): a reminder to finish a section's attendance or marks.
+  section: (_id, item) => (item.params?.["kind"] === "attendance" ? "/attendance" : "/marks"),
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

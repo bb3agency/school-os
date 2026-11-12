@@ -51,6 +51,8 @@ class RuleSpec(_Model):
 
 class FlagRules(_Model):
     due_days: int = Field(ge=1, le=30)
+    # FT-13 (D86; FR-EW-019): the furthest a follow-up review may be planned ahead.
+    review_max_days: int = Field(default=60, ge=7, le=180)
 
 
 class NoteRules(_Model):

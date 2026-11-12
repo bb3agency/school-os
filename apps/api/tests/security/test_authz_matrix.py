@@ -2173,6 +2173,23 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("GET", "/api/v1/insights/flags"): lambda w, r, a: ("/api/v1/insights/flags", None, {}),
     ("GET", "/api/v1/insights/summary"): lambda w, r, a: ("/api/v1/insights/summary", None, {}),
+    # FT-13 / FT-14 (D86): counts for management; completeness per section.
+    ("GET", "/api/v1/insights/counts"): lambda w, r, a: ("/api/v1/insights/counts", None, {}),
+    ("GET", "/api/v1/completeness/attendance"): lambda w, r, a: (
+        "/api/v1/completeness/attendance",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/completeness/exams/{exam_id}"): lambda w, r, a: (
+        f"/api/v1/completeness/exams/{IN.world_exam(w)}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/completeness/reminders"): lambda w, r, a: (
+        "/api/v1/completeness/reminders",
+        {"section_id": str(w.a.ids["section_9a"]), "kind": "attendance"},
+        {},
+    ),
     ("GET", "/api/v1/insights/flags/{flag_id}"): lambda w, r, a: (
         f"/api/v1/insights/flags/{_m5_shared_flag(w)}",
         None,
@@ -3281,6 +3298,8 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         return 409  # guard passed; the digest is not the preview's (FP-02)
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
+    if (method, path) == ("POST", "/api/v1/completeness/reminders"):
+        return 409  # guard passed; reminders are off by default (FT-14, D86)
     if method == "POST" and path.startswith("/api/v1/me/invitations/"):
         return 404  # guard passed; not the caller's own open invitation (DL-09)
     if method == "DELETE" and path in (

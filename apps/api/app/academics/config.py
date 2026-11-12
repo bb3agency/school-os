@@ -75,12 +75,19 @@ class YearEndRules(_Model):
     max_sheet_students: int = Field(ge=100, le=20000)
 
 
+class CompletenessRules(_Model):
+    """FT-14 (D86; FR-ATT-022, FR-MRK-022): in-app reminders to class teachers, off by default."""
+
+    reminders_enabled: bool = False
+
+
 class AcademicsConfig(_Model):
     version: int = Field(ge=1)
     attendance: AttendanceRules
     marks: MarksRules
     sheets: SheetRules
     year_end: YearEndRules
+    completeness: CompletenessRules = CompletenessRules()
 
 
 @lru_cache(maxsize=1)
@@ -95,6 +102,7 @@ __all__ = [
     "AcademicsConfig",
     "AttendanceRules",
     "AttendanceStatus",
+    "CompletenessRules",
     "MarksRules",
     "SheetLimits",
     "SheetRules",

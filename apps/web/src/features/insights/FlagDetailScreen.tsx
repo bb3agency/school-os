@@ -20,11 +20,14 @@ import {
   ERASE_REASONS,
   KEYS,
   PERM,
+  REVIEW_MAX_DAYS,
   actionSchema,
+  addDays,
   assignSchema,
   closeSchema,
   eraseSchema,
   ifMatch,
+  reviewOf,
   todayIst,
   useFlag,
   useOwners,
@@ -62,6 +65,7 @@ export function ActionLog({ actions, label }: { actions: readonly FlagAction[]; 
 
 function FlagFacts({ flag }: { flag: FlagDetail }) {
   const t = useTranslations("insights");
+  const review = reviewOf(flag);
   const rows: [string, ReactNode][] = [
     [
       t("detail.raisedOn"),
@@ -77,6 +81,17 @@ function FlagFacts({ flag }: { flag: FlagDetail }) {
       </span>,
     ],
     [t("detail.owner"), flag.owner?.display_name ?? t("unassigned")],
+    ...(review.on
+      ? ([
+          [
+            t("detail.reviewOn"),
+            <span key="review" className="inline-flex flex-wrap items-center gap-1">
+              <span className="num">{formatDate(review.on)}</span>
+              {review.due ? <span>{t("detail.reviewDue")}</span> : null}
+            </span>,
+          ],
+        ] as [string, ReactNode][])
+      : []),
     [
       t("detail.raisedBy"),
       flag.raised_by ? (flag.raised_by.display_name ?? t("someone")) : t("detail.byRule"),
@@ -150,6 +165,7 @@ function FlagActions({ flag }: { flag: FlagDetail }) {
                     kind: input.kind,
                     acted_on: input.acted_on,
                     ...(input.note ? { note: input.note } : {}),
+                    ...(input.review_on ? { review_on: input.review_on } : {}),
                   },
                 }),
               )
@@ -172,6 +188,15 @@ function FlagActions({ flag }: { flag: FlagDetail }) {
                   min={flag.raised_on}
                   max={todayIst()}
                   error={errors.acted_on}
+                />
+                <TextField
+                  name="review_on"
+                  type="date"
+                  label={t("action.reviewOn")}
+                  hint={t("action.reviewHint", { days: REVIEW_MAX_DAYS })}
+                  min={addDays(todayIst(), 1)}
+                  max={addDays(todayIst(), REVIEW_MAX_DAYS)}
+                  error={errors.review_on}
                 />
                 <TextAreaField
                   name="note"

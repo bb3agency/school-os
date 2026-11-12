@@ -88,3 +88,11 @@ year_end:
   max_reason_chars: 500
   # UDISE+ progression sheet: students per sheet (one school's year).
   max_sheet_students: 5000
+
+# FT-14 records completeness (lead decision D86, PO to confirm; FR-ATT-016.., FR-MRK-016..). The
+# principal and the exam coordinator see per section how complete attendance and marks entry is
+# (counts only) and the class teacher it waits on; never a teacher score or ranking. A person may
+# send the section's class teacher an in-app reminder only while this is switched on: off until the
+# PO decides whether teachers should be nudged at all (report question for FT-14).
+completeness:
+  reminders_enabled: false

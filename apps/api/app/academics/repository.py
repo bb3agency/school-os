@@ -344,6 +344,39 @@ def exam_subjects(session: Session, exam_id: uuid.UUID) -> list[str]:
     return [r.subject for r in rows]
 
 
+# --- completeness (FT-14; counts only) ----------------------------------------------------------
+
+
+def attendance_pairs(
+    session: Session, on_date: dt.date, section_ids: Collection[uuid.UUID]
+) -> set[tuple[uuid.UUID, uuid.UUID]]:
+    """(section_id, student_id) of every mark on the date in the sections (FR-ATT-016)."""
+    if not section_ids:
+        return set()
+    rows = session.execute(
+        select(AttendanceMark.section_id, AttendanceMark.student_id).where(
+            AttendanceMark.on_date == on_date,
+            AttendanceMark.section_id.in_(list(section_ids)),
+        )
+    )
+    return {(r.section_id, r.student_id) for r in rows}
+
+
+def exam_mark_keys(
+    session: Session, exam_id: uuid.UUID, section_ids: Collection[uuid.UUID]
+) -> list[tuple[uuid.UUID, str, uuid.UUID]]:
+    """(section_id, subject, student_id) of every stored mark (or absent) of the exam in the
+    sections (FR-MRK-016)."""
+    if not section_ids:
+        return []
+    rows = session.execute(
+        select(ExamMark.section_id, ExamMark.subject, ExamMark.student_id).where(
+            ExamMark.exam_id == exam_id, ExamMark.section_id.in_(list(section_ids))
+        )
+    )
+    return [(r.section_id, r.subject, r.student_id) for r in rows]
+
+
 def results_of(
     session: Session, student_ids: Collection[uuid.UUID], academic_year_id: uuid.UUID | None
 ) -> list[tuple[ExamMark, Exam]]:
