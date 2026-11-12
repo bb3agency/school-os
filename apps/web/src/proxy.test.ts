@@ -330,6 +330,26 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       );
     }
   });
+
+  it("leaves the fix-owner letters' CSP to the API, and only those paths (FA-08)", () => {
+    for (const path of [
+      "/bff/api/v1/dq/readiness/bseap-ssc-2027/parent-letters",
+      "/bff/api/v1/dq/readiness/bseap-ssc-2027/board-letter",
+    ]) {
+      const page = proxy(request(path));
+      expect(page.headers.get("content-security-policy"), path).toBeNull();
+      expect(page.headers.get("x-content-type-options"), path).toBe("nosniff");
+    }
+    for (const path of [
+      "/bff/api/v1/dq/readiness/bseap-ssc-2027/fix-letters",
+      "/bff/api/v1/dq/readiness/bseap-ssc-2027/parent-letters/x",
+      "/bff/api/v1/dq/readiness/../board-letter",
+    ]) {
+      expect(proxy(request(path)).headers.get("content-security-policy"), path).toContain(
+        "default-src 'self'",
+      );
+    }
+  });
 });
 
 describe("proxy with Telugu switched off (ADR-0036, the default)", () => {

@@ -50,6 +50,7 @@ export const CLIENT_NAMESPACES = {
     "extraction",
     "fees",
     "findings",
+    "fixLetters",
     "holds",
     "imports",
     "insights",
