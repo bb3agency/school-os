@@ -64,7 +64,19 @@ StopReason = Literal["end_turn", "tool_use", "max_tokens", "refusal"]
 BlockKind = Literal["heading", "paragraph", "list_item", "table", "page_break"]
 
 SourceKind = Literal[
-    "doc", "student", "finding", "change", "verified", "count", "fee", "conversation", "task"
+    "doc",
+    "student",
+    "finding",
+    "change",
+    "verified",
+    "count",
+    "fee",
+    "conversation",
+    "task",
+    "readiness",
+    "attendance",
+    "certificate",
+    "compliance",
 ]
 
 

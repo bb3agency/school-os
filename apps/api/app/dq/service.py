@@ -1337,6 +1337,8 @@ __all__ = [
     "WAIVE",
     "BlockerRef",
     "ClosingWindow",
+    "ReadinessClassCounts",
+    "ReadinessForAsk",
     "ReadinessTotals",
     "execute_queued_run",
     "export_records",
@@ -1349,6 +1351,7 @@ __all__ = [
     "open_blockers",
     "profiles_catalog",
     "purge_tenant_data",
+    "readiness_for_ask",
     "readiness_slip_students",
     "readiness_slips_document",
     "readiness_totals",
@@ -1445,6 +1448,82 @@ def readiness_totals(session: Session, ctx: UserContext, *, limit: int) -> list[
                 needs_parent=totals.needs_parent,
                 needs_school=totals.needs_school,
                 blocked=totals.blocked,
+            )
+        )
+    return out
+
+
+# --- "Ask the school" readiness summary (FA-04; FR-KB-066..069) -----------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ReadinessClassCounts:
+    """Readiness of one class of a profile, summed over the sections the caller reaches
+    (``class_id`` ``None``: every class the caller reaches)."""
+
+    class_id: uuid.UUID | None
+    label_en: str
+    students: int
+    ready: int
+    needs_parent: int
+    needs_school: int
+    blocked: int
+
+
+@dataclass(frozen=True, slots=True)
+class ReadinessForAsk:
+    """One readiness profile for "Ask the school": totals and per class counts (counts only)."""
+
+    profile_key: str
+    label_en: str
+    totals: ReadinessClassCounts
+    classes: tuple[ReadinessClassCounts, ...]
+
+
+def readiness_for_ask(
+    session: Session, ctx: UserContext, *, profile_key: str | None, limit: int
+) -> list[ReadinessForAsk]:
+    """Readiness by class of one profile (``profile_key``) or of the school's readiness profiles
+    (at most ``limit``), in ``ctx``'s reach: the same counts as ``GET /dq/readiness/{profile_key}``
+    summed per class (``dq.readiness.read``; class teachers: their sections). Unknown profile, or
+    one without a readiness check: ``NotFound``. Never a student id or name (FA-04)."""
+    from app.dq import readiness_service  # noqa: PLC0415 - imports this module
+
+    if not ctx.has(readiness_service.READ):
+        return []
+    if profile_key is not None:
+        keys = [readiness_service.readiness_profile(profile_key).key]
+    else:
+        keys = [p.key for p in school_profiles(session) if p.readiness][:limit]
+    labels = {c.id: c.display_en for c in tenancy.list_classes(session)}
+    out: list[ReadinessForAsk] = []
+    for key in keys:
+        found = readiness_service.summary(session, ctx, key)
+        per_class: dict[uuid.UUID, list[int]] = {}
+        for row in found.sections:
+            sums = per_class.setdefault(row.class_id, [0, 0, 0, 0, 0])
+            for i, n in enumerate(
+                (row.students, row.ready, row.needs_parent, row.needs_school, row.blocked)
+            ):
+                sums[i] += n
+        t = found.totals
+        out.append(
+            ReadinessForAsk(
+                profile_key=key,
+                label_en=found.profile.label_en,
+                totals=ReadinessClassCounts(
+                    None,
+                    "All classes",
+                    t.students,
+                    t.ready,
+                    t.needs_parent,
+                    t.needs_school,
+                    t.blocked,
+                ),
+                classes=tuple(
+                    ReadinessClassCounts(class_id, labels.get(class_id, "Class"), *sums)
+                    for class_id, sums in per_class.items()
+                ),
             )
         )
     return out

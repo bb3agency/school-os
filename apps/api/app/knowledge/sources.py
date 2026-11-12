@@ -39,9 +39,11 @@ _FIELD: Final = re.compile(
     rf"^sos://student/(?P<id>{_UUID})/field/(?P<attr>[a-z][a-z0-9_]{{0,63}})"
     r"\?src=(?P<src>[a-z][a-z0-9_]{0,63})$"
 )
-_SIMPLE: Final = re.compile(rf"^sos://(?P<kind>finding|change|verified|task)/(?P<id>{_UUID})$")
+_SIMPLE: Final = re.compile(
+    rf"^sos://(?P<kind>finding|change|verified|task|certificate)/(?P<id>{_UUID})$"
+)
 _AGGREGATE: Final = re.compile(
-    rf"^sos://(?P<kind>count|fee)/(?P<id>{_UUID})(?:#s(?P<scope>[0-9a-f]{{16}}))?$"
+    rf"^sos://(?P<kind>count|fee|readiness|attendance|compliance)/(?P<id>{_UUID})(?:#s(?P<scope>[0-9a-f]{{16}}))?$"
 )
 """A tool aggregate with the fingerprint of the scope it was computed over (W3-09); keys
 stored before the fingerprint have none (visible only school-wide, see ``visibility``)."""
@@ -106,6 +108,12 @@ def task(task_id: uuid.UUID) -> str:
     return f"sos://task/{task_id}"
 
 
+def certificate(certificate_id: uuid.UUID) -> str:
+    """One student certificate (``get_certificates``, FA-04): its type, serial, dates and
+    status, re-checked through ``certificates.service`` (the caller's reach)."""
+    return f"sos://certificate/{certificate_id}"
+
+
 def scope_fingerprint(grant: Reach) -> str:
     """16 hex characters naming the reach of one permission (school-wide, or the sorted class
     and section ids): ids only, hashed, so a source carries no list of sections. Equal grants
@@ -139,6 +147,27 @@ def fee_dues(fee_id: uuid.UUID, *, scope: str) -> str:
     is derived from the school, the student (or the summary) and the snapshot, so it names no
     person and no ledger; ``scope`` as for :func:`student_count`."""
     return f"sos://fee/{fee_id}#s{_scope(scope)}"
+
+
+def readiness(readiness_id: uuid.UUID, *, scope: str) -> str:
+    """Readiness counts of one profile by class (``get_readiness_summary``, FA-04). The id is
+    derived from the school, the profile and the day; ``scope`` as for :func:`student_count`
+    (the ``dq.readiness.read`` reach)."""
+    return f"sos://readiness/{readiness_id}#s{_scope(scope)}"
+
+
+def attendance(attendance_id: uuid.UUID, *, scope: str) -> str:
+    """Attendance counts by section over a date range (``get_attendance_summary``, FA-04). The
+    id is derived from the school, the range and the day; ``scope`` as for :func:`student_count`
+    (the ``attendance.read`` reach)."""
+    return f"sos://attendance/{attendance_id}#s{_scope(scope)}"
+
+
+def compliance(entry_id: uuid.UUID, *, scope: str) -> str:
+    """One row of the school's compliance certificate register (``list_compliance_status``,
+    FC-11; school-level facts, no personal data). The id is derived from the school, the kind
+    and the day; ``scope`` as for :func:`student_count` (the ``compliance.read`` reach)."""
+    return f"sos://compliance/{entry_id}#s{_scope(scope)}"
 
 
 def conversation_question(conversation_id: uuid.UUID, query_id: uuid.UUID) -> str:
@@ -178,12 +207,16 @@ def parse(uri: str) -> SourceRef:
 __all__ = [
     "Reach",
     "SourceRef",
+    "attendance",
+    "certificate",
     "change_request",
+    "compliance",
     "conversation_question",
     "document_page",
     "fee_dues",
     "finding",
     "parse",
+    "readiness",
     "scope_fingerprint",
     "student_count",
     "student_field",

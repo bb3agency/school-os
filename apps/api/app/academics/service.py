@@ -1178,6 +1178,101 @@ def exam_results(
     return out
 
 
+# --- "Ask the school" attendance summary (FA-04; FR-KB-070..073) ----------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class SectionAttendance:
+    """Counts of one section's register over a date range (no student ids, no names)."""
+
+    section_id: uuid.UUID
+    class_id: uuid.UUID
+    label: str
+    """``"<class display name> <section name>"``."""
+    students: int
+    """Students on the roll the caller reaches."""
+    days_marked: int
+    present: int
+    late: int
+    absent: int
+    leave: int
+
+    @property
+    def marks(self) -> int:
+        return self.present + self.late + self.absent + self.leave
+
+    @property
+    def rate(self) -> float | None:
+        """Present or late marks / all marks, in percent; ``None`` when nothing is marked."""
+        if not self.marks:
+            return None
+        return 100.0 * (self.present + self.late) / self.marks
+
+
+@dataclass(frozen=True, slots=True)
+class AttendanceRates:
+    """``attendance_rates_for_ask``: the sections of the current academic year the caller
+    reaches with ``attendance.read``, in class order (FA-04)."""
+
+    year_label: str | None
+    start: dt.date
+    end: dt.date
+    sections: tuple[SectionAttendance, ...]
+
+
+def attendance_rates_for_ask(
+    session: Session, ctx: UserContext, *, start: dt.date, end: dt.date
+) -> AttendanceRates:
+    """Per section counts of the register from ``start`` to ``end`` (inclusive) for "Ask the
+    school" (``attendance.read``; class teachers: their sections). The roll is the caller's
+    reach through ``student.read_basic`` AND ``attendance.read`` (as on the register screen);
+    only those students' marks are counted. Counts only: never a student id or name. Sections
+    the caller does not reach are left out, as are sections with nobody on the roll."""
+    if not ctx.has(ATTENDANCE_READ):
+        return AttendanceRates(year_label=None, start=start, end=end, sections=())
+    year = tenancy.get_current_academic_year(session)
+    if year is None:
+        return AttendanceRates(year_label=None, start=start, end=end, sections=())
+    classes = {c.id: c for c in tenancy.list_classes(session)}
+    sections = sorted(
+        tenancy.list_sections(session, academic_year_id=year.id, include_archived=False),
+        key=lambda s: (classes[s.class_id].sort_order if s.class_id in classes else 0, s.name),
+    )
+    out: list[SectionAttendance] = []
+    for section in sections:
+        try:
+            ensure_section_visible(ctx, ATTENDANCE_READ, section)
+        except NotFound:
+            continue
+        roll = set(
+            students.list_students_in_scope(
+                session, ctx, section_ids=[section.id], permissions=(ATTENDANCE_READ,)
+            )
+        )
+        if not roll:
+            continue
+        rows = [
+            r for r in repo.section_marks(session, section.id, start, end) if r.student_id in roll
+        ]
+        counts = _counts(r.status for r in rows)
+        klass = classes.get(section.class_id)
+        out.append(
+            SectionAttendance(
+                section_id=section.id,
+                class_id=section.class_id,
+                label=f"{klass.display_en if klass else 'Class'} {section.name}",
+                students=len(roll),
+                days_marked=len({r.on_date for r in rows}),
+                present=counts["present"],
+                late=counts["late"],
+                absent=counts["absent"],
+                leave=counts["leave"],
+            )
+        )
+    log.info("academics.attendance.ask_summary", count=len(out))
+    return AttendanceRates(year_label=year.label, start=start, end=end, sections=tuple(out))
+
+
 # --- full export and offboarding ------------------------------------------------------------------
 
 
@@ -1230,14 +1325,17 @@ __all__ = [
     "RECORDS_CHANGED_EVENT",
     "YEAR_RESULT_CONFIRM",
     "YEAR_RESULT_READ",
+    "AttendanceRates",
     "AttendanceSummary",
     "DayMark",
     "ExamResult",
+    "SectionAttendance",
     "absent_students",
     "add_entry",
     "attendance_day",
     "attendance_history",
     "attendance_month",
+    "attendance_rates_for_ask",
     "attendance_summary",
     "calendar_month",
     "confirm_results",

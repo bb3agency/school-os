@@ -8,10 +8,17 @@ any tool outside the ADR-0008 whitelist.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from app.knowledge.config.tools import ToolsConfig
+from app.knowledge.config.tools import ToolConfig, ToolsConfig
 from app.knowledge.interfaces import RecordTool
+from app.knowledge.tools.attendance import NAME as ATTENDANCE
+from app.knowledge.tools.attendance import GetAttendanceSummaryTool
+from app.knowledge.tools.certificates import NAME as CERTIFICATES
+from app.knowledge.tools.certificates import GetCertificatesTool
+from app.knowledge.tools.compliance import NAME as COMPLIANCE
+from app.knowledge.tools.compliance import ListComplianceStatusTool
 from app.knowledge.tools.conversations import NAME as CHATS
 from app.knowledge.tools.conversations import SearchMyConversationsTool
 from app.knowledge.tools.counts import NAME as COUNT
@@ -27,6 +34,8 @@ from app.knowledge.tools.findings import NAME as FINDINGS
 from app.knowledge.tools.findings import ListFindingsTool
 from app.knowledge.tools.history import NAME as HISTORY
 from app.knowledge.tools.history import GetValueHistoryTool
+from app.knowledge.tools.readiness import NAME as READINESS
+from app.knowledge.tools.readiness import GetReadinessSummaryTool
 from app.knowledge.tools.students import FACTS, FIND, FindStudentsTool, GetStudentFactsTool
 
 if TYPE_CHECKING:
@@ -65,6 +74,17 @@ def build_tools(config: ToolsConfig, search: DocumentSearch) -> dict[str, Offere
         tools[CHATS] = SearchMyConversationsTool(specs[CHATS])
     if specs[DUE].description:
         tools[DUE] = ListDueTasksTool(specs[DUE])
+    # D86 (FA-04, FC-11): readiness and attendance counts, one student's certificates and the
+    # school's compliance register.
+    simple: dict[str, Callable[[ToolConfig], OfferedTool]] = {
+        READINESS: GetReadinessSummaryTool,
+        ATTENDANCE: GetAttendanceSummaryTool,
+        CERTIFICATES: GetCertificatesTool,
+        COMPLIANCE: ListComplianceStatusTool,
+    }
+    for name, build in simple.items():
+        if specs[name].description:
+            tools[name] = build(specs[name])
     return tools
 
 
