@@ -9153,7 +9153,8 @@
         "fee_reminder": "Fee reminder",
         "fee_receipt": "Fee receipt",
         "optin_stopped": "Stop confirmation",
-        "school_closure": "School closure"
+        "school_closure": "School closure",
+        "school_reopening": "School reopening"
       },
       "languages": {
         "en": "English",

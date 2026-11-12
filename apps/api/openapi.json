@@ -10474,6 +10474,19 @@
             ],
             "title": "Closed To"
           },
+          "notice_text": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "FP-02 follow-up (FR-MSG-056): the order text for the closure's parent page (plain text, at most 1000 characters). Never in the WhatsApp message.",
+            "title": "Notice Text"
+          },
           "preview_token": {
             "maxLength": 80,
             "minLength": 8,
@@ -10541,6 +10554,19 @@
               }
             ],
             "title": "Closed To"
+          },
+          "notice_text": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "FP-02 follow-up (FR-MSG-056): the order text for the closure's parent page (plain text, at most 1000 characters). Never in the WhatsApp message.",
+            "title": "Notice Text"
           },
           "reason": {
             "enum": [
@@ -10618,6 +10644,17 @@
             "title": "Languages",
             "type": "object"
           },
+          "notice_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice Text"
+          },
           "queued": {
             "title": "Queued",
             "type": "integer"
@@ -10629,6 +10666,17 @@
           "recipients": {
             "title": "Recipients",
             "type": "integer"
+          },
+          "reopening": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClosureReopeningOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The \"school reopens\" message, once sent (FR-MSG-064)."
           },
           "section_ids": {
             "items": {
@@ -10834,6 +10882,229 @@
           "recent_closures"
         ],
         "title": "ClosurePreviewOut",
+        "type": "object"
+      },
+      "ClosureReopeningConfirmIn": {
+        "additionalProperties": false,
+        "description": "Send the previewed reopening message (``Idempotency-Key``; step-up). The preview token\npins who gets it (409 ``preview_stale`` when that changed).",
+        "properties": {
+          "preview_token": {
+            "maxLength": 80,
+            "minLength": 8,
+            "title": "Preview Token",
+            "type": "string"
+          },
+          "reopens_on": {
+            "format": "date",
+            "title": "Reopens On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reopens_on",
+          "preview_token"
+        ],
+        "title": "ClosureReopeningConfirmIn",
+        "type": "object"
+      },
+      "ClosureReopeningIn": {
+        "additionalProperties": false,
+        "description": "FP-02 follow-up (FR-MSG-059, FR-MSG-060): \"the school reopens on <date>\" to the closure's\naudience (the whole school or its sections, as they are now).",
+        "properties": {
+          "reopens_on": {
+            "format": "date",
+            "title": "Reopens On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reopens_on"
+        ],
+        "title": "ClosureReopeningIn",
+        "type": "object"
+      },
+      "ClosureReopeningOut": {
+        "properties": {
+          "closure_id": {
+            "format": "uuid",
+            "title": "Closure Id",
+            "type": "string"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Messages by status now.",
+            "title": "Counts",
+            "type": "object"
+          },
+          "estimated_cost_inr": {
+            "title": "Estimated Cost Inr",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "languages": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Languages",
+            "type": "object"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "recipients": {
+            "title": "Recipients",
+            "type": "integer"
+          },
+          "reopens_on": {
+            "format": "date",
+            "title": "Reopens On",
+            "type": "string"
+          },
+          "sent_at": {
+            "format": "date-time",
+            "title": "Sent At",
+            "type": "string"
+          },
+          "sent_by": {
+            "format": "uuid",
+            "title": "Sent By",
+            "type": "string"
+          },
+          "skipped": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Skipped",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "closure_id",
+          "reopens_on",
+          "recipients",
+          "queued",
+          "skipped",
+          "languages",
+          "estimated_cost_inr",
+          "counts",
+          "sent_by",
+          "sent_at"
+        ],
+        "title": "ClosureReopeningOut",
+        "type": "object"
+      },
+      "ClosureReopeningPreviewOut": {
+        "properties": {
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
+          "closure_id": {
+            "format": "uuid",
+            "title": "Closure Id",
+            "type": "string"
+          },
+          "estimated_cost_inr": {
+            "title": "Estimated Cost Inr",
+            "type": "string"
+          },
+          "guardians": {
+            "title": "Guardians",
+            "type": "integer"
+          },
+          "language_fallbacks": {
+            "title": "Language Fallbacks",
+            "type": "integer"
+          },
+          "languages": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Languages",
+            "type": "object"
+          },
+          "message_en": {
+            "description": "The English message parents will get.",
+            "title": "Message En",
+            "type": "string"
+          },
+          "preview_token": {
+            "title": "Preview Token",
+            "type": "string"
+          },
+          "recipients": {
+            "title": "Recipients",
+            "type": "integer"
+          },
+          "reopens_on": {
+            "format": "date",
+            "title": "Reopens On",
+            "type": "string"
+          },
+          "sends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When sending starts: null = now; otherwise the next opening of the closure window.",
+            "title": "Sends At"
+          },
+          "skipped": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Guardians left out by reason.",
+            "title": "Skipped",
+            "type": "object"
+          },
+          "window_end": {
+            "format": "time",
+            "title": "Window End",
+            "type": "string"
+          },
+          "window_start": {
+            "format": "time",
+            "title": "Window Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preview_token",
+          "closure_id",
+          "reopens_on",
+          "guardians",
+          "recipients",
+          "skipped",
+          "languages",
+          "language_fallbacks",
+          "estimated_cost_inr",
+          "message_en",
+          "sends_at",
+          "window_start",
+          "window_end",
+          "blocked_reason"
+        ],
+        "title": "ClosureReopeningPreviewOut",
         "type": "object"
       },
       "CollectionRegisterOut": {
@@ -26503,6 +26774,16 @@
         "additionalProperties": false,
         "description": "The parent page for the cookie's link (``/p/view``): which page it is, until when it\nworks, its language (the guardian's choice, else the school's parent language, else English:\nADR-0044), the school's name, and exactly one content block for its kind (R2-3H).",
         "properties": {
+          "closure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentClosureOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "dues": {
             "anyOf": [
               {
@@ -26523,7 +26804,8 @@
               "parent_notice",
               "parent_receipt",
               "parent_dues",
-              "parent_optin"
+              "parent_optin",
+              "parent_closure"
             ],
             "title": "Kind",
             "type": "string"
@@ -26611,7 +26893,8 @@
               "parent_notice",
               "parent_receipt",
               "parent_dues",
-              "parent_optin"
+              "parent_optin",
+              "parent_closure"
             ],
             "title": "Kind",
             "type": "string"
@@ -28272,7 +28555,8 @@
               "fee_reminder",
               "fee_receipt",
               "optin_stopped",
-              "school_closure"
+              "school_closure",
+              "school_reopening"
             ],
             "title": "Purpose",
             "type": "string"
@@ -28473,7 +28757,8 @@
                   "fee_reminder",
                   "fee_receipt",
                   "optin_stopped",
-                  "school_closure"
+                  "school_closure",
+                  "school_reopening"
                 ],
                 "type": "string"
               },
@@ -32567,6 +32852,58 @@
           "next_cursor"
         ],
         "title": "Page[VerifiedAnswerOut]",
+        "type": "object"
+      },
+      "ParentClosureOut": {
+        "additionalProperties": false,
+        "description": "FP-02 follow-up (FR-PUB-013, FR-MSG-057): the closure message's page, read-only: the\nclosure dates, the reason phrase in the page's language, the order text the principal typed\n(``None`` when none) and the reopening date once a \"school reopens\" message was sent.\nNothing about a child or a guardian (the school name is on the envelope).",
+        "properties": {
+          "closed_from": {
+            "format": "date",
+            "title": "Closed From",
+            "type": "string"
+          },
+          "closed_to": {
+            "format": "date",
+            "title": "Closed To",
+            "type": "string"
+          },
+          "notice_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice Text"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reopens_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopens On"
+          }
+        },
+        "required": [
+          "closed_from",
+          "closed_to",
+          "reason",
+          "notice_text",
+          "reopens_on"
+        ],
+        "title": "ParentClosureOut",
         "type": "object"
       },
       "ParentDocumentLinkOut": {
@@ -43096,7 +43433,11 @@
               "count",
               "fee",
               "conversation",
-              "task"
+              "task",
+              "readiness",
+              "attendance",
+              "certificate",
+              "compliance"
             ],
             "title": "Kind",
             "type": "string"
@@ -83540,7 +83881,7 @@
     },
     "/api/v1/messaging/closures": {
       "get": {
-        "description": "Closure messages sent recently with live delivery counts, and how many were sent in the\nwindow shown (FR-MSG-054; ``message.read`` school-wide). Counts only.",
+        "description": "Closure messages sent recently with live delivery counts, their \"school reopens\"\nmessages, and how many were sent in the window shown (FR-MSG-054, FR-MSG-064;\n``message.read`` school-wide). Counts and the principal's own order text only.",
         "operationId": "list_closures_api_v1_messaging_closures_get",
         "parameters": [
           {
@@ -83742,6 +84083,168 @@
           }
         },
         "summary": "Preview Closure",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/closures/{closure_id}/reopening": {
+      "post": {
+        "description": "Send the previewed reopening message (FR-MSG-061..063; ``message.closure.send`` with\nstep-up MFA, 428 without; ``Idempotency-Key``): the ``school_reopening`` utility template to\nevery guardian opted in for notices, inside the closure window, within the daily cap; one per\nclosure. Errors: 404; 409 ``reopening_already_sent``, ``preview_stale`` and the closure's\nblocking reasons; 422 as the preview. Audited ``messaging.closure.reopening_sent``.",
+        "operationId": "send_reopening_api_v1_messaging_closures__closure_id__reopening_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "closure_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Closure Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClosureReopeningConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClosureReopeningOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send Reopening",
+        "tags": [
+          "messaging"
+        ]
+      }
+    },
+    "/api/v1/messaging/closures/{closure_id}/reopening/preview": {
+      "post": {
+        "description": "Before sending \"the school reopens on <date>\" for a closure: recipients (the closure's\naudience as it is now), guardians left out by reason, the English text, when sending starts\nand the estimated Meta cost (FR-MSG-060; ``message.closure.send``: the principal). Nothing\nis sent. Errors: 404 unknown closure; 409 ``reopening_already_sent``; 422 ``reopens_on``\n(``in_past``, ``too_far_ahead``, ``not_after_closure_start``, ``too_long_after_closure``).",
+        "operationId": "preview_reopening_api_v1_messaging_closures__closure_id__reopening_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "closure_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Closure Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClosureReopeningIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClosureReopeningPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "``module_unavailable`` on a dedicated host or with messaging off."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Preview Reopening",
         "tags": [
           "messaging"
         ]

@@ -7446,8 +7446,9 @@ export interface paths {
         };
         /**
          * List Closures
-         * @description Closure messages sent recently with live delivery counts, and how many were sent in the
-         *     window shown (FR-MSG-054; ``message.read`` school-wide). Counts only.
+         * @description Closure messages sent recently with live delivery counts, their "school reopens"
+         *     messages, and how many were sent in the window shown (FR-MSG-054, FR-MSG-064;
+         *     ``message.read`` school-wide). Counts and the principal's own order text only.
          */
         get: operations["list_closures_api_v1_messaging_closures_get"];
         put?: never;
@@ -7461,6 +7462,54 @@ export interface paths {
          *     ``notices_off``; 422 as the preview. Audited ``messaging.closure.sent``.
          */
         post: operations["send_closure_api_v1_messaging_closures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/closures/{closure_id}/reopening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Reopening
+         * @description Send the previewed reopening message (FR-MSG-061..063; ``message.closure.send`` with
+         *     step-up MFA, 428 without; ``Idempotency-Key``): the ``school_reopening`` utility template to
+         *     every guardian opted in for notices, inside the closure window, within the daily cap; one per
+         *     closure. Errors: 404; 409 ``reopening_already_sent``, ``preview_stale`` and the closure's
+         *     blocking reasons; 422 as the preview. Audited ``messaging.closure.reopening_sent``.
+         */
+        post: operations["send_reopening_api_v1_messaging_closures__closure_id__reopening_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/closures/{closure_id}/reopening/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Reopening
+         * @description Before sending "the school reopens on <date>" for a closure: recipients (the closure's
+         *     audience as it is now), guardians left out by reason, the English text, when sending starts
+         *     and the estimated Meta cost (FR-MSG-060; ``message.closure.send``: the principal). Nothing
+         *     is sent. Errors: 404 unknown closure; 409 ``reopening_already_sent``; 422 ``reopens_on``
+         *     (``in_past``, ``too_far_ahead``, ``not_after_closure_start``, ``too_long_after_closure``).
+         */
+        post: operations["preview_reopening_api_v1_messaging_closures__closure_id__reopening_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17127,6 +17176,11 @@ export interface components {
             closed_from: string;
             /** Closed To */
             closed_to?: string | null;
+            /**
+             * Notice Text
+             * @description FP-02 follow-up (FR-MSG-056): the order text for the closure's parent page (plain text, at most 1000 characters). Never in the WhatsApp message.
+             */
+            notice_text?: string | null;
             /** Preview Token */
             preview_token: string;
             /**
@@ -17155,6 +17209,11 @@ export interface components {
             closed_from: string;
             /** Closed To */
             closed_to?: string | null;
+            /**
+             * Notice Text
+             * @description FP-02 follow-up (FR-MSG-056): the order text for the closure's parent page (plain text, at most 1000 characters). Never in the WhatsApp message.
+             */
+            notice_text?: string | null;
             /**
              * Reason
              * @enum {string}
@@ -17198,12 +17257,16 @@ export interface components {
             languages: {
                 [key: string]: number;
             };
+            /** Notice Text */
+            notice_text?: string | null;
             /** Queued */
             queued: number;
             /** Reason */
             reason: string;
             /** Recipients */
             recipients: number;
+            /** @description The "school reopens" message, once sent (FR-MSG-064). */
+            reopening?: components["schemas"]["ClosureReopeningOut"] | null;
             /** Section Ids */
             section_ids: string[];
             /**
@@ -17291,6 +17354,137 @@ export interface components {
             };
             /** Utility Rate Inr */
             utility_rate_inr: string;
+            /**
+             * Window End
+             * Format: time
+             */
+            window_end: string;
+            /**
+             * Window Start
+             * Format: time
+             */
+            window_start: string;
+        };
+        /**
+         * ClosureReopeningConfirmIn
+         * @description Send the previewed reopening message (``Idempotency-Key``; step-up). The preview token
+         *     pins who gets it (409 ``preview_stale`` when that changed).
+         */
+        ClosureReopeningConfirmIn: {
+            /** Preview Token */
+            preview_token: string;
+            /**
+             * Reopens On
+             * Format: date
+             */
+            reopens_on: string;
+        };
+        /**
+         * ClosureReopeningIn
+         * @description FP-02 follow-up (FR-MSG-059, FR-MSG-060): "the school reopens on <date>" to the closure's
+         *     audience (the whole school or its sections, as they are now).
+         */
+        ClosureReopeningIn: {
+            /**
+             * Reopens On
+             * Format: date
+             */
+            reopens_on: string;
+        };
+        /** ClosureReopeningOut */
+        ClosureReopeningOut: {
+            /**
+             * Closure Id
+             * Format: uuid
+             */
+            closure_id: string;
+            /**
+             * Counts
+             * @description Messages by status now.
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /** Estimated Cost Inr */
+            estimated_cost_inr: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Languages */
+            languages: {
+                [key: string]: number;
+            };
+            /** Queued */
+            queued: number;
+            /** Recipients */
+            recipients: number;
+            /**
+             * Reopens On
+             * Format: date
+             */
+            reopens_on: string;
+            /**
+             * Sent At
+             * Format: date-time
+             */
+            sent_at: string;
+            /**
+             * Sent By
+             * Format: uuid
+             */
+            sent_by: string;
+            /** Skipped */
+            skipped: {
+                [key: string]: number;
+            };
+        };
+        /** ClosureReopeningPreviewOut */
+        ClosureReopeningPreviewOut: {
+            /** Blocked Reason */
+            blocked_reason: string | null;
+            /**
+             * Closure Id
+             * Format: uuid
+             */
+            closure_id: string;
+            /** Estimated Cost Inr */
+            estimated_cost_inr: string;
+            /** Guardians */
+            guardians: number;
+            /** Language Fallbacks */
+            language_fallbacks: number;
+            /** Languages */
+            languages: {
+                [key: string]: number;
+            };
+            /**
+             * Message En
+             * @description The English message parents will get.
+             */
+            message_en: string;
+            /** Preview Token */
+            preview_token: string;
+            /** Recipients */
+            recipients: number;
+            /**
+             * Reopens On
+             * Format: date
+             */
+            reopens_on: string;
+            /**
+             * Sends At
+             * @description When sending starts: null = now; otherwise the next opening of the closure window.
+             */
+            sends_at: string | null;
+            /**
+             * Skipped
+             * @description Guardians left out by reason.
+             */
+            skipped: {
+                [key: string]: number;
+            };
             /**
              * Window End
              * Format: time
@@ -23225,6 +23419,7 @@ export interface components {
          *     ADR-0044), the school's name, and exactly one content block for its kind (R2-3H).
          */
         LinkEnvelopeOut: {
+            closure?: components["schemas"]["ParentClosureOut"] | null;
             dues?: components["schemas"]["ParentDuesOut"] | null;
             /**
              * Expires At
@@ -23235,7 +23430,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "parent_notice" | "parent_receipt" | "parent_dues" | "parent_optin";
+            kind: "parent_notice" | "parent_receipt" | "parent_dues" | "parent_optin" | "parent_closure";
             /**
              * Language
              * @enum {string}
@@ -23270,7 +23465,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "parent_notice" | "parent_receipt" | "parent_dues" | "parent_optin";
+            kind: "parent_notice" | "parent_receipt" | "parent_dues" | "parent_optin" | "parent_closure";
         };
         /** LinkIn */
         LinkIn: {
@@ -23903,7 +24098,7 @@ export interface components {
              * Purpose
              * @enum {string}
              */
-            purpose: "optin_confirm" | "school_notice" | "absence_alert" | "fee_reminder" | "fee_receipt" | "optin_stopped" | "school_closure";
+            purpose: "optin_confirm" | "school_notice" | "absence_alert" | "fee_reminder" | "fee_receipt" | "optin_stopped" | "school_closure" | "school_reopening";
             /**
              * Queued At
              * Format: date-time
@@ -23957,7 +24152,7 @@ export interface components {
              */
             limit: number;
             /** Purpose */
-            purpose?: ("optin_confirm" | "school_notice" | "absence_alert" | "fee_reminder" | "fee_receipt" | "optin_stopped" | "school_closure") | null;
+            purpose?: ("optin_confirm" | "school_notice" | "absence_alert" | "fee_reminder" | "fee_receipt" | "optin_stopped" | "school_closure" | "school_reopening") | null;
             /** Since */
             since?: string | null;
             /** Status */
@@ -25333,6 +25528,31 @@ export interface components {
             url: string;
             /** Version No */
             version_no: number;
+        };
+        /**
+         * ParentClosureOut
+         * @description FP-02 follow-up (FR-PUB-013, FR-MSG-057): the closure message's page, read-only: the
+         *     closure dates, the reason phrase in the page's language, the order text the principal typed
+         *     (``None`` when none) and the reopening date once a "school reopens" message was sent.
+         *     Nothing about a child or a guardian (the school name is on the envelope).
+         */
+        ParentClosureOut: {
+            /**
+             * Closed From
+             * Format: date
+             */
+            closed_from: string;
+            /**
+             * Closed To
+             * Format: date
+             */
+            closed_to: string;
+            /** Notice Text */
+            notice_text: string | null;
+            /** Reason */
+            reason: string;
+            /** Reopens On */
+            reopens_on: string | null;
         };
         /**
          * ParentDocumentLinkOut
@@ -29334,7 +29554,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "doc" | "student" | "finding" | "change" | "verified" | "count" | "fee" | "conversation" | "task";
+            kind: "doc" | "student" | "finding" | "change" | "verified" | "count" | "fee" | "conversation" | "task" | "readiness" | "attendance" | "certificate" | "compliance";
         };
         /** RetentionCategoryOut */
         RetentionCategoryOut: {
@@ -50884,6 +51104,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClosureOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    send_reopening_api_v1_messaging_closures__closure_id__reopening_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                closure_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClosureReopeningConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClosureReopeningOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    preview_reopening_api_v1_messaging_closures__closure_id__reopening_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                closure_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClosureReopeningIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClosureReopeningPreviewOut"];
                 };
             };
             /** @description ``module_unavailable`` on a dedicated host or with messaging off. */

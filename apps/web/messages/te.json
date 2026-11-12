@@ -9153,7 +9153,8 @@
         "fee_reminder": "ఫీజు గుర్తు",
         "fee_receipt": "ఫీజు రసీదు",
         "optin_stopped": "ఆపివేత నిర్ధారణ",
-        "school_closure": "పాఠశాల సెలవు"
+        "school_closure": "పాఠశాల సెలవు",
+        "school_reopening": "పాఠశాల పునఃప్రారంభం"
       },
       "languages": {
         "en": "ఇంగ్లీష్",
