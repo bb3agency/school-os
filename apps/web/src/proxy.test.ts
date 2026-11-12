@@ -268,6 +268,7 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       "/bff/api/v1/consents/forms",
       "/bff/api/v1/privacy/templates/notice_parents/preview",
       `/bff/api/v1/privacy/requests/${id}/letters/acknowledgement`,
+      `/bff/api/v1/compliance/inspection-packs/${id}/index`,
     ]) {
       const response = proxy(request(path));
       expect(response.headers.get("content-security-policy"), path).toBeNull();
@@ -283,6 +284,8 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       "/bff/api/v1/consents/summary",
       "/bff/api/v1/privacy/templates/notice_parents/pdf",
       `/bff/api/v1/privacy/requests/${id}`,
+      `/bff/api/v1/compliance/inspection-packs/${id}`,
+      `/bff/api/v1/compliance/inspection-packs/${id}/index/x`,
     ]) {
       expect(proxy(request(path)).headers.get("content-security-policy"), path).toContain(
         "default-src 'self'",

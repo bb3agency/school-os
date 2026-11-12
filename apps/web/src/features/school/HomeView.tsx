@@ -12,6 +12,11 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard } from "@/components/ui/StatCard";
 import { Timeline, type TimelineItem } from "@/components/ui/Timeline";
+import {
+  COMPLIANCE_KEYS,
+  fetchSummary as fetchComplianceSummary,
+  type ComplianceSummary,
+} from "@/features/compliance/data";
 import { KEYS as FEE_KEYS, isFeesOff } from "@/features/fees/data";
 import { ImportStatusBadge, SourceName } from "@/features/imports/ImportsScreen";
 import { readinessApi } from "@/features/privacy/readiness-api";
@@ -42,6 +47,7 @@ export const HOME_PERM = {
   feeCollect: "fee.collect",
   feeRead: "finance.read",
   feeApprove: ["fee.concession.approve", "fee.receipt.cancel", "fee.refund.approve"],
+  compliance: "compliance.read",
 } as const;
 
 /** Pending change requests are counted from one page; more than this reads "200+". */
@@ -111,6 +117,8 @@ export interface HomeData {
   readiness?: Loadable<ReadinessToday | null> | null;
   /** FC-03: DPDP readiness items done (GET /privacy/readiness), principals with privacy.read. */
   dpdp?: Loadable<DpdpToday> | null;
+  /** FC-01/FC-07: certificate counts (GET /compliance/summary), office and principal homes. */
+  compliance?: Loadable<ComplianceSummary> | null;
 }
 
 /** FC-03: DPDP readiness checklist items done of those that apply (not legal advice). */
@@ -240,6 +248,7 @@ export function HomeView({ data }: { data: HomeData }) {
   const fees = data.fees?.status === "ready" ? data.fees.data : null;
   const feeApprovals = data.feeApprovals?.status === "ready" ? data.feeApprovals.data : null;
   const readiness = data.readiness?.status === "ready" ? data.readiness.data : null;
+  const certificates = data.compliance?.status === "ready" ? data.compliance.data : null;
   const readinessPercent =
     readiness && readiness.students > 0
       ? Math.round((readiness.ready / readiness.students) * 100)
@@ -548,9 +557,43 @@ export function HomeView({ data }: { data: HomeData }) {
       </WorkCard>
     );
   }
+  if (data.compliance) {
+    // FC-01/FC-07: the school's own certificates, counts only (no names, no dates).
+    work.compliance = (
+      <WorkCard
+        key="compliance"
+        title={t("work.complianceTitle")}
+        icon="shieldCheck"
+        loading={data.compliance.status === "loading"}
+        action={
+          <ButtonLink href="/compliance" size="sm" variant="secondary">
+            {t("work.complianceAction")}
+            <Icon name="arrowRight" className="size-4" />
+          </ButtonLink>
+        }
+      >
+        {data.compliance.status === "error" || data.compliance.status === "unavailable" ? (
+          <p>{t("work.loadError")}</p>
+        ) : null}
+        {certificates ? (
+          certificates.expired + certificates.expiring + certificates.missing === 0 ? (
+            <p>{t("work.complianceNone")}</p>
+          ) : (
+            <p>
+              {t("work.complianceBody", {
+                expired: certificates.expired,
+                expiring: certificates.expiring,
+                missing: certificates.missing,
+              })}
+            </p>
+          )
+        ) : null}
+      </WorkCard>
+    );
+  }
   const WORK_ORDER: Record<HomeRole, readonly string[]> = {
-    office: ["checks", "changes", "imports", "feeApprovals", "dayClose"],
-    principal: ["changes", "feeApprovals", "checks", "dayClose", "imports"],
+    office: ["checks", "changes", "compliance", "imports", "feeApprovals", "dayClose"],
+    principal: ["changes", "feeApprovals", "compliance", "checks", "dayClose", "imports"],
     accountant: ["dayClose", "feeApprovals", "changes", "checks", "imports"],
     teacher: ["changes", "checks", "imports"],
   };
@@ -735,6 +778,8 @@ export function HomeScreen() {
   const canReadiness = canChecks && role === "principal";
   // FC-03: the DPDP readiness tile is the principal's and owner's (privacy.read).
   const canDpdp = has("privacy.read") && role === "principal";
+  // FC-01/FC-07: certificate counts on the office and principal homes (compliance.read).
+  const canCompliance = has(HOME_PERM.compliance) && (role === "office" || role === "principal");
 
   const checks = useApiQuery(
     ["staff", "home", "dq-summary"],
@@ -804,6 +849,12 @@ export function HomeScreen() {
     { enabled: canDpdp },
   );
 
+  const complianceSummary = useApiQuery(
+    COMPLIANCE_KEYS.summary,
+    () => fetchComplianceSummary(api),
+    { enabled: canCompliance },
+  );
+
   // Fees switched off for the school (404 module_hidden) hide the fee sections entirely.
   const feesHidden = isFeesOff(feeStatus) || (feeStatus.status === "ready" && !feesOn);
   const fees: Loadable<FeesToday> | null =
@@ -863,6 +914,7 @@ export function HomeScreen() {
         feeApprovals,
         readiness,
         dpdp: canDpdp ? dpdpQuery : null,
+        compliance: canCompliance ? complianceSummary : null,
       }}
     />
   );
