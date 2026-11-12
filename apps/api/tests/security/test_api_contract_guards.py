@@ -325,6 +325,13 @@ NON_UUID_PATH_PARAMS = {
     ("GET", "/api/v1/privacy/templates/{key}/preview", "key"),
     ("POST", "/api/v1/privacy/templates/{key}/pdf", "key"),
     ("GET", "/api/v1/privacy/requests/{request_id}/letters/{letter}", "letter"),
+    # FA-08: fix-owner letters per readiness profile (bounded, pattern-checked); the letter key
+    # is a closed Literal enum.
+    ("GET", "/api/v1/dq/readiness/{profile_key}/fix-letters", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/parent-letters", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/board-letter", "profile_key"),
+    ("POST", "/api/v1/dq/readiness/{profile_key}/fix-letters/{letter_key}/sent", "profile_key"),
+    ("POST", "/api/v1/dq/readiness/{profile_key}/fix-letters/{letter_key}/sent", "letter_key"),
 }
 
 
@@ -419,6 +426,10 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.dq.udise_schemas.UdiseCandidatesOut.profile_key": "DQ profile code",
     "app.dq.udise_schemas.UdiseRequestOut.profile_key": "DQ profile code",
     "app.dq.udise_schemas.UdiseRequestDetailOut.profile_key": "DQ profile code",
+    # FA-08: fix-owner letter template and recipient role keys, and the profile code.
+    "app.dq.fix_letter_schemas.FixLettersOut.profile_key": "DQ profile code",
+    "app.dq.fix_letter_schemas.FixLetterOut.key": "letter template key",
+    "app.dq.fix_letter_schemas.FixLetterRecipientOut.key": "recipient role key",
     "app.dq.udise_schemas.UdiseLineOut.attribute_key": "attribute catalog key",
     "app.dq.udise_schemas.UdiseRecipientOut.key": "recipient role code",
     "app.dq.udise_schemas.UdiseGroupOut.key": "field group code",

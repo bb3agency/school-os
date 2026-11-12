@@ -3033,6 +3033,23 @@ def _udise() -> ModuleType:
 SPECS.update(_udise().matrix_specs())
 
 
+def _fix_letters() -> ModuleType:
+    """tests/dq/fix_letter_security_support.py (FA-08 fix-owner letters)."""
+    name = "sos_test_dq_fix_letter_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "dq" / "fix_letter_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_fix_letters().matrix_specs())
+
+
 def _udise_match(w: Any, r: str, a: Engine) -> Request:
     """FO-04 (FR-UDI-014): skip the unmatched row of a fresh UDISE+ list of school A."""
     data = IM.xlsx_bytes(
@@ -3190,6 +3207,10 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         return 202
     if (method, path) in _udise().MATRIX_STATUS:
         return int(_udise().MATRIX_STATUS[(method, path)])  # FO-02: guard passed (no difference)
+    if (method, path) in _fix_letters().MATRIX_STATUS:
+        return int(_fix_letters().MATRIX_STATUS[(method, path)])  # FA-08: no board difference
+    if method == "POST" and path in _fix_letters().MATRIX_CREATES:
+        return 201
     if (method, path) in _disclosure().MATRIX_STATUS:
         return int(_disclosure().MATRIX_STATUS[(method, path)])
     if (method, path) in _consents().MATRIX_STATUS:
