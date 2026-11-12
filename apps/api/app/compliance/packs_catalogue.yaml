@@ -1,0 +1,246 @@
+# Inspection readiness packs (FC-07 merged with FO-12; FR-COMP-024..FR-COMP-045; docs/05 §16.9).
+# Versioned configuration read by app/compliance/packs_config.py (invariant 13).
+#
+# verified: false. What each authority asks to see is a SchoolOS proposal from public SECONDARY
+# sources (docs/research/2026-11-features/compliance-safety.md FC-07 and office-portals.md
+# FO-12, read on 2026-11-09), not from the authorities' own checklists. Lists differ by district
+# and year; the printed index says so. Confirm with pilot schools (docs/18 §5) before marking a
+# pack verified.
+#
+# packs        key -> label, authority (an office, never a person), the boards it applies to
+#              (empty list: every school), a source note, and its items in print order.
+# item         key, label, fix_by (the role that usually fixes a gap), an optional note and a
+#              source:
+#                certificate     a kind of app/compliance/catalogue.yaml (FC-01); an item whose
+#                                kind does not apply to the school's boards is left out
+#                register        register_view: a SchoolOS register print view: admission_withdrawal,
+#                                transfer_certificates or certificates (student lists: printed
+#                                only when chosen when the pack is made, register.read + step-up)
+#                disclosure      the CBSE Appendix IX page the public sees now (CBSE schools)
+#                privacy_notice  the parents' privacy notice record (DPDP)
+#                dpdp_readiness  the DPDP readiness checklist, done of applicable (not legal advice)
+#                not_tracked     evidence SchoolOS does not hold yet; `feature` names the research
+#                                id that would add it (FC-04 staff safety, FC-05 committees, FC-09
+#                                drills and safety checks). Shown as "not tracked in SchoolOS",
+#                                never as a failure.
+# log_limit    generated packs listed on the screen (newest first).
+version: 1
+verified: false
+source: "docs/research/2026-11-features/compliance-safety.md FC-07 and office-portals.md FO-12 (secondary sources, 2026-11-09); APSERMC, DEO/MEO, CBSE and fire department lists unverified (owner question: which authority first)"
+log_limit: 50
+
+packs:
+  deo_inspection:
+    label: DEO or MEO inspection and recognition renewal
+    authority: District or Mandal Educational Officer
+    boards: []
+    note: "Recognition renewal and routine visits ask for the recognition, building and fire papers and the school's registers (unverified)."
+    items:
+      - key: state_recognition
+        label: School recognition certificate
+        source: certificate
+        kind: state_recognition
+        fix_by: Principal
+      - key: rte_recognition
+        label: Recognition under the RTE Act
+        source: certificate
+        kind: rte_recognition
+        fix_by: Principal
+      - key: trust_registration
+        label: Society or trust registration
+        source: certificate
+        kind: trust_registration
+        fix_by: Correspondent
+      - key: building_safety
+        label: Building safety certificate
+        source: certificate
+        kind: building_safety
+        fix_by: Office admin
+      - key: fire_noc
+        label: Fire safety certificate
+        source: certificate
+        kind: fire_noc
+        fix_by: Office admin
+      - key: water_safety
+        label: Drinking water test report
+        source: certificate
+        kind: water_safety
+        fix_by: Office admin
+      - key: admission_register
+        label: Admission and withdrawal register
+        source: register
+        register_view: admission_withdrawal
+        fix_by: Office admin
+      - key: tc_register
+        label: Transfer certificate register (counterfoil)
+        source: register
+        register_view: transfer_certificates
+        fix_by: Office admin
+      - key: certificate_register
+        label: Certificate issue register
+        source: register
+        register_view: certificates
+        fix_by: Office admin
+      - key: privacy_notice
+        label: Privacy notice given to parents
+        source: privacy_notice
+        fix_by: Principal
+      - key: committees
+        label: School management and safety committees
+        source: not_tracked
+        feature: FC-05
+        fix_by: Principal
+      - key: staff_verification
+        label: Staff police verification and safety training
+        source: not_tracked
+        feature: FC-04
+        fix_by: Principal
+
+  apsermc_inspection:
+    label: APSERMC inspection
+    authority: AP School Education Regulatory and Monitoring Commission
+    boards: []
+    note: "Surprise inspections check recognition, safety papers, fee rules and records (unverified; the commission's checklist was not found)."
+    items:
+      - key: state_recognition
+        label: School recognition certificate
+        source: certificate
+        kind: state_recognition
+        fix_by: Principal
+      - key: cbse_affiliation
+        label: CBSE affiliation letter
+        source: certificate
+        kind: cbse_affiliation
+        fix_by: Principal
+      - key: fire_noc
+        label: Fire safety certificate
+        source: certificate
+        kind: fire_noc
+        fix_by: Office admin
+      - key: building_safety
+        label: Building safety certificate
+        source: certificate
+        kind: building_safety
+        fix_by: Office admin
+      - key: health_sanitation
+        label: Health and sanitation certificate
+        source: certificate
+        kind: health_sanitation
+        fix_by: Office admin
+      - key: admission_register
+        label: Admission and withdrawal register
+        source: register
+        register_view: admission_withdrawal
+        fix_by: Office admin
+      - key: privacy_notice
+        label: Privacy notice given to parents
+        source: privacy_notice
+        fix_by: Principal
+      - key: dpdp_readiness
+        label: Data protection (DPDP) readiness checklist
+        source: dpdp_readiness
+        fix_by: Principal
+        note: "A SchoolOS checklist, not legal advice."
+      - key: staff_verification
+        label: Staff police verification and safety training
+        source: not_tracked
+        feature: FC-04
+        fix_by: Principal
+
+  cbse_inspection:
+    label: CBSE affiliation or inspection visit
+    authority: Central Board of Secondary Education
+    boards: [CBSE]
+    note: "Affiliation extension and inspection committees check the Appendix IX papers and the disclosure page (CBSE Affiliation Bye-Laws 2018, unverified)."
+    items:
+      - key: cbse_affiliation
+        label: CBSE affiliation letter and latest extension
+        source: certificate
+        kind: cbse_affiliation
+        fix_by: Principal
+      - key: state_noc
+        label: State government NOC
+        source: certificate
+        kind: state_noc
+        fix_by: Principal
+      - key: deo_certificate
+        label: DEO certificate or self-certification
+        source: certificate
+        kind: deo_certificate
+        fix_by: Principal
+      - key: trust_registration
+        label: Society or trust registration
+        source: certificate
+        kind: trust_registration
+        fix_by: Correspondent
+      - key: building_safety
+        label: Building safety certificate
+        source: certificate
+        kind: building_safety
+        fix_by: Office admin
+      - key: fire_noc
+        label: Fire safety certificate
+        source: certificate
+        kind: fire_noc
+        fix_by: Office admin
+      - key: water_safety
+        label: Drinking water test report
+        source: certificate
+        kind: water_safety
+        fix_by: Office admin
+      - key: disclosure
+        label: Mandatory public disclosure (Appendix IX)
+        source: disclosure
+        fix_by: Principal
+      - key: admission_register
+        label: Admission and withdrawal register
+        source: register
+        register_view: admission_withdrawal
+        fix_by: Office admin
+      - key: committees
+        label: School management and safety committees
+        source: not_tracked
+        feature: FC-05
+        fix_by: Principal
+      - key: staff_verification
+        label: Staff police verification and safety training
+        source: not_tracked
+        feature: FC-04
+        fix_by: Principal
+      - key: safety_drills
+        label: Fire and evacuation drills
+        source: not_tracked
+        feature: FC-09
+        fix_by: Office admin
+
+  fire_inspection:
+    label: Fire department inspection
+    authority: State fire services department
+    boards: []
+    note: "Renewal of the fire NOC checks the building papers and fire equipment (unverified)."
+    items:
+      - key: fire_noc
+        label: Fire safety certificate
+        source: certificate
+        kind: fire_noc
+        fix_by: Office admin
+      - key: building_safety
+        label: Building safety certificate
+        source: certificate
+        kind: building_safety
+        fix_by: Office admin
+      - key: occupancy
+        label: Occupancy or completion certificate
+        source: certificate
+        kind: occupancy
+        fix_by: Correspondent
+      - key: safety_drills
+        label: Fire and evacuation drills
+        source: not_tracked
+        feature: FC-09
+        fix_by: Office admin
+      - key: extinguisher_checks
+        label: Fire extinguisher refills and checks
+        source: not_tracked
+        feature: FC-09
+        fix_by: Office admin

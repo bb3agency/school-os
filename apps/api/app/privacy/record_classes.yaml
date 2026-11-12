@@ -293,6 +293,17 @@ classes:
     erasure: no_personal_data
     source: Recorded by the school office from the certificates the school holds
 
+  inspection_packs:
+    label: Inspection packs made
+    owner: compliance
+    tables: [ops.inspection_packs]
+    classification: C1
+    docs_row: Inspection packs
+    retention: Life of the school
+    basis: The record of which inspection packs the office made and the state of each item then; labels, dates and counts, nothing about one person.
+    erasure: no_personal_data
+    source: Made by the school office from records SchoolOS holds
+
   imports:
     label: Spreadsheet imports
     owner: imports

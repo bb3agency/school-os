@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session
 from app.audit import service as audit
 from app.authz.context import UserContext
 from app.compliance import config as cfg
+from app.compliance import packs_repository as packs_repo
 from app.compliance import repository as repo
 from app.compliance.models import ComplianceCertificate as Row
 from app.compliance.schemas import (
@@ -645,11 +646,13 @@ def refuse_expired(items: Iterable[str]) -> None:
 
 
 def export_records(session: Session) -> list[RecordTable]:
-    """The school's register for its full data export (FR-COMP-016)."""
-    return repo.export_tables(session)
+    """The school's register and inspection pack log for its full data export (FR-COMP-016,
+    FR-COMP-043)."""
+    return [*repo.export_tables(session), *packs_repo.export_tables(session)]
 
 
-_PURGE = purging.PurgeTables(deleted=("ops.compliance_certificates",))
+# FC-07: the inspection pack log (0098) references no certificate; order is free.
+_PURGE = purging.PurgeTables(deleted=("ops.inspection_packs", "ops.compliance_certificates"))
 
 
 def tenant_data_counts(session: Session) -> dict[str, int]:

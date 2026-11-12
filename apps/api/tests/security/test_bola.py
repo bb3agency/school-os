@@ -1018,6 +1018,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "tax_certificate_id": lambda w: _tax().b_certificate(_ADMIN[0], w),
     # FM-02: an add-on fee of school B.
     "addon_id": lambda w: _addons().b_addon(_ADMIN[0], w),
+    # FC-07 / FO-12: an inspection pack of school B.
+    "pack_id": lambda w: _compliance().b_pack(_ADMIN[0], w),
     # R2-2D online payments: a payment link and a reconciliation item of school B.
     "intent_id": lambda w: _b_fee(w, "intent_id"),
     "recon_item_id": lambda w: _b_fee(w, "recon_item_id"),
@@ -1160,8 +1162,9 @@ def _b_id(template: str, w: Any) -> uuid.UUID:
         value: uuid.UUID = _privacy().b_request(w)
         return value
     if template.startswith(_compliance().BOLA_PREFIX):
-        # FC-01: ``certificate_id`` is a compliance certificate on the compliance routes.
-        cert: uuid.UUID = _compliance().b_certificate(_ADMIN[0], w)
+        # FC-01: ``certificate_id`` is a compliance certificate on the compliance routes;
+        # FC-07: ``pack_id`` an inspection pack.
+        cert: uuid.UUID = _compliance().b_object(_ADMIN[0], w, template)
         return cert
     return PARAM_TO_B[_param(template)](w)
 
