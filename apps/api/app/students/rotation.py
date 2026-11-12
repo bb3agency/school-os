@@ -105,6 +105,7 @@ CIPHERTEXT_COLUMNS: Final[tuple[tuple[str, str], ...]] = (
     ("kb.conversations", "title_ciphertext"),
     ("kb.conversations", "summary_ciphertext"),
     ("kb.user_memories", "text_ciphertext"),
+    ("kb.knowledge_gaps", "question_ciphertext"),  # FA-06 (0100_knowledge_gaps)
     ("sis.behaviour_notes", "body_ciphertext"),
     ("sis.flag_actions", "note_ciphertext"),
     # R2-1C (0057_messaging_core): message variables and the provider inbox (app.messaging

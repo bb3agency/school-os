@@ -53,6 +53,12 @@ categories:
     max_days: 180
     configurable: false
     enforced_by: knowledge.purge_queries  # daily; query_log.retention_days in knowledge models.yaml
+  kb_gaps:
+    default_days: 90      # FA-06 (FR-KB-091): knowledge gaps (redacted questions, no asker),
+    min_days: 30          # after last seen or closed; knowledge/config/gaps.yaml retention_days.
+    max_days: 90          # Lead decision D86, PO to confirm: short, may only be shortened.
+    configurable: true
+    enforced_by: knowledge.purge_gaps
   behaviour_notes:
     default_days: 365     # FR-EW-017: M5 behaviour notes (C3), after their date;
     min_days: 365         # DPDP Rules keep personal data 1 year (docs/08 §3); the

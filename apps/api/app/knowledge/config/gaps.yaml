@@ -1,0 +1,23 @@
+# Knowledge gaps (FA-06; FR-KB-081..FR-KB-095; docs/06 §8.1). Versioned configuration read by
+# app/knowledge/config/gaps.py (invariant 13). Lead decision D86 (2026-11-12), PO to confirm:
+# redacted question text is shown to the holders of kb.verified_answer.manage (no asker, no
+# topic labels), kept at most `retention_days` (the school may shorten it, FR-ADM-002:
+# app/admin/retention.yaml category kb_gaps).
+version: 1
+verified: false
+source: SchoolOS proposal (docs/research/2026-11-features/ai-platform.md FA-06); privacy review of the new use of the query log pending (docs/08 §7)
+
+# Days a gap is kept after it was last seen (open) or closed/dismissed (the daily
+# knowledge.purge_gaps job). The school's own setting (kb_gaps) applies within its bounds.
+retention_days: 90
+# How far back the collection job looks for new "not found", unchecked and "not helpful"
+# questions (never further back than the retention). Runs every `collect_every_minutes`.
+lookback_hours: 48
+collect_every_minutes: 60
+# Questions read per school per run (the rest are collected on the next run).
+batch_size: 500
+# A stored sample question is cut to this many characters after redaction.
+max_question_chars: 300
+# Digit runs of at least this length are masked after core.redaction (admission, roll,
+# receipt and phone-like numbers that are not Indian mobile numbers).
+mask_digit_runs_from: 3

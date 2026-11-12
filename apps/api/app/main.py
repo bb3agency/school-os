@@ -45,6 +45,7 @@ from app.imports.api import router as imports_router
 from app.insights.api import router as insights_router
 from app.knowledge import service as knowledge
 from app.knowledge.api import router as knowledge_router
+from app.knowledge.gaps_api import router as knowledge_gaps_router
 from app.messaging import webhook as messaging_webhook
 from app.messaging.api import router as messaging_router
 from app.messaging.api import webhook_router as messaging_webhook_router
@@ -117,6 +118,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(consents_router)
     app.include_router(breach_router)
     app.include_router(knowledge_router)
+    app.include_router(knowledge_gaps_router)  # FA-06 knowledge gaps
     app.include_router(circulars_router)
     app.include_router(academics_router)
     app.include_router(insights_router)

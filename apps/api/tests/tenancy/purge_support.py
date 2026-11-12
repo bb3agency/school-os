@@ -1063,6 +1063,28 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             s=renewed,
             u=u["user"],
         )
+        # --- FA-06 (0100_knowledge_gaps): a gap closed by the verified answer, and its mark --
+        gap = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO kb.knowledge_gaps (id, tenant_id, question_ciphertext, question_hmac, "
+            "key_version, not_found_count, first_seen_at, last_seen_at, status, resolution, "
+            "verified_answer_id, closed_by, closed_at) VALUES (:i, :t, '\\x0a', :h, 1, 1, now(), "
+            "now(), 'closed', 'verified_answer', :a, :m, now())",
+            i=gap,
+            t=t,
+            h=hashlib.sha256(b"gap").digest(),
+            a=ids["answer"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO kb.knowledge_gap_queries (tenant_id, query_id, gap_id, signal) "
+            "VALUES (:t, :q, :g, 'not_found')",
+            t=t,
+            q=ids["query"],
+            g=gap,
+        )
         # --- student timeline and early warning (M5, 0035_student_insights) ---------------
         exam, flag, mark = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
         _run(
