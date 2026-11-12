@@ -55,6 +55,8 @@ const OWN_CSP_PATHS: readonly RegExp[] = [
   // FM-07 (FR-FEE-107): the family payment hand-over slip; FM-10 (FR-FEE-115): the fee
   // structure notice (each answer carries its own policy of hashed style blocks).
   /^\/bff\/api\/v1\/fees\/(family-payments\/slip|structure-notice\/print)$/i,
+  // FM-08 (FR-FEE-136): the list of cheques deposited on a day, for the bank's pay-in slip.
+  /^\/bff\/api\/v1\/fees\/cheques\/deposit-slip\/print$/i,
   /^\/bff\/api\/v1\/students\/[0-9a-f-]{36}\/apaar-consent\/form$/i,
   /^\/bff\/api\/v1\/sections\/[0-9a-f-]{36}\/(apaar-consent-forms|join-slips)$/i,
   /^\/bff\/api\/v1\/consents\/forms$/i,

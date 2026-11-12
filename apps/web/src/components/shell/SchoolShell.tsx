@@ -437,6 +437,14 @@ export function SchoolShell({
           activePattern: "^/fees/reconcile/?$",
         },
         {
+          // FM-08 (FR-FEE-131..141): cheques received, deposited, cleared or returned.
+          href: "/fees/cheques",
+          label: t("fees.nav.cheques"),
+          permission: ["fee.collect", "fee.reconcile"],
+          feature: "fees",
+          icon: "file",
+        },
+        {
           // R2-2D (US-2111, FR-PAY-010): online payment exceptions and the daily check.
           href: "/fees/reconcile/online",
           label: t("payments.nav.reconcile"),

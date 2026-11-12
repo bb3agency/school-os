@@ -9826,7 +9826,8 @@
       "taxCertificates": "Tax certificates",
       "leftWithDues": "Left with dues",
       "reports": "Fee reports",
-      "addons": "Add-on fees"
+      "addons": "Add-on fees",
+      "cheques": "Cheques"
     },
     "modes": {
       "cash": "Cash",
@@ -10597,7 +10598,9 @@
       "kinds": {
         "utr_exact": "Same UTR and amount",
         "amount_date": "Same amount, near date: check it",
-        "manual": "Matched by a person"
+        "manual": "Matched by a person",
+        "cheque_exact": "Same cheque number and amount",
+        "transfer_exact": "Same bank reference and amount"
       },
       "exceptions": {
         "no_receipt": "No receipt has this payment yet",
@@ -10647,7 +10650,10 @@
       "onlineMenu": "Online reconciliation (Razorpay)",
       "upiSettingsLink": "UPI QR settings",
       "amountInr": "Amount (₹)",
-      "noStatementsBody": "Download the account statement from the bank's website as Excel or CSV and read it above. Matches are proposed for you to confirm."
+      "noStatementsBody": "Download the account statement from the bank's website as Excel or CSV and read it above. Matches are proposed for you to confirm.",
+      "chequeNo": "Cheque {number}",
+      "transferRef": "Ref {ref}",
+      "chequesLink": "Cheques: deposit list and returned cheques"
     },
     "settings": {
       "title": "Fee settings",
@@ -11005,6 +11011,55 @@
       },
       "total": "Total for the year",
       "aboveThreshold": "(above the review level)"
+    },
+    "cheques": {
+      "title": "Cheques",
+      "description": "Cheques taken at the counter: mark them deposited, print the list for the bank's pay-in slip and record a cheque the bank returned.",
+      "listTitle": "Cheque receipts from {from} to {to}",
+      "listBody": "{received} at school, {deposited} deposited, {cleared} cleared, {returned} returned.",
+      "clearedNote": "A cheque shows as cleared once a person confirms it from an imported bank statement (Reconcile UPI and bank).",
+      "filter": "Show",
+      "allStatuses": "All cheques",
+      "statuses": {
+        "received": "At school",
+        "deposited": "Deposited",
+        "cleared": "Cleared",
+        "returned": "Returned"
+      },
+      "tableLabel": "Cheque receipts",
+      "tableCaption": "Cheque receipts with their status",
+      "select": "Select",
+      "chequeNo": "Cheque no.",
+      "bank": "Bank",
+      "receipt": "Receipt",
+      "student": "Student",
+      "amount": "Amount",
+      "status": "Status",
+      "actions": "Actions",
+      "chequeLabel": "Cheque {number}",
+      "depositedOnText": "Deposited on {date}",
+      "clearedOnText": "Seen in the bank on {date}",
+      "returnedOnText": "Returned on {date}",
+      "overdue": "Not deposited yet",
+      "receiptCancelled": "Receipt cancelled",
+      "markDeposited": "{count, plural, =0 {Mark deposited} one {Mark # cheque deposited} other {Mark # cheques deposited}}",
+      "depositTitle": "{count, plural, one {Mark # cheque deposited} other {Mark # cheques deposited}}",
+      "depositBody": "Record the day these cheques were taken to the bank.",
+      "depositConsequence": "They appear on that day's deposit list. Receipts and dues do not change.",
+      "depositedOn": "Deposited on",
+      "depositDone": "{count, plural, one {# cheque marked deposited} other {# cheques marked deposited}}{skipped, plural, =0 {.} other {; # could not be marked.}}",
+      "printSlip": "Print deposit list",
+      "markReturned": "Returned by bank",
+      "returnTitle": "Cheque {number} returned by the bank",
+      "returnBody": "This asks for the receipt to be cancelled with the reason \"Cheque dishonoured\". Another person with the right to cancel receipts approves it.",
+      "returnConsequence": "The dues come back only when the cancellation is approved. Collect the fee again by another payment.",
+      "returnConfirm": "Ask to cancel the receipt",
+      "returnedOn": "Returned on",
+      "returnReason": "Reason",
+      "returnReasonHint": "What the bank said, for example \"funds insufficient\". Do not write account numbers.",
+      "returnReasonDefault": "Cheque returned by the bank",
+      "truncated": "Only the first 500 cheques are shown. Choose a shorter period.",
+      "empty": "No cheque receipts in this period."
     }
   },
   "payments": {

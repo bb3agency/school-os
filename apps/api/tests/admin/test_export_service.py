@@ -273,6 +273,8 @@ EXPECTED_TABLES = {
     "fees_bank_statement_imports",
     "fees_bank_statement_lines",
     "fees_upi_confirmations",
+    # FM-08 (0103_bank_matching): cheque deposited / cleared / returned events.
+    "fees_cheque_status_events",
     # R2-2D online payments (the webhook inbox is not exported; no secret columns).
     "fees_payment_connections",
     "fees_payment_intents",

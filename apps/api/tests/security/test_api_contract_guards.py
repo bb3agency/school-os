@@ -667,6 +667,11 @@ IDEMPOTENCY_EXEMPT = {
     # FM-02 add-on fees (FR-FEE-089, FR-FEE-090).
     ("POST", "/api/v1/fees/addons/{addon_id}/unassign"): "idempotent by design: a repeat finds "
     "no active assignment (not_assigned) and one credit stands per assignment and instalment",
+    # FM-08 cheques deposited (FR-FEE-132) and returned (FR-FEE-134).
+    ("POST", "/api/v1/fees/cheques/deposited"): "idempotent by design: one deposited event per "
+    "receipt, a repeat counts as already_deposited",
+    ("POST", "/api/v1/fees/cheques/{receipt_id}/returned"): "a state transition (409 "
+    "cheque_already_returned on repeat; one returned event per receipt in the database)",
 }
 
 

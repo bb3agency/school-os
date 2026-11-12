@@ -58,9 +58,32 @@ export function useUpiSettings(enabled = true): Loadable<UpiSettings> {
 export function initialSelection(lines: readonly StatementLine[]): Set<string> {
   return new Set(
     lines
-      .filter((l) => l.match_status === "proposed" && l.match_kind === "utr_exact")
+      .filter((l) => l.match_status === "proposed" && EXACT_KINDS.has(l.match_kind ?? ""))
       .map((l) => l.id),
   );
+}
+
+/** Exact rules are ticked from the start: UTR, and (FM-08) cheque number or transfer reference. */
+const EXACT_KINDS: ReadonlySet<string> = new Set(["utr_exact", "cheque_exact", "transfer_exact"]);
+
+/**
+ * FM-08 (FR-FEE-126): the cheque number and transfer reference read from a credit.
+ * LEAD: `StatementLineOut` carries them after `make openapi`; until then they are read here.
+ */
+export function bankFacts(line: StatementLine): {
+  cheque_no: string | null;
+  transfer_ref: string | null;
+} {
+  const extra = line as StatementLine & { cheque_no?: string | null; transfer_ref?: string | null };
+  return { cheque_no: extra.cheque_no ?? null, transfer_ref: extra.transfer_ref ?? null };
+}
+
+/** Which receipts a person may match a credit with (FM-08: cheque, bank transfer or UPI). */
+export function receiptModeFor(line: StatementLine): "cheque" | "bank_transfer" | "upi_qr" {
+  const facts = bankFacts(line);
+  if (facts.cheque_no) return "cheque";
+  if (facts.transfer_ref || line.ref_kind === "reference") return "bank_transfer";
+  return "upi_qr";
 }
 
 export function confirmable(lines: readonly StatementLine[]): StatementLine[] {

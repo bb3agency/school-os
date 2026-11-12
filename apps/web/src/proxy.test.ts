@@ -265,6 +265,7 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       // FM-07 hand-over slip and FM-10 fee structure notice (FR-FEE-110).
       "/bff/api/v1/fees/family-payments/slip",
       "/bff/api/v1/fees/structure-notice/print",
+      "/bff/api/v1/fees/cheques/deposit-slip/print",
       `/bff/api/v1/students/${id}/apaar-consent/form`,
       `/bff/api/v1/sections/${id}/apaar-consent-forms`,
       `/bff/api/v1/sections/${id}/join-slips`,
@@ -287,6 +288,8 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       "/bff/api/v1/fees/reports/daily",
       "/bff/api/v1/fees/family-payments",
       "/bff/api/v1/fees/structure-notice",
+      "/bff/api/v1/fees/cheques",
+      "/bff/api/v1/fees/cheques/deposit-slip/print/x",
       `/bff/api/v1/students/${id}/apaar-consent`,
       `/bff/api/v1/sections/${id}/join-slips/x`,
       "/bff/api/v1/consents/summary",

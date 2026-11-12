@@ -187,7 +187,7 @@ classes:
              fin.receipt_cancellations, fin.refunds, fin.ledger_entries, fin.day_closes,
              fin.provider_payments, fin.reconciliation_runs, fin.reconciliation_items,
              fin.upi_settings, fin.upi_confirmations, fin.tax_certificates,
-             fin.fee_addons, fin.fee_addon_assignments]
+             fin.fee_addons, fin.fee_addon_assignments, fin.cheque_status_events]
     classification: C2
     docs_row: Receipts, refunds, cancellations, ledger entries
     retention: 8 years after the end of the financial year (owner decision D21, 2026-10-14; a CA confirms when available)

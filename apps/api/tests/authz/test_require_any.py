@@ -388,6 +388,13 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         ("GET", "/api/v1/fees/upi-settings"): UPI_READERS,
         ("GET", "/api/v1/fees/upi-settings/qr.svg"): UPI_READERS,
         ("GET", "/api/v1/fees/reports/upi"): ("fee.reconcile", ("finance.read",), False),
+        # FM-08: the counter (deposits) and reconcilers see cheque status and the deposit list.
+        ("GET", "/api/v1/fees/cheques"): ("fee.collect", ("fee.reconcile",), False),
+        ("GET", "/api/v1/fees/cheques/deposit-slip/print"): (
+            "fee.collect",
+            ("fee.reconcile",),
+            False,
+        ),
         ("GET", "/api/v1/fees/settings"): FEE_SETUP_READERS,
         ("GET", "/api/v1/fees/plans"): FEE_SETUP_READERS,
         ("GET", "/api/v1/fees/plans/{plan_id}"): FEE_SETUP_READERS,

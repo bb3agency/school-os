@@ -20,6 +20,7 @@ from typing import Any
 from sqlalchemy import Engine, text
 
 from app.fees import service as fees
+from app.fees.bank_matching_schemas import ChequeDepositIn
 from app.fees.upi_schemas import StatementImportIn, UpiSettingsIn
 
 _HERE = Path(__file__).resolve()
@@ -177,7 +178,46 @@ def matrix_specs() -> dict[tuple[str, str], Builder]:
         ),
         ("GET", "/api/v1/fees/upi-exceptions"): g(lambda w, a: "/api/v1/fees/upi-exceptions"),
         ("GET", "/api/v1/fees/reports/upi"): g(lambda w, a: "/api/v1/fees/reports/upi"),
+        # FM-08 cheque status (FR-FEE-131..138).
+        ("GET", "/api/v1/fees/cheques"): g(lambda w, a: "/api/v1/fees/cheques"),
+        ("POST", "/api/v1/fees/cheques/deposited"): lambda w, r, a: (
+            "/api/v1/fees/cheques/deposited",
+            {"receipt_ids": [str(uuid.uuid4())], "deposited_on": U.today().isoformat()},
+            {},
+        ),
+        ("GET", "/api/v1/fees/cheques/deposit-slip/print"): g(
+            lambda w, a: "/api/v1/fees/cheques/deposit-slip/print"
+        ),
+        ("POST", "/api/v1/fees/cheques/{receipt_id}/returned"): lambda w, r, a: (
+            f"/api/v1/fees/cheques/{_deposited_cheque(w, a)}/returned",
+            {"returned_on": U.today().isoformat(), "reason": "Returned by the bank"},
+            {},
+        ),
     }
+
+
+def _deposited_cheque(w: Any, admin: Engine) -> uuid.UUID:
+    """A fresh deposited cheque receipt of school A (each call: a return is once per cheque)."""
+    S.ensure_people(admin, w.a)
+    receipt = F.issue(
+        w.a,
+        S._account(w),
+        "1.00",
+        mode="cheque",
+        mode_details={
+            "cheque_number": f"{100000 + secrets.randbelow(899999):06d}",
+            "bank_name": "Synthetic Co-operative Bank",
+            "cheque_date": U.today().isoformat(),
+        },
+    )
+    F.call(
+        w.a,
+        "accountant",
+        fees.mark_cheques_deposited,
+        ChequeDepositIn(receipt_ids=[receipt.id], deposited_on=U.today()),
+    )
+    value: uuid.UUID = receipt.id
+    return value
 
 
 MATRIX_CREATES = frozenset({"/api/v1/fees/bank-statements"})

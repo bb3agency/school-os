@@ -57,8 +57,28 @@ _CONFLICTS: dict[str, tuple[str, str]] = {
     ),
     "upi_confirmations_receipt_state": (
         "receipt_not_confirmable",
-        "Only an issued UPI receipt can be confirmed from the bank statement.",
+        "Only an issued UPI, cheque or bank transfer receipt can be confirmed from the bank "
+        "statement.",
     ),
+    # FM-08 (0103_bank_matching)
+    "upi_confirmations_cheque_differs": (
+        "cheque_number_differs",
+        "The bank credit carries a different cheque number than the receipt, so they are not "
+        "matched. Check the receipt; a wrong receipt is cancelled and issued again.",
+    ),
+    "upi_confirmations_cheque_returned": (
+        "cheque_returned",
+        "This cheque was returned by the bank, so it cannot be confirmed.",
+    ),
+    "cheque_status_events_once": (
+        "cheque_status_recorded",
+        "This cheque status is already recorded. Reload to see it.",
+    ),
+    "cheque_status_events_order": (
+        "cheque_status_order",
+        "A cheque is deposited, then cleared or returned. Reload to see where it is.",
+    ),
+    "cheque_status_events_not_cheque": ("not_a_cheque", "This receipt is not a cheque receipt."),
     "upi_confirmations_amount_differs": (
         "amount_mismatch",
         "The bank credit and the receipt have different amounts, so they are not matched. Check "

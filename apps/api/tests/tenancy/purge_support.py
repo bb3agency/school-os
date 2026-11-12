@@ -1726,6 +1726,51 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             l=upi["line"],
             m=ids["m1"],
         )
+        # --- FM-08 (0103_bank_matching): a cheque receipt marked deposited --------------------
+        chq = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO fin.receipts (id, tenant_id, account_id, financial_year, receipt_no, "
+            "receipt_number, receipt_date, amount, mode, mode_details, collected_by, content, "
+            "content_sha256) VALUES (:i, :t, :a, '2026-27', 3, 'RCT/2026-27/000003', "
+            "'2026-09-01', 30, 'cheque', CAST(:md AS jsonb), :m, '{}'::jsonb, :h)",
+            i=chq,
+            t=t,
+            a=f["acct"],
+            md='{"cheque_number": "123456", "bank_name": "Synthetic Bank", '
+            '"cheque_date": "2026-09-01"}',
+            m=ids["m1"],
+            h=b"\x00" * 32,
+        )
+        _run(
+            c,
+            "INSERT INTO fin.receipt_allocations (id, tenant_id, receipt_id, instalment_no, "
+            "head_id, amount) VALUES (:i, :t, :r, 1, :h, 30)",
+            i=uuid.uuid4(),
+            t=t,
+            r=chq,
+            h=f["head"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.ledger_entries (id, tenant_id, account_id, entry_kind, amount, "
+            "instalment_no, head_id, entry_date, receipt_id) VALUES (:i, :t, :a, 'payment', -30, "
+            "1, :h, '2026-09-01', :r)",
+            i=uuid.uuid4(),
+            t=t,
+            a=f["acct"],
+            h=f["head"],
+            r=chq,
+        )
+        _run(
+            c,
+            "INSERT INTO fin.cheque_status_events (id, tenant_id, receipt_id, status, event_date, "
+            "source, recorded_by) VALUES (:i, :t, :r, 'deposited', '2026-09-02', 'manual', :m)",
+            i=uuid.uuid4(),
+            t=t,
+            r=chq,
+            m=ids["m1"],
+        )
         # --- R3-1A privacy requests (0066_privacy_requests; ADR-0048) -------------------------
         pr = uuid.uuid4()
         notice_id = uuid.uuid4()

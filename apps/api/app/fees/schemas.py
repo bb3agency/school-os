@@ -549,6 +549,8 @@ class ReceiptOut(_Out):
     # R2-2E (FR-FEE-016): when a person confirmed this UPI receipt from the bank statement;
     # null: "Not yet seen in bank statement" (UPI receipts) or not applicable (other modes).
     bank_confirmed_at: dt.datetime | None = None
+    # FM-08 (FR-FEE-131): cheque receipts only: received, deposited, cleared or returned.
+    cheque_status: Literal["received", "deposited", "cleared", "returned"] | None = None
 
 
 class ReceiptListItem(_Out):

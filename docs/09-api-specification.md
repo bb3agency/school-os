@@ -702,6 +702,15 @@ As built (R2-1A): `GET /certificates/types` gives the transfer certificate in th
 
 `ReceiptOut` gains `bank_confirmed_at` (UPI receipts; null until confirmed). `GET /fees/status` also opens to `fee.reconcile`. New problem codes: `statement_already_imported`, `amount_mismatch`, `utr_differs`, `receipt_already_confirmed`, `receipt_not_confirmable`, `receipt_taken`, `line_decided`, `line_taken`, `upi_not_set`, `not_an_import_file`. Notification `fee.upi_exceptions` (`{unconfirmed, credits}`, no resource).
 
+**Cheques and bank transfers as built (FM-08, 2026-11-12; `app/fees/api_bank_matching.py`).** The statement routes above now also propose and confirm cheque and bank transfer receipts (`match_kind` `cheque_exact`, `transfer_exact`; lines carry `cheque_no`, `transfer_ref`; `receipt` carries `mode`, `cheque_number`, `transfer_reference`; new 409 codes `cheque_number_differs`, `cheque_returned`). `ReceiptOut` gains `cheque_status` (cheque receipts) and `bank_confirmed_at` now covers cheque and bank transfer receipts.
+
+| Method | Path | Guard |
+|---|---|---|
+| GET | `/fees/cheques` (`?from=&to=&status=received\|deposited\|cleared\|returned`; default 30 days, ≤ 366) → `{as_of, date_from, date_to, deposit_due_days, items, counts, truncated}` | `fee.collect` or `fee.reconcile` |
+| POST | `/fees/cheques/deposited` (`{"receipt_ids": [...≤200], "deposited_on"}`) → `{deposited, already_deposited, skipped: [{receipt_id, code}]}` | `fee.collect` |
+| GET | `/fees/cheques/deposit-slip/print` (`?day=`, default today) → A4 HTML (`no-store`, style-hash CSP) | `fee.collect` or `fee.reconcile` |
+| POST | `/fees/cheques/{receipt_id}/returned` (`{"returned_on", "reason"}`) → `{cheque, cancellation}`; 409 `cheque_not_deposited`, `cheque_already_returned`, `cancellation_exists`; 404 for a non-cheque or another school's receipt | `fee.reconcile` (+ `fee.collect` or `fee.manage` for the request) |
+
 #### Online payments (R2.2; FR-PAY-*)
 
 | Method | Path | Guard |
