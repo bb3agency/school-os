@@ -15,8 +15,8 @@ from app.certificates.api import router as certificates_router
 from app.changes.api import router as changes_router
 from app.circulars.api import router as circulars_router
 from app.compliance.api import router as compliance_router
-from app.compliance.safety_api import router as compliance_safety_router
 from app.compliance.packs_api import router as compliance_packs_router
+from app.compliance.safety_api import router as compliance_safety_router
 from app.core import ratelimit
 from app.core.config import DeploymentMode, Settings, get_settings
 from app.core.errors import install_error_handlers
