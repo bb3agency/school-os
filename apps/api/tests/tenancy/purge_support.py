@@ -1130,6 +1130,17 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             q=ids["query"],
             g=gap,
         )
+        # --- FC-07 (0101_inspection_packs): a generated pack -------------------------------
+        _run(
+            c,
+            "INSERT INTO ops.inspection_packs (id, tenant_id, pack_key, pack_version, pack_label, "
+            "authority, verified, items, counts, generated_by) VALUES (:i, :t, 'fire_inspection', "
+            "1, 'Fire department inspection', 'State fire services department', false, '[]', "
+            "'{}', :u)",
+            i=uuid.uuid4(),
+            t=t,
+            u=u["user"],
+        )
         # --- student timeline and early warning (M5, 0035_student_insights) ---------------
         exam, flag, mark = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
         _run(

@@ -139,6 +139,22 @@ def row(admin: Engine, certificate_id: uuid.UUID) -> dict[str, Any]:
     return dict(found._mapping)
 
 
+def pack(admin: Engine, school: Any) -> uuid.UUID:
+    """A generated inspection pack of ``school`` (FC-07), inserted directly."""
+    pid = uuid.uuid4()
+    with admin.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO ops.inspection_packs (id, tenant_id, pack_key, pack_version, "
+                "pack_label, authority, verified, items, counts, generated_by) VALUES (:i, :t, "
+                "'fire_inspection', 1, 'Fire department inspection', 'State fire services "
+                "department', false, '[]', '{}', :u)"
+            ),
+            {"i": pid, "t": school.tenant_id, "u": school.people["owner"].user_id},
+        )
+    return pid
+
+
 # --- security suites (authz matrix, BOLA) -----------------------------------------------------
 
 Request = tuple[str, dict[str, Any] | None, dict[str, str]]
@@ -152,6 +168,21 @@ def b_certificate(admin: Engine, w: Any) -> uuid.UUID:
         )
     value: uuid.UUID = w.b.ids["bola_compliance_certificate"]
     return value
+
+
+def b_pack(admin: Engine, w: Any) -> uuid.UUID:
+    """An inspection pack of school B (FC-07; BOLA: school A's callers get 404)."""
+    if "bola_inspection_pack" not in w.b.ids:
+        w.b.ids["bola_inspection_pack"] = pack(admin, w.b)
+    value: uuid.UUID = w.b.ids["bola_inspection_pack"]
+    return value
+
+
+def b_object(admin: Engine, w: Any, template: str) -> uuid.UUID:
+    """School B's object for a compliance route: a pack on the pack routes, else a certificate."""
+    if "{pack_id}" in template:
+        return b_pack(admin, w)
+    return b_certificate(admin, w)
 
 
 def matrix_specs() -> dict[tuple[str, str], Any]:
@@ -179,10 +210,32 @@ def matrix_specs() -> dict[tuple[str, str], Any]:
         ("GET", f"{BASE}/certificates/{{certificate_id}}"): on_new(""),
         ("PUT", f"{BASE}/certificates/{{certificate_id}}"): put,
         ("POST", f"{BASE}/certificates/{{certificate_id}}:remove"): on_new(":remove"),
+        # FC-07 / FO-12 inspection readiness packs (FR-COMP-044).
+        ("GET", f"{BASE}/inspection-readiness"): lambda w, r, a: (
+            f"{BASE}/inspection-readiness",
+            None,
+            {},
+        ),
+        ("GET", f"{BASE}/inspection-packs"): lambda w, r, a: (f"{BASE}/inspection-packs", None, {}),
+        ("POST", f"{BASE}/inspection-packs"): lambda w, r, a: (
+            f"{BASE}/inspection-packs",
+            {"pack_key": "fire_inspection"},
+            {},
+        ),
+        ("GET", f"{BASE}/inspection-packs/{{pack_id}}"): lambda w, r, a: (
+            f"{BASE}/inspection-packs/{pack(a, w.a)}",
+            None,
+            {},
+        ),
+        ("GET", f"{BASE}/inspection-packs/{{pack_id}}/index"): lambda w, r, a: (
+            f"{BASE}/inspection-packs/{pack(a, w.a)}/index",
+            None,
+            {},
+        ),
     }
 
 
-MATRIX_CREATES = frozenset({f"{BASE}/certificates"})
+MATRIX_CREATES = frozenset({f"{BASE}/certificates", f"{BASE}/inspection-packs"})
 
 # BOLA: valid bodies for the writes on school B's certificate (FR-COMP-018).
 BOLA_PREFIX = f"{BASE}/"

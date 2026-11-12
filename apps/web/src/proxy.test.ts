@@ -274,6 +274,7 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       // FO-06, FO-11: enrolment statistics sheet and scheme attendance list.
       "/bff/api/v1/reports/enrolment-statistics/print",
       "/bff/api/v1/scheme-packs/attendance/print",
+      `/bff/api/v1/compliance/inspection-packs/${id}/index`,
     ]) {
       const response = proxy(request(path));
       expect(response.headers.get("content-security-policy"), path).toBeNull();
@@ -293,6 +294,8 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       `/bff/api/v1/privacy/requests/${id}`,
       "/bff/api/v1/reports/enrolment-statistics",
       "/bff/api/v1/scheme-packs/attendance",
+      `/bff/api/v1/compliance/inspection-packs/${id}`,
+      `/bff/api/v1/compliance/inspection-packs/${id}/index/x`,
     ]) {
       expect(proxy(request(path)).headers.get("content-security-policy"), path).toContain(
         "default-src 'self'",

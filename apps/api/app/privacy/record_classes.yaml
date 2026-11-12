@@ -337,6 +337,16 @@ classes:
     basis: Shows inspectors that staff read the school's child-protection and safety policies; kept as the school's record of which version each member read and when.
     erasure: refused_official_record
     source: Confirmed by each staff member in SchoolOS
+  inspection_packs:
+    label: Inspection packs made
+    owner: compliance
+    tables: [ops.inspection_packs]
+    classification: C1
+    docs_row: Inspection packs
+    retention: Life of the school
+    basis: The record of which inspection packs the office made and the state of each item then; labels, dates and counts, nothing about one person.
+    erasure: no_personal_data
+    source: Made by the school office from records SchoolOS holds
 
   imports:
     label: Spreadsheet imports

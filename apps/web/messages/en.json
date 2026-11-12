@@ -316,7 +316,11 @@
         "dayCloseAction": "Open the day book",
         "dayClosed": "Today is closed. New payments go to the next day.",
         "dayOpen": "Today is not closed yet. Close it after counting the cash.",
-        "receiptsTotalLabel": "Receipts so far:"
+        "receiptsTotalLabel": "Receipts so far:",
+        "complianceTitle": "School certificates",
+        "complianceAction": "Open certificates",
+        "complianceNone": "Every certificate the school needs is recorded and valid.",
+        "complianceBody": "{expired, plural, one {1 certificate has expired} other {# certificates have expired}}, {expiring} expire soon and {missing} are not recorded yet."
       },
       "steps": {
         "label": "Steps to get started",
@@ -13322,6 +13326,97 @@
       "conflict": {
         "title": "Someone recorded this at the same time",
         "body": "Reload the page and check the certificate before trying again."
+      },
+      "unknown_pack": {
+        "title": "This inspection pack is not available",
+        "body": "Reload the page and choose one of the packs listed for your school."
+      }
+    },
+    "inspectionLink": "Prepare for an inspection",
+    "packs": {
+      "title": "Prepare for an inspection",
+      "description": "See what an inspector usually asks for, what SchoolOS already holds and what is missing, then make a pack to print.",
+      "unverifiedTitle": "These lists are a guide",
+      "unverifiedBody": "What each office asks for was put together from public guidance and is not yet confirmed. It can differ by district and year. Check with the office before the visit.",
+      "choosePack": "Inspection by",
+      "authority": "For: {authority}",
+      "colItem": "Item",
+      "colState": "State",
+      "colDetails": "Details",
+      "colFixBy": "Fixed by",
+      "colWhere": "Where to print it",
+      "ownFiles": "School's own files",
+      "openAria": "Open the screen for {name}",
+      "emptyTitle": "No items",
+      "emptyBody": "This pack has no items for your school's boards.",
+      "where": {
+        "certificate": "Compliance certificates",
+        "register": "Registers",
+        "disclosure": "CBSE disclosure",
+        "privacy_notice": "Privacy notices",
+        "dpdp_readiness": "DPDP readiness",
+        "not_tracked": "School's own files"
+      },
+      "state": {
+        "ready": "Ready",
+        "expiring": "Expires soon",
+        "no_copy": "No copy on file",
+        "incomplete": "Incomplete",
+        "expired": "Expired",
+        "missing": "Missing",
+        "left_out": "Not included",
+        "not_tracked": "Not tracked in SchoolOS"
+      },
+      "details": {
+        "certificateMissing": "Not recorded in SchoolOS",
+        "validUntil": "Valid until {date}",
+        "noExpiry": "No expiry",
+        "copy": "copy on file",
+        "noCopy": "no copy on file",
+        "registerReady": "Prints from SchoolOS records",
+        "registerChosen": "Chosen for this pack",
+        "registerLeftOut": "Not chosen for this pack",
+        "published": "Published {date}",
+        "notPublished": "No page published yet",
+        "noticeGiven": "Given on {date}",
+        "noNotice": "No notice recorded yet",
+        "dpdp": "{done} of {applicable} done",
+        "notTracked": "Keep it in the school's own files for now ({feature})"
+      },
+      "counts": {
+        "ready": "Ready",
+        "attention": "Need attention",
+        "missing": "Missing or expired",
+        "notTracked": "Not tracked in SchoolOS"
+      },
+      "make": {
+        "title": "Make the pack",
+        "body": "SchoolOS keeps each item's state as it is now and gives you an index to print as the cover. Print each item from its own screen and put it behind the index.",
+        "year": "Academic year of the registers",
+        "yearDefault": "The current year",
+        "currentYear": "{label} (current)",
+        "visitOn": "Visit date",
+        "visitOnHint": "Optional. Printed on the index.",
+        "registers": "Registers to include",
+        "registersHint": "Registers list students. Include only the ones the inspector is entitled to see. They print from the Registers screen after you confirm it is you.",
+        "registersNotAllowed": "Registers are listed as not included. Ask someone who can print registers to add them.",
+        "submit": "Make the pack",
+        "printIndex": "Print the index",
+        "newTab": "opens in a new tab",
+        "made": "Pack made: {ready} items ready, {missing} missing or expired."
+      },
+      "log": {
+        "title": "Packs made",
+        "colMade": "Pack",
+        "colVisit": "Visit date",
+        "colSummary": "Summary",
+        "colIndex": "Index",
+        "summary": "{ready} ready, {attention} need attention, {missing} missing",
+        "print": "Print index",
+        "printAria": "Print the index of {name}",
+        "newTab": "opens in a new tab",
+        "emptyTitle": "No packs made yet",
+        "emptyBody": "Choose an inspection above and make the pack before the visit."
       }
     }
   },

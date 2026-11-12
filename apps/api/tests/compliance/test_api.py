@@ -365,4 +365,6 @@ def test_FR_COMP_016_register_is_in_the_full_export(school: Any, admin_engine: E
     with tenant_session(school.tenant_id) as db:
         tables = {t.name: t for t in service.export_records(db)}
     table = tables["compliance_certificates"]
+    # FC-07 (FR-COMP-043): the inspection pack log is in the export too.
+    assert "inspection_packs" in tables
     assert str(cid) in str(table.rows)

@@ -67,6 +67,8 @@ const OWN_CSP_PATHS: readonly RegExp[] = [
   // FO-06 (FR-EXP-013) enrolment statistics and FO-11 (FR-EXP-022) scheme attendance list.
   /^\/bff\/api\/v1\/reports\/enrolment-statistics\/print$/i,
   /^\/bff\/api\/v1\/scheme-packs\/attendance\/print$/i,
+  // FC-07 / FO-12 (FR-COMP-038): the inspection pack index.
+  /^\/bff\/api\/v1\/compliance\/inspection-packs\/[0-9a-f-]{36}\/index$/i,
 ];
 
 function isNonLocalised(pathname: string): boolean {

@@ -16,6 +16,7 @@ from app.changes.api import router as changes_router
 from app.circulars.api import router as circulars_router
 from app.compliance.api import router as compliance_router
 from app.compliance.safety_api import router as compliance_safety_router
+from app.compliance.packs_api import router as compliance_packs_router
 from app.core import ratelimit
 from app.core.config import DeploymentMode, Settings, get_settings
 from app.core.errors import install_error_handlers
@@ -140,6 +141,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(compliance_router)
     # FC-09 safety drills and checks, FC-10 policy library with staff acknowledgement.
     app.include_router(compliance_safety_router)
+    # FC-07 / FO-12 inspection readiness packs.
+    app.include_router(compliance_packs_router)
     # R2-1B fees (ADR-0042): every route answers 404 module_hidden while fees are off.
     app.include_router(fees_router)
     # R2-2E UPI and bank statements (ADR-0042 decision 9).
