@@ -284,6 +284,9 @@ test.describe("D57-D62 screens (stand-in IdP)", () => {
     await expect(sheet).toContainText("Sri Saraswati High School");
     await expect(sheet).toContainText("A printed class list was left on the bus");
     await expect(sheet).toContainText("Template 2026-10");
+    // A client navigation scrolls the new segment to the top, which leaves the announcement's
+    // Hide button half under the sticky top bar; measure the page as it opens (from the top).
+    await page.evaluate(() => window.scrollTo(0, 0));
     await expectNoAxeViolations(page, "draft print page");
     await expectNoHorizontalOverflow(page, "draft print page");
 
