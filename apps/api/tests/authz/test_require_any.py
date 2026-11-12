@@ -374,6 +374,12 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
             ("finance.read",),
             False,
         ),
+        # FM-07 family counter and hand-over slip; FM-10 fee structure notice (D86)
+        ("GET", "/api/v1/fees/students/{student_id}/family"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/family-payments/slip"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/structure-notice"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/structure-notice/print"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/structure-changes"): FEE_SETUP_READERS,
         # R2-2E UPI (ADR-0042 decision 9): the counter, setup, finance readers and reconcilers
         # see the UPI details and QR; the confirmed vs unconfirmed report also opens to readers.
         ("GET", "/api/v1/fees/upi-settings"): UPI_READERS,

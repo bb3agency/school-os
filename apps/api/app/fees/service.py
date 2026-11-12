@@ -37,6 +37,7 @@ from app.fees import (
     approvals,
     arrears,
     ask,
+    family,
     ledger,
     online,
     parent_pages,
@@ -46,6 +47,7 @@ from app.fees import (
     reports,
     setup,
     statements,
+    structure_notice,
     tally_feed,
     tax_certificates,
     upi,
@@ -159,6 +161,14 @@ series_check = period_reports.series_check
 year_end_pack = period_reports.year_end_pack
 
 post_late_fees = late.post_for_school
+
+# FM-07 family counter (FR-FEE-101..112) and FM-10 fee structure notice (FR-FEE-113..125); D86
+family_counter = family.family_counter
+issue_family_payment = family.issue_family_payment
+family_slip = family.slip_page
+fee_structure_notice = structure_notice.structure_notice
+fee_structure_notice_print = structure_notice.notice_print
+fee_structure_changes = structure_notice.structure_changes
 
 # R2-2E UPI and bank statements (ADR-0042 decision 9; FR-FEE-014..017)
 get_upi_settings = upi.get_settings

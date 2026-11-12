@@ -2907,6 +2907,23 @@ def _addons() -> ModuleType:
 SPECS.update(_addons().matrix_specs())
 
 
+def _family() -> ModuleType:
+    """tests/fees/family_security_support.py (FM-07 family counter, FM-10 fee structure)."""
+    name = "sos_test_fees_family_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "family_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_family().matrix_specs())
+
+
 def _disclosure() -> ModuleType:
     """tests/disclosure/security_support.py (R3-1C: CBSE on per call, snapshots of a school)."""
     name = "sos_test_disclosure_security_support"
@@ -3246,6 +3263,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         | _upi().MATRIX_CREATES
         | _tax().MATRIX_CREATES
         | _addons().MATRIX_CREATES
+        | _family().MATRIX_CREATES
     ):
         return 201
     if (method, path) in _fees().ONLINE_REFUSED:

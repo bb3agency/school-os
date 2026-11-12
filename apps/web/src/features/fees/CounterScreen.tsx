@@ -52,6 +52,7 @@ import {
 } from "./data";
 import { ReceiptWhatsApp } from "@/features/messaging/ReceiptWhatsApp";
 import { EarlierYearsPanel, type PlannedPart, type SplitPlan } from "./CounterYears";
+import { FamilyPanel } from "./FamilyCounter";
 import { Amount, FeesGate, NoAccess } from "./parts";
 import { UpiCounterHelp } from "./UpiCounter";
 
@@ -985,6 +986,8 @@ export function CounterScreen({ initialAccountId = null }: { initialAccountId?: 
                         onSplit={setPlan}
                         onTakePart={takePart}
                       />
+                      {/* FM-07 (FR-FEE-101..107): siblings and one payment for the family. */}
+                      <FamilyPanel studentId={loaded.student_id} />
                     </>
                   ) : (
                     <FeesGate data={account}>{() => null}</FeesGate>

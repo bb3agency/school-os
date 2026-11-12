@@ -505,6 +505,33 @@ export function r2Answer(
     };
     return [200, years];
   }
+  // FM-07 (FR-FEE-101): no sibling, so the counter shows no "Family" panel. Hand-written until
+  // the client is regenerated with FamilyCounterOut.
+  if (path === `/api/v1/fees/students/${state.account.student_id}/family` && get) {
+    return [
+      200,
+      {
+        student_id: state.account.student_id,
+        as_of: "2026-10-21",
+        members: [
+          {
+            student_id: state.account.student_id,
+            display_name: null,
+            admission_no: null,
+            class_section: null,
+            status: "active",
+            selected: true,
+            linked_by: [],
+            accounts: [],
+            collectable: "0.00",
+          },
+        ],
+        total_collectable: "0.00",
+        max_accounts: 8,
+        modes: ["cash", "cheque", "bank_transfer"],
+      },
+    ];
+  }
   if (path === `/api/v1/fees/accounts/${state.account.id}` && get) return [200, state.account];
   if (path.startsWith("/api/v1/fees/accounts/") && get) return notFound;
   if (path === "/api/v1/fees/receipts" && post) return saveReceipt(body);

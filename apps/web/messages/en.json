@@ -9788,6 +9788,45 @@
           "not_positive": "Enter an amount above zero, like 4999 or 4999.50.",
           "above_outstanding": "This is more than the student owes across all years. Lower the amount."
         }
+      },
+      "family": {
+        "title": "Family",
+        "formLabel": "One payment for the family",
+        "description": "Brothers and sisters linked to the same parent or guardian on their student records. Enter what the parent pays for each child: one receipt is saved for each child, all together.",
+        "columns": {
+          "student": "Student",
+          "year": "Year",
+          "dueNow": "Due now",
+          "amount": "Amount paid (₹)"
+        },
+        "thisStudent": "this student",
+        "noYear": "Year not recorded",
+        "nothingDue": "Nothing due now",
+        "amountFor": "Amount paid for {name}, {year}",
+        "fillAll": "Fill in everything due",
+        "total": "Total:",
+        "mode": "Paid by",
+        "noUpi": "UPI is not offered here: each UPI payment has its own UTR, so take each child's UPI payment with its own receipt.",
+        "save": "{count, plural, =0 {Save receipts} one {Save # receipt} other {Save # receipts}}",
+        "refusedTitle": "The receipts were not saved",
+        "savedTitle": "Family payment saved",
+        "savedLead": "{count, plural, one {# receipt saved} other {# receipts saved}}",
+        "savedBody": "{amount} received. Print each child's receipt, or the hand-over slip that lists them all.",
+        "printReceipt": "Print receipt {number}",
+        "printSlip": "Print hand-over slip",
+        "another": "Take another family payment",
+        "errors": {
+          "amount": "Enter an amount like 4999 or 4999.50, or leave it empty.",
+          "above_due": "This is more than is due now. Lower the amount.",
+          "two_or_more": "Enter an amount for at least two accounts. For one child, use the payment form.",
+          "too_many": "One family payment can cover at most {count} accounts.",
+          "missing": "Fill in this field.",
+          "invalid_cheque_number": "Enter the 6-digit cheque number.",
+          "invalid_reference": "Enter the bank reference: 12 to 22 letters or digits.",
+          "upi_one_receipt_per_utr": "UPI cannot be used for a family payment. Take each child's UPI payment with its own receipt.",
+          "not_in_family": "One of the accounts is not of this family any more. Reload the counter and try again.",
+          "duplicate": "The same account is listed twice. Reload the counter and try again."
+        }
       }
     },
     "receipts": {
@@ -10708,6 +10747,44 @@
         "receipt": "Receipts",
         "refund": "Refund vouchers"
       }
+    },
+    "structureNotice": {
+      "title": "Fee structure notice",
+      "description": "Print the school's fee structure for a year by class, for the notice board and admission enquiries, and check the change against last year before you activate plans.",
+      "year": "Year of the notice",
+      "class": "Classes on the notice",
+      "allClasses": "All classes",
+      "print": "Print notice",
+      "printNote": "One A4 page per class: fee heads, the total for the year, instalments with due dates and the late-fee rule. A class whose plan is still a draft is marked DRAFT.",
+      "changesTitle": "Change against last year",
+      "threshold": "Flag increases above (%)",
+      "thresholdHint": "Leave empty for the school's usual review level. This only changes this view; nothing is saved. It is not a legal limit.",
+      "thresholdError": "Enter a number from 0 to 1000 with at most one decimal, like 10 or 12.5.",
+      "noPlans": "No fee plans to compare",
+      "noPlansBody": "Make a plan for this year or last year first.",
+      "against": "{year} against {previous}. Increases above {percent}% are flagged.",
+      "firstYear": "No earlier year to compare {year} with.",
+      "flaggedTitle": "{count, plural, one {# class has an increase above the review level} other {# classes have an increase above the review level}}",
+      "flaggedBody": "Check the flagged rows before you activate the plans. The review level ({percent}%) is the school's own, not a legal rule.",
+      "draft": "Draft plan",
+      "noPlanThisYear": "No plan this year",
+      "tableLabel": "Change for {name}",
+      "columns": {
+        "head": "Fee head",
+        "change": "Change",
+        "previous": "Last year",
+        "current": "This year",
+        "difference": "Difference",
+        "percent": "Change %"
+      },
+      "kinds": {
+        "added": "New",
+        "removed": "Removed",
+        "changed": "Changed",
+        "unchanged": "Same"
+      },
+      "total": "Total for the year",
+      "aboveThreshold": "(above the review level)"
     }
   },
   "payments": {

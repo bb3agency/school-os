@@ -1,0 +1,28 @@
+# Fee structure notice and year-on-year change summary (FM-10; FR-FEE-113..125; lead decision
+# D86, PO to confirm). Versioned configuration shipped inside the package (invariant 13). Read by
+# app/fees/structure_notice.py. No personal data: plans, heads and amounts only.
+version: 1
+
+# The change summary flags an increase above this percentage (per head and per class total).
+# A school's own review threshold, not a legal rule: AP and Telangana fee regulation sets no
+# current percentage cap that SchoolOS relies on (unverified). The screen may ask for another
+# value for one view; nothing is stored.
+warn_percent:
+  value: "10.0"
+  verified: false
+  source: "docs/research/2026-11-features/money.md FM-10 (example threshold; school config, not law)"
+
+# Wording printed on the notice. It says "the school's fee structure", never "approved by" any
+# commission or authority (FM-10 risk: implying legal compliance).
+notice:
+  title: "Fee structure {year}"
+  draft_mark: "DRAFT - not yet in force"
+  disclaimer: >-
+    This is the school's fee structure for the academic year. Amounts are in rupees for one
+    student for the whole year. Concessions, add-on fees (transport, hostel, activities) and
+    earlier-year dues are not shown here. Ask the school office for any question about fees.
+  late_fee:
+    none: "No late fee is charged."
+    flat_per_instalment: "A late fee of ₹{amount} is charged once per instalment paid more than {grace_days} days after its due date."
+    per_day: "A late fee of ₹{amount} per day is charged from {grace_days} days after the due date, up to ₹{cap} per instalment."
+    per_day_no_cap: "A late fee of ₹{amount} per day is charged from {grace_days} days after the due date."

@@ -1,0 +1,13 @@
+# Family counter: siblings and one payment across their accounts (FM-07; FR-FEE-101..112;
+# lead decision D86, PO to confirm). Versioned configuration shipped inside the package
+# (invariant 13). Read by app/fees/family.py.
+version: 1
+
+# Accounts one family payment may cover (one receipt each, in one transaction). Two or more:
+# a single account is an ordinary counter receipt.
+max_accounts: 8
+
+# Counter modes a family payment may use. A UPI payment carries one UTR, and a UTR belongs to
+# exactly one receipt (FR-FEE-014; unique index receipts_utr_unique), so UPI stays one receipt
+# per child: take each child's UPI payment with its own UTR.
+modes: [cash, cheque, bank_transfer]
