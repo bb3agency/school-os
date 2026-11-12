@@ -9880,6 +9880,311 @@
         "title": "ChecksOverviewOut",
         "type": "object"
       },
+      "ChequeDepositIn": {
+        "additionalProperties": false,
+        "description": "Mark cheques as taken to the bank (FR-FEE-132). ``deposited_on``: today or earlier, not\nbefore the receipt date.",
+        "properties": {
+          "deposited_on": {
+            "format": "date",
+            "title": "Deposited On",
+            "type": "string"
+          },
+          "receipt_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Receipt Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "receipt_ids",
+          "deposited_on"
+        ],
+        "title": "ChequeDepositIn",
+        "type": "object"
+      },
+      "ChequeDepositOut": {
+        "properties": {
+          "already_deposited": {
+            "title": "Already Deposited",
+            "type": "integer"
+          },
+          "deposited": {
+            "title": "Deposited",
+            "type": "integer"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/ChequeSkipped"
+            },
+            "title": "Skipped",
+            "type": "array"
+          }
+        },
+        "required": [
+          "deposited",
+          "already_deposited",
+          "skipped"
+        ],
+        "title": "ChequeDepositOut",
+        "type": "object"
+      },
+      "ChequeListOut": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "deposit_due_days": {
+            "title": "Deposit Due Days",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChequeOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "as_of",
+          "date_from",
+          "date_to",
+          "deposit_due_days",
+          "items",
+          "counts",
+          "truncated"
+        ],
+        "title": "ChequeListOut",
+        "type": "object"
+      },
+      "ChequeOut": {
+        "description": "A cheque receipt and where its cheque is: ``received`` (at the school), ``deposited``\n(taken to the bank), ``cleared`` (seen in a bank statement and confirmed by a person) or\n``returned`` (the bank returned it; a ``cheque_dishonoured`` cancellation request exists).",
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,15}0*$)\\d{0,12}\\.\\d{0,2}0*$)",
+            "title": "Amount",
+            "type": "string"
+          },
+          "bank_name": {
+            "title": "Bank Name",
+            "type": "string"
+          },
+          "cancellation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Id"
+          },
+          "cheque_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cheque Date"
+          },
+          "cheque_number": {
+            "title": "Cheque Number",
+            "type": "string"
+          },
+          "cheque_status": {
+            "enum": [
+              "received",
+              "deposited",
+              "cleared",
+              "returned"
+            ],
+            "title": "Cheque Status",
+            "type": "string"
+          },
+          "class_section": {
+            "title": "Class Section",
+            "type": "string"
+          },
+          "cleared_from_statement": {
+            "title": "Cleared From Statement",
+            "type": "boolean"
+          },
+          "cleared_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cleared On"
+          },
+          "deposit_overdue": {
+            "title": "Deposit Overdue",
+            "type": "boolean"
+          },
+          "deposited_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deposited On"
+          },
+          "receipt_date": {
+            "format": "date",
+            "title": "Receipt Date",
+            "type": "string"
+          },
+          "receipt_id": {
+            "format": "uuid",
+            "title": "Receipt Id",
+            "type": "string"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "receipt_status": {
+            "title": "Receipt Status",
+            "type": "string"
+          },
+          "returned_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned On"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_id",
+          "receipt_number",
+          "receipt_date",
+          "receipt_status",
+          "amount",
+          "cheque_number",
+          "bank_name",
+          "cheque_date",
+          "student_name",
+          "class_section",
+          "cheque_status",
+          "deposited_on",
+          "cleared_on",
+          "cleared_from_statement",
+          "returned_on",
+          "cancellation_id",
+          "deposit_overdue"
+        ],
+        "title": "ChequeOut",
+        "type": "object"
+      },
+      "ChequeReturnIn": {
+        "additionalProperties": false,
+        "description": "The bank returned the cheque (FR-FEE-134): a ``cheque_dishonoured`` cancellation request is\nraised for the receipt (a different holder of ``fee.receipt.cancel`` decides).",
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "title": "Reason",
+            "type": "string"
+          },
+          "returned_on": {
+            "format": "date",
+            "title": "Returned On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "returned_on",
+          "reason"
+        ],
+        "title": "ChequeReturnIn",
+        "type": "object"
+      },
+      "ChequeReturnOut": {
+        "properties": {
+          "cancellation": {
+            "$ref": "#/components/schemas/CancellationOut"
+          },
+          "cheque": {
+            "$ref": "#/components/schemas/ChequeOut"
+          }
+        },
+        "required": [
+          "cheque",
+          "cancellation"
+        ],
+        "title": "ChequeReturnOut",
+        "type": "object"
+      },
+      "ChequeSkipped": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "receipt_id": {
+            "format": "uuid",
+            "title": "Receipt Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_id",
+          "code"
+        ],
+        "title": "ChequeSkipped",
+        "type": "object"
+      },
       "ChoiceOut": {
         "properties": {
           "label_en": {
@@ -42715,6 +43020,23 @@
             ],
             "title": "Cancelled On"
           },
+          "cheque_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "received",
+                  "deposited",
+                  "cleared",
+                  "returned"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cheque Status"
+          },
           "class_section": {
             "title": "Class Section",
             "type": "string"
@@ -42887,6 +43209,17 @@
             "title": "Amount",
             "type": "string"
           },
+          "cheque_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cheque Number"
+          },
           "class_section": {
             "title": "Class Section",
             "type": "string"
@@ -42894,6 +43227,11 @@
           "id": {
             "format": "uuid",
             "title": "Id",
+            "type": "string"
+          },
+          "mode": {
+            "default": "upi_qr",
+            "title": "Mode",
             "type": "string"
           },
           "receipt_date": {
@@ -42912,6 +43250,17 @@
           "student_name": {
             "title": "Student Name",
             "type": "string"
+          },
+          "transfer_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transfer Reference"
           },
           "utr": {
             "anyOf": [
@@ -47584,6 +47933,17 @@
             "title": "Amount",
             "type": "string"
           },
+          "cheque_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cheque No"
+          },
           "conflict_receipt": {
             "anyOf": [
               {
@@ -47674,7 +48034,9 @@
                 "enum": [
                   "utr_exact",
                   "amount_date",
-                  "manual"
+                  "manual",
+                  "cheque_exact",
+                  "transfer_exact"
                 ],
                 "type": "string"
               },
@@ -47728,6 +48090,17 @@
             ],
             "title": "Ref Kind",
             "type": "string"
+          },
+          "transfer_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transfer Ref"
           },
           "utr_or_ref": {
             "anyOf": [
@@ -74055,6 +74428,339 @@
           }
         },
         "summary": "Withdraw Fee Cancellation",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/cheques": {
+      "get": {
+        "description": "Cheque receipts of a receipt-date range (default the last 30 days; at most 366) with\ntheir cheque status: received, deposited, cleared (seen in a bank statement) or returned\n(``fee.collect`` or ``fee.reconcile``).",
+        "operationId": "list_fee_cheques_api_v1_fees_cheques_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "received",
+                    "deposited",
+                    "cleared",
+                    "returned"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChequeListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Fee Cheques",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/cheques/deposit-slip/print": {
+      "get": {
+        "description": "The A4 list of cheques marked deposited on ``day`` (default today) for the bank's pay-in\nslip (``fee.collect`` or ``fee.reconcile``). Audited.",
+        "operationId": "fee_cheque_deposit_slip_api_v1_fees_cheques_deposit_slip_print_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "day",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A4 print page"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Fee Cheque Deposit Slip",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/cheques/deposited": {
+      "post": {
+        "description": "Mark cheques as taken to the bank (``fee.collect``). Receipts that are not issued cheque\nreceipts are listed in ``skipped``; marking again is harmless. Audited.",
+        "operationId": "mark_fee_cheques_deposited_api_v1_fees_cheques_deposited_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChequeDepositIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChequeDepositOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mark Fee Cheques Deposited",
+        "tags": [
+          "fees"
+        ]
+      }
+    },
+    "/api/v1/fees/cheques/{receipt_id}/returned": {
+      "post": {
+        "description": "The bank returned a deposited cheque (``fee.reconcile``): a ``cheque_dishonoured``\ncancellation request is raised (another holder of ``fee.receipt.cancel`` decides; the ledger\nchanges only when it is approved). 409 ``cheque_not_deposited``,\n``cheque_already_returned``, ``cancellation_pending``; 404 for a non-cheque receipt.",
+        "operationId": "mark_fee_cheque_returned_api_v1_fees_cheques__receipt_id__returned_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receipt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChequeReturnIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChequeReturnOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mark Fee Cheque Returned",
         "tags": [
           "fees"
         ]

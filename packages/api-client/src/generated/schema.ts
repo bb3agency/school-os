@@ -4554,6 +4554,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fees/cheques": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Fee Cheques
+         * @description Cheque receipts of a receipt-date range (default the last 30 days; at most 366) with
+         *     their cheque status: received, deposited, cleared (seen in a bank statement) or returned
+         *     (``fee.collect`` or ``fee.reconcile``).
+         */
+        get: operations["list_fee_cheques_api_v1_fees_cheques_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/cheques/{receipt_id}/returned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Fee Cheque Returned
+         * @description The bank returned a deposited cheque (``fee.reconcile``): a ``cheque_dishonoured``
+         *     cancellation request is raised (another holder of ``fee.receipt.cancel`` decides; the ledger
+         *     changes only when it is approved). 409 ``cheque_not_deposited``,
+         *     ``cheque_already_returned``, ``cancellation_pending``; 404 for a non-cheque receipt.
+         */
+        post: operations["mark_fee_cheque_returned_api_v1_fees_cheques__receipt_id__returned_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/cheques/deposit-slip/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fee Cheque Deposit Slip
+         * @description The A4 list of cheques marked deposited on ``day`` (default today) for the bank's pay-in
+         *     slip (``fee.collect`` or ``fee.reconcile``). Audited.
+         */
+        get: operations["fee_cheque_deposit_slip_api_v1_fees_cheques_deposit_slip_print_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/cheques/deposited": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Fee Cheques Deposited
+         * @description Mark cheques as taken to the bank (``fee.collect``). Receipts that are not issued cheque
+         *     receipts are listed in ``skipped``; marking again is harmless. Audited.
+         */
+        post: operations["mark_fee_cheques_deposited_api_v1_fees_cheques_deposited_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fees/concessions/{concession_id}/approve": {
         parameters: {
             query?: never;
@@ -17104,6 +17191,137 @@ export interface components {
              */
             state: "ok" | "due_soon" | "overdue" | "never" | "logged";
         };
+        /**
+         * ChequeDepositIn
+         * @description Mark cheques as taken to the bank (FR-FEE-132). ``deposited_on``: today or earlier, not
+         *     before the receipt date.
+         */
+        ChequeDepositIn: {
+            /**
+             * Deposited On
+             * Format: date
+             */
+            deposited_on: string;
+            /** Receipt Ids */
+            receipt_ids: string[];
+        };
+        /** ChequeDepositOut */
+        ChequeDepositOut: {
+            /** Already Deposited */
+            already_deposited: number;
+            /** Deposited */
+            deposited: number;
+            /** Skipped */
+            skipped: components["schemas"]["ChequeSkipped"][];
+        };
+        /** ChequeListOut */
+        ChequeListOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Deposit Due Days */
+            deposit_due_days: number;
+            /** Items */
+            items: components["schemas"]["ChequeOut"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * ChequeOut
+         * @description A cheque receipt and where its cheque is: ``received`` (at the school), ``deposited``
+         *     (taken to the bank), ``cleared`` (seen in a bank statement and confirmed by a person) or
+         *     ``returned`` (the bank returned it; a ``cheque_dishonoured`` cancellation request exists).
+         */
+        ChequeOut: {
+            /** Amount */
+            amount: string;
+            /** Bank Name */
+            bank_name: string;
+            /** Cancellation Id */
+            cancellation_id: string | null;
+            /** Cheque Date */
+            cheque_date: string | null;
+            /** Cheque Number */
+            cheque_number: string;
+            /**
+             * Cheque Status
+             * @enum {string}
+             */
+            cheque_status: "received" | "deposited" | "cleared" | "returned";
+            /** Class Section */
+            class_section: string;
+            /** Cleared From Statement */
+            cleared_from_statement: boolean;
+            /** Cleared On */
+            cleared_on: string | null;
+            /** Deposit Overdue */
+            deposit_overdue: boolean;
+            /** Deposited On */
+            deposited_on: string | null;
+            /**
+             * Receipt Date
+             * Format: date
+             */
+            receipt_date: string;
+            /**
+             * Receipt Id
+             * Format: uuid
+             */
+            receipt_id: string;
+            /** Receipt Number */
+            receipt_number: string;
+            /** Receipt Status */
+            receipt_status: string;
+            /** Returned On */
+            returned_on: string | null;
+            /** Student Name */
+            student_name: string;
+        };
+        /**
+         * ChequeReturnIn
+         * @description The bank returned the cheque (FR-FEE-134): a ``cheque_dishonoured`` cancellation request is
+         *     raised for the receipt (a different holder of ``fee.receipt.cancel`` decides).
+         */
+        ChequeReturnIn: {
+            /** Reason */
+            reason: string;
+            /**
+             * Returned On
+             * Format: date
+             */
+            returned_on: string;
+        };
+        /** ChequeReturnOut */
+        ChequeReturnOut: {
+            cancellation: components["schemas"]["CancellationOut"];
+            cheque: components["schemas"]["ChequeOut"];
+        };
+        /** ChequeSkipped */
+        ChequeSkipped: {
+            /** Code */
+            code: string;
+            /**
+             * Receipt Id
+             * Format: uuid
+             */
+            receipt_id: string;
+        };
         /** ChoiceOut */
         ChoiceOut: {
             /** Label En */
@@ -29428,6 +29646,8 @@ export interface components {
             cancellation: components["schemas"]["CancellationOut"] | null;
             /** Cancelled On */
             cancelled_on: string | null;
+            /** Cheque Status */
+            cheque_status?: ("received" | "deposited" | "cleared" | "returned") | null;
             /** Class Section */
             class_section: string;
             /** Collected By */
@@ -29499,6 +29719,8 @@ export interface components {
         ReceiptRef: {
             /** Amount */
             amount: string;
+            /** Cheque Number */
+            cheque_number?: string | null;
             /** Class Section */
             class_section: string;
             /**
@@ -29506,6 +29728,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Mode
+             * @default upi_qr
+             */
+            mode: string;
             /**
              * Receipt Date
              * Format: date
@@ -29517,6 +29744,8 @@ export interface components {
             status: string;
             /** Student Name */
             student_name: string;
+            /** Transfer Reference */
+            transfer_reference?: string | null;
             /** Utr */
             utr: string | null;
         };
@@ -31342,6 +31571,8 @@ export interface components {
         StatementLineOut: {
             /** Amount */
             amount: string;
+            /** Cheque No */
+            cheque_no?: string | null;
             /** @description The receipt with this line's UTR when it does not match (never corrected) */
             conflict_receipt: components["schemas"]["ReceiptRef"] | null;
             /** Decided At */
@@ -31368,7 +31599,7 @@ export interface components {
             /** Line No */
             line_no: number;
             /** Match Kind */
-            match_kind: ("utr_exact" | "amount_date" | "manual") | null;
+            match_kind: ("utr_exact" | "amount_date" | "manual" | "cheque_exact" | "transfer_exact") | null;
             /**
              * Match Status
              * @enum {string}
@@ -31387,6 +31618,8 @@ export interface components {
              * @enum {string}
              */
             ref_kind: "utr" | "reference" | "none";
+            /** Transfer Ref */
+            transfer_ref?: string | null;
             /** Utr Or Ref */
             utr_or_ref: string | null;
             /**
@@ -44934,6 +45167,190 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CancellationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_fee_cheques_api_v1_fees_cheques_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                status?: ("received" | "deposited" | "cleared" | "returned") | null;
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChequeListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mark_fee_cheque_returned_api_v1_fees_cheques__receipt_id__returned_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receipt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChequeReturnIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChequeReturnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    fee_cheque_deposit_slip_api_v1_fees_cheques_deposit_slip_print_get: {
+        parameters: {
+            query?: {
+                day?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A4 print page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mark_fee_cheques_deposited_api_v1_fees_cheques_deposited_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChequeDepositIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChequeDepositOut"];
                 };
             };
             /** @description Validation Error */
