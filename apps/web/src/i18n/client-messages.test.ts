@@ -61,6 +61,8 @@ describe("client message namespaces per area (WP-04)", () => {
     expect(size(pickMessages(en, CLIENT_NAMESPACES.root))).toBeLessThan(whole * 0.1);
     expect(size(pickMessages(en, CLIENT_NAMESPACES.marketing))).toBeLessThan(whole * 0.1);
     expect(size(pickMessages(en, CLIENT_NAMESPACES.platform))).toBeLessThan(whole * 0.35);
-    expect(size(pickMessages(en, CLIENT_NAMESPACES.school))).toBeLessThan(whole * 0.85);
+    // The school console sends every namespace but platform, marketing and public; it grows with
+    // each school feature (0.85 until wave F3, D86). Splitting it per area is a follow-up (WP-04).
+    expect(size(pickMessages(en, CLIENT_NAMESPACES.school))).toBeLessThan(whole * 0.87);
   });
 });
