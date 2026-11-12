@@ -32,6 +32,9 @@ ARGS ?=
 # (e.g. "--tenants 3 --students 800 --no-documents"; see python -m app.devtools.seed_synthetic -h).
 PROFILE   ?= full
 SEED_ARGS ?=
+# seed-demo / demo-reset: DEMO_ARGS (e.g. "--students 200 --no-documents"; see
+# python -m app.devtools.seed_demo -h).
+DEMO_ARGS ?=
 # restore-drill: e.g. DRILL_ARGS="--tenants 3 --students 800 --report-dir /tmp/drills" (see -h).
 DRILL_ARGS ?=
 # test-order: ORDER_SEED (random by default; the run prints it) and ORDER_BUCKET (module, global).
@@ -42,7 +45,7 @@ E2E_ARGS ?=
 # e2e-audit: report and screenshot directory, relative to apps/web.
 AUDIT_OUT ?= audit-out
 
-.PHONY: help install dev dev-host dev-stop down logs migrate db-bootstrap seed-synthetic restore-drill sync-system-roles test test-api test-web test-security eval-live \
+.PHONY: help install dev dev-host dev-stop down logs migrate db-bootstrap seed-synthetic seed-demo demo-reset restore-drill sync-system-roles test test-api test-web test-security eval-live \
         migration-check e2e e2e-audit lint format typecheck security eval check db-shell openapi tf-validate
 
 help: ## List targets
@@ -88,6 +91,12 @@ db-shell: ## psql into the local database as the admin
 
 seed-synthetic: .env ## Synthetic schools, staff, students, documents (NEVER real data; PROFILE=none|small|full)
 	$(UV) run python scripts/dev.py --seed-only -- --profile $(PROFILE) $(SEED_ARGS)
+
+seed-demo: .env ## Demo school for sales demos, synthetic only (FA-12; DEMO_ARGS, e.g. "--no-documents")
+	$(UV) run python scripts/dev.py --demo-only -- $(DEMO_ARGS)
+
+demo-reset: .env ## Delete the demo school (offboarding purge) and seed the next generation (local/ci only)
+	$(UV) run python scripts/dev.py --demo-only -- --reset $(DEMO_ARGS)
 
 restore-drill: ## Local backup/restore drill on synthetic data in throwaway containers (SEC-024; DRILL_ARGS)
 	SOS_ENV=$${SOS_ENV:-local} SOS_LOG_LEVEL=$${SOS_LOG_LEVEL:-WARNING} $(UV) run python -m app.devtools.restore_drill $(DRILL_ARGS)

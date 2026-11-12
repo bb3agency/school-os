@@ -113,7 +113,7 @@ def _parser() -> argparse.ArgumentParser:
     return p
 
 
-def _allowed(settings: Settings | None) -> bool:
+def allowed(settings: Settings | None) -> bool:
     if settings is None:
         try:
             settings = get_settings()
@@ -134,7 +134,7 @@ def main(
 ) -> int:
     out = stdout or sys.stdout
     err = stderr or sys.stderr
-    if not _allowed(settings):
+    if not allowed(settings):
         err.write(REFUSED_MESSAGE)
         return EXIT_REFUSED
     settings = settings or get_settings()

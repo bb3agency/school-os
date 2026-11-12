@@ -25,6 +25,8 @@ the handout.
 Your role decides which menu items you see. If a guide mentions a page you do not have, your role
 does not include it: ask the principal or office admin, who manage **Users and roles**.
 
+Presenting SchoolOS to a school (not a staff guide)? See the [demo school and demo script](demo-school.md).
+
 ## Things every staff member should know
 
 ### Signing in
