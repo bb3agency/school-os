@@ -267,6 +267,8 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         # Consent forms as a PDF: the print views' permissions (step-up checked in the service).
         ("POST", "/api/v1/exports/apaar-consent-forms"): APAAR_READERS,
         ("POST", "/api/v1/exports/consent-forms"): CONSENT_READERS,
+        # FO-11 (FR-EXP-028): the scheme list for attendance readers and certificate issuers.
+        ("GET", "/api/v1/scheme-packs"): ("attendance.read", ("certificate.issue",), False),
         # R3-1B consents (ADR-0049): a student's decisions, section counts and printed forms
         # for readers and recorders; purposes also for settings managers. Scope in the service.
         ("GET", "/api/v1/students/{student_id}/consents"): CONSENT_READERS,

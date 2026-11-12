@@ -383,6 +383,12 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.certificates.schemas.CertificatePreview.format_key": "TC format code",
     "app.certificates.schemas.CertificateOut.format_key": "TC format code",
     "app.dq.schemas.FindingOut.attribute_key": "attribute catalog key",
+    # FO-06 / FO-11: enrolment statistics table and column codes, scheme codes.
+    "app.exports.pack_schemas.EnrolmentStatsColumnOut.key": "count column code",
+    "app.exports.pack_schemas.EnrolmentStatsTableOut.key": "count table code",
+    "app.exports.pack_schemas.EnrolmentStatsGapOut.attribute_key": "attribute catalog key",
+    "app.exports.pack_schemas.SchemeOut.key": "scheme code (schemes.yaml)",
+    "app.exports.pack_schemas.SchemeCertificatesOut.scheme_key": "scheme code (schemes.yaml)",
     # R3-1C (ADR-0051): disclosure format, section and item codes.
     "app.disclosure.schemas.DisclosureFormatOut.key": "disclosure format code",
     "app.disclosure.schemas.FormatSectionOut.key": "disclosure section code",

@@ -30,6 +30,7 @@ from app.dq.api import tasks_router as dq_tasks_router
 from app.dq.followup_api import router as dq_followup_router
 from app.dq.udise_api import router as udise_router
 from app.exports.api import router as exports_router
+from app.exports.pack_api import router as export_packs_router
 from app.extraction.api import router as extraction_router
 from app.fees import webhook as payments_webhook
 from app.fees.api import router as fees_router
@@ -110,6 +111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(changes_router)
     app.include_router(extraction_router)
     app.include_router(exports_router)
+    app.include_router(export_packs_router)  # FO-06 enrolment statistics, FO-11 scheme packs
     app.include_router(admin_router)
     app.include_router(certificates_router)
     app.include_router(apaar_router)

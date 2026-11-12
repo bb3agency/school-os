@@ -1,0 +1,42 @@
+# Government scheme verification pack (FO-11; FR-EXP-020..FR-EXP-030). Versioned configuration
+# shipped inside the package; loaded and validated by app.exports.scheme_packs.load_scheme_config().
+#
+# UNVERIFIED: scheme names, the certificate each scheme's verification usually asks for and the
+# attendance counting rule follow public secondary sources (docs/research/2026-11-features/
+# office-portals.md FO-11). Scheme rules change every year, so SchoolOS makes NO eligibility
+# decision: it prints the school's own attendance percentages and certificates; the department
+# decides. Nothing is sent to any government system (no portal automation).
+version: 1
+verified: false
+note: >-
+  SchoolOS prints the school's own records for the scheme's verification. Whether a student is
+  eligible is decided by the department under the scheme's rules for the year, not by SchoolOS.
+
+# How the percentage is counted (the same rule as the early-warning attendance rate, M5):
+# present or late days over the marked days, leave days left out. Unverified for any scheme.
+attendance:
+  present_statuses: [present, late]
+  excluded_statuses: [leave]
+
+# At most this many certificates in one bulk issue (each gets its own serial and register line).
+max_certificates: 200
+
+schemes:
+  thalliki_vandanam:
+    label: Thalliki Vandanam (Andhra Pradesh)
+    certificate_type: study
+    purpose_note: Thalliki Vandanam scheme verification
+    note: >-
+      The scheme covers students of recognised private schools and asks about attendance;
+      sources differ on the year and the threshold. Check the current government order.
+    verified: false
+    source:
+      - https://deccanchronicle.com/southern-states/andhra-pradesh/thalliki-vandanam-scheme-eligibility-criteria-announced-for-202526-1884797
+  scholarship:
+    label: Scholarship verification (other schemes)
+    certificate_type: bonafide
+    purpose_note: Scholarship verification
+    note: Bonafide certificates with the purpose "Scholarship" for the scheme's verification.
+    verified: false
+    source:
+      - docs/research/2026-11-features/office-portals.md
