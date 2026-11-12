@@ -64,6 +64,7 @@ const REF = {
   receipt_date: "2026-10-17",
   amount: "1500.00",
   status: "issued",
+  mode: "upi",
   utr: "629112345678",
   student_name: "Synthetica Fee Student",
   class_section: "Class IX A",
