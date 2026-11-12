@@ -29,6 +29,7 @@ from app.insights.schemas import (
     FlagStatus,
     FlagView,
     IndicatorName,
+    InsightCountsOut,
     InsightFlagDetail,
     InsightFlagOut,
     InsightSummaryOut,
@@ -44,6 +45,7 @@ from app.insights.schemas import (
 router = APIRouter(prefix="/api/v1", tags=["student insights"])
 
 Reader = Annotated[UserContext, Depends(require(service.READ))]
+CountsReader = Annotated[UserContext, Depends(require(service.COUNTS_READ, scope="school"))]
 NoteWriter = Annotated[UserContext, Depends(require(service.NOTE))]
 Actor = Annotated[UserContext, Depends(require(service.ACT))]
 ManagerRead = Annotated[UserContext, Depends(require(service.MANAGE, scope="school"))]
@@ -98,6 +100,19 @@ def summary(
     """Counts only for your scope in this school: flags raised, first acted on by their due
     date (the M5 exit metric), late, not yet, overdue and open (``insights.read``)."""
     return service.summary(db, ctx, since)
+
+
+@router.get("/insights/counts", response_model=InsightCountsOut)
+def counts(
+    ctx: CountsReader,
+    db: TenantDB,
+    since: Annotated[dt.date | None, Query(description="Default: 30 days ago")] = None,
+) -> InsightCountsOut:
+    """School-wide early-warning follow-up counts for management (``insights.counts_read``;
+    FT-13): raised, first acted on in time or late, overdue, open, reviews due, closed and
+    closed per reason. Numbers only: no names, students, sections, flags or notes (PRV-004).
+    422 ``future_date``."""
+    return service.counts(db, ctx, since)
 
 
 @router.get("/insights/flags/{flag_id}", response_model=InsightFlagDetail)

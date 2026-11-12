@@ -57,7 +57,7 @@ CloseReason = Literal[
 ]
 EraseReason = Literal["parent_request", "entered_in_error"]
 FlagView = Literal["mine", "all"]
-DueFilter = Literal["overdue", "due_soon"]
+DueFilter = Literal["overdue", "due_soon", "review_due"]
 TimelineKind = Literal["enrolment", "attendance_month", "exam", "note", "flag", "certificate"]
 Evidence = dict[str, int | float | str]
 
@@ -101,6 +101,9 @@ class ActionOut(_Out):
     note: str | None = Field(description="Restricted (C3); shown only to people who may act")
     by: StaffRef | None
     created_at: dt.datetime
+    review_on: dt.date | None = Field(
+        default=None, description="The follow-up review planned with this action (FR-EW-019)"
+    )
 
 
 class InsightFlagOut(_Out):
@@ -122,6 +125,13 @@ class InsightFlagOut(_Out):
     closed_at: dt.datetime | None
     close_reason: CloseReason | None
     raised_by: StaffRef | None = Field(description="Set for flags a person raised (manual)")
+    review_on: dt.date | None = Field(
+        default=None,
+        description="Next planned review of an open flag (FR-EW-019); null when none or closed",
+    )
+    review_due: bool = Field(
+        default=False, description="Open and its planned review date is today or past"
+    )
     version: int
 
 
@@ -138,6 +148,11 @@ class ActionIn(_In):
     kind: ActionKind
     acted_on: dt.date | None = Field(default=None, description="Default: today (IST)")
     note: Text | None = Field(default=None, max_length=1000)
+    review_on: dt.date | None = Field(
+        default=None,
+        description="Plan the next review (after today, within the configured days; "
+        "FR-EW-019). Omitted: no review is planned (an earlier one counts as done).",
+    )
 
 
 class CloseIn(_In):
@@ -176,6 +191,28 @@ class InsightSummaryOut(_Out):
     not_actioned: int
     overdue: int = Field(description="Open flags past their due date with no action (now)")
     open: int = Field(description="Flags not closed (now)")
+    review_due: int = Field(
+        default=0, description="Open flags whose planned review is today or past (now)"
+    )
+
+
+class InsightCountsOut(_Out):
+    """School-wide early-warning counts for management (FT-13, FR-EW-026): numbers only, never
+    a name, a student, a flag, a note or a section (PRV-004, invariant 14)."""
+
+    since: dt.date
+    raised: int = Field(description="Flags raised since the date")
+    actioned_on_time: int = Field(description="Of those, first acted on by their due date")
+    actioned_late: int
+    not_actioned: int
+    overdue: int = Field(description="Open flags past their due date with no action (now)")
+    open: int = Field(description="Flags not closed (now)")
+    review_due: int = Field(description="Open flags whose planned review is today or past (now)")
+    closed: int = Field(description="Flags closed since the date")
+    outcomes: dict[str, int] = Field(
+        description="Flags closed since the date per closing reason (the recorded outcome); "
+        "every reason is listed, zero included"
+    )
 
 
 # --- notes ----------------------------------------------------------------------------------------
@@ -347,6 +384,7 @@ __all__ = [
     "FlagView",
     "IndicatorName",
     "IndicatorsOut",
+    "InsightCountsOut",
     "InsightFlagDetail",
     "InsightFlagOut",
     "InsightStudentRef",

@@ -58,6 +58,8 @@ class InsightFlag(Base):
     closed_at: Mapped[dt.datetime | None]
     closed_by: Mapped[uuid.UUID | None]
     close_reason: Mapped[str | None] = mapped_column(Text)
+    # FT-13 (0102_ew_followups): the next planned review; NULL when none or closed.
+    review_on: Mapped[dt.date | None] = mapped_column(Date)
     created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
@@ -74,6 +76,8 @@ class FlagAction(Base):
     acted_on: Mapped[dt.date] = mapped_column(Date)
     note_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
     key_version: Mapped[int | None] = mapped_column(Integer)
+    # FT-13 (0102_ew_followups): the review planned with this action.
+    review_on: Mapped[dt.date | None] = mapped_column(Date)
     created_by: Mapped[uuid.UUID]
     created_by_membership: Mapped[uuid.UUID]
     created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))

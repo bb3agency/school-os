@@ -20,6 +20,12 @@ student's current section when that member may act for the student, else unassig
 principal is notified). Due date: raised + 7 days. Actions (with an optional encrypted note)
 move ``open`` to ``in_progress``; closing needs a reason.
 
+**Follow-ups (FT-13, lead decision D86; FR-EW-019..030).** An action may plan the next review
+(``review_on``, after today, within ``flags.review_max_days``); the owner is reminded in the app
+on that day; the next action clears or moves it and closing clears it. Management (owner) sees
+school-wide counts only (``insights.counts_read``: raised, on time, overdue, reviews due, closed
+per reason), never a name or a flag.
+
 **Audit (invariant 7).** Writes and every read of restricted insights (flag lists and details,
 notes, timelines) are audited in the same transaction with ids, codes and counts only; logs carry
 ids and counts only (invariant 5).
@@ -87,6 +93,7 @@ from app.insights.schemas import (
     FlagView,
     IndicatorName,
     IndicatorsOut,
+    InsightCountsOut,
     InsightFlagDetail,
     InsightFlagOut,
     InsightStudentRef,
@@ -114,6 +121,7 @@ from app.tenancy.schemas import SectionOut as TenancySection
 log = get_logger(__name__)
 
 READ: Final = "insights.read"
+COUNTS_READ: Final = "insights.counts_read"
 NOTE: Final = "insights.note"
 ACT: Final = "insights.act"
 MANAGE: Final = "insights.manage"
@@ -371,6 +379,10 @@ def _overdue(flag: InsightFlag, today: dt.date) -> bool:
     return flag.status != "closed" and flag.first_action_at is None and flag.due_on < today
 
 
+def _review_due(flag: InsightFlag, today: dt.date) -> bool:
+    return flag.status != "closed" and flag.review_on is not None and flag.review_on <= today
+
+
 def _flag_out(
     flag: InsightFlag,
     refs: Mapping[uuid.UUID, InsightStudentRef],
@@ -394,6 +406,8 @@ def _flag_out(
         closed_at=flag.closed_at,
         close_reason=flag.close_reason,
         raised_by=users.get(flag.raised_by) if flag.raised_by is not None else None,
+        review_on=flag.review_on,
+        review_due=_review_due(flag, today),
         version=flag.version,
     )
 
@@ -406,6 +420,7 @@ def _action_out(session: Session, action: FlagAction, names: Mapping[uuid.UUID, 
         note=crypto.decrypt_action(session, action.note_ciphertext, action.id),
         by=_member(names, action.created_by_membership),
         created_at=action.created_at,
+        review_on=action.review_on,
     )
 
 
@@ -692,6 +707,7 @@ def list_flags(
         student_id=student_id,
         overdue_before=today if due == "overdue" else None,
         due_until=today + dt.timedelta(days=2) if due == "due_soon" else None,
+        review_until=today if due == "review_due" else None,
         after=position,
         limit=limit + 1,
     )
@@ -746,6 +762,57 @@ def summary(session: Session, ctx: UserContext, since: dt.date | None = None) ->
         not_actioned=not_actioned,
         overdue=sum(1 for r in rows if r[0] == "open" and r[3] is None and r[2] < today),
         open=sum(1 for r in rows if r[0] in OPEN),
+        review_due=_review_due_count(session, _scope_ids(session, ctx), today),
+    )
+
+
+def _review_due_count(session: Session, scope: Collection[uuid.UUID] | None, today: dt.date) -> int:
+    """Open flags of ``scope`` (None = the school) whose planned review is today or past."""
+    flags = repo.review_due_flags(session, today)
+    return sum(1 for f in flags if scope is None or f.student_id in scope)
+
+
+def counts(session: Session, ctx: UserContext, since: dt.date | None = None) -> InsightCountsOut:
+    """School-wide counts for management (``insights.counts_read``; FT-13, FR-EW-026..027):
+    raised, first acted on in time or late, not actioned, overdue, open, reviews due, closed
+    and closed per reason (the recorded outcome). Numbers only: never a name, a student, a
+    section, a flag or a note (PRV-004, invariant 14), so the read is not an ``insights.viewed``
+    event. The caller's own scope does not narrow it (the permission is school-wide only)."""
+    del ctx  # school-wide by the route guard; nothing about the caller narrows a count
+    cfg = load_config()
+    today = today_ist()
+    start = since or today - dt.timedelta(days=30)
+    if start > today:
+        raise ValidationFailed([_error("since", "future_date")])
+    since_at = dt.datetime.combine(start, dt.time(), tzinfo=IST)
+    rows = repo.count_rows(session, start, since_at)
+    on_time = late = not_actioned = raised = 0
+    outcomes: dict[str, int] = dict.fromkeys(cfg.close_reasons, 0)
+    closed = 0
+    for status, raised_on, due_on, first_action_at, _review, reason, closed_at in rows:
+        if raised_on >= start:
+            raised += 1
+            if first_action_at is None:
+                not_actioned += 1
+            elif first_action_at.astimezone(IST).date() <= due_on:
+                on_time += 1
+            else:
+                late += 1
+        if status == "closed" and closed_at is not None and closed_at >= since_at:
+            closed += 1
+            if reason is not None:
+                outcomes[reason] = outcomes.get(reason, 0) + 1
+    return InsightCountsOut(
+        since=start,
+        raised=raised,
+        actioned_on_time=on_time,
+        actioned_late=late,
+        not_actioned=not_actioned,
+        overdue=sum(1 for r in rows if r[0] == "open" and r[3] is None and r[2] < today),
+        open=sum(1 for r in rows if r[0] in OPEN),
+        review_due=sum(1 for r in rows if r[0] in OPEN and r[4] is not None and r[4] <= today),
+        closed=closed,
+        outcomes=outcomes,
     )
 
 
@@ -760,6 +827,7 @@ def _insert_action(
     kind: str,
     day: dt.date,
     note: str | None,
+    review_on: dt.date | None = None,
 ) -> FlagAction:
     action_id = new_id()
     blob, key_version = crypto.encrypt_action(session, note, action_id)
@@ -772,6 +840,7 @@ def _insert_action(
             "acted_on": day,
             "note_ciphertext": blob,
             "key_version": key_version,
+            "review_on": review_on,
             "created_by": ctx.user_id,
             "created_by_membership": ctx.membership_id,
         },
@@ -840,7 +909,11 @@ def add_action(
 ) -> InsightFlagDetail:
     """Record what was done (``insights.act``; FR-EW-007): kind, date (not in the future, not
     before the flag), optional note (encrypted). The first action marks the flag actioned and
-    in progress. 409 ``flag_closed``. Audit ``insights.flag_action_added``."""
+    in progress. 409 ``flag_closed``. Audit ``insights.flag_action_added``.
+
+    FT-13 (FR-EW-019..020): ``review_on`` plans the next review (after today, at most
+    ``flags.review_max_days`` ahead; 422 ``review_not_after_today`` / ``review_too_far``) and
+    becomes the flag's ``review_on``; an action without one clears it (the review was held)."""
     flag = _visible_flag(session, ctx, flag_id, ACT, lock=True)
     if flag.status == "closed":
         raise Conflict("This flag is closed.", code="flag_closed")
@@ -851,21 +924,34 @@ def add_action(
         errors.append(_error("acted_on", "future_date"))
     elif day < flag.raised_on:
         errors.append(_error("acted_on", "before_flag"))
+    if data.review_on is not None:
+        if data.review_on <= today:
+            errors.append(_error("review_on", "review_not_after_today"))
+        elif data.review_on > today + dt.timedelta(days=load_config().flags.review_max_days):
+            errors.append(_error("review_on", "review_too_far"))
     if errors:
         raise ValidationFailed(errors)
     _refuse_aadhaar({"note": data.note})
-    _insert_action(session, ctx, flag.id, kind=data.kind, day=day, note=data.note)
+    _insert_action(
+        session, ctx, flag.id, kind=data.kind, day=day, note=data.note, review_on=data.review_on
+    )
     first = flag.first_action_at is None
     values: dict[str, Any] = (
         {"first_action_at": _now(), "status": "in_progress"} if first else {"status": flag.status}
     )
+    values["review_on"] = data.review_on
     flag = repo.update_flag(session, flag.id, values)
     _audit(
         session,
         "insights.flag_action_added",
         "insight_flag",
         flag.id,
-        {"kind": data.kind, "has_note": data.note is not None, "first_action": first},
+        {
+            "kind": data.kind,
+            "has_note": data.note is not None,
+            "first_action": first,
+            "review_on": data.review_on.isoformat() if data.review_on else None,
+        },
     )
     return _details(session, [flag])[0]
 
@@ -892,6 +978,7 @@ def close_flag(
             "closed_by": ctx.user_id,
             "close_reason": data.reason,
             "first_action_at": flag.first_action_at or now,
+            "review_on": None,  # FR-EW-022: a closed flag has no review planned
         },
     )
     _audit(
@@ -979,10 +1066,26 @@ def erase_flag(session: Session, ctx: UserContext, flag_id: uuid.UUID, data: Era
 
 def send_reminders(session: Session, *, today: dt.date | None = None) -> int:
     """Daily (FR-EW-006): one ``insights.flag_overdue`` per open flag past its due date that
-    nobody acted on, to its owner (or the principal when unassigned); reruns never repeat."""
+    nobody acted on, to its owner (or the principal when unassigned); reruns never repeat.
+    FT-13 (FR-EW-021): also one ``insights.flag_review_due`` per open flag whose planned review
+    is today or past, once per planned date."""
     day = today or today_ist()
     tenant_id = repo.current_tenant_id(session)
     sent = 0
+    for flag in repo.review_due_flags(session, day):
+        sent += notifications.notify(
+            session,
+            tenant_id=tenant_id,
+            recipients=(
+                [flag.owner_membership_id]
+                if flag.owner_membership_id is not None
+                else notifications.PermissionSelector(MANAGE)
+            ),
+            template_key="insights.flag_review_due",
+            params={"flag_id": str(flag.id)},
+            resource_id=flag.id,
+            dedupe_key=f"insights.flag_review_due:{flag.id}:{flag.review_on}",
+        )
     for flag in repo.overdue_flags(session, day):
         sent += notifications.notify(
             session,
@@ -1377,6 +1480,7 @@ def export_records(session: Session, *, include_sensitive: bool) -> list[RecordT
             f.closed_at,
             f.closed_by,
             f.close_reason,
+            f.review_on,
             f.created_at,
         )
         for f in repo.all_flags(session)
@@ -1392,6 +1496,7 @@ def export_records(session: Session, *, include_sensitive: bool) -> list[RecordT
                 if include_sensitive
                 else (MASK if a.note_ciphertext is not None else None)
             ),
+            a.review_on,
             a.created_by,
             a.created_by_membership,
             a.created_at,
@@ -1436,6 +1541,7 @@ def export_records(session: Session, *, include_sensitive: bool) -> list[RecordT
                 "closed_at",
                 "closed_by",
                 "close_reason",
+                "review_on",
                 "created_at",
             ),
             rows=flags,
@@ -1449,6 +1555,7 @@ def export_records(session: Session, *, include_sensitive: bool) -> list[RecordT
                 "kind",
                 "acted_on",
                 "note",
+                "review_on",
                 "created_by",
                 "created_by_membership",
                 "created_at",
