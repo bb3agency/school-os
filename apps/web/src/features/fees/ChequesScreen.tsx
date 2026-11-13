@@ -20,11 +20,10 @@ import {
   CHEQUE_KEYS,
   CHEQUE_READERS,
   CHEQUE_STATUSES,
-  chequeApi,
   depositable,
-  depositOutSchema,
   DEPOSIT_SLIP_PATH,
-  parsed,
+  markDeposited,
+  markReturned,
   returnable,
   useCheques,
   type Cheque,
@@ -70,14 +69,10 @@ function DepositDialog({
         onDone(t("depositDone", { count: out.deposited, skipped: out.skipped.length }))
       }
       submit={(input) =>
-        parsed<DepositOut>(
-          depositOutSchema,
-          chequeApi(api).POST("/api/v1/fees/cheques/deposited", {
-            body: {
-              receipt_ids: chosen.map((c) => c.receipt_id),
-              deposited_on: input.deposited_on,
-            },
-          }),
+        markDeposited(
+          api,
+          chosen.map((c) => c.receipt_id),
+          input.deposited_on,
         )
       }
     >
@@ -118,14 +113,7 @@ function ReturnDialog({ cheque, today }: { cheque: Cheque; today: string }) {
       })}
       invalidate={[CHEQUE_KEYS.all, ["staff", "fees", "receipt"], ["staff", "fees", "approvals"]]}
       errorNamespace="fees"
-      submit={(input) =>
-        parsed(
-          z.object({ cancellation: z.object({ id: z.string() }) }),
-          chequeApi(api).POST(`/api/v1/fees/cheques/${cheque.receipt_id}/returned`, {
-            body: input,
-          }),
-        )
-      }
+      submit={(input) => markReturned(api, cheque.receipt_id, input)}
     >
       {(errors) => (
         <>
