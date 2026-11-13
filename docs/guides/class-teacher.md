@@ -29,6 +29,15 @@ and documents, and ask the school. Sections 1-4 below do not apply to the teache
 If you made a mistake before saving, select **Undo changes**. After saving, change the mark and save
 again.
 
+**Bad network on your phone.** What you mark is kept on this phone or computer until it is saved
+(for 24 hours at most). If the network drops when you select **Save attendance**, the page says
+**Not saved yet** and sends it again by itself when the network is back; you can also select
+**Try now**. Do not mark the day again on another device in the meantime. If you close the page,
+open **Attendance** and the same section and day again: your changes come back. If someone else
+saved the day in between, nothing of yours is sent over theirs: the page shows what is saved now
+next to your choice, and you check and save again. Signing out or **Lock now** removes the copy, so
+save before you sign out.
+
 If the school has switched on absence alerts on WhatsApp, the parents of children marked absent get
 one message later in the day. Mark attendance on time and carefully.
 
