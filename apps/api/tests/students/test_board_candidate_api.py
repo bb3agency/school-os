@@ -218,3 +218,27 @@ def test_FR_STU_035_full_aadhaar_in_the_body_is_refused(world: Any, api: Any) ->
         world.person("office_admin"), "PUT", grid_path(school.ids["section_9a"], None), json=body
     )
     assert res.status_code == 422
+    assert res.json()["errors"][0]["code"] == "aadhaar_full_number_rejected"
+
+
+def test_SEC_008_board_candidate_calls_do_not_log_names_or_choices(
+    world: Any, api: Any, capsys: pytest.CaptureFixture[str]
+) -> None:
+    school = world.a
+    name = "Synthetica Loglessa Candidate"
+    sid = candidate(school, name)
+    capsys.readouterr()
+    body = {
+        "scheme": "bseap-ssc",
+        "rows": [
+            {"student_id": str(sid), "first_language": "SANSKRIT", "third_language": "ENGLISH"}
+        ],
+    }
+    admin = world.person("office_admin")
+    assert api.call(admin, "PUT", grid_path(school.ids["section_9a"], None), json=body).is_success
+    assert api.call(admin, "GET", grid_path(school.ids["section_9a"])).is_success
+    out = capsys.readouterr()
+    logged = out.out + out.err
+    assert name not in logged
+    assert "Loglessa" not in logged
+    assert "SANSKRIT" not in logged
