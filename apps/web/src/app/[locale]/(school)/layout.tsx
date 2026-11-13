@@ -106,9 +106,9 @@ export default async function SchoolLayout({ children }: { children: ReactNode }
   const schoolName =
     schools?.data?.data?.find((school) => school.tenant_id === activeTenantId)?.name ?? null;
 
-  // WP-04: the browser gets the school console's message namespaces only.
+  // WP-04: the browser gets the shell's messages here; each area's layout sends its own.
   return (
-    <ClientMessages scope="school">
+    <ClientMessages scope="schoolBase">
       <SchoolShell
         topbarActions={suspended ? null : <NotificationBell />}
         account={{

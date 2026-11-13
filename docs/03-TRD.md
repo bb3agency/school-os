@@ -1484,6 +1484,9 @@ Four read-only record tools for "Ask the school" (docs/research/2026-11-features
 | NFR-PERF-010 | Public parent and verification pages (R2): LCP on a mid-range Android phone over 3G | ≤ 3 s; page weight ≤ 150 KB without the Telugu font |
 | NFR-PERF-011 | WhatsApp sending (R2): a 2,000-recipient notice broadcast fully handed to Meta | ≤ 10 min, within Meta's throughput and the school's messaging limit |
 | NFR-PERF-012 | Subject access report (R3; report built R3-1A, no timing test yet): PDF ready for one student with 10 years of records | ≤ 60 s on the `pdf` queue |
+| NFR-PERF-013 | School console shell messages (WP-04 follow-up, built wave F4; `apps/web/src/i18n/client-messages.test.ts`): the message JSON the school layout sends to the browser (`schoolBase`: shell, menu labels, banners, footer) as a share of the whole en catalogue. *(Lead decision D87, PO to confirm.)* | < 0.10 (0.073 measured 2026-11-13; the whole school list it replaces was 0.85) |
+| NFR-PERF-014 | School console page messages (wave F4): each area of the school console (`(school)/<folder>`, settings by subfolder, the home page) sends only the message paths its client components use, by its own `layout.tsx`; a static scan fails on a path missing from the area's list and `app/english-only.test.tsx` renders every page with these lists. Shell plus area, as a share of the en catalogue. *(Lead decision D87, PO to confirm.)* | < 0.42 per page (0.361 at most, fees; gzip with the root list 28-72 KB per page, was 147 KB) |
+| NFR-PERF-015 | Per-area budgets (wave F4): each school area's list stays under its own budget in `client-messages.test.ts`, about 0.03 above its 2026-11-13 measurement; a budget is raised only with a note in the PR. *(Lead decision D87, PO to confirm.)* | per area, e.g. fees < 0.32, students < 0.31, settings/tally < 0.20, notifications < 0.05 |
 
 ### 4.4 Scalability (NFR-SCAL): capacity model
 
