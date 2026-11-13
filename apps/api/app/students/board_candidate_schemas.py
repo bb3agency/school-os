@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -89,7 +89,9 @@ class BoardCandidateEntryIn(BaseModel):
     first_language: str | None = Field(default=None, pattern=_CODE)
     second_language: str | None = Field(default=None, pattern=_CODE)
     third_language: str | None = Field(default=None, pattern=_CODE)
-    board_subjects: list[str] | None = Field(default=None, max_length=10)
+    board_subjects: list[Annotated[str, Field(max_length=16, pattern=_CODE)]] | None = Field(
+        default=None, max_length=10
+    )
     photo_signature_ready: bool | None = None
 
 
