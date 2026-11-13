@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from app.compliance.packs_config import RegisterKey, Source
 
@@ -85,7 +85,7 @@ class InspectionPackCreate(_In):
         default=None, description="The registers' academic year (default: the current one)."
     )
     visit_on: dt.date | None = Field(default=None, description="The inspection date, if known.")
-    registers: list[str] = Field(
+    registers: list[Annotated[str, StringConstraints(min_length=1, max_length=64)]] = Field(
         default_factory=list,
         max_length=10,
         description="Item keys of the pack's registers to include (student lists: needs "

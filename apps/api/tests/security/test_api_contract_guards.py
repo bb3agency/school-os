@@ -364,6 +364,11 @@ _SECRET_NAME = re.compile(
 
 # Response fields whose names look like secrets, with the reason they may be returned.
 RESPONSE_FIELD_ALLOWLIST = {
+    # FC-07 (FR-COMP-024..045): inspection pack catalogue and item codes.
+    "app.compliance.packs_schemas.InspectionPackOut.pack_key": "inspection pack code",
+    "app.compliance.packs_schemas.InspectionPackDetailOut.pack_key": "inspection pack code",
+    "app.compliance.packs_schemas.InspectionPackItemOut.key": "inspection pack item code",
+    "app.compliance.packs_schemas.InspectionPackReadinessOut.key": "inspection pack code",
     # R3-1A privacy (ADR-0048): template, record-class and letter catalog keys.
     "app.privacy.schemas.PrivacyErasurePlanRowOut.class_key": "record class code",
     "app.privacy.schemas.PrivacyErasureResultRowOut.class_key": "record class code",
@@ -519,6 +524,9 @@ ACTION_SEGMENTS = {
 
 # Creating POSTs that do not take Idempotency-Key, with the reason.
 IDEMPOTENCY_EXEMPT = {
+    # FT-14 (FR-ATT-023, FR-MRK-023): one reminder per section and day (or exam), deduplicated.
+    ("POST", "/api/v1/completeness/reminders"): "notices are deduplicated per section and day "
+    "or exam; a repeat notifies no one again",
     # F1 (D49): a dedicated school told of a reopen by phone.
     ("POST", "/api/v1/platform/incidents/{incident_id}/reopen:told"): "a state transition: a "
     "repeat answers 409 reopen_not_pending",
