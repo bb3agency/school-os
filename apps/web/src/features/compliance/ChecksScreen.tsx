@@ -126,7 +126,7 @@ function LogDialog({
               name="led_by_membership_id"
               defaultValue=""
               placeholder={t("nobody")}
-              options={overview.leaders.map((m) => ({
+              options={(overview.leaders ?? []).map((m) => ({
                 value: m.membership_id,
                 label: m.display_name ?? m.membership_id,
               }))}
