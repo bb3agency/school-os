@@ -1,0 +1,145 @@
+# Board candidate catalogue (FO-10; FR-STU-020..035): the medium, language and subject choices
+# a school enters for each board candidate, per board scheme. Loaded and validated by
+# app.students.board_catalogue.load_board_catalogue(); the dq rule DQ-032 and the board
+# pre-check sheets (bseap-ssc-2027, cbse-loc-2027) read it through app.students.service.
+#
+# UNVERIFIED (owner decision D3, docs/18 §8): every list below is built from public, mostly
+# secondary sources (`source`) and was NOT checked against an official BSEAP or CBSE document.
+# Subject codes change from year to year: bump `version` of the scheme when a list changes
+# (DQ-032 stores the scheme version in its findings) and set `verified: true` only after a
+# pilot school confirmed the list against the board's current portal screen.
+#
+# Stored values are the codes below (upper case). The values are personal (C2), not identity
+# fields: they are recorded per source like any other attribute (manual_entry, parent_form or
+# board_registration) and never need a change request. Photographs and signatures are NOT
+# stored (a photo store would be a new data class and needs an ADR): staff only tick whether
+# they were collected for the board portal (photo_signature_ready yes/no).
+#
+# Per scheme
+#   board            BSEAP | CBSE (the school's declared board, FR-TEN-020)
+#   classes          class codes whose students are candidates of this scheme
+#   medium           required: the medium of instruction must be recorded; options: exam_medium
+#                    values allowed for this board
+#   languages        one entry per language slot (first_language, second_language,
+#                    third_language): required, options (codes); the same code may not be
+#                    chosen twice across slots
+#   subjects         groups of board_subjects codes (non-language subjects): required groups
+#                    need exactly `min` .. `max` codes; optional groups at most `max`. An empty
+#                    list means the board fixes the subjects (nothing to enter)
+#   max_subjects     the most codes board_subjects may hold
+#   photo_required   the photograph and signature must be marked collected (yes)
+#   codes            label of every code used above (English; shown in the grid and sheets)
+version: 1
+
+schemes:
+  bseap-ssc:
+    version: 1
+    label_en: AP SSC (BSEAP) Classes IX and X
+    board: BSEAP
+    classes: [IX, X]
+    verified: false
+    source:
+      - https://www.bse.ap.gov.in/
+      - https://www.eduinfo4all.com/ssc-public-examinations-march-2026-nominal-roll-link-fee-due-dates-fee-pariculars-age-condonation-forms-how-to-submit-nominal-roll-online-891
+    source_note: >-
+      Public guides to the SSC nominal roll list the medium, first, second and third language
+      and the photo and signature. Mathematics, science and social studies are fixed for every
+      candidate, so no subject is entered. Language options follow the AP first-language list
+      as reported (unverified, D3).
+    medium:
+      required: true
+      options: [english, telugu, urdu, hindi, tamil, kannada, odia]
+    languages:
+      - slot: first_language
+        required: true
+        options: [TELUGU, HINDI, URDU, TAMIL, KANNADA, ODIA, SANSKRIT, TELUGU_COMPOSITE,
+                  URDU_COMPOSITE]
+      - slot: second_language
+        required: true
+        options: [HINDI, TELUGU]
+      - slot: third_language
+        required: true
+        options: [ENGLISH]
+    subjects: []
+    max_subjects: 0
+    photo_required: true
+    codes:
+      TELUGU: Telugu
+      HINDI: Hindi
+      URDU: Urdu
+      TAMIL: Tamil
+      KANNADA: Kannada
+      ODIA: Odia
+      SANSKRIT: Sanskrit
+      TELUGU_COMPOSITE: Telugu (composite)
+      URDU_COMPOSITE: Urdu (composite)
+      ENGLISH: English
+
+  cbse-secondary:
+    version: 1
+    label_en: CBSE secondary (Classes IX and X)
+    board: CBSE
+    classes: [IX, X]
+    verified: false
+    source:
+      - https://cbseacademic.nic.in/curriculum_2027.html
+      - https://news.careers360.com/cbse-board-exams-apaar-id-class-9-11-loc-registration-2026-27-two-level-10-maths-social-science-2028/amp
+    source_note: >-
+      Scheme of studies for Classes IX and X as published for 2026-27 (secondary reading): two
+      languages, mathematics (standard or basic), science and social science, with an optional
+      skill subject or third language. The Class IX registration and the Class X list of
+      candidates carry the same choices. Two levels for mathematics, science and social science
+      from 2028 are not modelled yet (unverified, D3).
+    medium:
+      required: false
+      options: [english, hindi]
+    languages:
+      - slot: first_language
+        required: true
+        options: ["184", "002", "085", "089", "122", "003", "303"]
+      - slot: second_language
+        required: true
+        options: ["184", "002", "085", "089", "122", "003", "303"]
+    subjects:
+      - key: mathematics
+        label_en: Mathematics (standard or basic)
+        required: true
+        min: 1
+        max: 1
+        options: ["041", "241"]
+      - key: science
+        label_en: Science
+        required: true
+        min: 1
+        max: 1
+        options: ["086"]
+      - key: social_science
+        label_en: Social science
+        required: true
+        min: 1
+        max: 1
+        options: ["087"]
+      - key: optional
+        label_en: Optional skill subject or third language
+        required: false
+        min: 0
+        max: 1
+        options: ["402", "417", "401", "413", "122", "089", "002", "085"]
+    max_subjects: 5
+    photo_required: true
+    codes:
+      "184": English Language and Literature
+      "002": Hindi Course A
+      "085": Hindi Course B
+      "089": Telugu
+      "122": Sanskrit
+      "003": Urdu Course A
+      "303": Urdu Course B
+      "041": Mathematics Standard
+      "241": Mathematics Basic
+      "086": Science
+      "087": Social Science
+      "402": Information Technology
+      "417": Artificial Intelligence
+      "401": Retail
+      "413": Introduction to Tourism

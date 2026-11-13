@@ -186,6 +186,95 @@ attributes:
       show_conflicts_from: []
     label_en: APAAR ID
     label_te: APAAR ఐడి
+  # --- board candidate choices (FO-10, FR-STU-020..025; seeded by 0105_board_candidate) -------
+  # C2, not identity fields: medium, languages and subjects the office enters for board
+  # candidates, as codes of app/students/board_catalogue.yaml (verified: false). DQ-032 checks
+  # them against the school's board scheme; nothing is corrected automatically. The photograph
+  # and signature are never stored: photo_signature_ready is a staff tick only.
+  exam_medium:
+    data_type: enum
+    classification: C2
+    is_identity: false
+    sort_order: 95
+    validation: {values: [english, telugu, urdu, hindi, tamil, kannada, odia],
+                 sources: [parent_form, board_registration, manual_entry]}
+    canonical_policy:
+      precedence: [board_registration, manual_entry, parent_form]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Medium of instruction (board)
+    label_te: బోధనా మాధ్యమం (బోర్డు)
+  first_language:
+    data_type: text
+    classification: C2
+    is_identity: false
+    sort_order: 96
+    validation: {max_length: 16, pattern: '^[A-Za-z0-9][A-Za-z0-9_]{1,15}$',
+                 format_code: board_code_required,
+                 sources: [parent_form, board_registration, manual_entry]}
+    canonical_policy:
+      precedence: [board_registration, manual_entry, parent_form]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: First language
+    label_te: ప్రథమ భాష
+  second_language:
+    data_type: text
+    classification: C2
+    is_identity: false
+    sort_order: 97
+    validation: {max_length: 16, pattern: '^[A-Za-z0-9][A-Za-z0-9_]{1,15}$',
+                 format_code: board_code_required,
+                 sources: [parent_form, board_registration, manual_entry]}
+    canonical_policy:
+      precedence: [board_registration, manual_entry, parent_form]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Second language
+    label_te: ద్వితీయ భాష
+  third_language:
+    data_type: text
+    classification: C2
+    is_identity: false
+    sort_order: 98
+    validation: {max_length: 16, pattern: '^[A-Za-z0-9][A-Za-z0-9_]{1,15}$',
+                 format_code: board_code_required,
+                 sources: [parent_form, board_registration, manual_entry]}
+    canonical_policy:
+      precedence: [board_registration, manual_entry, parent_form]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Third language
+    label_te: తృతీయ భాష
+  board_subjects:
+    data_type: text
+    classification: C2
+    is_identity: false
+    sort_order: 99
+    # Comma-separated board subject codes (non-language subjects), e.g. "041,086,087".
+    validation: {max_length: 120,
+                 pattern: '^[A-Za-z0-9][A-Za-z0-9_]{1,15}(,[A-Za-z0-9][A-Za-z0-9_]{1,15}){0,9}$',
+                 format_code: board_codes_required,
+                 sources: [parent_form, board_registration, manual_entry]}
+    canonical_policy:
+      precedence: [board_registration, manual_entry, parent_form]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Board subjects (codes)
+    label_te: బోర్డు సబ్జెక్టులు (కోడ్‌లు)
+  photo_signature_ready:
+    data_type: enum
+    classification: C2
+    is_identity: false
+    sort_order: 99
+    # Staff tick only (FR-STU-025): the photograph and signature themselves are never stored.
+    validation: {values: ["yes", "no"], sources: [manual_entry]}
+    canonical_policy:
+      precedence: [manual_entry]
+      require_verified: false
+      show_conflicts_from: []
+    label_en: Photo and signature collected for the board portal
+    label_te: బోర్డు పోర్టల్ కోసం ఫోటో, సంతకం సేకరించారు
   # --- Aadhaar (ADR-0007, PRV-013..014, FR-STU-012): last 4 digits and as-printed fields only ---
   aadhaar_last4:
     data_type: digits4
