@@ -2214,7 +2214,11 @@
       "unknown_check_kind": "Choose a check from the list.",
       "policy_document_not_ready": "Choose a PDF in Documents with the purpose policy that has finished its virus scan.",
       "review_in_past": "Choose a date after today.",
-      "too_many_roles": "Choose fewer roles."
+      "too_many_roles": "Choose fewer roles.",
+      "not_in_scheme": "This is not in the board's list for this class. Choose one from the list.",
+      "not_for_this_class": "This board does not apply to this class. Choose another board.",
+      "board_code_required": "Enter the board's code, for example 184 or HINDI.",
+      "board_codes_required": "Enter the board's subject codes separated by commas, for example 041,086,087."
     },
     "api": {
       "year_result_changed": {
@@ -13927,5 +13931,88 @@
         "body": "Ask the office to check the document, then try again later."
       }
     }
+  },
+  "boardCandidates": {
+    "nav": "Board candidates",
+    "title": "Board candidates",
+    "description": "Record each candidate's medium, languages, subjects and whether the photo and signature were collected, before the board portal opens.",
+    "noPermissionTitle": "You can't open board candidates",
+    "noPermissionBody": "Ask the school's admin for access to student records.",
+    "section": "Section",
+    "chooseSection": "Choose a section",
+    "scheme": "Board",
+    "schemes": {
+      "bseap-ssc": "AP SSC (BSEAP)",
+      "cbse-secondary": "CBSE secondary"
+    },
+    "pickTitle": "Choose a section",
+    "pickBody": "Board classes only: Class IX and X.",
+    "noSchemeTitle": "This is not a board class",
+    "noSchemeBody": "Board candidate details are recorded for the school's board classes only. Choose a Class IX or X section.",
+    "noStudentsTitle": "No students in this section",
+    "noStudentsBody": "Students appear here once they are enrolled in the section.",
+    "gridTitle": "Candidates of {section}",
+    "readyCount": "{ready} of {total} ready for the board",
+    "unverifiedTitle": "Lists not yet confirmed",
+    "unverifiedBody": "These lists come from public guides and are not yet checked against the board's own portal. Check the portal before you submit.",
+    "fillTitle": "Same for the whole section",
+    "fillButton": "Fill empty cells",
+    "fillHint": "Fills only the cells that are empty. Nothing is saved until you press Save.",
+    "choose": "Choose",
+    "none": "None",
+    "tableLabel": "Board candidates of the section",
+    "formLabel": "Board candidate details",
+    "colStudent": "Student",
+    "colPhoto": "Photo and signature",
+    "colStatus": "What is missing",
+    "unnamed": "Name not recorded",
+    "roll": "Roll {roll}",
+    "photoCollected": "Collected",
+    "ready": "Ready",
+    "sourceLabel": "Taken from",
+    "source": {
+      "parent_form": "Parent's form",
+      "manual_entry": "Office records"
+    },
+    "discard": "Discard changes",
+    "save": "{count, plural, =0 {Save} one {Save # student} other {Save # students}}",
+    "saved": "{count, plural, =0 {Nothing changed.} one {Saved # value.} other {Saved # values.}}",
+    "medium": {
+      "label": "Medium",
+      "english": "English",
+      "telugu": "Telugu",
+      "urdu": "Urdu",
+      "hindi": "Hindi",
+      "tamil": "Tamil",
+      "kannada": "Kannada",
+      "odia": "Odia"
+    },
+    "slot": {
+      "first_language": "First language",
+      "second_language": "Second language",
+      "third_language": "Third language"
+    },
+    "field": {
+      "exam_medium": "Medium",
+      "first_language": "First language",
+      "second_language": "Second language",
+      "third_language": "Third language",
+      "board_subjects": "Subjects",
+      "photo_signature_ready": "Photo and signature"
+    },
+    "issue": {
+      "missing": "{field}: not recorded",
+      "not_in_list": "{field}: not in the board's list",
+      "repeated": "{field}: {code} is chosen twice",
+      "group_missing": "Choose {group}",
+      "too_many": "{field}: too many",
+      "photo": "Photo and signature not collected"
+    },
+    "profileTitle": "Board candidate",
+    "profileDescription": "{scheme}. Photos and signatures are uploaded on the board portal; SchoolOS records only whether they were collected.",
+    "openGrid": "Open the section grid",
+    "notRecorded": "Not recorded",
+    "yes": "Yes",
+    "no": "No"
   }
 }

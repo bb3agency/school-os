@@ -724,6 +724,24 @@ export function r1Answer(
     return found ? [200, found] : notFound;
   }
 
+  // FO-10 (FR-STU-026): the profile's board candidate card; not a board class here (no card).
+  const candidate = /^\/api\/v1\/students\/([0-9a-f-]{36})\/board-candidate$/.exec(path);
+  if (candidate && get) {
+    const id = candidate[1] ?? "";
+    return [
+      200,
+      {
+        student_id: id,
+        section_id: null,
+        class_section: null,
+        scheme: null,
+        values: {},
+        issues: [],
+        ready: false,
+      },
+    ];
+  }
+
   const record = /^\/api\/v1\/students\/([0-9a-f-]{36})(\/guardians)?$/.exec(path);
   if (record && get) {
     if (record[2]) return [200, GUARDIANS];

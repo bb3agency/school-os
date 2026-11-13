@@ -33,6 +33,7 @@ export const CLIENT_NAMESPACES = {
     "ask",
     "attendance",
     "auth",
+    "boardCandidates",
     "breaches",
     "breakGlass",
     "brief",

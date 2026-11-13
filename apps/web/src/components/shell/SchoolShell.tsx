@@ -188,6 +188,13 @@ export function SchoolShell({
           icon: "checkCircle",
         },
         {
+          // FO-10 (FR-STU-026..029): board candidate medium, languages, subjects, photo tick.
+          href: "/students/board-candidates",
+          label: t("boardCandidates.nav"),
+          permission: ["student.update_nonidentity", "dq.readiness.read"],
+          icon: "clipboard",
+        },
+        {
           // FO-03 (FR-UDI-031..040): what to repeat in UDISE+ after a TC, a leaver, an
           // admission or a promotion.
           href: "/findings/udise-todo",
