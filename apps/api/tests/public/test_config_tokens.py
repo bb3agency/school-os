@@ -24,7 +24,7 @@ def test_FR_PUB_006_lifetimes_are_the_owner_decided_ones() -> None:
         "parent_closure": 7,
     }
     assert cfg.purge_after_days == 30
-    assert set(cfg.webhook_providers) == {"razorpay", "meta"}
+    assert set(cfg.webhook_providers) == {"razorpay", "meta", "razorpay_schoolos"}
     assert cfg.webhook_providers["razorpay"].max_body_bytes == 256 * 1024
     assert cfg.webhook_providers["meta"].max_body_bytes == 3 * 1024 * 1024
 

@@ -657,6 +657,11 @@ IDEMPOTENCY_EXEMPT = {
     # R2-2D online payments (ADR-0042).
     ("POST", "/api/v1/webhooks/razorpay/{route}"): "machine route; signed, and event ids are "
     "unique per school (FR-PAY-007)",
+    # FA-13: the Razorpay webhook of SchoolOS's own account (SchoolOS invoices).
+    ("POST", "/api/v1/webhooks/schoolos-billing"): "machine route; signed, event ids replay-"
+    "checked and each payment recorded once by (provider, provider_payment_id) (FR-PAY-021)",
+    ("POST", "/api/v1/platform/payment-links/{link_id}/check"): "re-fetches a link; a payment "
+    "is applied once by (provider, provider_payment_id), so a repeat changes nothing (FR-PAY-024)",
     ("POST", "/api/v1/payments/connection/manual"): "the answer carries the webhook secret once; "
     "a replay store would keep it (as R-15); a repeat is 409 payments_already_connected",
     ("POST", "/api/v1/payments/connection/rotate-webhook-secret"): "returns a one-time secret "

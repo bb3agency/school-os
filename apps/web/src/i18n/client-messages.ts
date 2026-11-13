@@ -111,6 +111,7 @@ export const CLIENT_NAMESPACES = {
     "deploymentMode",
     "errors",
     "findings",
+    "invoicePayments",
     "language",
     "metadata",
     "payments",

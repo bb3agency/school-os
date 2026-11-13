@@ -12,11 +12,13 @@ import { useId } from "react";
 import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
+import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { UsageMeter } from "@/components/ui/UsageMeter";
 import { Value } from "@/components/ui/Value";
+import { paymentUrlOf } from "@/features/platform/payment-links";
 import { invoiceTone, known, subscriptionTone } from "@/features/status";
 import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import { formatCount, formatDate, formatDateTime, formatInr } from "@/lib/format";
@@ -151,6 +153,7 @@ export function BillingView({ billing, invoices, onRetryInvoices }: BillingViewP
   const te = useTranslations("errors");
   const tsub = useTranslations("status.subscription");
   const tinv = useTranslations("status.invoice");
+  const tpay = useTranslations("invoicePayments.school");
   const locale = useLocale();
   const invoicesHeadingId = useId();
 
@@ -235,6 +238,29 @@ export function BillingView({ billing, invoices, onRetryInvoices }: BillingViewP
           <Badge tone={invoiceTone[status]}>{tinv(status)}</Badge>
         ) : (
           <Badge>{row.status}</Badge>
+        );
+      },
+    },
+    {
+      // FA-13 (FR-PAY-027): SchoolOS's Razorpay page for the amount still to pay, when SchoolOS
+      // made a payment link for this invoice. Opens in a new tab; SchoolOS is the merchant.
+      key: "pay",
+      header: tpay("colPay"),
+      name: tpay("colPay"),
+      cell: (row) => {
+        const url = paymentUrlOf(row);
+        return url ? (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonClasses("primary", "sm")}
+            aria-label={tpay("payOnlineLabel", { number: row.invoice_number ?? "" })}
+          >
+            {tpay("payOnline")}
+          </a>
+        ) : (
+          <Value>{null}</Value>
         );
       },
     },
@@ -370,6 +396,7 @@ export function BillingView({ billing, invoices, onRetryInvoices }: BillingViewP
             {t("invoicesTitle")}
           </h2>
           <p className="text-sm text-ink-muted">{t("invoicesNote")}</p>
+          <p className="text-sm text-ink-muted">{tpay("payNote")}</p>
         </div>
         <DataTableV2
           id="school-invoices"

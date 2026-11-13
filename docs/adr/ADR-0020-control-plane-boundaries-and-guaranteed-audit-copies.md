@@ -184,3 +184,16 @@ to `TENANCY_ALLOWED`, called only by `platform/usage.py`, whose daily collector 
 `platform.deployments.boards` current (audit `deployment.boards_synced`). No new `tenant_session`
 file, tenant relation in SQL or tenant-side import; `platform` still never imports `app.dq` (the
 protected windows are a tested copy of the portal calendar in `billing.yaml`).
+
+## Amendments (2026-11-13, FA-13)
+
+`platform/payment_webhook.py` imports the public surface's webhook guard and verifier registry
+(`app.public.guards`: `WebhookCaller`, `forget_event`, `require_webhook_signature`;
+`app.public.webhooks`: the verifier types and `register_webhook_verifier` / `webhook_verifier`;
+`app.public.config`: `WebhookProvider`) for the Razorpay webhook of SchoolOS's own account
+(provider `razorpay_schoolos`, ADR-0016 amendment 2026-11-13). Pinned in
+`tests/platform/test_boundaries.py`. The verifier resolves no school handle and the route reads
+and writes platform rows only; no new `tenant_session` file, tenant relation in SQL or
+`tenancy.service` call. The school's billing page reads the links of its own invoices through
+`platform.service.school_payment_urls` (platform rows of the caller's own tenant, like
+`school_ai_bundle`).

@@ -277,6 +277,7 @@ export const SCHOOL_AREAS = {
   "settings/billing": [
     "common",
     "errors",
+    "invoicePayments.school",
     "school.billing",
     "status.invoice",
     "status.subscription",

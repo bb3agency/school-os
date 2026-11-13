@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections.abc import Iterable
 from decimal import Decimal
 from typing import Any
 
@@ -58,6 +59,7 @@ from app.platform import (
     flags,
     heartbeat_apply,
     incidents,
+    payment_links,
     repository,
     support,
     usage,
@@ -134,6 +136,14 @@ def school_next_invoice(
     """(day, estimated total incl. GST) of the school's next invoice; ``(None, None)`` when
     none follows (trial, suspended, ending at the period end)."""
     return billing.school_next_invoice(tenant_id, subscription_id)
+
+
+def school_payment_urls(
+    tenant_id: uuid.UUID, invoices: Iterable[tuple[uuid.UUID, Decimal]]
+) -> dict[uuid.UUID, str]:
+    """invoice id -> SchoolOS's Razorpay link for the calling school's own open invoices
+    ``(invoice_id, amount_due)`` (FA-13, FR-PAY-027); empty when online payment is off."""
+    return payment_links.school_payment_urls(tenant_id, invoices)
 
 
 def dedicated_billing_summary() -> tuple[HbBillingSummary | None, dt.datetime] | None:

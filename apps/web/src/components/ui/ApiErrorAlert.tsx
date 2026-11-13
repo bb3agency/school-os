@@ -37,6 +37,7 @@ export type ErrorNamespace =
   | "platform.announcements"
   | "payments"
   | "platform.invoices.payments"
+  | "invoicePayments"
   | "consents"
   | "breaches"
   | "holds"

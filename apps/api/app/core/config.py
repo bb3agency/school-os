@@ -433,6 +433,20 @@ class Settings(BaseSettings):
     razorpay_manual_keys_allowed: bool = False
     webhook_base_url: str | None = None
 
+    # --- FA-13 online payment of SchoolOS's own invoices (ADR-0016; FR-PAY-017..030) -----------
+    # SchoolOS is the merchant: these are SchoolOS's own Razorpay key and webhook secret
+    # (Secrets Manager), never a school's. Off by default: no payment link is offered and the
+    # webhook answers 404 until enabled. Provider mode as for fees: unset = "fake" in local/ci,
+    # "live" in staging/prod; "fake" is refused in staging/prod. Shared tier only (the control
+    # plane); links only, no UPI Autopay or e-mandate (lead default D87).
+    platform_payments_enabled: bool = False
+    platform_payments_provider_mode: PaymentsProviderMode | None = None
+    platform_razorpay_key_id: str | None = Field(
+        default=None, pattern=r"^rzp_(live|test)_[A-Za-z0-9]{6,40}$"
+    )
+    platform_razorpay_key_secret: SecretStr | None = None
+    platform_razorpay_webhook_secret: SecretStr | None = None
+
     # Control plane / fleet (docs/16 §10, §12; ADR-0015). Supplier identity for GST invoices.
     billing_supplier_legal_name: str = DEV_SUPPLIER_NAME
     billing_supplier_gstin: str = DEV_SUPPLIER_GSTIN
@@ -709,6 +723,40 @@ class Settings(BaseSettings):
             if value is not None and not _is_public_https(value):
                 raise ValueError(f"{name} must be a public https URL in {self.env}")
 
+    @property
+    def effective_platform_payments_provider_mode(self) -> PaymentsProviderMode:
+        """``SOS_PLATFORM_PAYMENTS_PROVIDER_MODE``, else ``fake`` locally and in CI, ``live``
+        elsewhere (FA-13)."""
+        if self.platform_payments_provider_mode is not None:
+            return self.platform_payments_provider_mode
+        return PaymentsProviderMode.LIVE if self.is_production_like else PaymentsProviderMode.FAKE
+
+    def _guard_platform_payments(self) -> None:
+        """FA-13 (FR-PAY-026): when SchoolOS's own invoice payments are on in staging/prod, the
+        provider is live, the key id, key secret and webhook secret are all set and real, and
+        production uses a live key (a test key moves no money, so its "captured" payments would
+        mark real invoices paid; same reasoning as CP-01)."""
+        if not (self.platform_payments_enabled and self.is_production_like):
+            return
+        if self.effective_platform_payments_provider_mode is PaymentsProviderMode.FAKE:
+            raise ValueError(
+                f"SOS_PLATFORM_PAYMENTS_PROVIDER_MODE=fake is not allowed in {self.env}"
+            )
+        if self.deployment_mode is not DeploymentMode.SHARED:
+            raise ValueError("SOS_PLATFORM_PAYMENTS_ENABLED is for the shared tier only")
+        key_id = self.platform_razorpay_key_id
+        if key_id is None:
+            raise ValueError(f"SOS_PLATFORM_RAZORPAY_KEY_ID is required in {self.env}")
+        if self.env is Environment.PROD and not key_id.startswith("rzp_live_"):
+            raise ValueError("SOS_PLATFORM_RAZORPAY_KEY_ID must be a live key in prod")
+        for name, value in (
+            ("SOS_PLATFORM_RAZORPAY_KEY_SECRET", self.platform_razorpay_key_secret),
+            ("SOS_PLATFORM_RAZORPAY_WEBHOOK_SECRET", self.platform_razorpay_webhook_secret),
+        ):
+            raw = None if value is None else value.get_secret_value()
+            if raw is None or "dev-only" in raw or len(raw) < 16:
+                raise ValueError(f"{name} must be the real secret in {self.env}")
+
     def _guard_postgres_tls(self) -> None:
         """Shared tier, staging/prod: the database is RDS across the VPC, so TLS must check the
         server's certificate and host name (audit 2026-10-05; Terraform writes
@@ -741,6 +789,7 @@ class Settings(BaseSettings):
         self._guard_public_origins()
         self._guard_messaging()
         self._guard_payments()
+        self._guard_platform_payments()
         if self.is_production_like:
             # Anti-automation is a production control (OWASP API4:2023, ASVS 2.2.1).
             if not self.rate_limit_enabled:

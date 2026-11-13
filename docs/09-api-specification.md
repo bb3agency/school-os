@@ -798,6 +798,7 @@ As built (R2-1A): `GET /certificates/types` gives the transfer certificate in th
 | Method | Path | Guard |
 |---|---|---|
 | POST | `/webhooks/razorpay/{route}` | `require_webhook_signature("razorpay")`: route handle → school → secret (current or previous) → `X-Razorpay-Signature` over the raw body; ≤ 256 KB; store then 200; duplicate `x-razorpay-event-id` 200; bad signature 401; unknown route 404. Rate limit `machine_ip` |
+| POST | `/webhooks/schoolos-billing` | FA-13, shared tier only: `require_webhook_signature("razorpay_schoolos")`: `X-Razorpay-Signature` with SchoolOS's own webhook secret over the raw body; ≤ 256 KB; `payment_link.paid` only, link and payment re-fetched before the invoice is marked paid; duplicate `x-razorpay-event-id` 200; bad signature 401; off 404; Razorpay unreachable 503 (retried). Rate limit `machine_ip` |
 | GET | `/webhooks/meta` (`hub.mode`, `hub.challenge`, `hub.verify_token`) | `require_meta_verify_token()` → 200 with the challenge or 403 |
 | POST | `/webhooks/meta` | `require_webhook_signature("meta")`: `X-Hub-Signature-256` with the app secret over the raw body; ≤ 3 MB; each `entry` routed by WABA-id handle; store then 200. Rate limit `machine_ip` |
 
