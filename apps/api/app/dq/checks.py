@@ -39,6 +39,10 @@ Check kinds and their rules:
 ``readiness_diff`` (DQ-031)   per readiness profile: the profile's identity fields compared
                               exactly across its sources (:mod:`app.dq.readiness`); one finding
                               per difference with its fix owner (ADR-0040)
+``board_candidate`` (DQ-032)  per profile with a ``candidate_scheme``: the medium, languages,
+                              subjects and photo tick of the scheme's candidates (the engine
+                              passes the schemes of ``app.students.service.board_schemes``);
+                              one finding per field to fix (FO-10)
 ============================  =====================================================================
 
 The APAAR ID itself never appears in a finding: values are masked (``••••``) and a duplicate
@@ -54,7 +58,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
-from typing import Any, Final
+from typing import Any, Final, Protocol
 
 from app.dq import readiness as rd
 from app.dq.explanations import load_explanations
@@ -171,6 +175,32 @@ class StudentFacts:
         return bool(codes) and all(class_boards.get(code, board) != board for code in codes)
 
 
+class CandidateIssueLike(Protocol):
+    @property
+    def field(self) -> str: ...
+    @property
+    def reason(self) -> str: ...
+    @property
+    def code(self) -> str | None: ...
+    @property
+    def group(self) -> str | None: ...
+
+
+class CandidateSchemeLike(Protocol):
+    """A board candidate scheme (``app.students.service.BoardScheme``), seen by DQ-032."""
+
+    @property
+    def key(self) -> str: ...
+    @property
+    def version(self) -> int: ...
+    @property
+    def classes(self) -> tuple[str, ...]: ...
+    @property
+    def keys(self) -> tuple[str, ...]: ...
+    def group_label(self, key: str) -> str: ...
+    def issues(self, values: Mapping[str, str | None], /) -> Iterable[CandidateIssueLike]: ...
+
+
 @dataclass(frozen=True, slots=True)
 class CheckContext:
     """Everything one run needs, loaded in bulk (no per-student queries)."""
@@ -185,6 +215,8 @@ class CheckContext:
     identity_keys: frozenset[str] = frozenset()
     # FR-TEN-021: class code -> board (``settings.class_boards``; empty: one board for all).
     class_boards: Mapping[str, str] = field(default_factory=dict)
+    # FO-10 (DQ-032): board candidate schemes by key (profiles name one as candidate_scheme).
+    candidate_schemes: Mapping[str, CandidateSchemeLike] = field(default_factory=dict)
 
     def classify(self, a: str, b: str) -> Any:
         return classify(a, b, variants=self.variants, thresholds=self.policy.thresholds)
@@ -923,6 +955,88 @@ class ReadinessCheck(_Check):
                     yield readiness_finding(self.rule, assessment, item, context.config, cfg)
 
 
+_CANDIDATE_CODES: Final[Mapping[str, str]] = {
+    "missing": "DQ-032",
+    "not_in_list": "DQ-032-LIST",
+    "repeated": "DQ-032-REPEATED",
+    "group_missing": "DQ-032-GROUP",
+    "too_many": "DQ-032-MANY",
+    "photo": "DQ-032-PHOTO",
+}
+
+
+class BoardCandidateCheck(_Check):
+    """DQ-032 (FO-10): board candidate choices of the profile's scheme, for students whose
+    current class is in both the scheme's and the profile's classes. One finding per field
+    (the first issue sets the explanation; ``reasons`` lists them all). Codes only, never a
+    name or another personal value."""
+
+    def evaluate(self, context: CheckContext, /) -> Iterator[Finding]:
+        rule = self.rule
+        severity = _fixed(rule)
+        for profile in context.profiles:
+            scheme = (
+                context.candidate_schemes.get(profile.candidate_scheme)
+                if profile.candidate_scheme
+                else None
+            )
+            if scheme is None:
+                continue
+            classes = set(scheme.classes)
+            if profile.classes:
+                classes &= set(profile.classes)
+            for facts in context.students.values():
+                current = {e.class_code for e in facts.enrolments if e.current and e.class_code}
+                if not current & classes:
+                    continue
+                values = {k: facts.canonical_value(k) for k in scheme.keys}
+                by_field: dict[str, list[CandidateIssueLike]] = {}
+                for issue in scheme.issues(values):
+                    by_field.setdefault(issue.field, []).append(issue)
+                for key, issues in by_field.items():
+                    yield _candidate_finding(rule, severity, facts, profile, scheme, key, issues)
+
+
+def _candidate_finding(  # noqa: PLR0917 - one call site
+    rule: Rule,
+    severity: Severity,
+    facts: StudentFacts,
+    profile: Profile,
+    scheme: CandidateSchemeLike,
+    key: str,
+    issues: list[CandidateIssueLike],
+) -> Finding:
+    first = issues[0]
+    code = _CANDIDATE_CODES.get(first.reason, rule.explanation_key)
+    params: dict[str, str | int] = {"profile": profile.key}
+    if first.reason != "photo":
+        params["field"] = key
+    # A code outside the list was typed by someone and could be anything, so only codes of the
+    # catalogue (a repeated choice) are kept; never a typed value (FR-DQ-006).
+    if first.reason == "repeated":
+        params["code"] = first.code or ""
+    if first.reason == "group_missing":
+        params["group"] = scheme.group_label(first.group or "")
+    reasons = [
+        {
+            "reason": i.reason,
+            "code": i.code if i.reason == "repeated" else None,
+            "group": i.group,
+        }
+        for i in issues
+    ]
+    return make_finding(
+        rule,
+        facts.student_id,
+        severity,
+        attribute_key=key,
+        details={"scheme": scheme.key, "scheme_version": scheme.version, "reasons": reasons},
+        params=params,
+        profile_key=profile.key,
+        explanation_code=code,
+    )
+
+
 CHECKS: Final[dict[CheckKind, Callable[[Rule], RuleCheck[CheckContext]]]] = {
     CheckKind.NAME_MATCH: NameMatchCheck,
     CheckKind.VALUE_EQUAL: ValueEqualCheck,
@@ -936,6 +1050,7 @@ CHECKS: Final[dict[CheckKind, Callable[[Rule], RuleCheck[CheckContext]]]] = {
     CheckKind.APAAR_ID: ApaarIdCheck,
     CheckKind.APAAR_DEMOGRAPHICS: ApaarDemographicsCheck,
     CheckKind.READINESS_DIFF: ReadinessCheck,
+    CheckKind.BOARD_CANDIDATE: BoardCandidateCheck,
 }
 
 

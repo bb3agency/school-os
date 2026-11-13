@@ -57,6 +57,10 @@ routes:
   ROUTE-ERP:
     en: "Correct the value in your other school system (ERP) to match the admission register, then refresh from its export."
     te: "మీ ఇతర పాఠశాల వ్యవస్థ (ERP)లో విలువను అడ్మిషన్ రిజిస్టర్‌కు సరిపోయేలా సరిచేసి, దాని ఎగుమతి నుండి మళ్లీ నవీకరించండి."
+  # FO-10 (DQ-032): not an identity field, so no change request.
+  ROUTE-CANDIDATE:
+    en: "Record the board choice on the board candidates screen from the parent's form."
+    te: "తల్లిదండ్రుల ఫారం నుండి బోర్డు ఎంపికను బోర్డు అభ్యర్థుల తెరపై నమోదు చేయండి."
 
 # Rule explanation templates (rules.yaml `explanation_key`), English from docs/02 §5.
 rules:
@@ -118,6 +122,26 @@ rules:
     te: "కార్యాలయ రికార్డులు (లేదా మీ ఇతర పాఠశాల వ్యవస్థ) అడ్మిషన్ రిజిస్టర్‌తో సరిపోలడం లేదు."
   # ADR-0040 (FR-DQ-040..FR-DQ-043): board and portal readiness, one code per fix owner.
   # {field} is the field label, {source} the record to correct, {diff} the kinds of difference.
+  # FO-10 (FR-STU-030..033): board candidate choices. {field} is the field label, {code} a board
+  # code (never personal data), {group} the English label of a subject group.
+  DQ-032:
+    en: "For {profile}: {field} is not recorded."
+    te: "{profile} కోసం: {field} నమోదు కాలేదు."
+  DQ-032-LIST:
+    en: "For {profile}: {field} has a code that is not in the board's list. Choose one from the list."
+    te: "{profile} కోసం: {field} లో బోర్డు జాబితాలో లేని కోడ్ ఉంది. జాబితా నుండి ఒకటి ఎంచుకోండి."
+  DQ-032-REPEATED:
+    en: "For {profile}: {field} repeats a language or subject that is already chosen ({code})."
+    te: "{profile} కోసం: {field} లో ఇప్పటికే ఎంచుకున్న భాష లేదా సబ్జెక్టు మళ్లీ ఉంది ({code})."
+  DQ-032-GROUP:
+    en: "For {profile}: {field} needs a subject from {group}."
+    te: "{profile} కోసం: {field} లో {group} నుండి ఒక సబ్జెక్టు ఉండాలి."
+  DQ-032-MANY:
+    en: "For {profile}: {field} has more subjects than the board allows."
+    te: "{profile} కోసం: {field} లో బోర్డు అనుమతించిన దానికంటే ఎక్కువ సబ్జెక్టులు ఉన్నాయి."
+  DQ-032-PHOTO:
+    en: "For {profile}: the photograph and signature are not yet marked as collected for the board portal."
+    te: "{profile} కోసం: బోర్డు పోర్టల్ కోసం ఫోటో, సంతకం సేకరించినట్లు ఇంకా గుర్తించలేదు."
   DQ-031:
     en: "Records must match exactly for {profile}."
     te: "{profile} కోసం రికార్డులు అక్షరం అక్షరం సరిపోలాలి."

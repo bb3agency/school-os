@@ -273,6 +273,9 @@ class Profile(BaseModel):
     portal_fields: tuple[PortalField, ...] = ()
     # Board and portal readiness (FR-DQ-040..046, ADR-0040): the exact cross-source comparison.
     readiness: ReadinessSpec | None = None
+    # FO-10 (FR-STU-030): the board candidate scheme of app/students/board_catalogue.yaml whose
+    # medium, language, subject and photo choices DQ-032 checks for this profile.
+    candidate_scheme: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9-]{1,39}$")
 
     @field_validator("key")
     @classmethod
