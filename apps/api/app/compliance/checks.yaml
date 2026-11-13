@@ -1,0 +1,92 @@
+# Safety drills and periodic checks (FC-09; FR-COMP-046..FR-COMP-055; docs/05 §16.10). Versioned
+# configuration read by app/compliance/checks_config.py (invariant 13).
+#
+# verified: false. A SchoolOS proposal from public SECONDARY sources read on 2026-11-09
+# (docs/research/2026-11-features/compliance-safety.md §2 and FC-09): MoE Guidelines on School
+# Safety and Security 2021 (mock drills, safety audits), CBSE bye-law clause 4.7.10 (CCTV kept
+# working, footage at least 15 days), CBSE circular 19/2017 (safety audit), NBC fire equipment
+# upkeep. The frequencies below are typical practice, not a rule the school must follow: the
+# school decides how often it checks, and SchoolOS only reminds.
+#
+# kinds          key -> label, how often (every_months; null: no reminders), the boards it applies
+#                to (empty list: every school), drill (true: the log asks for the number of people
+#                who took part and the minutes it took), a source note.
+#                `other` is reserved: a check the school names itself (no reminders).
+# reminders      lead days before the next check is due: one in-app notice per lead day to the
+#                holders of compliance.manage; 0 is the notice on the day it falls due. Then
+#                again every `overdue_every_days` days while it stays overdue (lead decision D86).
+#                Only for kinds the school has logged at least once (a new school is not flooded).
+# due_soon_days  a check is "due soon" this many days before it falls due (screen and counts).
+#
+# Never: student names, photos that identify children, CCTV footage. Drill entries carry
+# counts and short notes only (lead decision D86).
+version: 1
+verified: false
+source: "docs/research/2026-11-features/compliance-safety.md FC-09 (secondary sources, 2026-11-09); MoE School Safety and Security Guidelines 2021 and CBSE clause 4.7.10 not re-read in full"
+
+reminders:
+  lead_days: [7, 0]
+  overdue_every_days: 14
+due_soon_days: 14
+
+kinds:
+  fire_drill:
+    label: Fire evacuation drill
+    every_months: 4
+    boards: []
+    drill: true
+    note: "Once a term is common practice (MoE safety guidelines 2021 ask for regular mock drills; frequency unverified)."
+  disaster_drill:
+    label: Earthquake or disaster mock drill
+    every_months: 6
+    boards: []
+    drill: true
+    note: "Twice a year is common practice (NDMA school safety guidance; unverified)."
+  fire_extinguisher_refill:
+    label: Fire extinguisher refill and service
+    every_months: 12
+    boards: []
+    drill: false
+    note: "Yearly refill or service as printed on the extinguisher tag (unverified)."
+  fire_equipment_check:
+    label: Fire alarm, hydrant and exit check
+    every_months: 3
+    boards: []
+    drill: false
+    note: "Exits clear, alarms and hydrants working (NBC upkeep; frequency unverified)."
+  electrical_check:
+    label: Electrical safety check
+    every_months: 12
+    boards: []
+    drill: false
+    note: "Wiring, earthing and switchboards checked by an electrician (frequency unverified)."
+  structural_check:
+    label: Building and structural walk-through
+    every_months: 12
+    boards: []
+    drill: false
+    note: "Before the school year: walls, roofs, stairs, railings and water tanks (unverified)."
+  water_test:
+    label: Drinking water test
+    every_months: 6
+    boards: []
+    drill: false
+    note: "Water tested by a laboratory; keep the report as the evidence (frequency unverified)."
+  first_aid_check:
+    label: First aid kit check
+    every_months: 3
+    boards: []
+    drill: false
+    note: "Kits complete and medicines in date (frequency unverified)."
+  cctv_check:
+    label: CCTV working check
+    every_months: 1
+    boards: [CBSE]
+    drill: false
+    note: "CBSE bye-law clause 4.7.10: cameras working and footage kept at least 15 days (secondary source). Record that you checked; never upload footage."
+  other:
+    label: Other check (named by the school)
+    every_months: null
+    boards: []
+    drill: false
+    note: "For a check not in this list (no reminders)."

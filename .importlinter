@@ -1341,8 +1341,9 @@ forbidden_modules =
     app.insights.crypto
 allow_indirect_imports = True
 
-# Purpose limit (docs/08 §4, invariant 14): no AI reads attendance, marks, notes or flags in M5,
-# and school records never depend on the early-warning module.
+# Purpose limit (docs/08 §4, invariant 14): no AI reads notes, flags or indicators, and school records
+# never depend on the early-warning module. Since D86 (FA-04) Ask reads attendance COUNTS by section
+# through academics.service (knowledge.tools.attendance); academics itself still never imports AI.
 [importlinter:contract:insights-without-ai]
 name = academics and insights never import the knowledge module (no AI in M5)
 type = forbidden
@@ -1351,6 +1352,17 @@ source_modules =
     app.insights
 forbidden_modules =
     app.knowledge
+allow_indirect_imports = True
+
+# D86 (FA-04, invariant 14): Ask never reads early-warning notes, flags or indicators. Indirect
+# imports are allowed (other modules' services may know insights; Ask's tools call none of them).
+[importlinter:contract:knowledge-without-insights]
+name = knowledge never imports the insights module (Ask never reads early-warning data)
+type = forbidden
+source_modules =
+    app.knowledge
+forbidden_modules =
+    app.insights
 allow_indirect_imports = True
 
 [importlinter:contract:academics-below-insights]
@@ -1859,6 +1871,9 @@ source_modules =
 forbidden_modules =
     app.compliance.repository
     app.compliance.models
+    # FC-09/FC-10 safety check log and policy library (0099_drills_policies)
+    app.compliance.safety_repository
+    app.compliance.safety_models
 allow_indirect_imports = True
 
 # The catalogue and its date rules stay pure (no DB, web or feature modules).
@@ -1867,6 +1882,7 @@ name = compliance config stays pure (no DB, web or feature modules)
 type = forbidden
 source_modules =
     app.compliance.config
+    app.compliance.safety_config
 forbidden_modules =
     sqlalchemy
     fastapi

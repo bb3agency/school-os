@@ -17,7 +17,12 @@ from sqlalchemy import and_, false, func, insert, or_, select, text, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from app.certificates.models import Certificate, CertificateCounter, CertificateVerification
+from app.certificates.models import (
+    Certificate,
+    CertificateCounter,
+    CertificateVerification,
+    TcRequest,
+)
 from app.core.errors import Conflict, DomainError, Forbidden, ValidationFailed
 from app.core.ids import new_id
 from app.core.record_tables import dump_table
@@ -335,6 +340,13 @@ def export_tables(session: Session) -> list[RecordTable]:
             V.__table__,
             name="certificate_verifications",
             order_by=("created_at", "id"),
+        ),
+        # FO-09 (0102_tc_requests): the TC request log.
+        dump_table(
+            session,
+            TcRequest.__table__,
+            name="tc_requests",
+            order_by=("received_on", "id"),
         ),
     ]
 

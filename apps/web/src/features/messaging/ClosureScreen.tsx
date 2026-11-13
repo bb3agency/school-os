@@ -9,7 +9,7 @@ import { ApiErrorAlert } from "@/components/ui/ApiErrorAlert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { TextField } from "@/components/ui/Input";
+import { TextAreaField, TextField } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectField } from "@/components/ui/Select";
 import { Value } from "@/components/ui/Value";
@@ -23,14 +23,19 @@ import { READ, hhmm, isUnavailable } from "./data";
 import {
   CLOSURE_REASONS,
   CLOSURE_SEND,
+  NOTICE_TEXT_MAX,
   REACH_KEYS,
   previewClosure,
+  previewReopening,
   sendClosure,
+  sendReopening,
   useClosures,
   type Closure,
   type ClosureInput,
   type ClosurePreview,
   type ClosureReason,
+  type ClosureReopening,
+  type ClosureReopeningPreview,
 } from "./reach-data";
 
 /**
@@ -40,6 +45,10 @@ import {
  * text, who gets it and when it goes out (06:00-21:30 IST, also during quiet hours, never
  * outside that window). Recent closure messages and how many were sent are listed for everyone
  * with school-wide ``message.read``.
+ *
+ * FP-02 follow-up (FR-MSG-056..065; lead decision D86): the optional order text shown only on
+ * the closure's parent page (the message's "See details" button), and one "school reopens"
+ * message per closure, previewed and sent the same way (step-up, same window).
  */
 
 const MAX_DAYS_AHEAD = 7;
@@ -69,6 +78,7 @@ function ClosureForm() {
   const [from, setFrom] = useState(() => addDays(today, 1));
   const [to, setTo] = useState("");
   const [reason, setReason] = useState<ClosureReason>("weather");
+  const [noticeText, setNoticeText] = useState("");
   const [preview, setPreview] = useState<{ input: ClosureInput; out: ClosurePreview } | null>(null);
   const [sent, setSent] = useState<Closure | null>(null);
   const [pending, setPending] = useState(false);
@@ -88,6 +98,7 @@ function ClosureForm() {
     closed_from: from,
     ...(to ? { closed_to: to } : {}),
     reason,
+    ...(noticeText.trim() ? { notice_text: noticeText.trim() } : {}),
   };
   const ready = from !== "" && (wholeSchool || chosen.size > 0);
 
@@ -204,6 +215,17 @@ function ClosureForm() {
             options={CLOSURE_REASONS.map((r) => ({ value: r, label: t(`reasons.${r}`) }))}
           />
         </div>
+        <TextAreaField
+          label={t("noticeText")}
+          hint={t("noticeTextHint")}
+          value={noticeText}
+          maxLength={NOTICE_TEXT_MAX}
+          rows={4}
+          onChange={(event) => {
+            setNoticeText(event.target.value);
+            changed();
+          }}
+        />
         <Button
           variant="secondary"
           disabled={!ready || pending}
@@ -219,6 +241,7 @@ function ClosureForm() {
             <blockquote className="border-s-4 border-border ps-3 text-ink">
               {p.message_en}
             </blockquote>
+            <p className="text-sm text-ink-muted">{t("pageNote")}</p>
             <p className="text-ink">
               {t("recipients", {
                 recipients: count(p.recipients),
@@ -274,7 +297,141 @@ function ClosureForm() {
   );
 }
 
-function RecentClosures() {
+function ReopeningPanel({ closure, onClose }: { closure: Closure; onClose: () => void }) {
+  const t = useTranslations("messaging.closures");
+  const tr = useTranslations("messaging.log.reasons");
+  const api = useBffClient("staff");
+  const queryClient = useQueryClient();
+  const locale = useLocale() as Locale;
+  const [today] = useState(istToday);
+  const [reopensOn, setReopensOn] = useState(() => {
+    const next = addDays(closure.closed_to, 1);
+    return next < today ? today : next;
+  });
+  const [preview, setPreview] = useState<ClosureReopeningPreview | null>(null);
+  const [sent, setSent] = useState<ClosureReopening | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<unknown>(undefined);
+  const confirmKey = useMemo(() => (preview ? newIdempotencyKey() : ""), [preview]);
+  const count = (n: number | undefined) => formatCount(n ?? 0, locale) ?? "0";
+
+  async function check() {
+    setPending(true);
+    setError(undefined);
+    setSent(null);
+    try {
+      setPreview(await previewReopening(api, closure.id, reopensOn));
+    } catch (failure) {
+      setError(failure);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function confirm() {
+    if (!preview) return;
+    setPending(true);
+    setError(undefined);
+    try {
+      const out = await sendReopening(
+        api,
+        closure.id,
+        { reopens_on: preview.reopens_on, preview_token: preview.preview_token },
+        confirmKey,
+      );
+      setSent(out);
+      setPreview(null);
+      await queryClient.invalidateQueries({ queryKey: REACH_KEYS.closures });
+    } catch (failure) {
+      setError(failure);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Card title={t("reopen.title")} description={t("reopen.description")}>
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <TextField
+            label={t("reopen.date")}
+            type="date"
+            value={reopensOn}
+            min={today}
+            max={addDays(today, MAX_DAYS_AHEAD)}
+            required
+            onChange={(event) => {
+              setReopensOn(event.target.value);
+              setPreview(null);
+            }}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            disabled={reopensOn === "" || pending}
+            aria-disabled={reopensOn === "" || pending || undefined}
+            onClick={() => void check()}
+          >
+            {t("reopen.check")}
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            {t("reopen.cancel")}
+          </Button>
+        </div>
+        <ApiErrorAlert error={error} namespace="messaging" />
+        {preview ? (
+          <div className="space-y-3 rounded-md border border-border p-4">
+            <p className="font-semibold text-ink">{t("messageLabel")}</p>
+            <blockquote className="border-s-4 border-border ps-3 text-ink">
+              {preview.message_en}
+            </blockquote>
+            <p className="text-ink">
+              {t("recipients", {
+                recipients: count(preview.recipients),
+                guardians: count(preview.guardians),
+              })}
+            </p>
+            <p className="text-sm text-ink">
+              {preview.sends_at
+                ? t("sendsAt", { when: formatDateTime(preview.sends_at) ?? "" })
+                : t("sendsNow")}{" "}
+              {t("window", {
+                start: hhmm(preview.window_start),
+                end: hhmm(preview.window_end),
+              })}
+            </p>
+            <p className="text-sm text-ink-muted">
+              {t("cost", { cost: formatInr(preview.estimated_cost_inr, locale) ?? "" })}
+            </p>
+            {preview.blocked_reason ? (
+              <Alert tone="warning">
+                {tr.has(preview.blocked_reason as "no_optin")
+                  ? tr(preview.blocked_reason as "no_optin")
+                  : t("blocked")}
+              </Alert>
+            ) : (
+              <Button
+                disabled={pending || preview.recipients === 0}
+                aria-disabled={pending || preview.recipients === 0 || undefined}
+                onClick={() => void confirm()}
+              >
+                {t("send", { count: preview.recipients })}
+              </Button>
+            )}
+          </div>
+        ) : null}
+        {sent ? (
+          <Alert tone="success" live>
+            {t("queued", { count: sent.queued })}
+          </Alert>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+function RecentClosures({ onReopen }: { onReopen?: ((closure: Closure) => void) | undefined }) {
   const t = useTranslations("messaging.closures");
   const tm = useTranslations("messaging");
   const locale = useLocale() as Locale;
@@ -326,6 +483,20 @@ function RecentClosures() {
       header: t("columns.sentAt"),
       cell: (row) => formatDateTime(row.sent_at),
     },
+    {
+      key: "reopening",
+      header: t("columns.reopening"),
+      cell: (row) =>
+        row.reopening ? (
+          t("reopen.reopensOn", { date: formatDate(row.reopening.reopens_on) ?? "" })
+        ) : onReopen ? (
+          <Button variant="secondary" size="sm" onClick={() => onReopen(row)}>
+            {t("reopen.action")}
+          </Button>
+        ) : (
+          t("reopen.none")
+        ),
+    },
   ];
   return (
     <Card
@@ -359,6 +530,7 @@ export function ClosureScreen() {
   const me = useStaffMe();
   const closures = useClosures(me !== undefined && can(READ));
   const sender = can(CLOSURE_SEND);
+  const [reopenFor, setReopenFor] = useState<Closure | null>(null);
   return (
     <div className="space-y-5">
       <PageHeader
@@ -377,7 +549,14 @@ export function ClosureScreen() {
       ) : (
         <>
           {sender ? <ClosureForm /> : <Alert tone="info">{t("principalOnly")}</Alert>}
-          {can(READ) ? <RecentClosures /> : null}
+          {can(READ) ? <RecentClosures onReopen={sender ? setReopenFor : undefined} /> : null}
+          {sender && reopenFor ? (
+            <ReopeningPanel
+              key={reopenFor.id}
+              closure={reopenFor}
+              onClose={() => setReopenFor(null)}
+            />
+          ) : null}
         </>
       )}
     </div>

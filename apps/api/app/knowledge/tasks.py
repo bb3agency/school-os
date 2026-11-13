@@ -27,6 +27,11 @@
   (docs/06 §4.11), re-index documents whose searchable chunks have no context yet (indexed
   before the switch, or deferred by the school's budget/AI switch/provider), rate-limited per
   school and per run (:mod:`app.knowledge.contextual_backfill`). A no-op while off.
+- ``knowledge.collect_gaps`` (every ``gaps.yaml`` ``collect_every_minutes``, queue
+  ``maintenance``; FA-06): per school, count new "not found", unchecked and "not helpful"
+  questions into knowledge gaps (redacted, no asker; :func:`app.knowledge.gaps.collect`).
+- ``knowledge.purge_gaps`` (daily, queue ``maintenance``; FA-06): per school, delete knowledge
+  gaps past their retention (``kb_gaps``, default 90 days; legal holds asked first).
 
 Every task is idempotent and retries with exponential backoff (max 5, docs/04 §6); after the
 last attempt it logs ``error_code`` and gives up (the next event for the document repairs it).
@@ -47,8 +52,9 @@ from celery.schedules import crontab
 from app.authz.kv import KVUnavailable
 from app.core.db import context_free_session, tenant_session
 from app.core.logging import get_logger
-from app.knowledge import composition, contextual_backfill, policy, service
+from app.knowledge import composition, contextual_backfill, gaps, policy, service
 from app.knowledge.config.contextual import load_contextual_config
+from app.knowledge.config.gaps import load_gaps_config
 from app.knowledge.ingestion import hooks, runtime
 from app.ops.service import TenantTask
 from app.tenancy import service as tenancy
@@ -63,6 +69,8 @@ SETTLE_TASK: Final = policy.SETTLE_TASK
 SETTLE_MAX_RETRIES: Final = 10
 TIDY_CONVERSATIONS_TASK: Final = "knowledge.tidy_conversations"
 PURGE_ORPHAN_VECTORS_TASK: Final = "knowledge.purge_orphan_vectors"
+COLLECT_GAPS_TASK: Final = "knowledge.collect_gaps"
+PURGE_GAPS_TASK: Final = gaps.PURGE_JOB
 # Schools whose query log is still kept (an offboarded school's rows go with the whole purge).
 PURGE_TENANT_STATUSES: Final = ("active", "suspended", "offboarding")
 
@@ -228,6 +236,38 @@ def tidy_conversations_all() -> dict[str, int]:
     }
 
 
+def _each_school(step: Callable[[Any], int], failed_event: str) -> tuple[int, int, int]:
+    """Run ``step`` in each school's own ``tenant_session``; a failing school is rolled back,
+    logged (ids and error type only) and retried on the next run. (tenants, total, failed)."""
+    with context_free_session() as session:
+        tenant_ids = tenancy.list_tenant_ids(session, PURGE_TENANT_STATUSES)
+    total = failed = 0
+    for tenant_id in tenant_ids:
+        try:
+            with tenant_session(tenant_id) as session:
+                total += step(session)
+        except Exception as exc:  # database: this school only, retried next run
+            failed += 1
+            log.warning(failed_event, tenant_id=tenant_id, error_type=type(exc).__name__)
+    return len(tenant_ids), total, failed
+
+
+def collect_gaps_all() -> dict[str, int]:
+    """Count new unanswered questions into knowledge gaps, school by school (FA-06)."""
+    tenants, counted, failed = _each_school(
+        lambda s: gaps.collect(s).questions, "knowledge.gaps.collect_failed"
+    )
+    log.info("knowledge.gaps.collected", count=counted, failed=failed)
+    return {"tenants": tenants, "questions": counted, "failed": failed}
+
+
+def purge_gaps_all() -> dict[str, int]:
+    """Delete knowledge gaps past their retention, school by school (FA-06)."""
+    tenants, purged, failed = _each_school(gaps.purge, "knowledge.gaps.purge_failed")
+    log.info("knowledge.gaps.purged", count=purged, failed=failed)
+    return {"tenants": tenants, "purged": purged, "failed": failed}
+
+
 @shared_task(
     name=SUMMARY_TASK,
     base=TenantTask,
@@ -315,6 +355,16 @@ def purge_orphan_vectors() -> dict[str, int]:
     return purge_orphan_vectors_all()
 
 
+@shared_task(name=COLLECT_GAPS_TASK, queue="maintenance", acks_late=True, ignore_result=True)
+def collect_gaps() -> dict[str, int]:
+    return collect_gaps_all()
+
+
+@shared_task(name=PURGE_GAPS_TASK, queue="maintenance", acks_late=True)
+def purge_gaps() -> dict[str, int]:
+    return purge_gaps_all()
+
+
 def beat_schedule() -> dict[str, dict[str, Any]]:
     """Beat entries for knowledge (both deployment modes)."""
     every = load_contextual_config().backfill.every_minutes
@@ -335,5 +385,14 @@ def beat_schedule() -> dict[str, dict[str, Any]]:
         "knowledge-purge-orphan-vectors": {
             "task": PURGE_ORPHAN_VECTORS_TASK,
             "schedule": crontab(minute=55, hour=21),  # 03:25 IST
+        },
+        # FA-06 knowledge gaps: collect often, purge daily (after the query purge).
+        "knowledge-collect-gaps": {
+            "task": COLLECT_GAPS_TASK,
+            "schedule": float(load_gaps_config().collect_every_minutes * 60),
+        },
+        "knowledge-purge-gaps": {
+            "task": PURGE_GAPS_TASK,
+            "schedule": crontab(minute=10, hour=22),  # 03:40 IST
         },
     }

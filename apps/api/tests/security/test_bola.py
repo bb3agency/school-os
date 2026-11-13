@@ -10,6 +10,7 @@ invariant 3, docs/12 §4.3-4.4).
 from __future__ import annotations
 
 import contextlib
+import datetime as dt
 import importlib.util
 import re
 import sys
@@ -177,6 +178,8 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/certificates/{certificate_id}/verification/withdraw"): {
         "reason": "Synthetic BOLA verification reason"
     },
+    # FO-09: moving another school's TC request is 404.
+    ("POST", "/api/v1/tc-requests/{tc_request_id}/status"): {"status": "in_preparation"},
     # M4: circulars (document ids), suggestions, tasks and notices of school B are 404.
     ("POST", "/api/v1/circulars/{document_id}/read"): {},
     ("POST", "/api/v1/circulars/{document_id}/review"): {},
@@ -269,6 +272,11 @@ BODIES: dict[tuple[str, str], dict[str, Any] | None] = {
     ("POST", "/api/v1/messages/{message_id}/revoke-link"): None,
     # R2-3J: another school's receipt or notice is 404 like a random id.
     ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"): None,
+    # FM-08: another school's (cheque) receipt is 404 like a random id.
+    ("POST", "/api/v1/fees/cheques/{receipt_id}/returned"): {
+        "returned_on": "2026-11-01",
+        "reason": "Returned by the bank",
+    },
     ("POST", "/api/v1/notices/{notice_id}/withdraw"): {
         "reason": "The date in this notice was wrong"
     },
@@ -334,6 +342,8 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/certificates/{certificate_id}/duplicates"),
         ("POST", "/api/v1/certificates/{certificate_id}/withdraw"),
         ("POST", "/api/v1/certificates/{certificate_id}/render"),
+        # FO-09: moving a TC request needs certificate.issue too.
+        ("POST", "/api/v1/tc-requests/{tc_request_id}/status"),
         # M5: attendance, marks and insights are not owner permissions (08 PRV-004).
         ("GET", "/api/v1/sections/{section_id}/attendance"),
         ("GET", "/api/v1/sections/{section_id}/attendance/month"),
@@ -346,6 +356,8 @@ ACTOR: dict[tuple[str, str], str] = dict.fromkeys(
         ("POST", "/api/v1/exams/{exam_id}/lock"),
         ("POST", "/api/v1/exams/{exam_id}/unlock"),
         ("GET", "/api/v1/sections/{section_id}/exams/{exam_id}/marks/history"),
+        # FT-14 (D86): completeness is the principal's and the exam coordinator's.
+        ("GET", "/api/v1/completeness/exams/{exam_id}"),
         # FT-08 (D85): year-end results are not owner permissions.
         ("GET", "/api/v1/sections/{section_id}/year-results"),
         ("POST", "/api/v1/sections/{section_id}/year-results"),
@@ -689,6 +701,27 @@ def _b_certificate(w: Any) -> uuid.UUID:
     return value
 
 
+def _b_tc_request(w: Any) -> uuid.UUID:
+    """A TC request of school B (FO-09; logged through the real service by the B owner acting
+    with the office admin's permissions)."""
+    if "bola_tc_request" not in w.b.ids:
+        _b_certificate(w)  # loads tests/certificates/support.py
+        from app.certificates import tc_requests
+        from app.certificates.schemas import TcRequestIn
+
+        cert = sys.modules["sos_test_certificates_support"]
+        out = cert.call(
+            w.b,
+            w.b.people["owner"],
+            "office_admin",
+            tc_requests.log_request,
+            TcRequestIn(student_id=cert.student(w.b), received_on=cert.today(), channel="paper"),
+        )
+        w.b.ids["bola_tc_request"] = out.id
+    value: uuid.UUID = w.b.ids["bola_tc_request"]
+    return value
+
+
 def _circ() -> ModuleType:
     """tests/circulars/support.py (circulars, tasks and notices through the real services)."""
     name = "sos_test_circulars_support"
@@ -989,6 +1022,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "answer_id": _b_verified_answer,
     # Certificates (US-1101): an issued certificate of school B.
     "certificate_id": _b_certificate,
+    # FO-09: a TC request of school B.
+    "tc_request_id": _b_tc_request,
     # Circulars, tasks and notices (M4): a suggestion, a task and a notice of school B.
     "suggestion_id": _b_suggestion,
     "task_id": _b_task,
@@ -1018,6 +1053,8 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "tax_certificate_id": lambda w: _tax().b_certificate(_ADMIN[0], w),
     # FM-02: an add-on fee of school B.
     "addon_id": lambda w: _addons().b_addon(_ADMIN[0], w),
+    # FC-07 / FO-12: an inspection pack of school B.
+    "pack_id": lambda w: _compliance().b_pack(_ADMIN[0], w),
     # R2-2D online payments: a payment link and a reconciliation item of school B.
     "intent_id": lambda w: _b_fee(w, "intent_id"),
     "recon_item_id": lambda w: _b_fee(w, "recon_item_id"),
@@ -1035,6 +1072,11 @@ PARAM_TO_B: dict[str, Callable[[Any], uuid.UUID]] = {
     "correction_id": lambda w: _udise().b_request(_ADMIN[0], w),
     # FA-05 (FR-BRF-002): a stored weekly brief of school B.
     "brief_id": lambda w: _b_brief(_ADMIN[0], w),
+    # FC-09/FC-10: a safety check entry and a policy of school B (_safety, below).
+    "check_id": lambda w: _safety().b_id(_ADMIN[0], w, "/api/v1/compliance/checks/"),
+    "policy_id": lambda w: _safety().b_id(_ADMIN[0], w, "/api/v1/compliance/policies/"),
+    # FP-02 follow-up (FR-MSG-060): an urgent closure message of school B.
+    "closure_id": lambda w: _b_closure(_ADMIN[0], w),
 }
 
 
@@ -1055,6 +1097,47 @@ def _b_brief(admin: Engine, w: Any) -> uuid.UUID:
     return value
 
 
+def _b_closure(admin: Engine, w: Any) -> uuid.UUID:
+    """An urgent closure message of school B (today only; no messages)."""
+    if "bola_closure" not in w.b.ids:
+        closure_id = uuid.uuid4()
+        with admin.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO msg.closures (id, tenant_id, whole_school, closed_from, "
+                    "closed_to, reason_code, sent_by) VALUES (:i, :t, true, current_date, "
+                    "current_date, 'weather', :u)"
+                ),
+                {"i": closure_id, "t": w.b.tenant_id, "u": w.b.people["owner"].user_id},
+            )
+        w.b.ids["bola_closure"] = closure_id
+    value: uuid.UUID = w.b.ids["bola_closure"]
+    return value
+
+
+# message.closure.send is the principal's only (D85).
+ACTOR.update(
+    dict.fromkeys(
+        (
+            ("POST", "/api/v1/messaging/closures/{closure_id}/reopening/preview"),
+            ("POST", "/api/v1/messaging/closures/{closure_id}/reopening"),
+        ),
+        "principal",
+    )
+)
+BODIES.update(
+    {
+        ("POST", "/api/v1/messaging/closures/{closure_id}/reopening/preview"): {
+            "reopens_on": (dt.datetime.now(dt.UTC).date() + dt.timedelta(days=1)).isoformat()
+        },
+        ("POST", "/api/v1/messaging/closures/{closure_id}/reopening"): {
+            "reopens_on": (dt.datetime.now(dt.UTC).date() + dt.timedelta(days=1)).isoformat(),
+            "preview_token": "ro_" + "0" * 40,
+        },
+    }
+)
+
+
 def _id_routes() -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     for rc in iter_route_contexts(create_app().routes):
@@ -1072,7 +1155,10 @@ def _id_routes() -> list[tuple[str, str]]:
         # tests/dq/test_calendar_api.py). A UDISE+ to-do item key (FO-03, ``kind:uuid``) is derived
         # only from the caller's own reach (cross-school 404 in
         # tests/dq/test_udise_followup_api.py::test_FR_UDI_039_todo_authz_scope_and_tenant).
-        configuration = {"profile_key", "event_key", "key", "item_key"}
+        # A fix-owner letter key (FA-08) names a letter of the catalogue; its students are
+        # looked up only inside the caller's reach (cross-school 404 in
+        # tests/dq/test_fix_letters.py).
+        configuration = {"profile_key", "event_key", "key", "item_key", "letter_key"}
         if isinstance(rc.original_route, APIRoute) and params - configuration:
             out.extend((m, str(rc.path)) for m in sorted(rc.methods or ()))
     return sorted(out)
@@ -1153,15 +1239,58 @@ def _compliance() -> ModuleType:
 BODIES.update(_compliance().BOLA_BODIES)
 
 
+def _safety() -> ModuleType:
+    """tests/compliance/safety_support.py (FC-09/FC-10: a check entry and a policy of school B)."""
+    name = "sos_test_compliance_safety_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "compliance" / "safety_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+BODIES.update(_safety().BOLA_BODIES)
+
+
+def _gaps() -> ModuleType:
+    """tests/knowledge/gaps_security_support.py (FA-06 knowledge gaps)."""
+    name = "sos_test_knowledge_gaps_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "knowledge" / "gaps_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+# FA-06: ``gap_id`` is a knowledge gap of school B; kb.verified_answer.manage is the
+# principal's and the office admin's, not the owner's.
+PARAM_TO_B["gap_id"] = lambda w: _gaps().b_gap(w)
+BODIES.update(_gaps().BOLA_BODIES)
+ACTOR.update(dict.fromkeys(_gaps().BOLA_BODIES, "principal"))
+
+
 def _b_id(template: str, w: Any) -> uuid.UUID:
     """School B's object for ``template``: ``request_id`` is a privacy request on the privacy
     routes (R3-1A) and a break-glass request elsewhere."""
     if template.startswith(PRIVACY_REQUESTS):
         value: uuid.UUID = _privacy().b_request(w)
         return value
+    if template.startswith(_safety().BOLA_PREFIXES):
+        # FC-09/FC-10: ``check_id`` is a check entry, ``policy_id`` a policy of school B.
+        found: uuid.UUID = _safety().b_id(_ADMIN[0], w, template)
+        return found
     if template.startswith(_compliance().BOLA_PREFIX):
-        # FC-01: ``certificate_id`` is a compliance certificate on the compliance routes.
-        cert: uuid.UUID = _compliance().b_certificate(_ADMIN[0], w)
+        # FC-01: ``certificate_id`` is a compliance certificate on the compliance routes;
+        # FC-07: ``pack_id`` an inspection pack.
+        cert: uuid.UUID = _compliance().b_object(_ADMIN[0], w, template)
         return cert
     return PARAM_TO_B[_param(template)](w)
 

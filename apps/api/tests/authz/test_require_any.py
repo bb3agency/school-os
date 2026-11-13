@@ -267,6 +267,8 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         # Consent forms as a PDF: the print views' permissions (step-up checked in the service).
         ("POST", "/api/v1/exports/apaar-consent-forms"): APAAR_READERS,
         ("POST", "/api/v1/exports/consent-forms"): CONSENT_READERS,
+        # FO-11 (FR-EXP-028): the scheme list for attendance readers and certificate issuers.
+        ("GET", "/api/v1/scheme-packs"): ("attendance.read", ("certificate.issue",), False),
         # R3-1B consents (ADR-0049): a student's decisions, section counts and printed forms
         # for readers and recorders; purposes also for settings managers. Scope in the service.
         ("GET", "/api/v1/students/{student_id}/consents"): CONSENT_READERS,
@@ -288,6 +290,9 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
         # R2-1A (ADR-0045): TC formats and a certificate's verification code.
         ("GET", "/api/v1/certificates/formats"): CERT_READERS,
         ("GET", "/api/v1/certificates/{certificate_id}/verification"): CERT_READERS,
+        # FO-09: the TC request log (the service applies the student scope per request).
+        ("GET", "/api/v1/tc-requests"): CERT_READERS,
+        ("GET", "/api/v1/tc-requests/{tc_request_id}"): CERT_READERS,
         # Task assignees (FR-TASK-002, FR-CIR-004): whoever creates tasks or confirms suggested
         # deadlines picks an owner; the service requires a school-wide grant of either.
         ("GET", "/api/v1/task-assignees"): ("task.manage", ("circular.review",), False),
@@ -372,11 +377,24 @@ def test_SEC_003_tenant_any_of_guards_all_use_the_shared_require_any() -> None:
             ("finance.read",),
             False,
         ),
+        # FM-07 family counter and hand-over slip; FM-10 fee structure notice (D86)
+        ("GET", "/api/v1/fees/students/{student_id}/family"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/family-payments/slip"): FEE_VIEWERS,
+        ("GET", "/api/v1/fees/structure-notice"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/structure-notice/print"): FEE_SETUP_READERS,
+        ("GET", "/api/v1/fees/structure-changes"): FEE_SETUP_READERS,
         # R2-2E UPI (ADR-0042 decision 9): the counter, setup, finance readers and reconcilers
         # see the UPI details and QR; the confirmed vs unconfirmed report also opens to readers.
         ("GET", "/api/v1/fees/upi-settings"): UPI_READERS,
         ("GET", "/api/v1/fees/upi-settings/qr.svg"): UPI_READERS,
         ("GET", "/api/v1/fees/reports/upi"): ("fee.reconcile", ("finance.read",), False),
+        # FM-08: the counter (deposits) and reconcilers see cheque status and the deposit list.
+        ("GET", "/api/v1/fees/cheques"): ("fee.collect", ("fee.reconcile",), False),
+        ("GET", "/api/v1/fees/cheques/deposit-slip/print"): (
+            "fee.collect",
+            ("fee.reconcile",),
+            False,
+        ),
         ("GET", "/api/v1/fees/settings"): FEE_SETUP_READERS,
         ("GET", "/api/v1/fees/plans"): FEE_SETUP_READERS,
         ("GET", "/api/v1/fees/plans/{plan_id}"): FEE_SETUP_READERS,

@@ -316,7 +316,11 @@
         "dayCloseAction": "Open the day book",
         "dayClosed": "Today is closed. New payments go to the next day.",
         "dayOpen": "Today is not closed yet. Close it after counting the cash.",
-        "receiptsTotalLabel": "Receipts so far:"
+        "receiptsTotalLabel": "Receipts so far:",
+        "complianceTitle": "School certificates",
+        "complianceAction": "Open certificates",
+        "complianceNone": "Every certificate the school needs is recorded and valid.",
+        "complianceBody": "{expired, plural, one {1 certificate has expired} other {# certificates have expired}}, {expiring} expire soon and {missing} are not recorded yet."
       },
       "steps": {
         "label": "Steps to get started",
@@ -2201,7 +2205,16 @@
       "unknown_kind": "Choose a certificate from the list.",
       "renews_not_allowed": "Only an 'other' certificate names the one it renews.",
       "renews_not_found": "The certificate it renews was changed. Reload the page.",
-      "certificate_expired": "This certificate has expired. Record the renewed one before publishing."
+      "certificate_expired": "This certificate has expired. Record the renewed one before publishing.",
+      "done_in_future": "The date can't be in the future.",
+      "drill_fields_not_allowed": "Only drills take a number of people and minutes. Leave this empty.",
+      "leader_not_active": "This person is no longer an active member. Choose someone else.",
+      "check_label_required": "Type the name of the check.",
+      "check_label_not_allowed": "Only an 'other' check takes a name.",
+      "unknown_check_kind": "Choose a check from the list.",
+      "policy_document_not_ready": "Choose a PDF in Documents with the purpose policy that has finished its virus scan.",
+      "review_in_past": "Choose a date after today.",
+      "too_many_roles": "Choose fewer roles."
     },
     "api": {
       "year_result_changed": {
@@ -2458,7 +2471,13 @@
       "completeTitle": "You have signed in again",
       "completeBody": "Go back to the SchoolOS window. Your action continues there. You can close this window.",
       "closeWindow": "Close this window"
-    }
+    },
+    "review_not_after_today": "Choose a review date after today.",
+    "review_too_far": "Choose a review date within the next 60 days.",
+    "reminders_off": "Reminders are switched off for this school.",
+    "no_class_teacher": "This section has no class teacher to remind. Set one in the school structure.",
+    "already_complete": "Nothing is missing for this section any more.",
+    "exam_required": "Choose the exam first."
   },
   "auth": {
     "signedInAs": "Signed in as {name}",
@@ -3899,6 +3918,75 @@
     "summaryBySeverityLabel": "By severity:",
     "chipSection": "Chosen section",
     "chipOneStudent": "One student"
+  },
+  "fixLetters": {
+    "nav": "Letters to fix owners",
+    "title": "Letters to parents and the board",
+    "description": "Print the letters that ask a parent to update Aadhaar, or the board office to correct a registration, from the differences the readiness check found. Then record that they were given.",
+    "readinessCrumb": "Board and portal readiness",
+    "aboutTitle": "Letters from the school's records, not AI",
+    "aboutBody": "Each letter is a fixed template filled from the school's records. A letter asks for a correction; nothing in the school's records changes here. The letter to the MEO for UDISE+ corrections is on its own page:",
+    "udiseLink": "UDISE+ corrections to the MEO",
+    "noPermissionTitle": "You cannot print these letters",
+    "noPermissionBody": "Ask the office admin or the principal: this needs permission to run readiness checks.",
+    "profile": "Check",
+    "profiles": {
+      "bseap-ssc-2027": "AP SSC March 2027",
+      "apaar": "APAAR ID"
+    },
+    "unverifiedTitle": "Format not yet confirmed",
+    "unverifiedBody": "These letters follow the public guidance we could find. Show them to your office once and tell us if a different format is wanted.",
+    "parentAbout": "One letter per student. It names the detail, the value in the school's record and what differs. It never shows the Aadhaar number or the Aadhaar details.",
+    "boardAbout": "One letter listing every board registration correction. It goes outside the school, so the principal prints it after signing in again.",
+    "noneTitle": "No letters needed",
+    "noneParent": "Aadhaar agrees with the school's records for every student this check covers.",
+    "noneBoard": "The board registration agrees with the school's records for every student this check covers.",
+    "noSection": "No section",
+    "printSection": "Print letters for this section",
+    "printOne": "Print letter",
+    "newTab": "opens in a new tab",
+    "recipient": "Address the letter to",
+    "prepareBoard": "Prepare the board letter",
+    "checking": "Checking your sign-in…",
+    "openBoard": "Open the board letter",
+    "askPrincipal": "The principal or the office admin prints this letter.",
+    "colStudent": "Student",
+    "colFields": "Details to correct",
+    "colSent": "Last given or sent",
+    "colAction": "Letter",
+    "notShown": "Student outside your classes",
+    "notSent": "Not yet",
+    "emptyTitle": "No students",
+    "emptyBody": "No student needs this letter.",
+    "sent": {
+      "confirm": "Record",
+      "date": "Date",
+      "consequence": "This adds a step to each student's follow-up. It does not change any record.",
+      "parent_aadhaar": {
+        "trigger": "Record letters given",
+        "title": "Record letters given to parents",
+        "description": "{count, plural, one {# student's parent} other {# students' parents}} got the letter. The follow-up then shows the parent as contacted by letter."
+      },
+      "board_registration": {
+        "trigger": "Record letter sent",
+        "title": "Record the board letter as sent",
+        "description": "The letter for {count, plural, one {# student} other {# students}} went to the board office. The follow-up then shows the request as sent by letter."
+      }
+    },
+    "errors": {
+      "nothing_to_print": {
+        "title": "Nothing left to print",
+        "body": "No open difference is left for this letter. Reload the page."
+      },
+      "no_open_fix": {
+        "title": "Some differences changed",
+        "body": "Some students no longer need this letter. Reload the page and try again."
+      },
+      "too_many": {
+        "title": "Too many students",
+        "body": "Print one section at a time."
+      }
+    }
   },
   "readiness": {
     "nav": "Board readiness",
@@ -5601,7 +5689,8 @@
       "label": "Ask the school sections",
       "ask": "Ask",
       "search": "Search documents",
-      "verified": "Verified answers"
+      "verified": "Verified answers",
+      "gaps": "Unanswered questions"
     },
     "form": {
       "question": "Your question",
@@ -6066,6 +6155,89 @@
       },
       "nextBudgetBilling": "Full answers return when the month resets. To get them sooner, ask SchoolOS support about a bigger answer bundle.",
       "dismiss": "Dismiss: {title}"
+    },
+    "gaps": {
+      "title": "Unanswered questions",
+      "description": "Questions Ask could not answer, most asked first. Write a verified answer or add the missing document so the next person gets an answer.",
+      "noAccessTitle": "You can't see unanswered questions",
+      "noAccessBody": "Only people who manage verified answers (usually the principal and office admin) can see this page.",
+      "privacyNote": "Each question is shown with numbers, phone numbers and emails hidden, and never with who asked it. Questions are kept for a short time only.",
+      "uploadDocument": "Upload a document",
+      "summaryLabel": "Unanswered questions in numbers",
+      "openGaps": "Open questions",
+      "notFound": "Answered “not found”",
+      "notHelpful": "Not helpful or not checked",
+      "uncheckedHint": "{count, plural, =0 {None could not be checked} one {# could not be checked} other {# could not be checked}}",
+      "closedThisMonth": "Fixed this month",
+      "retention": "Kept for {days} days",
+      "statusFilter": "Show",
+      "status": {
+        "open": "Open",
+        "closed": "Fixed",
+        "dismissed": "Dismissed"
+      },
+      "listLabel": "Unanswered questions",
+      "questionUnreadable": "Question not available",
+      "asked": "{count, plural, one {Asked # time} other {Asked # times}}",
+      "signal": {
+        "not_found": "{count} not found",
+        "unchecked": "{count} not checked",
+        "not_helpful": "{count} not helpful"
+      },
+      "seen": "First asked {first} · last asked {last}",
+      "closedWithAnswer": "Fixed with a verified answer",
+      "closedWithDocument": "Fixed with a document",
+      "dismissedNote": "Dismissed",
+      "closedBy": "by {name}",
+      "openDocument": "Open the document",
+      "actionsFor": "For the question: {question}",
+      "writeAnswer": "Write a verified answer",
+      "linkDocument": "Fixed by a document",
+      "linkDocumentTitle": "Mark as fixed by a document",
+      "linkDocumentBody": "Upload the missing document first (Documents), then paste its page link here. Ask will find it once it is indexed.",
+      "linkDocumentConfirm": "Mark as fixed",
+      "documentField": "Document link",
+      "documentHint": "Paste the address of the document's page, for example from the Documents list.",
+      "dismiss": "Dismiss",
+      "dismissTitle": "Dismiss this question?",
+      "dismissBody": "Use this for questions the school's records should not answer. If people ask it again, it shows here again.",
+      "dismissConfirm": "Dismiss",
+      "empty": {
+        "open": {
+          "title": "No unanswered questions",
+          "body": "When Ask can't answer a question, or someone marks an answer not helpful, it shows here."
+        },
+        "closed": {
+          "title": "Nothing fixed yet",
+          "body": "Questions you fix with a verified answer or a document show here."
+        },
+        "dismissed": {
+          "title": "Nothing dismissed",
+          "body": "Questions you dismiss show here."
+        }
+      },
+      "errors": {
+        "knowledge_gap_closed": {
+          "title": "Already fixed",
+          "body": "Someone fixed or dismissed this question already. Close this and reload the page."
+        },
+        "gap_document_not_found": {
+          "title": "Document not found",
+          "body": "Check the link. You can only use a document you can open, and it must not be archived."
+        },
+        "gap_answer_not_usable": {
+          "title": "Answer can't be used",
+          "body": "The verified answer is retired or cites a document you can't open. Write a new answer instead."
+        },
+        "not_found": {
+          "title": "Question not found",
+          "body": "It may have been removed after its retention period. Reload the page."
+        },
+        "precondition_failed": {
+          "title": "Changed somewhere else",
+          "body": "This was changed in another window. Reload the page and try again."
+        }
+      }
     }
   },
   "marketing": {
@@ -7005,6 +7177,22 @@
       "verification_code_unavailable": {
         "title": "The code could not be made",
         "body": "Try again in a moment."
+      },
+      "tc_request_open_exists": {
+        "title": "This student already has an open TC request",
+        "body": "Open the request in the list instead of logging a new one."
+      },
+      "tc_request_wrong_status": {
+        "title": "This request has moved on",
+        "body": "Reload the list to see where it is now."
+      },
+      "tc_request_certificate_pending": {
+        "title": "A TC for this request is waiting for approval",
+        "body": "Withdraw the TC or ask the principal to reject it, then cancel the request."
+      },
+      "tc_request_certificate_not_issued": {
+        "title": "The TC for this request is no longer issued",
+        "body": "Open the certificate to see why, then prepare the TC again."
       }
     },
     "detail": {
@@ -7246,7 +7434,85 @@
       "saved": "Saved."
     },
     "more": "More",
-    "chipOneStudent": "One student"
+    "chipOneStudent": "One student",
+    "tcRequests": {
+      "nav": "TC requests",
+      "title": "TC requests",
+      "description": "Transfer certificate requests that reached the office on paper, by phone or in person. Log each one, prepare the TC from it and record when it was handed over.",
+      "crumbHome": "Home",
+      "crumbCertificates": "Certificates",
+      "colReceived": "Received",
+      "colStudent": "Student",
+      "colStatus": "Status",
+      "colDays": "Days open",
+      "days": "{count, plural, one {# day} other {# days}}",
+      "overdue": "Overdue",
+      "overdueTitle": "{count, plural, one {# request is overdue} other {# requests are overdue}}",
+      "overdueBody": "These were received more than {days} days ago and the TC is not ready yet. A TC must not delay the pupil's admission elsewhere.",
+      "overdueUnverified": "The number of days is a default your school has not confirmed yet.",
+      "showOverdue": "Show overdue requests",
+      "duesNote": "Unpaid fees never stop or delay a TC. Staff who see fees find the balance on the request as information only.",
+      "filter": "Show",
+      "filters": {
+        "overdue": "Overdue",
+        "received": "Received",
+        "in_preparation": "In preparation",
+        "ready": "Ready to collect",
+        "issued": "Handed over",
+        "cancelled": "Cancelled"
+      },
+      "status": {
+        "received": "Received",
+        "in_preparation": "In preparation",
+        "ready": "Ready to collect",
+        "issued": "Handed over",
+        "cancelled": "Cancelled"
+      },
+      "channels": {
+        "paper": "Letter or form",
+        "phone": "Phone call",
+        "in_person": "In person",
+        "other": "Other"
+      },
+      "reasons": {
+        "parent_request": "At the request of the parent",
+        "parent_transferred": "Parent transferred",
+        "course_completed": "Completed the course",
+        "other": "Other"
+      },
+      "stepReceived": "Logged on {date} by {who}",
+      "stepPreparing": "Being prepared since {date} by {who}",
+      "stepReady": "Issued on {date} by {who}",
+      "stepIssued": "Handed over on {date} by {who}",
+      "stepCancelled": "Cancelled on {date} by {who}",
+      "someone": "a staff member",
+      "openTc": "Open the TC",
+      "prepareTc": "Prepare the TC",
+      "markPreparing": "Mark as being prepared",
+      "handOver": "Record hand-over",
+      "handOverTitle": "Record that the TC was handed over",
+      "handOverBody": "The transfer certificate of {name} was given to the parent or the pupil.",
+      "cancel": "Cancel request",
+      "cancelTitle": "Cancel this TC request",
+      "cancelBody": "The request for {name} is closed. The pupil stays on the rolls unless a TC is issued.",
+      "cancelConsequence": "A cancelled request cannot be opened again. Log a new request if the parent asks again.",
+      "cancelReason": "Why is it cancelled?",
+      "cancelReasonHint": "At least {min} characters. Staff can read this; do not enter Aadhaar numbers.",
+      "log": "Log a request",
+      "logTitle": "Log a TC request",
+      "logBody": "Record a request that came on paper, by phone or in person. The day it was received becomes the TC's application date.",
+      "changeStudent": "Change student",
+      "receivedOn": "Received on",
+      "receivedOnHint": "The day the office got the request.",
+      "channel": "How it came",
+      "leavingDate": "Leaving date asked for",
+      "leavingReason": "Reason for leaving",
+      "optional": "Optional",
+      "emptyTitle": "No TC requests",
+      "emptyBody": "Requests logged by the office appear here.",
+      "emptyBodyIssuer": "Log a request when a parent asks for a transfer certificate.",
+      "showMore": "Show more"
+    }
   },
   "circulars": {
     "nav": "Circulars",
@@ -7946,7 +8212,9 @@
       "closeReason": "Closed because",
       "profile": "Open the student's profile",
       "logTitle": "What has been done",
-      "logDescription": "Oldest first. Notes are seen only by people who can act on this flag."
+      "logDescription": "Oldest first. Notes are seen only by people who can act on this flag.",
+      "reviewOn": "Next review",
+      "reviewDue": "Review due"
     },
     "log": {
       "kind": {
@@ -7974,7 +8242,9 @@
       "actedOn": "When",
       "note": "Note (optional)",
       "noteHint": "Up to 1,000 characters. Kept encrypted and seen only by the class teacher and the principal.",
-      "consequence": "The action is added to the flag's log. Nothing on the student's record changes."
+      "consequence": "The action is added to the flag's log. Nothing on the student's record changes.",
+      "reviewOn": "Next review (optional)",
+      "reviewHint": "When to look at this again, up to {days} days ahead. The owner is reminded in the app that day."
     },
     "close": {
       "open": "Close the flag",
@@ -8182,7 +8452,9 @@
       "no_current_year": {
         "title": "No current academic year",
         "body": "Ask the office admin to set the current academic year in Settings, then try again."
-      }
+      },
+      "review_not_after_today": "Choose a review date after today.",
+      "review_too_far": "Choose a review date within the next 60 days."
     }
   },
   "tally": {
@@ -8658,7 +8930,8 @@
       "parent_notice": "Notice from the school",
       "parent_receipt": "Fee receipt",
       "parent_dues": "Fees due",
-      "parent_optin": "School messages on WhatsApp"
+      "parent_optin": "School messages on WhatsApp",
+      "parent_closure": "School closed"
     },
     "view": {
       "validUntil": "This link works until {date}."
@@ -8978,7 +9251,8 @@
         "fee_reminder": "Fee reminder",
         "fee_receipt": "Fee receipt",
         "optin_stopped": "Stop confirmation",
-        "school_closure": "School closure"
+        "school_closure": "School closure",
+        "school_reopening": "School reopening"
       },
       "languages": {
         "en": "English",
@@ -9421,7 +9695,22 @@
         "dates": "Closed",
         "reason": "Reason",
         "audience": "Sent to",
-        "sentAt": "Sent at"
+        "sentAt": "Sent at",
+        "reopening": "Reopening"
+      },
+      "noticeText": "Order text for parents (optional)",
+      "noticeTextHint": "Shown only on the page the message links to, not in the WhatsApp message. Plain text, at most 1000 characters. Never type an Aadhaar number.",
+      "pageNote": "The message has a See details button. It opens a page with the dates, the reason and the order text, until 7 days after the last closed day.",
+      "reopen": {
+        "action": "Send a reopening message",
+        "title": "School reopens",
+        "description": "Tell the same parents when the school opens again. One reopening message per closure; the same sending hours apply.",
+        "date": "School reopens on",
+        "check": "Check the reopening message",
+        "cancel": "Close",
+        "sent": "Reopening message sent",
+        "reopensOn": "Reopens {date}",
+        "none": "No reopening message yet"
       }
     }
   },
@@ -9537,7 +9826,8 @@
       "taxCertificates": "Tax certificates",
       "leftWithDues": "Left with dues",
       "reports": "Fee reports",
-      "addons": "Add-on fees"
+      "addons": "Add-on fees",
+      "cheques": "Cheques"
     },
     "modes": {
       "cash": "Cash",
@@ -9718,6 +10008,45 @@
         "errors": {
           "not_positive": "Enter an amount above zero, like 4999 or 4999.50.",
           "above_outstanding": "This is more than the student owes across all years. Lower the amount."
+        }
+      },
+      "family": {
+        "title": "Family",
+        "formLabel": "One payment for the family",
+        "description": "Brothers and sisters linked to the same parent or guardian on their student records. Enter what the parent pays for each child: one receipt is saved for each child, all together.",
+        "columns": {
+          "student": "Student",
+          "year": "Year",
+          "dueNow": "Due now",
+          "amount": "Amount paid (₹)"
+        },
+        "thisStudent": "this student",
+        "noYear": "Year not recorded",
+        "nothingDue": "Nothing due now",
+        "amountFor": "Amount paid for {name}, {year}",
+        "fillAll": "Fill in everything due",
+        "total": "Total:",
+        "mode": "Paid by",
+        "noUpi": "UPI is not offered here: each UPI payment has its own UTR, so take each child's UPI payment with its own receipt.",
+        "save": "{count, plural, =0 {Save receipts} one {Save # receipt} other {Save # receipts}}",
+        "refusedTitle": "The receipts were not saved",
+        "savedTitle": "Family payment saved",
+        "savedLead": "{count, plural, one {# receipt saved} other {# receipts saved}}",
+        "savedBody": "{amount} received. Print each child's receipt, or the hand-over slip that lists them all.",
+        "printReceipt": "Print receipt {number}",
+        "printSlip": "Print hand-over slip",
+        "another": "Take another family payment",
+        "errors": {
+          "amount": "Enter an amount like 4999 or 4999.50, or leave it empty.",
+          "above_due": "This is more than is due now. Lower the amount.",
+          "two_or_more": "Enter an amount for at least two accounts. For one child, use the payment form.",
+          "too_many": "One family payment can cover at most {count} accounts.",
+          "missing": "Fill in this field.",
+          "invalid_cheque_number": "Enter the 6-digit cheque number.",
+          "invalid_reference": "Enter the bank reference: 12 to 22 letters or digits.",
+          "upi_one_receipt_per_utr": "UPI cannot be used for a family payment. Take each child's UPI payment with its own receipt.",
+          "not_in_family": "One of the accounts is not of this family any more. Reload the counter and try again.",
+          "duplicate": "The same account is listed twice. Reload the counter and try again."
         }
       }
     },
@@ -10269,7 +10598,9 @@
       "kinds": {
         "utr_exact": "Same UTR and amount",
         "amount_date": "Same amount, near date: check it",
-        "manual": "Matched by a person"
+        "manual": "Matched by a person",
+        "cheque_exact": "Same cheque number and amount",
+        "transfer_exact": "Same bank reference and amount"
       },
       "exceptions": {
         "no_receipt": "No receipt has this payment yet",
@@ -10319,7 +10650,10 @@
       "onlineMenu": "Online reconciliation (Razorpay)",
       "upiSettingsLink": "UPI QR settings",
       "amountInr": "Amount (₹)",
-      "noStatementsBody": "Download the account statement from the bank's website as Excel or CSV and read it above. Matches are proposed for you to confirm."
+      "noStatementsBody": "Download the account statement from the bank's website as Excel or CSV and read it above. Matches are proposed for you to confirm.",
+      "chequeNo": "Cheque {number}",
+      "transferRef": "Ref {ref}",
+      "chequesLink": "Cheques: deposit list and returned cheques"
     },
     "settings": {
       "title": "Fee settings",
@@ -10639,6 +10973,93 @@
         "receipt": "Receipts",
         "refund": "Refund vouchers"
       }
+    },
+    "structureNotice": {
+      "title": "Fee structure notice",
+      "description": "Print the school's fee structure for a year by class, for the notice board and admission enquiries, and check the change against last year before you activate plans.",
+      "year": "Year of the notice",
+      "class": "Classes on the notice",
+      "allClasses": "All classes",
+      "print": "Print notice",
+      "printNote": "One A4 page per class: fee heads, the total for the year, instalments with due dates and the late-fee rule. A class whose plan is still a draft is marked DRAFT.",
+      "changesTitle": "Change against last year",
+      "threshold": "Flag increases above (%)",
+      "thresholdHint": "Leave empty for the school's usual review level. This only changes this view; nothing is saved. It is not a legal limit.",
+      "thresholdError": "Enter a number from 0 to 1000 with at most one decimal, like 10 or 12.5.",
+      "noPlans": "No fee plans to compare",
+      "noPlansBody": "Make a plan for this year or last year first.",
+      "against": "{year} against {previous}. Increases above {percent}% are flagged.",
+      "firstYear": "No earlier year to compare {year} with.",
+      "flaggedTitle": "{count, plural, one {# class has an increase above the review level} other {# classes have an increase above the review level}}",
+      "flaggedBody": "Check the flagged rows before you activate the plans. The review level ({percent}%) is the school's own, not a legal rule.",
+      "draft": "Draft plan",
+      "noPlanThisYear": "No plan this year",
+      "tableLabel": "Change for {name}",
+      "columns": {
+        "head": "Fee head",
+        "change": "Change",
+        "previous": "Last year",
+        "current": "This year",
+        "difference": "Difference",
+        "percent": "Change %"
+      },
+      "kinds": {
+        "added": "New",
+        "removed": "Removed",
+        "changed": "Changed",
+        "unchanged": "Same"
+      },
+      "total": "Total for the year",
+      "aboveThreshold": "(above the review level)"
+    },
+    "cheques": {
+      "title": "Cheques",
+      "description": "Cheques taken at the counter: mark them deposited, print the list for the bank's pay-in slip and record a cheque the bank returned.",
+      "listTitle": "Cheque receipts from {from} to {to}",
+      "listBody": "{received} at school, {deposited} deposited, {cleared} cleared, {returned} returned.",
+      "clearedNote": "A cheque shows as cleared once a person confirms it from an imported bank statement (Reconcile UPI and bank).",
+      "filter": "Show",
+      "allStatuses": "All cheques",
+      "statuses": {
+        "received": "At school",
+        "deposited": "Deposited",
+        "cleared": "Cleared",
+        "returned": "Returned"
+      },
+      "tableLabel": "Cheque receipts",
+      "tableCaption": "Cheque receipts with their status",
+      "select": "Select",
+      "chequeNo": "Cheque no.",
+      "bank": "Bank",
+      "receipt": "Receipt",
+      "student": "Student",
+      "amount": "Amount",
+      "status": "Status",
+      "actions": "Actions",
+      "chequeLabel": "Cheque {number}",
+      "depositedOnText": "Deposited on {date}",
+      "clearedOnText": "Seen in the bank on {date}",
+      "returnedOnText": "Returned on {date}",
+      "overdue": "Not deposited yet",
+      "receiptCancelled": "Receipt cancelled",
+      "markDeposited": "{count, plural, =0 {Mark deposited} one {Mark # cheque deposited} other {Mark # cheques deposited}}",
+      "depositTitle": "{count, plural, one {Mark # cheque deposited} other {Mark # cheques deposited}}",
+      "depositBody": "Record the day these cheques were taken to the bank.",
+      "depositConsequence": "They appear on that day's deposit list. Receipts and dues do not change.",
+      "depositedOn": "Deposited on",
+      "depositDone": "{count, plural, one {# cheque marked deposited} other {# cheques marked deposited}}{skipped, plural, =0 {.} other {; # could not be marked.}}",
+      "printSlip": "Print deposit list",
+      "markReturned": "Returned by bank",
+      "returnTitle": "Cheque {number} returned by the bank",
+      "returnBody": "This asks for the receipt to be cancelled with the reason \"Cheque dishonoured\". Another person with the right to cancel receipts approves it.",
+      "returnConsequence": "The dues come back only when the cancellation is approved. Collect the fee again by another payment.",
+      "returnConfirm": "Ask to cancel the receipt",
+      "returnedOn": "Returned on",
+      "returnReason": "Reason",
+      "returnReasonHint": "What the bank said, for example \"funds insufficient\". Do not write account numbers.",
+      "returnReasonDefault": "Cheque returned by the bank",
+      "truncated": "Only the first 500 cheques are shown. Choose a shorter period.",
+      "empty": "No cheque receipts in this period."
     }
   },
   "payments": {
@@ -12803,7 +13224,9 @@
       "useLabel": "Use the SchoolOS value for {field}",
       "source": {
         "year_result": "the confirmed annual result",
-        "attendance_register": "the attendance register up to today"
+        "attendance_register": "the attendance register up to today",
+        "tc_request": "the TC request log",
+        "conduct_certificate": "the last conduct certificate"
       }
     },
     "promotion": {
@@ -13054,6 +13477,454 @@
       "conflict": {
         "title": "Someone recorded this at the same time",
         "body": "Reload the page and check the certificate before trying again."
+      },
+      "unknown_pack": {
+        "title": "This inspection pack is not available",
+        "body": "Reload the page and choose one of the packs listed for your school."
+      }
+    },
+    "inspectionLink": "Prepare for an inspection",
+    "packs": {
+      "title": "Prepare for an inspection",
+      "description": "See what an inspector usually asks for, what SchoolOS already holds and what is missing, then make a pack to print.",
+      "unverifiedTitle": "These lists are a guide",
+      "unverifiedBody": "What each office asks for was put together from public guidance and is not yet confirmed. It can differ by district and year. Check with the office before the visit.",
+      "choosePack": "Inspection by",
+      "authority": "For: {authority}",
+      "colItem": "Item",
+      "colState": "State",
+      "colDetails": "Details",
+      "colFixBy": "Fixed by",
+      "colWhere": "Where to print it",
+      "ownFiles": "School's own files",
+      "openAria": "Open the screen for {name}",
+      "emptyTitle": "No items",
+      "emptyBody": "This pack has no items for your school's boards.",
+      "where": {
+        "certificate": "Compliance certificates",
+        "register": "Registers",
+        "disclosure": "CBSE disclosure",
+        "privacy_notice": "Privacy notices",
+        "dpdp_readiness": "DPDP readiness",
+        "not_tracked": "School's own files"
+      },
+      "state": {
+        "ready": "Ready",
+        "expiring": "Expires soon",
+        "no_copy": "No copy on file",
+        "incomplete": "Incomplete",
+        "expired": "Expired",
+        "missing": "Missing",
+        "left_out": "Not included",
+        "not_tracked": "Not tracked in SchoolOS"
+      },
+      "details": {
+        "certificateMissing": "Not recorded in SchoolOS",
+        "validUntil": "Valid until {date}",
+        "noExpiry": "No expiry",
+        "copy": "copy on file",
+        "noCopy": "no copy on file",
+        "registerReady": "Prints from SchoolOS records",
+        "registerChosen": "Chosen for this pack",
+        "registerLeftOut": "Not chosen for this pack",
+        "published": "Published {date}",
+        "notPublished": "No page published yet",
+        "noticeGiven": "Given on {date}",
+        "noNotice": "No notice recorded yet",
+        "dpdp": "{done} of {applicable} done",
+        "notTracked": "Keep it in the school's own files for now ({feature})"
+      },
+      "counts": {
+        "ready": "Ready",
+        "attention": "Need attention",
+        "missing": "Missing or expired",
+        "notTracked": "Not tracked in SchoolOS"
+      },
+      "make": {
+        "title": "Make the pack",
+        "body": "SchoolOS keeps each item's state as it is now and gives you an index to print as the cover. Print each item from its own screen and put it behind the index.",
+        "year": "Academic year of the registers",
+        "yearDefault": "The current year",
+        "currentYear": "{label} (current)",
+        "visitOn": "Visit date",
+        "visitOnHint": "Optional. Printed on the index.",
+        "registers": "Registers to include",
+        "registersHint": "Registers list students. Include only the ones the inspector is entitled to see. They print from the Registers screen after you confirm it is you.",
+        "registersNotAllowed": "Registers are listed as not included. Ask someone who can print registers to add them.",
+        "submit": "Make the pack",
+        "printIndex": "Print the index",
+        "newTab": "opens in a new tab",
+        "made": "Pack made: {ready} items ready, {missing} missing or expired."
+      },
+      "log": {
+        "title": "Packs made",
+        "colMade": "Pack",
+        "colVisit": "Visit date",
+        "colSummary": "Summary",
+        "colIndex": "Index",
+        "summary": "{ready} ready, {attention} need attention, {missing} missing",
+        "print": "Print index",
+        "printAria": "Print the index of {name}",
+        "newTab": "opens in a new tab",
+        "emptyTitle": "No packs made yet",
+        "emptyBody": "Choose an inspection above and make the pack before the visit."
+      }
+    }
+  },
+  "enrolmentStats": {
+    "nav": "Enrolment statistics",
+    "title": "Enrolment statistics",
+    "description": "How many students each class has on one day of the year: by gender, age, category, minority group, special needs, repeaters, admissions and leavers. Counts only, no names.",
+    "year": "Academic year",
+    "currentYear": "Current year",
+    "asOf": "Count on",
+    "asOfHint": "Leave empty for 30 September of the year.",
+    "show": "Show counts",
+    "noAccessTitle": "You cannot see the enrolment statistics",
+    "noAccessBody": "The sheet counts the whole school. Ask the principal for the portal export permission for the whole school.",
+    "unverifiedTitle": "Not yet checked against the official form",
+    "unverifiedBody": "The table shapes, the age day and the minority groups follow public guidance on the UDISE+ form. Check them against the portal before you copy the numbers.",
+    "restrictedTitle": "Some tables are hidden",
+    "restrictedBody": "The category, minority and special needs tables need permission to see restricted student details for the whole school.",
+    "summaryTitle": "{year}, counted on {date}",
+    "summaryBody": "{count, plural, one {# student enrolled on the day.} other {# students enrolled on the day.}}",
+    "gapsLabel": "Details missing in the records",
+    "gap": "{count, plural, one {# student has} other {# students have}} no {field} recorded",
+    "noGaps": "Every counted student has the details these tables need.",
+    "emptyTitle": "No students on that day",
+    "emptyBody": "No student was enrolled in this academic year on the day you chose.",
+    "restrictedTable": "Counted from restricted details. Only the numbers are shown.",
+    "colClass": "Class",
+    "totalRow": "Total",
+    "total": {
+      "gender": "Total",
+      "age": "Total",
+      "category": "Total",
+      "minority": "Total",
+      "cwsn": "Total with special needs",
+      "repeaters": "Total repeaters",
+      "movement": "Enrolled on the day"
+    }
+  },
+  "exportPacks": {
+    "back": "Back to exports",
+    "print": "Prepare print",
+    "preparing": "Checking…",
+    "openPrint": "Open print page",
+    "newTab": "opens in a new tab",
+    "downloadXlsx": "Download XLSX",
+    "downloading": "Downloading…",
+    "downloaded": "Saved {name}"
+  },
+  "schemePacks": {
+    "nav": "Scheme verification",
+    "title": "Scheme verification pack",
+    "description": "Attendance lists and study or bonafide certificates for a government scheme's verification, from the school's own records.",
+    "noAccessTitle": "You cannot use the scheme pack",
+    "noAccessBody": "It needs permission to see attendance or to issue certificates.",
+    "noEligibilityTitle": "The department decides who is eligible",
+    "scheme": "Scheme",
+    "section": "Class and section",
+    "chooseSection": "Choose a section",
+    "from": "From",
+    "to": "To",
+    "show": "Show attendance list",
+    "noAttendanceTitle": "Attendance lists need the attendance permission",
+    "noAttendanceBody": "Ask a class teacher or the office for the list. You can still issue certificates from a student's page.",
+    "emptyTitle": "No students in this section",
+    "emptyBody": "Choose another section, or check the class lists for this year.",
+    "listTitle": "{section}: {from} to {to}",
+    "listBody": "{count, plural, one {# student.} other {# students.}} Print the list for the head's signature or download it.",
+    "tableLabel": "Attendance of {section}",
+    "chooseAll": "Choose every student",
+    "chooseOne": "Choose {name}",
+    "colRoll": "Roll no.",
+    "colAdmission": "Admission no.",
+    "colStudent": "Student",
+    "colCounted": "Days counted",
+    "colPresent": "Days present",
+    "colPercent": "Attendance",
+    "noMarks": "No marks",
+    "unnamed": "No name recorded",
+    "countingNote": "Days present counts present and late days. Leave days and days not marked are not counted.",
+    "certificatesTitle": "Certificates for the chosen students",
+    "certificatesBody": "Each chosen student gets a {type} with its own serial number and register line.",
+    "type": {
+      "study": "study certificate",
+      "bonafide": "bonafide certificate"
+    },
+    "issue": "{count, plural, =0 {Choose students to issue certificates} one {Issue a certificate for # student} other {Issue certificates for # students}}",
+    "confirmBody": "{count, plural, one {A certificate will be issued for # student.} other {Certificates will be issued for # students.}} Issued certificates can only be cancelled one at a time.",
+    "confirm": "{count, plural, one {Issue # certificate} other {Issue # certificates}}",
+    "cancel": "Cancel",
+    "issuing": "Issuing…",
+    "resultTitle": "Certificates issued",
+    "resultBody": "{issued, plural, one {# issued} other {# issued}}, {refused, plural, one {# not issued} other {# not issued}}.",
+    "openCertificate": "Open certificate",
+    "refusal": {
+      "not_found": "Not issued: outside your classes",
+      "other": "Not issued: check the student's record"
+    }
+  },
+  "completeness": {
+    "nav": "Entry progress",
+    "title": "Attendance and marks entry",
+    "description": "How much of today's attendance and each exam's marks is entered, per section, and whose entry it waits on. Counts only.",
+    "noPermissionTitle": "You can't see entry progress",
+    "noPermissionBody": "The principal and the exam coordinator see this page.",
+    "section": "Section",
+    "waitingOn": "Waiting on",
+    "action": "Action",
+    "nobody": "Nobody",
+    "noClassTeacher": "No class teacher set",
+    "ofStudents": "{entered} of {students}",
+    "remind": "Send a reminder",
+    "remindSection": "Send a reminder for {section}",
+    "reminded": "Reminder sent",
+    "alreadyReminded": "Already reminded",
+    "footnote": "This shows how complete each section's entry is. It is not a measure of any teacher's work.",
+    "status": {
+      "label": "Status",
+      "complete": "Complete",
+      "partial": "Partly entered",
+      "not_taken": "Not taken",
+      "not_started": "Not started",
+      "missing": "Missing",
+      "day_off": "No school",
+      "no_students": "No students"
+    },
+    "attendance": {
+      "title": "Attendance",
+      "date": "Date",
+      "taken": "Attendance taken in {taken} of {of} sections",
+      "breakdown": "{partial} partly entered, {notTaken} not taken, {dayOff} with no school that day.",
+      "marked": "Students marked",
+      "tableLabel": "Attendance per section, table, scrolls sideways"
+    },
+    "marks": {
+      "title": "Marks",
+      "exam": "Exam",
+      "chooseExam": "Choose an exam",
+      "summary": "{exam}: marks complete in {complete} of {of} sections",
+      "locked": "This exam is locked.",
+      "noSubjects": "No marks are entered for this exam yet.",
+      "tableLabel": "Marks per section and subject, table, scrolls sideways"
+    }
+  },
+  "followUpCounts": {
+    "nav": "Follow-up counts",
+    "title": "Student follow-up counts",
+    "description": "How the school follows up early-warning flags, as numbers for the whole school. No names and no student details.",
+    "noPermissionTitle": "You can't see follow-up counts",
+    "noPermissionBody": "Management sees these counts. Flags stay with the class teacher and the principal.",
+    "since": "Since {date}",
+    "raised": "Flags raised",
+    "onTime": "{count} acted on by the due date",
+    "overdue": "Overdue, nobody acted",
+    "reviewDue": "Reviews due",
+    "open": "Still open",
+    "outcomes": "{count} closed, by outcome",
+    "footnote": "Counts only. They are for supporting students, never for judging a student or a teacher."
+  },
+  "complianceChecks": {
+    "nav": "Safety checks",
+    "title": "Safety drills and checks",
+    "description": "Fire drills, extinguisher refills, electrical, water and CCTV checks: when each was last done and when the next is due.",
+    "logButton": "Log a check",
+    "noPermissionTitle": "You can't see the safety checks",
+    "noPermissionBody": "Ask the principal or the office admin if you need to see them.",
+    "unverifiedTitle": "Suggested frequencies",
+    "unverifiedBody": "How often each check is done is common practice, not a rule we have checked. Do them as often as your board, fire officer or management asks.",
+    "privacyNote": "Record counts and short notes only. Never type a student's name and never upload photos that show children's faces.",
+    "counts": {
+      "overdue": "Overdue",
+      "never": "Never logged",
+      "dueSoon": "Due within {days} days"
+    },
+    "colCheck": "Check",
+    "colStatus": "Status",
+    "colLastDone": "Last done",
+    "colActions": "Actions",
+    "every": "{months, plural, one {Every month} other {Every # months}}",
+    "noFrequency": "No fixed frequency",
+    "dueOn": "Due {date}",
+    "daysLeft": "{days, plural, =0 {today} one {in # day} other {in # days}}",
+    "daysAgo": "{days, plural, one {# day ago} other {# days ago}}",
+    "never": "Not logged yet",
+    "state": {
+      "ok": "Up to date",
+      "due_soon": "Due soon",
+      "overdue": "Overdue",
+      "never": "Never logged",
+      "logged": "Logged"
+    },
+    "emptyTitle": "No checks for this school",
+    "emptyBody": "No check in the list applies to your school's board.",
+    "logAria": "Log {name}",
+    "recentTitle": "Latest entries",
+    "recentEmptyTitle": "Nothing logged yet",
+    "recentEmptyBody": "Log a drill or check after it is done; reminders start after the first entry.",
+    "colDate": "Date",
+    "colPeople": "People and time",
+    "colResult": "Result",
+    "colNotes": "Notes",
+    "colReport": "Report",
+    "people": "{count, plural, one {# person} other {# people}}",
+    "minutes": "{minutes, plural, one {# minute} other {# minutes}}",
+    "result": {
+      "ok": "No issues",
+      "action_needed": "Action needed"
+    },
+    "reportHidden": "Report not visible to you",
+    "remove": "Remove",
+    "removeAria": "Remove the entry {name} of {date}",
+    "removeDialog": {
+      "title": "Remove this entry?",
+      "confirm": "Remove entry",
+      "consequence": "It stays in the history as removed and no longer counts for the due date."
+    },
+    "form": {
+      "title": "Log a check",
+      "description": "Record a drill or check that was done.",
+      "kind": "Check",
+      "choose": "Choose a check",
+      "label": "Name of the check",
+      "doneOn": "Done on",
+      "ledBy": "Led by",
+      "nobody": "Not recorded",
+      "participants": "People who took part",
+      "duration": "Minutes taken",
+      "durationHint": "For an evacuation drill: from the alarm until everyone was out.",
+      "result": "Result",
+      "observations": "What was found",
+      "observationsHint": "Up to 500 characters. Do not type names.",
+      "document": "Report",
+      "documentHint": "A report or certificate already in Documents.",
+      "noDocument": "No report",
+      "loading": "Loading documents...",
+      "record": "Log check"
+    },
+    "errors": {
+      "check_removed": {
+        "title": "This entry was already removed",
+        "body": "Reload the page to see the latest log."
+      }
+    }
+  },
+  "compliancePolicies": {
+    "nav": "Policies",
+    "title": "School policies",
+    "description": "Child protection, anti-bullying, safety and other policies: when each is due for review and which staff have read it.",
+    "addButton": "Add a policy",
+    "noPermissionTitle": "You can't see the policy library",
+    "noPermissionBody": "Ask the principal or the office admin if you need to see it.",
+    "unverifiedTitle": "Yearly review",
+    "unverifiedBody": "A review every {months} months is common practice, not a rule we have checked. Set the date your management or board asks for.",
+    "counts": {
+      "overdue": "Reviews overdue",
+      "dueSoon": "Reviews due soon",
+      "pending": "Acknowledgements missing"
+    },
+    "colPolicy": "Policy",
+    "colReview": "Next review",
+    "colAcknowledged": "Read by staff",
+    "colActions": "Actions",
+    "acknowledged": "{done} of {total}",
+    "noTargets": "No staff asked",
+    "notReady": "Document not ready",
+    "retired": "Retired",
+    "reviewState": {
+      "ok": "Up to date",
+      "due_soon": "Review due soon",
+      "overdue": "Review overdue"
+    },
+    "emptyTitle": "No policies yet",
+    "emptyBody": "Upload the policy as a PDF in Documents (purpose: policy), then add it here and choose who must read it.",
+    "view": "View",
+    "viewAria": "View {name}",
+    "review": "Mark reviewed",
+    "reviewAria": "Mark {name} reviewed",
+    "edit": "Edit",
+    "editAria": "Edit {name}",
+    "reviewDialog": {
+      "title": "Mark this policy reviewed?",
+      "nextReview": "Next review",
+      "nextReviewHint": "Leave empty for {months} months from today.",
+      "confirm": "Mark reviewed"
+    },
+    "form": {
+      "addTitle": "Add a policy",
+      "editTitle": "Edit {name}",
+      "description": "The policy must be a PDF in Documents with the purpose policy. Staff read that exact version.",
+      "title": "Name",
+      "document": "Policy document",
+      "choose": "Choose a document",
+      "loading": "Loading documents...",
+      "reviewDue": "Next review",
+      "reviewDueHint": "Leave empty for {months} months from today.",
+      "roles": "Who must read it",
+      "rolesHint": "Everyone with one of these roles is asked to read and confirm it.",
+      "add": "Add policy",
+      "save": "Save"
+    },
+    "detail": {
+      "back": "School policies",
+      "document": "Document",
+      "openDocument": "Open in Documents",
+      "reviewDue": "Next review",
+      "lastReviewed": "Last reviewed",
+      "notReviewed": "Not reviewed yet",
+      "askedRoles": "Asked to read",
+      "askAgain": "Remind staff who have not read it",
+      "askedResult": "{count, plural, =0 {Everyone has already been reminded today.} one {# person was reminded.} other {# people were reminded.}}",
+      "retire": "Retire policy",
+      "reactivate": "Make active again",
+      "retireConsequence": "Staff no longer see it under Policies to read. Their acknowledgements are kept.",
+      "membersTitle": "Staff asked to read it",
+      "membersEmpty": "No staff member has the roles asked.",
+      "colName": "Name",
+      "colRoles": "Roles",
+      "colStatus": "Read this version",
+      "notYet": "Not yet",
+      "earlier": "Read an earlier version",
+      "readOn": "Read on {date}",
+      "notFoundTitle": "Policy not found",
+      "notFoundBody": "It may belong to another school or the link is wrong."
+    },
+    "errors": {
+      "policy_retired": {
+        "title": "This policy is retired",
+        "body": "Make it active again before reviewing it or reminding staff."
+      },
+      "policy_document_not_ready": {
+        "title": "The policy document is not ready",
+        "body": "Upload a PDF version in Documents and wait for the virus scan to finish."
+      }
+    }
+  },
+  "myPolicies": {
+    "nav": "Policies to read",
+    "title": "Policies to read",
+    "description": "School policies you are asked to read. Open each one, read it, then confirm.",
+    "emptyTitle": "Nothing to read",
+    "emptyBody": "When the school asks you to read a policy, it appears here.",
+    "pending": "{count, plural, =0 {You have read every policy asked of you.} one {# policy to read} other {# policies to read}}",
+    "open": "Open policy",
+    "openAria": "Open {name}",
+    "opened": "Opened. Read it in the new tab, then confirm here.",
+    "confirm": "I have read this version",
+    "confirmAria": "Confirm that you have read {name}",
+    "readOn": "Read on {date}",
+    "notReady": "Not ready to read yet",
+    "toRead": "To read",
+    "errors": {
+      "policy_version_changed": {
+        "title": "The policy was updated",
+        "body": "A newer version was added since you opened it. Open it again and read the new version."
+      },
+      "policy_document_not_ready": {
+        "title": "The policy is not ready to read",
+        "body": "Ask the office to check the document, then try again later."
       }
     }
   }

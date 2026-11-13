@@ -23,6 +23,7 @@ from sos_evals import (
     judge,
     metrics,
     sentences,
+    status,
 )
 from sos_evals.adapters import AskAdapter, AskResult, RetrievalAdapter, Retrieved
 from sos_evals.schema import CATEGORIES, CorpusItem, EvalItem
@@ -108,6 +109,12 @@ class Metrics(_Model):
     due_leakage_count: int | None = None
     due_citation_validity: float | None = None
     due_task_recall: float | None = None
+    # School status questions (sos_evals.status; D86, FA-04 / FC-11 tools). None when not
+    # measured.
+    status_items: int = 0
+    status_leakage_count: int | None = None
+    status_citation_validity: float | None = None
+    status_recall: float | None = None
     # Contextual retrieval and reranking (sos_evals.contextual; docs/06 §13.6). None when not
     # measured (their gates fail).
     ctx_items: int = 0
@@ -333,6 +340,7 @@ class RunResult(_Model):
     circular_outcomes: tuple[circulars.CircularOutcome, ...] = ()
     fee_outcomes: tuple[fees.FeeOutcome, ...] = ()
     due_outcomes: tuple[due.DueOutcome, ...] = ()
+    status_outcomes: tuple[status.StatusOutcome, ...] = ()
     contextual_outcomes: tuple[contextual.CtxOutcome, ...] = ()
     conversation_outcomes: tuple[conversations.StepOutcome, ...] = ()
     english_first_outcomes: tuple[english_first.EnglishFirstOutcome, ...] = ()
@@ -374,7 +382,7 @@ def _judge_pass(
     return found, outcomes, spent
 
 
-def run(
+def run(  # noqa: PLR0915 - one short block per eval set
     items: Sequence[EvalItem],
     corpus: Mapping[str, CorpusItem],
     retrieval: RetrievalAdapter,
@@ -386,6 +394,8 @@ def run(
     fee_cases: Sequence[fees.FeeCase] = (),
     due_adapter: due.DueAdapter | None = None,
     due_cases: Sequence[due.DueCase] = (),
+    status_adapter: status.StatusAdapter | None = None,
+    status_cases: Sequence[status.StatusCase] = (),
     ctx: contextual.ContextualAdapter | None = None,
     ctx_set: contextual.ContextualSet | None = None,
     ctx_fast: bool = False,
@@ -435,6 +445,10 @@ def run(
     if due_adapter is not None and due_cases:
         tasks, due_outcomes = due.run(due_cases, due_adapter)
         overall = overall.model_copy(update=tasks.model_dump())
+    status_outcomes: tuple[status.StatusOutcome, ...] = ()
+    if status_adapter is not None and status_cases:
+        facts, status_outcomes = status.run(status_cases, status_adapter)
+        overall = overall.model_copy(update=facts.model_dump())
     ctx_outcomes: tuple[contextual.CtxOutcome, ...] = ()
     if ctx is not None and ctx_set is not None:
         ctx_metrics, ctx_outcomes = contextual.run(ctx_set, ctx_set.select(ctx_fast), ctx)
@@ -480,6 +494,7 @@ def run(
         circular_outcomes=circular_outcomes,
         fee_outcomes=fee_outcomes,
         due_outcomes=due_outcomes,
+        status_outcomes=status_outcomes,
         contextual_outcomes=ctx_outcomes,
         conversation_outcomes=conversation_outcomes,
         english_first_outcomes=english_outcomes,

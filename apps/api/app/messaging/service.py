@@ -2548,6 +2548,8 @@ _PURGE = purging.PurgeTables(
         # 0061_messaging_sends: messages reference broadcasts
         "msg.send_runs",
         "msg.broadcasts",
+        # 0100_closure_reopen: reopenings reference closures (composite FK)
+        "msg.closure_reopenings",
         # 0093_msg_reach_closure: closure messages reference closures by source id only
         "msg.closures",
         "msg.join_codes",
@@ -2607,6 +2609,40 @@ def parent_optin_state(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class ClosurePage:
+    """What the closure message's parent page shows (FP-02 follow-up, FR-PUB-013): dates, the
+    reason phrase in the page's language, the principal's order text and the reopening date."""
+
+    closed_from: dt.date
+    closed_to: dt.date
+    reason: str
+    notice_text: str | None
+    reopens_on: dt.date | None
+
+
+def closure_page(session: Session, closure_id: uuid.UUID, language: Language) -> ClosurePage | None:
+    """The read-only closure page for a live ``parent_closure`` link, or ``None`` when the
+    closure is gone or WhatsApp messages are not offered here. No permission check: the caller
+    holds a live closure link of this school (RLS). Nothing about a child or a guardian."""
+    if not available():
+        return None
+    row = sends_repo.get_closure(session, closure_id)
+    if row is None:
+        return None
+    reasons = load_config().closures.reasons
+    phrase = reasons.get(row.reason_code)  # type: ignore[call-overload]
+    reason = (phrase.te if language == "te" else phrase.en) if phrase is not None else ""
+    reopening = sends_repo.reopenings_of(session, [row.id]).get(row.id)
+    return ClosurePage(
+        closed_from=row.closed_from,
+        closed_to=row.closed_to,
+        reason=reason,
+        notice_text=row.notice_text,
+        reopens_on=reopening.reopens_on if reopening is not None else None,
+    )
+
+
 def office_phone(session: Session) -> str | None:
     """The school office phone set in the WhatsApp settings (the parent dues page shows it,
     ADR-0046 decision 2 "Dues"); ``None`` when unset or messaging is not offered."""
@@ -2620,9 +2656,11 @@ __all__ = [
     "CONFIGURE",
     "READ",
     "RECORD",
+    "ClosurePage",
     "ParentCategoryState",
     "QueuedMessage",
     "available",
+    "closure_page",
     "connect_embedded_signup",
     "connect_manual",
     "deliver",

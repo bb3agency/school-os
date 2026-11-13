@@ -262,12 +262,20 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       `/bff/api/v1/fees/receipts/${id}/print`,
       `/bff/api/v1/fees/refunds/${id}/print`,
       "/bff/api/v1/fees/reports/daily/print",
+      // FM-07 hand-over slip and FM-10 fee structure notice (FR-FEE-110).
+      "/bff/api/v1/fees/family-payments/slip",
+      "/bff/api/v1/fees/structure-notice/print",
+      "/bff/api/v1/fees/cheques/deposit-slip/print",
       `/bff/api/v1/students/${id}/apaar-consent/form`,
       `/bff/api/v1/sections/${id}/apaar-consent-forms`,
       `/bff/api/v1/sections/${id}/join-slips`,
       "/bff/api/v1/consents/forms",
       "/bff/api/v1/privacy/templates/notice_parents/preview",
       `/bff/api/v1/privacy/requests/${id}/letters/acknowledgement`,
+      // FO-06, FO-11: enrolment statistics sheet and scheme attendance list.
+      "/bff/api/v1/reports/enrolment-statistics/print",
+      "/bff/api/v1/scheme-packs/attendance/print",
+      `/bff/api/v1/compliance/inspection-packs/${id}/index`,
     ]) {
       const response = proxy(request(path));
       expect(response.headers.get("content-security-policy"), path).toBeNull();
@@ -278,11 +286,19 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       `/bff/api/v1/fees/receipts/${id}/print/x`,
       "/bff/api/v1/fees/receipts/../print",
       "/bff/api/v1/fees/reports/daily",
+      "/bff/api/v1/fees/family-payments",
+      "/bff/api/v1/fees/structure-notice",
+      "/bff/api/v1/fees/cheques",
+      "/bff/api/v1/fees/cheques/deposit-slip/print/x",
       `/bff/api/v1/students/${id}/apaar-consent`,
       `/bff/api/v1/sections/${id}/join-slips/x`,
       "/bff/api/v1/consents/summary",
       "/bff/api/v1/privacy/templates/notice_parents/pdf",
       `/bff/api/v1/privacy/requests/${id}`,
+      "/bff/api/v1/reports/enrolment-statistics",
+      "/bff/api/v1/scheme-packs/attendance",
+      `/bff/api/v1/compliance/inspection-packs/${id}`,
+      `/bff/api/v1/compliance/inspection-packs/${id}/index/x`,
     ]) {
       expect(proxy(request(path)).headers.get("content-security-policy"), path).toContain(
         "default-src 'self'",
@@ -324,6 +340,26 @@ describe("proxy (SEC-010, NFR-I18N-001)", () => {
       "/bff/api/v1/dq/readiness/bseap-ssc-2027",
       "/bff/api/v1/dq/readiness/bseap-ssc-2027/slips/x",
       "/bff/api/v1/dq/readiness/../slips",
+    ]) {
+      expect(proxy(request(path)).headers.get("content-security-policy"), path).toContain(
+        "default-src 'self'",
+      );
+    }
+  });
+
+  it("leaves the fix-owner letters' CSP to the API, and only those paths (FA-08)", () => {
+    for (const path of [
+      "/bff/api/v1/dq/readiness/bseap-ssc-2027/parent-letters",
+      "/bff/api/v1/dq/readiness/bseap-ssc-2027/board-letter",
+    ]) {
+      const page = proxy(request(path));
+      expect(page.headers.get("content-security-policy"), path).toBeNull();
+      expect(page.headers.get("x-content-type-options"), path).toBe("nosniff");
+    }
+    for (const path of [
+      "/bff/api/v1/dq/readiness/bseap-ssc-2027/fix-letters",
+      "/bff/api/v1/dq/readiness/bseap-ssc-2027/parent-letters/x",
+      "/bff/api/v1/dq/readiness/../board-letter",
     ]) {
       expect(proxy(request(path)).headers.get("content-security-policy"), path).toContain(
         "default-src 'self'",

@@ -52,6 +52,11 @@ const OWN_CSP_PATHS: readonly RegExp[] = [
   /^\/bff\/api\/v1\/fees\/reports\/(daily|collections)\/print$/i,
   // FM-06 (FR-FEE-046..056): tuition fee tax certificate print view.
   /^\/bff\/api\/v1\/fees\/tax-certificates\/[0-9a-f-]{36}\/print$/i,
+  // FM-07 (FR-FEE-107): the family payment hand-over slip; FM-10 (FR-FEE-115): the fee
+  // structure notice (each answer carries its own policy of hashed style blocks).
+  /^\/bff\/api\/v1\/fees\/(family-payments\/slip|structure-notice\/print)$/i,
+  // FM-08 (FR-FEE-136): the list of cheques deposited on a day, for the bank's pay-in slip.
+  /^\/bff\/api\/v1\/fees\/cheques\/deposit-slip\/print$/i,
   /^\/bff\/api\/v1\/students\/[0-9a-f-]{36}\/apaar-consent\/form$/i,
   /^\/bff\/api\/v1\/sections\/[0-9a-f-]{36}\/(apaar-consent-forms|join-slips)$/i,
   /^\/bff\/api\/v1\/consents\/forms$/i,
@@ -59,6 +64,13 @@ const OWN_CSP_PATHS: readonly RegExp[] = [
   /^\/bff\/api\/v1\/privacy\/requests\/[0-9a-f-]{36}\/letters\/[a-z_]{1,40}$/i,
   // FO-02 (FR-UDI-007): the UDISE+ correction request letter to the MEO.
   /^\/bff\/api\/v1\/dq\/udise-corrections\/[0-9a-f-]{36}\/letter$/i,
+  // FA-08 (FR-DQ-051, FR-DQ-054): the fix-owner letters to parents and to the board office.
+  /^\/bff\/api\/v1\/dq\/readiness\/[a-z0-9][a-z0-9-]{0,63}\/(parent-letters|board-letter)$/i,
+  // FO-06 (FR-EXP-013) enrolment statistics and FO-11 (FR-EXP-022) scheme attendance list.
+  /^\/bff\/api\/v1\/reports\/enrolment-statistics\/print$/i,
+  /^\/bff\/api\/v1\/scheme-packs\/attendance\/print$/i,
+  // FC-07 / FO-12 (FR-COMP-038): the inspection pack index.
+  /^\/bff\/api\/v1\/compliance\/inspection-packs\/[0-9a-f-]{36}\/index$/i,
 ];
 
 function isNonLocalised(pathname: string): boolean {

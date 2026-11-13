@@ -9,7 +9,7 @@ import {
   PUBLIC_TELUGU_STYLESHEET_HREF,
   type ParentLanguage,
 } from "@/server/public/messages";
-import type { LinkPage } from "@/server/public/view";
+import type { LinkPage, ParentClosure } from "@/server/public/view";
 import { PublicIcon } from "./PublicIcon";
 
 /**
@@ -508,6 +508,42 @@ function OptinSheet({
   );
 }
 
+// --- closure (FP-02 follow-up, FR-PUB-013) ------------------------------------------------------
+
+/** The closure message's page: read-only, no form, no PDF; nothing about a child. */
+function ClosureSheet({ closure, t }: { closure: ParentClosure; t: T }) {
+  const paragraphs = (closure.notice_text ?? "").split(/\n\s*\n/).filter((p) => p.trim() !== "");
+  const from = parentDay(closure.closed_from);
+  const to = parentDay(closure.closed_to);
+  return (
+    <section className="public-card" aria-labelledby="public-heading">
+      <h1 id="public-heading">{t("closure.title")}</h1>
+      <Banner tone="amber" icon="alert">
+        {closure.closed_from === closure.closed_to
+          ? t("closure.closedOn", { date: from })
+          : t("closure.closedRange", { from, to })}
+      </Banner>
+      <p>{t("closure.reason", { reason: closure.reason })}</p>
+      {paragraphs.length > 0 ? (
+        <>
+          <h2>{t("closure.orderTitle")}</h2>
+          <div className="public-prose">
+            {paragraphs.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+        </>
+      ) : null}
+      {closure.reopens_on ? (
+        <Banner tone="green" icon="valid">
+          {t("closure.reopensOn", { date: parentDay(closure.reopens_on) })}
+        </Banner>
+      ) : null}
+      <p className="public-muted">{t("closure.contact")}</p>
+    </section>
+  );
+}
+
 // --- the page ----------------------------------------------------------------------------------
 
 export function LinkFrame({
@@ -538,6 +574,8 @@ export function LinkFrame({
         flash={notice}
       />
     );
+  } else if (envelope.kind === "parent_closure" && envelope.closure) {
+    sheet = <ClosureSheet closure={envelope.closure} t={t} />;
   }
   return <Frame envelope={envelope}>{sheet}</Frame>;
 }

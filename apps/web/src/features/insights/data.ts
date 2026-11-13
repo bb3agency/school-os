@@ -365,7 +365,33 @@ export const actionSchema = z.object({
   kind: z.enum(ACTION_KINDS as [ActionKind, ...ActionKind[]], { error: "chooseOption" }),
   acted_on: z.string().regex(ISO_DATE, { error: "invalidDate" }),
   note: freeText(1000),
+  // FT-13 (FR-EW-019): the next planned review; empty = none (an earlier one counts as held).
+  review_on: z
+    .union([z.literal(""), z.string().regex(ISO_DATE, { error: "invalidDate" })])
+    .optional(),
 });
+
+/** FT-13 (FR-EW-019): the furthest a review may be planned (rules.yaml review_max_days). */
+export const REVIEW_MAX_DAYS = 60;
+
+/** An ISO date some calendar days after another (no time zone involved). */
+export function addDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const out = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + days));
+  return out.toISOString().slice(0, 10);
+}
+
+/**
+ * The flag's planned review (FR-EW-023). The field is not in the generated client yet; it is
+ * read defensively until the client is regenerated, then flag.review_on can be used directly.
+ */
+export function reviewOf(flag: object): { on: string | null; due: boolean } {
+  const value = flag as { review_on?: unknown; review_due?: unknown };
+  return {
+    on: typeof value.review_on === "string" ? value.review_on : null,
+    due: value.review_due === true,
+  };
+}
 
 /** Closing a flag: a reason and an optional note. */
 export const closeSchema = z.object({

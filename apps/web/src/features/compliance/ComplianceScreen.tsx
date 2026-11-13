@@ -7,7 +7,7 @@ import { DataTableV2, type ColumnV2 } from "@/components/console";
 import { ActionDialog } from "@/components/ui/ActionDialog";
 import { Alert } from "@/components/ui/Alert";
 import { Pill, type PillVariant } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { TextAreaField, TextField } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -257,13 +257,21 @@ export function ComplianceScreen() {
       description={t("description")}
       breadcrumb={[{ label: tn("home"), href: "/" }, { label: t("title") }]}
       actions={
-        manage && register.data ? (
-          <Button
-            variant="primary"
-            onClick={() => setEditing({ mode: "record", kind: "", certificate: null })}
-          >
-            {t("recordButton")}
-          </Button>
+        allowed ? (
+          <span className="flex flex-wrap gap-2">
+            {/* FC-07 / FO-12: the inspection packs build on this register. */}
+            <ButtonLink href="/compliance/inspection" variant="secondary">
+              {t("inspectionLink")}
+            </ButtonLink>
+            {manage && register.data ? (
+              <Button
+                variant="primary"
+                onClick={() => setEditing({ mode: "record", kind: "", certificate: null })}
+              >
+                {t("recordButton")}
+              </Button>
+            ) : null}
+          </span>
         ) : undefined
       }
     />

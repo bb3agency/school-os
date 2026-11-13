@@ -128,6 +128,29 @@ describe("school home (dashboard)", () => {
     expect(stub.callsTo("GET /bff/api/v1/dq/profiles")).toHaveLength(0);
   });
 
+  it("office home: certificate counts only, linking to the register (FR-COMP-045)", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(["compliance.read"]));
+    stub.routes["GET /bff/api/v1/compliance/summary"] = () =>
+      Response.json({ expired: 2, expiring: 1, missing: 3 });
+    renderWithIntl(<HomeScreen />);
+    expect(
+      await screen.findByText(
+        "2 certificates have expired, 1 expire soon and 3 are not recorded yet.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: new RegExp(sm.home.work.complianceAction) }),
+    ).toHaveAttribute("href", "/compliance");
+  });
+
+  it("no certificate card without compliance.read (no call)", async () => {
+    stub.routes["GET /bff/api/v1/me"] = () => Response.json(me(["student.create"]));
+    renderWithIntl(<HomeScreen />);
+    await screen.findByRole("link", { name: sm.home.primary.addStudent });
+    expect(stub.callsTo("GET /bff/api/v1/compliance/summary")).toHaveLength(0);
+    expect(screen.queryByText(sm.home.work.complianceTitle)).not.toBeInTheDocument();
+  });
+
   it("teacher home: attendance and marks as large links, no setup steps, no fee calls", async () => {
     stub.routes["GET /bff/api/v1/me"] = () =>
       Response.json({

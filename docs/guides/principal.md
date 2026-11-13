@@ -158,6 +158,20 @@ facts SchoolOS gives you.
 - **Audit log**: every important action, with who did it and when.
 - **Plan and billing**: your plan, AI answers used this month and invoices.
 
+## 12. Safety checks and school policies
+
+- **Safety checks** (**Compliance > Safety checks**): after a fire drill, extinguisher refill,
+  electrical, water or CCTV check, click **Log a check** and type the date, who led it, for drills
+  how many people took part and how many minutes it took, and what was found. Type counts and
+  short notes only: never a student's name, and never upload photos that show children. The list
+  shows what is overdue or never logged; SchoolOS reminds the office before the next one is due.
+- **Policies** (**Compliance > Policies**): upload the policy as a PDF in Documents (purpose
+  policy), then **Add a policy**, choose who must read it (for example teachers and class
+  teachers) and the next review date. Open a policy to see who has and has not read it, and
+  **Remind staff who have not read it**. After the yearly review, click **Mark reviewed**.
+- **Policies to read**: every staff member sees the policies asked of them, opens each one and
+  clicks **I have read this version**. A new version of the document needs a new confirmation.
+
 ## If something goes wrong
 
 - "Not done: we still need to confirm it's you": the step-up window was closed. Try again and choose

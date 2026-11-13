@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0034 |
+| Status | Accepted (recorded retroactively 2026-09-26) · Amended by ADR-0034, D74 (`list_due_tasks`) and D86 (FA-04 `get_readiness_summary`, `get_attendance_summary`, `get_certificates`; FC-11 `list_compliance_status`; lead decision 2026-11-12, PO to confirm) |
 | Date | 2026-09-26 |
 | Deciders | Founder |
 | Amends / supersedes | none |
@@ -34,6 +34,10 @@ Many staff questions are about structured records ("DOB of admission no. 1234", 
 | Text-to-SQL with a read-only role | Scope/sensitivity rules bypassed; injection risk; unpredictable cost |
 | Text-to-SQL over curated views | Still hard to prove scope safety and to cite results |
 | No structured answers (documents only) | Misses the most common office questions |
+
+## Amendments
+
+- **D86 (2026-11-12, lead decision, PO to confirm; FA-04, FC-11).** Four tools join the whitelist, each a read through the owning module's service under the caller's context: `get_readiness_summary` (readiness counts by class, `dq.readiness.read`), `get_attendance_summary` (attendance counts by section, `attendance.read`, sections under 5 students show no figure, never per child), `get_certificates` (ONE student's certificates: type, serial, dates, status; `certificate.read`) and `list_compliance_status` (the school's compliance register, `compliance.read` school-wide). Early-warning data stays out of Ask (invariant 14, import-linter `knowledge-without-insights`). Evals: `sos_evals.status` with hard leakage and citation gates (docs/06 §13.13). FR-KB-066..080.
 
 ## Related requirements
 

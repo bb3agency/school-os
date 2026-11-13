@@ -118,9 +118,14 @@ contributors:
     subjects: [member]
     classes: [brief_preferences]
     eraser: true
+  # FC-10: a staff member's own policy acknowledgements (which policy, when). The certificate
+  # register, the safety check log and the policies hold nothing about one person.
+  compliance:
+    subjects: [member]
+    classes: [policy_acknowledgements]
+    eraser: false
 no_personal_data:
   ops: Background job runs, the outbox and idempotency keys hold ids and counts only.
   admin: Whole-school archives asked for by the owner and the school's retention settings; nothing about one person.
-  compliance: The school's own certificates (fire NOC, building safety, recognition, affiliation, water and sanitation) and who renews them; nothing about one student.
   disclosure: The school's public CBSE disclosure holds school-level facts and counts that the school publishes on purpose; nothing about one student.
   tenancy: The school's structure (years, classes, sections) and its encryption keys; nothing about one person.

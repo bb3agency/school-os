@@ -68,6 +68,7 @@ export const MESSAGE_PURPOSES: readonly MessagePurpose[] = [
   "fee_receipt",
   "optin_stopped",
   "school_closure",
+  "school_reopening",
 ];
 
 export const KEYS = {

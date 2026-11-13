@@ -1633,6 +1633,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/completeness/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Attendance Completeness
+         * @description How complete attendance is for a date in every section of the current year: students,
+         *     students with a status, the day's calendar kind and the class teacher it waits on
+         *     (``completeness.read``; counts only, no student is named). 409 ``no_current_year``; 422
+         *     ``future_date``, ``date_out_of_range``.
+         */
+        get: operations["attendance_completeness_api_v1_completeness_attendance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/completeness/exams/{exam_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Marks Completeness
+         * @description How complete marks entry is for an exam: per section and subject entered for the exam,
+         *     students and students with a mark or absent, and the class teacher it waits on
+         *     (``completeness.read``; counts only). 404 for an exam of another school; 422
+         *     ``unknown_class``.
+         */
+        get: operations["marks_completeness_api_v1_completeness_exams__exam_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/completeness/reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Completeness Reminder
+         * @description Remind the section's class teacher in the app to finish attendance (today) or an exam's
+         *     marks (``completeness.remind``). Once per section and day or exam (``sent`` 0 for a
+         *     repeat). 409 ``reminders_off`` (the default), ``no_class_teacher``, ``already_complete``;
+         *     422 ``exam_required``; 404 for another school's section or exam.
+         */
+        post: operations["send_completeness_reminder_api_v1_completeness_reminders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/compliance/certificates": {
         parameters: {
             query?: never;
@@ -1706,6 +1775,332 @@ export interface paths {
          *     again. Errors: 409 ``certificate_not_current``, 412 stale ``If-Match``.
          */
         post: operations["remove_certificate_api_v1_compliance_certificates__certificate_id__remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Checks
+         * @description Every drill and periodic check that applies to the school with its next due date
+         *     (overdue, never done, due soon, ok), counts, the latest entries and the catalogue
+         *     (``verified: false``). Permission ``compliance.read``.
+         */
+        get: operations["get_checks_api_v1_compliance_checks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/checks/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Check Entries
+         * @description The log, newest first (at most 200), optionally of one kind. Permission
+         *     ``compliance.read``.
+         */
+        get: operations["list_check_entries_api_v1_compliance_checks_entries_get"];
+        put?: never;
+        /**
+         * Record Check
+         * @description Log a drill or check (counts and a short note; never student names). Permission
+         *     ``compliance.manage``. Errors (422): ``unknown_check_kind``, ``check_label_required``,
+         *     ``check_label_not_allowed``, ``done_in_future``, ``drill_fields_not_allowed``,
+         *     ``document_not_found``, ``leader_not_active``, ``aadhaar_full_number_rejected``. Accepts
+         *     ``Idempotency-Key``.
+         */
+        post: operations["record_check_api_v1_compliance_checks_entries_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/checks/entries/{check_id}:remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove Check
+         * @description Remove an entry logged by mistake (kept as removed; permission ``compliance.manage``,
+         *     ``If-Match``). Errors: 409 ``check_removed``, 412 stale ``If-Match``.
+         */
+        post: operations["remove_check_api_v1_compliance_checks_entries__check_id__remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/inspection-packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Inspection Packs
+         * @description The packs the office made, newest first (permission ``compliance.read``).
+         */
+        get: operations["list_inspection_packs_api_v1_compliance_inspection_packs_get"];
+        put?: never;
+        /**
+         * Generate Inspection Pack
+         * @description Make a pack: each item's state is kept as it is now, with the academic year, the visit
+         *     date and the registers chosen (choosing registers needs ``register.read``, 403 otherwise).
+         *     Permission ``compliance.manage``. Errors (422): ``unknown_pack``, ``unknown_register``,
+         *     ``academic_year_not_found``. Audited (``compliance.inspection_pack.generated``). Accepts
+         *     ``Idempotency-Key``.
+         */
+        post: operations["generate_inspection_pack_api_v1_compliance_inspection_packs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/inspection-packs/{pack_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Inspection Pack
+         * @description One pack as it was made (permission ``compliance.read``).
+         */
+        get: operations["get_inspection_pack_api_v1_compliance_inspection_packs__pack_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/inspection-packs/{pack_id}/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inspection Pack Index
+         * @description The pack's index as an A4 print page: school, authority, visit date, summary counts and
+         *     one row per item with its state, details and who fixes it (permission ``compliance.read``;
+         *     no personal data).
+         */
+        get: operations["inspection_pack_index_api_v1_compliance_inspection_packs__pack_id__index_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/inspection-readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Inspection Readiness
+         * @description Every inspection pack for the school's boards (DEO/MEO, APSERMC, CBSE, fire department;
+         *     ``verified: false``) with each item's state now: certificates from the register, registers,
+         *     the Appendix IX page, the parents' privacy notice, the DPDP checklist, and evidence not
+         *     tracked in SchoolOS. Permission ``compliance.read``.
+         */
+        get: operations["get_inspection_readiness_api_v1_compliance_inspection_readiness_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/my-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Policies
+         * @description The school policies you are asked to read and acknowledge (any signed-in member).
+         */
+        get: operations["list_my_policies_api_v1_compliance_my_policies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/my-policies/{policy_id}:acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Acknowledge My Policy
+         * @description Confirm "I have read this version" (repeating it changes nothing). Errors: 404 (not asked
+         *     of you), 409 ``policy_version_changed`` (open it again).
+         */
+        post: operations["acknowledge_my_policy_api_v1_compliance_my_policies__policy_id__acknowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/my-policies/{policy_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Policy File
+         * @description A link (5 minutes) to the version of the policy you are asked to read. Errors: 404 (not
+         *     asked of you), 409 ``policy_document_not_ready``.
+         */
+        get: operations["get_my_policy_file_api_v1_compliance_my_policies__policy_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Policies
+         * @description The school's policies with their review state and how many of the asked staff have
+         *     acknowledged the current version. Permission ``compliance.read``.
+         */
+        get: operations["list_policies_api_v1_compliance_policies_get"];
+        put?: never;
+        /**
+         * Create Policy
+         * @description Add a policy: a clean PDF in Documents of purpose policy, its next review date and the
+         *     roles whose members must acknowledge it (with ``notify``, they get an in-app notice).
+         *     Permission ``compliance.manage``. Errors (422): ``policy_document_not_ready``,
+         *     ``review_in_past``, ``unknown_role``, ``too_many_roles``, ``aadhaar_full_number_rejected``.
+         *     Accepts ``Idempotency-Key``.
+         */
+        post: operations["create_policy_api_v1_compliance_policies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/policies/{policy_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Policy
+         * @description One policy with who has and has not acknowledged the current version (permission
+         *     ``compliance.read``). ``ETag`` for ``If-Match``.
+         */
+        get: operations["get_policy_api_v1_compliance_policies__policy_id__get"];
+        /**
+         * Update Policy
+         * @description Correct or retire a policy (every field; permission ``compliance.manage``,
+         *     ``If-Match``). Errors: 412 stale ``If-Match``, 422 as when adding.
+         */
+        put: operations["update_policy_api_v1_compliance_policies__policy_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/policies/{policy_id}:request-acknowledgement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Policy Acknowledgement
+         * @description Send an in-app notice to the asked staff who have not acknowledged the current version
+         *     (at most once a day each; permission ``compliance.manage``). Errors: 409
+         *     ``policy_retired``, 409 ``policy_document_not_ready``.
+         */
+        post: operations["request_policy_acknowledgement_api_v1_compliance_policies__policy_id__request_acknowledgement_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance/policies/{policy_id}:review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Policy
+         * @description Mark the policy reviewed today and set the next review date (default in 12 months;
+         *     permission ``compliance.manage``, ``If-Match``). Errors: 409 ``policy_retired``, 412 stale
+         *     ``If-Match``, 422 ``review_in_past``.
+         */
+        post: operations["review_policy_api_v1_compliance_policies__policy_id__review_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2567,6 +2962,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dq/readiness/{profile_key}/board-letter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Board Letter
+         * @description The A4 letter to the board office listing the open board registration corrections of the
+         *     profile or one section (permission ``export.portal`` with a recent MFA sign-in, 428
+         *     ``step_up_required``): PEN, student, field, the value in the registration, the correct
+         *     value, its record and the evidence held. Audited; ``check=true`` 204 only. 409
+         *     ``nothing_to_print``.
+         */
+        get: operations["board_letter_api_v1_dq_readiness__profile_key__board_letter_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/readiness/{profile_key}/fix-letters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Fix Letters
+         * @description The fix-owner letters offered for the profile (the parent letter asking for an Aadhaar
+         *     update, the board registration correction letter) and, for each, the students it covers now
+         *     with the fields it lists (labels only, never a value) and the date it was last recorded as
+         *     given or sent (permission ``dq.readiness.manage``; a section outside your reach: 404). The
+         *     UDISE+ letter to the MEO is the UDISE+ correction request.
+         */
+        get: operations["list_fix_letters_api_v1_dq_readiness__profile_key__fix_letters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/readiness/{profile_key}/fix-letters/{letter_key}/sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Fix Letters Sent
+         * @description Record that the letters were given to the parents (follow-up step ``parent_contacted``
+         *     by letter) or that the board letter was sent (``request_sent`` by letter), for up to 300
+         *     students (permission ``dq.readiness.manage``). Each student must be in your reach (else 404)
+         *     and still have an open difference for this letter (else 422 ``no_open_fix``). Audited as a
+         *     follow-up step. Accepts ``Idempotency-Key``.
+         */
+        post: operations["record_fix_letters_sent_api_v1_dq_readiness__profile_key__fix_letters__letter_key__sent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dq/readiness/{profile_key}/follow-ups": {
         parameters: {
             query?: never;
@@ -2615,6 +3082,30 @@ export interface paths {
          *     open (permission ``dq.readiness.read``; a student outside your reach: 404).
          */
         get: operations["followup_history_api_v1_dq_readiness__profile_key__follow_ups__student_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dq/readiness/{profile_key}/parent-letters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Parent Letters
+         * @description Letters to parents asking for an Aadhaar update at an Aadhaar centre (A4, one per
+         *     student), for one student, one readiness finding or one section (exactly one; permission
+         *     ``dq.readiness.manage``). Each lists the field, the value in the school's record and what
+         *     differs: never the Aadhaar value or number. Audited; with ``check=true`` 204 only, not
+         *     audited. 409 ``nothing_to_print`` when no open Aadhaar difference is left.
+         */
+        get: operations["parent_letters_api_v1_dq_readiness__profile_key__parent_letters_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4063,6 +4554,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fees/cheques": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Fee Cheques
+         * @description Cheque receipts of a receipt-date range (default the last 30 days; at most 366) with
+         *     their cheque status: received, deposited, cleared (seen in a bank statement) or returned
+         *     (``fee.collect`` or ``fee.reconcile``).
+         */
+        get: operations["list_fee_cheques_api_v1_fees_cheques_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/cheques/{receipt_id}/returned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Fee Cheque Returned
+         * @description The bank returned a deposited cheque (``fee.reconcile``): a ``cheque_dishonoured``
+         *     cancellation request is raised (another holder of ``fee.receipt.cancel`` decides; the ledger
+         *     changes only when it is approved). 409 ``cheque_not_deposited``,
+         *     ``cheque_already_returned``, ``cancellation_pending``; 404 for a non-cheque receipt.
+         */
+        post: operations["mark_fee_cheque_returned_api_v1_fees_cheques__receipt_id__returned_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/cheques/deposit-slip/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fee Cheque Deposit Slip
+         * @description The A4 list of cheques marked deposited on ``day`` (default today) for the bank's pay-in
+         *     slip (``fee.collect`` or ``fee.reconcile``). Audited.
+         */
+        get: operations["fee_cheque_deposit_slip_api_v1_fees_cheques_deposit_slip_print_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/cheques/deposited": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Fee Cheques Deposited
+         * @description Mark cheques as taken to the bank (``fee.collect``). Receipts that are not issued cheque
+         *     receipts are listed in ``skipped``; marking again is harmless. Audited.
+         */
+        post: operations["mark_fee_cheques_deposited_api_v1_fees_cheques_deposited_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fees/concessions/{concession_id}/approve": {
         parameters: {
             query?: never;
@@ -4170,6 +4748,51 @@ export interface paths {
          *     like an export.
          */
         get: operations["fee_dues_csv_api_v1_fees_dues_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/family-payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Fee Family Payment
+         * @description One payment split across siblings' accounts: one receipt per account, consecutive
+         *     numbers, all or none (``fee.collect``; send ``Idempotency-Key``). Errors (422): ``mode``
+         *     ``upi_one_receipt_per_utr``; ``parts`` ``too_many``, ``duplicate``, ``not_in_family``; mode
+         *     details and allocations as a counter receipt. (409): ``amount_exceeds_due``,
+         *     ``head_not_collectable``, ``day_closed``, ``account_closed``.
+         */
+        post: operations["issue_fee_family_payment_api_v1_fees_family_payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/family-payments/slip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fee Family Payment Slip
+         * @description The hand-over slip of a family payment (A4, no scripts): the receipts given to the
+         *     parent, from their frozen content (``fee.collect`` or ``finance.read``). Audited.
+         */
+        get: operations["fee_family_payment_slip_api_v1_fees_family_payments_slip_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5176,6 +5799,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/fees/structure-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fee Structure Changes
+         * @description This year's plans against the previous academic year's, per class and head: added,
+         *     removed and changed heads, amounts and percent; increases above ``warn_percent`` (default:
+         *     the school review threshold in config) are flagged (``finance.read`` or ``fee.manage``).
+         */
+        get: operations["fee_structure_changes_api_v1_fees_structure_changes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/structure-notice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fee Structure Notice
+         * @description The school's fee structure for the year by class: heads, annual amounts, instalments and
+         *     the late-fee rule (``finance.read`` or ``fee.manage``). Plans only, no personal data.
+         */
+        get: operations["fee_structure_notice_api_v1_fees_structure_notice_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/structure-notice/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fee Structure Notice Print
+         * @description The notice as print-ready A4 pages, one per class; a draft plan is marked DRAFT.
+         *     Audited.
+         */
+        get: operations["fee_structure_notice_print_api_v1_fees_structure_notice_print_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/fees/students/{student_id}/family": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fee Family Counter
+         * @description The student and each sibling the clerk may see (children sharing a guardian), with their
+         *     open fee accounts, earlier years first (``fee.collect`` or ``finance.read``). 404 when the
+         *     student is not visible. Nothing is written.
+         */
+        get: operations["fee_family_counter_api_v1_fees_students__student_id__family_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/fees/students/{student_id}/years": {
         parameters: {
             query?: never;
@@ -5823,6 +6532,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/insights/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Counts
+         * @description School-wide early-warning follow-up counts for management (``insights.counts_read``;
+         *     FT-13): raised, first acted on in time or late, overdue, open, reviews due, closed and
+         *     closed per reason. Numbers only: no names, students, sections, flags or notes (PRV-004).
+         *     422 ``future_date``.
+         */
+        get: operations["counts_api_v1_insights_counts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/insights/flags": {
         parameters: {
             query?: never;
@@ -6109,6 +6841,98 @@ export interface paths {
          *     since you read it; 404 for anyone else's.
          */
         patch: operations["update_conversation_api_v1_knowledge_conversations__conversation_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/knowledge/gaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Knowledge Gaps
+         * @description Questions Ask could not answer (permission ``kb.verified_answer.manage``; FR-KB-085):
+         *     open gaps most asked first, closed and dismissed ones newest first. Each shows one sample
+         *     question with numbers, phone numbers and emails masked, and how often it came back "not
+         *     found", unchecked or "not helpful"; never who asked. Audited ``kb.gaps.viewed``.
+         */
+        get: operations["list_knowledge_gaps_api_v1_knowledge_gaps_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/gaps/{gap_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Knowledge Gap
+         * @description Close this gap with an existing active verified answer (every document it cites must
+         *     be one you can read; 422 ``gap_answer_not_usable``) or the document that was missing
+         *     (one you can read; 422 ``gap_document_not_found``), or dismiss it (permission
+         *     ``kb.verified_answer.manage``; ``If-Match``; FR-KB-088, FR-KB-089). 404 / 409 / 412 as
+         *     above.
+         */
+        post: operations["close_knowledge_gap_api_v1_knowledge_gaps__gap_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/gaps/{gap_id}/verified-answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer Knowledge Gap
+         * @description Write a verified answer for this gap and close it (permission
+         *     ``kb.verified_answer.manage``; ``If-Match``; FR-KB-087). The answer follows every rule of
+         *     ``POST /knowledge/verified-answers`` (422 ``citation_*``, ``answer_personal_data``) and is
+         *     then searched by Ask like any other, only for people who can read every document it cites.
+         *     404 unknown gap; 409 ``knowledge_gap_closed``; 412 when it changed since you read it.
+         */
+        post: operations["answer_knowledge_gap_api_v1_knowledge_gaps__gap_id__verified_answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/gaps/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Knowledge Gap Summary
+         * @description Counts only (permission ``kb.verified_answer.manage``; FR-KB-090): open gaps by signal
+         *     and gaps closed or dismissed per month (this month and the two before, IST).
+         */
+        get: operations["knowledge_gap_summary_api_v1_knowledge_gaps_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/knowledge/memories": {
@@ -6802,8 +7626,9 @@ export interface paths {
         };
         /**
          * List Closures
-         * @description Closure messages sent recently with live delivery counts, and how many were sent in the
-         *     window shown (FR-MSG-054; ``message.read`` school-wide). Counts only.
+         * @description Closure messages sent recently with live delivery counts, their "school reopens"
+         *     messages, and how many were sent in the window shown (FR-MSG-054, FR-MSG-064;
+         *     ``message.read`` school-wide). Counts and the principal's own order text only.
          */
         get: operations["list_closures_api_v1_messaging_closures_get"];
         put?: never;
@@ -6817,6 +7642,54 @@ export interface paths {
          *     ``notices_off``; 422 as the preview. Audited ``messaging.closure.sent``.
          */
         post: operations["send_closure_api_v1_messaging_closures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/closures/{closure_id}/reopening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Reopening
+         * @description Send the previewed reopening message (FR-MSG-061..063; ``message.closure.send`` with
+         *     step-up MFA, 428 without; ``Idempotency-Key``): the ``school_reopening`` utility template to
+         *     every guardian opted in for notices, inside the closure window, within the daily cap; one per
+         *     closure. Errors: 404; 409 ``reopening_already_sent``, ``preview_stale`` and the closure's
+         *     blocking reasons; 422 as the preview. Audited ``messaging.closure.reopening_sent``.
+         */
+        post: operations["send_reopening_api_v1_messaging_closures__closure_id__reopening_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/closures/{closure_id}/reopening/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Reopening
+         * @description Before sending "the school reopens on <date>" for a closure: recipients (the closure's
+         *     audience as it is now), guardians left out by reason, the English text, when sending starts
+         *     and the estimated Meta cost (FR-MSG-060; ``message.closure.send``: the principal). Nothing
+         *     is sent. Errors: 404 unknown closure; 409 ``reopening_already_sent``; 422 ``reopens_on``
+         *     (``in_past``, ``too_far_ahead``, ``not_after_closure_start``, ``too_long_after_closure``).
+         */
+        post: operations["preview_reopening_api_v1_messaging_closures__closure_id__reopening_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10245,6 +11118,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/enrolment-statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Enrolment Statistics
+         * @description Enrolment counts per class on one day of an academic year, in the UDISE+ table shapes
+         *     (permission ``export.portal`` school-wide, and school-wide ``student.read_basic``, else 403
+         *     ``school_wide_read_required``): by gender, by age (completed years on the day), repeaters,
+         *     admissions and leavers; with school-wide ``student.read_sensitive`` also by social category,
+         *     minority group and CWSN (else ``restricted_hidden``). Counts only, never names. ``gaps``
+         *     counts students without a value. ``verified`` is false: the shapes are not checked against
+         *     the official form. 422 ``as_of_out_of_year``. No RTE count (the RTE register is not
+         *     built).
+         */
+        get: operations["get_enrolment_statistics_api_v1_reports_enrolment_statistics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/enrolment-statistics/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print Enrolment Statistics
+         * @description The A4 enrolment statistics sheet with signature lines (``export.portal`` school-wide
+         *     with a recent MFA sign-in, 428 ``step_up_required``). Audited as an export; with
+         *     ``check=true`` 204 only, not audited.
+         */
+        get: operations["print_enrolment_statistics_api_v1_reports_enrolment_statistics_print_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/enrolment-statistics/xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Enrolment Statistics
+         * @description The enrolment statistics as XLSX, one worksheet per table (``export.portal``
+         *     school-wide with a recent MFA sign-in, 428). Audited as an export download.
+         */
+        get: operations["download_enrolment_statistics_api_v1_reports_enrolment_statistics_xlsx_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/roles": {
         parameters: {
             query?: never;
@@ -10261,6 +11204,118 @@ export interface paths {
         get: operations["list_roles_api_v1_roles_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scheme-packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Scheme Packs
+         * @description The schemes the pack prints for and how the attendance percentage is counted
+         *     (``attendance.read`` or ``certificate.issue``). ``verified`` is false: scheme rules change
+         *     every year and SchoolOS makes no eligibility decision.
+         */
+        get: operations["get_scheme_packs_api_v1_scheme_packs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scheme-packs/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Scheme Attendance
+         * @description One section's attendance percentages over a period for a scheme's verification
+         *     (``attendance.read`` in the section's scope, 404 outside it): roll and admission numbers,
+         *     names and the percentage only, no eligibility. Errors: 422 ``unknown_scheme``,
+         *     ``invalid_period``, ``date_out_of_range``, ``future_date``.
+         */
+        get: operations["get_scheme_attendance_api_v1_scheme_packs_attendance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scheme-packs/attendance/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print Scheme Attendance
+         * @description The A4 attendance list for the head's signature (``attendance.read`` in scope, recent
+         *     MFA sign-in, 428 ``step_up_required``). Audited as an export; with ``check=true`` 204
+         *     only, not audited.
+         */
+        get: operations["print_scheme_attendance_api_v1_scheme_packs_attendance_print_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scheme-packs/attendance/xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Scheme Attendance
+         * @description The attendance list as XLSX (``attendance.read`` in scope, recent MFA sign-in, 428).
+         *     Audited as an export download.
+         */
+        get: operations["download_scheme_attendance_api_v1_scheme_packs_attendance_xlsx_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scheme-packs/certificates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Scheme Certificates
+         * @description Issue one study or bonafide certificate per chosen student for a scheme's verification
+         *     (``certificate.issue``; each student in your reach, else that student is ``refused`` with
+         *     ``not_found``). Each certificate gets its own serial and register line, approved per the
+         *     type's rule; a refused student does not stop the others. Errors: 422 ``unknown_scheme``,
+         *     ``too_many_students``. Accepts ``Idempotency-Key``.
+         */
+        post: operations["issue_scheme_certificates_api_v1_scheme_packs_certificates_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11770,6 +12825,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tc-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tc Requests
+         * @description The TC request log of students you can see, newest received first, with the number of
+         *     overdue requests (``overdue=true`` lists only those; read, issue or approve permission;
+         *     FR-CERT-035..FR-CERT-037).
+         */
+        get: operations["list_tc_requests_api_v1_tc_requests_get"];
+        put?: never;
+        /**
+         * Log Tc Request
+         * @description Log a transfer certificate request that reached the office on paper, by phone or in
+         *     person (permission ``certificate.issue``; FR-CERT-026, FR-CERT-027). Accepts
+         *     ``Idempotency-Key``. Errors: ``tc_request_open_exists`` (409); ``date_in_future`` (422).
+         */
+        post: operations["log_tc_request_api_v1_tc_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tc-requests/{tc_request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tc Request
+         * @description One TC request with its steps; the fee note for holders of ``finance.read`` (information
+         *     only, never a blocker: D16); returns ``ETag`` (read, issue or approve permission).
+         */
+        get: operations["get_tc_request_api_v1_tc_requests__tc_request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tc-requests/{tc_request_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Tc Request Status
+         * @description Start preparing the TC, record that the ready TC was handed over, or cancel the request
+         *     with a reason (permission ``certificate.issue``, ``If-Match``; FR-CERT-030, FR-CERT-034).
+         *     Errors: ``tc_request_wrong_status``, ``tc_request_certificate_pending``,
+         *     ``tc_request_certificate_not_issued`` (409).
+         */
+        post: operations["change_tc_request_status_api_v1_tc_requests__tc_request_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant": {
         parameters: {
             query?: never;
@@ -12308,6 +13435,11 @@ export interface components {
             kind: "talked_with_student" | "called_parent" | "met_parent" | "home_visit" | "remedial_support" | "referred_counsellor" | "referred_principal" | "other";
             /** Note */
             note?: string | null;
+            /**
+             * Review On
+             * @description Plan the next review (after today, within the configured days; FR-EW-019). Omitted: no review is planned (an earlier one counts as done).
+             */
+            review_on?: string | null;
         };
         /** ActionOut */
         ActionOut: {
@@ -12337,6 +13469,11 @@ export interface components {
              * @description Restricted (C3); shown only to people who may act
              */
             note: string | null;
+            /**
+             * Review On
+             * @description The follow-up review planned with this action (FR-EW-019)
+             */
+            review_on?: string | null;
         };
         /** ActiveTenantIn */
         ActiveTenantIn: {
@@ -13513,6 +14650,84 @@ export interface components {
              * Format: uuid
              */
             owner_membership_id: string;
+        };
+        /** AttendanceCompletenessOut */
+        AttendanceCompletenessOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /**
+             * Complete
+             * @description Sections where every student has a status
+             */
+            complete: number;
+            /**
+             * Day Off
+             * @description Sections whose class has no school that day
+             */
+            day_off: number;
+            /** No Students */
+            no_students: number;
+            /** Not Taken */
+            not_taken: number;
+            /**
+             * On Date
+             * Format: date
+             */
+            on_date: string;
+            /** Partial */
+            partial: number;
+            /**
+             * Reminders Enabled
+             * @description Whether in-app reminders may be sent
+             */
+            reminders_enabled: boolean;
+            /** Rows */
+            rows: components["schemas"]["AttendanceCompletenessRow"][];
+            /** Sections */
+            sections: number;
+        };
+        /** AttendanceCompletenessRow */
+        AttendanceCompletenessRow: {
+            /**
+             * Calendar
+             * @description The day's kind for the section's class; null without a school calendar
+             */
+            calendar: ("working" | "working_day" | "weekly_off" | "saturday_off" | "holiday" | "vacation" | "outside_year") | null;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** @description Who the entry waits on; null when the section has no class teacher */
+            class_teacher: components["schemas"]["CompletenessTeacherRef"] | null;
+            /**
+             * Label
+             * @description e.g. IX-A
+             */
+            label: string;
+            /**
+             * Marked
+             * @description Of those, students with a status for the date
+             */
+            marked: number;
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "not_taken" | "day_off" | "no_students";
+            /**
+             * Students
+             * @description Students enrolled in the section on the date
+             */
+            students: number;
         };
         /** AttendanceDayOut */
         AttendanceDayOut: {
@@ -15806,6 +17021,87 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** CheckCountsOut */
+        CheckCountsOut: {
+            /** Due Soon */
+            due_soon: number;
+            /** Never */
+            never: number;
+            /** Ok */
+            ok: number;
+            /** Overdue */
+            overdue: number;
+        };
+        /**
+         * CheckCreate
+         * @description Log a drill or periodic check. Counts and a short note only: never type a student's
+         *     name.
+         */
+        CheckCreate: {
+            /**
+             * Document Id
+             * @description A report in Documents you can see. Do not upload photos that identify children.
+             */
+            document_id?: string | null;
+            /**
+             * Done On
+             * Format: date
+             * @description The day it was done (not in the future).
+             */
+            done_on: string;
+            /**
+             * Duration Minutes
+             * @description Drills only: minutes to evacuate or finish.
+             */
+            duration_minutes?: number | null;
+            /** Kind */
+            kind: string;
+            /**
+             * Label
+             * @description Only for kind 'other': the check's name (3-120).
+             */
+            label?: string | null;
+            /**
+             * Led By Membership Id
+             * @description The staff member who led it (an active member).
+             */
+            led_by_membership_id?: string | null;
+            /**
+             * Observations
+             * @description What was found (1-500). Do not type the names of students or staff.
+             */
+            observations?: string | null;
+            /**
+             * Participants Count
+             * @description Drills only: how many people took part.
+             */
+            participants_count?: number | null;
+            /**
+             * Result
+             * @description 'action_needed' when something must be fixed.
+             * @default ok
+             * @enum {string}
+             */
+            result: "ok" | "action_needed";
+        };
+        /** CheckKindOut */
+        CheckKindOut: {
+            /**
+             * Applies
+             * @description It applies to this school's boards.
+             */
+            applies: boolean;
+            /** Drill */
+            drill: boolean;
+            /** Every Months */
+            every_months: number | null;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Note */
+            note: string;
+        };
         /** CheckRow */
         CheckRow: {
             /** Difference */
@@ -15826,6 +17122,205 @@ export interface components {
             students: number;
             /** Tally Balance */
             tally_balance: string | null;
+        };
+        /** ChecksLogOut */
+        ChecksLogOut: {
+            /** Items */
+            items: components["schemas"]["ComplianceCheckOut"][];
+        };
+        /** ChecksOverviewOut */
+        ChecksOverviewOut: {
+            counts: components["schemas"]["CheckCountsOut"];
+            /** Due Soon Days */
+            due_soon_days: number;
+            /**
+             * Kinds
+             * @description The catalogue (verified: false).
+             */
+            kinds: components["schemas"]["CheckKindOut"][];
+            /**
+             * Leaders
+             * @description Active members who can be named as having led a check (compliance.manage).
+             */
+            leaders?: components["schemas"]["ComplianceOwnerOut"][];
+            /**
+             * Recent
+             * @description The latest entries, newest first.
+             */
+            recent: components["schemas"]["ComplianceCheckOut"][];
+            /**
+             * Statuses
+             * @description Most urgent first.
+             */
+            statuses: components["schemas"]["CheckStatusOut"][];
+            /**
+             * Today
+             * Format: date
+             */
+            today: string;
+            /** Verified */
+            verified: boolean;
+        };
+        /**
+         * CheckStatusOut
+         * @description One expected check kind and when it is next due.
+         */
+        CheckStatusOut: {
+            /**
+             * Days Left
+             * @description Days until it is due (negative once overdue).
+             */
+            days_left: number | null;
+            /** Drill */
+            drill: boolean;
+            /** Every Months */
+            every_months: number | null;
+            /** Kind */
+            kind: string;
+            /** Kind Label */
+            kind_label: string;
+            /** Last Done On */
+            last_done_on: string | null;
+            /** Last Entry Id */
+            last_entry_id: string | null;
+            /** Next Due */
+            next_due: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ok" | "due_soon" | "overdue" | "never" | "logged";
+        };
+        /**
+         * ChequeDepositIn
+         * @description Mark cheques as taken to the bank (FR-FEE-132). ``deposited_on``: today or earlier, not
+         *     before the receipt date.
+         */
+        ChequeDepositIn: {
+            /**
+             * Deposited On
+             * Format: date
+             */
+            deposited_on: string;
+            /** Receipt Ids */
+            receipt_ids: string[];
+        };
+        /** ChequeDepositOut */
+        ChequeDepositOut: {
+            /** Already Deposited */
+            already_deposited: number;
+            /** Deposited */
+            deposited: number;
+            /** Skipped */
+            skipped: components["schemas"]["ChequeSkipped"][];
+        };
+        /** ChequeListOut */
+        ChequeListOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Deposit Due Days */
+            deposit_due_days: number;
+            /** Items */
+            items: components["schemas"]["ChequeOut"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * ChequeOut
+         * @description A cheque receipt and where its cheque is: ``received`` (at the school), ``deposited``
+         *     (taken to the bank), ``cleared`` (seen in a bank statement and confirmed by a person) or
+         *     ``returned`` (the bank returned it; a ``cheque_dishonoured`` cancellation request exists).
+         */
+        ChequeOut: {
+            /** Amount */
+            amount: string;
+            /** Bank Name */
+            bank_name: string;
+            /** Cancellation Id */
+            cancellation_id: string | null;
+            /** Cheque Date */
+            cheque_date: string | null;
+            /** Cheque Number */
+            cheque_number: string;
+            /**
+             * Cheque Status
+             * @enum {string}
+             */
+            cheque_status: "received" | "deposited" | "cleared" | "returned";
+            /** Class Section */
+            class_section: string;
+            /** Cleared From Statement */
+            cleared_from_statement: boolean;
+            /** Cleared On */
+            cleared_on: string | null;
+            /** Deposit Overdue */
+            deposit_overdue: boolean;
+            /** Deposited On */
+            deposited_on: string | null;
+            /**
+             * Receipt Date
+             * Format: date
+             */
+            receipt_date: string;
+            /**
+             * Receipt Id
+             * Format: uuid
+             */
+            receipt_id: string;
+            /** Receipt Number */
+            receipt_number: string;
+            /** Receipt Status */
+            receipt_status: string;
+            /** Returned On */
+            returned_on: string | null;
+            /** Student Name */
+            student_name: string;
+        };
+        /**
+         * ChequeReturnIn
+         * @description The bank returned the cheque (FR-FEE-134): a ``cheque_dishonoured`` cancellation request is
+         *     raised for the receipt (a different holder of ``fee.receipt.cancel`` decides).
+         */
+        ChequeReturnIn: {
+            /** Reason */
+            reason: string;
+            /**
+             * Returned On
+             * Format: date
+             */
+            returned_on: string;
+        };
+        /** ChequeReturnOut */
+        ChequeReturnOut: {
+            cancellation: components["schemas"]["CancellationOut"];
+            cheque: components["schemas"]["ChequeOut"];
+        };
+        /** ChequeSkipped */
+        ChequeSkipped: {
+            /** Code */
+            code: string;
+            /**
+             * Receipt Id
+             * Format: uuid
+             */
+            receipt_id: string;
         };
         /** ChoiceOut */
         ChoiceOut: {
@@ -16064,6 +17559,11 @@ export interface components {
             closed_from: string;
             /** Closed To */
             closed_to?: string | null;
+            /**
+             * Notice Text
+             * @description FP-02 follow-up (FR-MSG-056): the order text for the closure's parent page (plain text, at most 1000 characters). Never in the WhatsApp message.
+             */
+            notice_text?: string | null;
             /** Preview Token */
             preview_token: string;
             /**
@@ -16092,6 +17592,11 @@ export interface components {
             closed_from: string;
             /** Closed To */
             closed_to?: string | null;
+            /**
+             * Notice Text
+             * @description FP-02 follow-up (FR-MSG-056): the order text for the closure's parent page (plain text, at most 1000 characters). Never in the WhatsApp message.
+             */
+            notice_text?: string | null;
             /**
              * Reason
              * @enum {string}
@@ -16135,12 +17640,16 @@ export interface components {
             languages: {
                 [key: string]: number;
             };
+            /** Notice Text */
+            notice_text?: string | null;
             /** Queued */
             queued: number;
             /** Reason */
             reason: string;
             /** Recipients */
             recipients: number;
+            /** @description The "school reopens" message, once sent (FR-MSG-064). */
+            reopening?: components["schemas"]["ClosureReopeningOut"] | null;
             /** Section Ids */
             section_ids: string[];
             /**
@@ -16240,6 +17749,137 @@ export interface components {
             window_start: string;
         };
         /**
+         * ClosureReopeningConfirmIn
+         * @description Send the previewed reopening message (``Idempotency-Key``; step-up). The preview token
+         *     pins who gets it (409 ``preview_stale`` when that changed).
+         */
+        ClosureReopeningConfirmIn: {
+            /** Preview Token */
+            preview_token: string;
+            /**
+             * Reopens On
+             * Format: date
+             */
+            reopens_on: string;
+        };
+        /**
+         * ClosureReopeningIn
+         * @description FP-02 follow-up (FR-MSG-059, FR-MSG-060): "the school reopens on <date>" to the closure's
+         *     audience (the whole school or its sections, as they are now).
+         */
+        ClosureReopeningIn: {
+            /**
+             * Reopens On
+             * Format: date
+             */
+            reopens_on: string;
+        };
+        /** ClosureReopeningOut */
+        ClosureReopeningOut: {
+            /**
+             * Closure Id
+             * Format: uuid
+             */
+            closure_id: string;
+            /**
+             * Counts
+             * @description Messages by status now.
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /** Estimated Cost Inr */
+            estimated_cost_inr: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Languages */
+            languages: {
+                [key: string]: number;
+            };
+            /** Queued */
+            queued: number;
+            /** Recipients */
+            recipients: number;
+            /**
+             * Reopens On
+             * Format: date
+             */
+            reopens_on: string;
+            /**
+             * Sent At
+             * Format: date-time
+             */
+            sent_at: string;
+            /**
+             * Sent By
+             * Format: uuid
+             */
+            sent_by: string;
+            /** Skipped */
+            skipped: {
+                [key: string]: number;
+            };
+        };
+        /** ClosureReopeningPreviewOut */
+        ClosureReopeningPreviewOut: {
+            /** Blocked Reason */
+            blocked_reason: string | null;
+            /**
+             * Closure Id
+             * Format: uuid
+             */
+            closure_id: string;
+            /** Estimated Cost Inr */
+            estimated_cost_inr: string;
+            /** Guardians */
+            guardians: number;
+            /** Language Fallbacks */
+            language_fallbacks: number;
+            /** Languages */
+            languages: {
+                [key: string]: number;
+            };
+            /**
+             * Message En
+             * @description The English message parents will get.
+             */
+            message_en: string;
+            /** Preview Token */
+            preview_token: string;
+            /** Recipients */
+            recipients: number;
+            /**
+             * Reopens On
+             * Format: date
+             */
+            reopens_on: string;
+            /**
+             * Sends At
+             * @description When sending starts: null = now; otherwise the next opening of the closure window.
+             */
+            sends_at: string | null;
+            /**
+             * Skipped
+             * @description Guardians left out by reason.
+             */
+            skipped: {
+                [key: string]: number;
+            };
+            /**
+             * Window End
+             * Format: time
+             */
+            window_end: string;
+            /**
+             * Window Start
+             * Format: time
+             */
+            window_start: string;
+        };
+        /**
          * CollectionRegisterOut
          * @description The collection register of an IST date range (FR-FEE-061): gross receipts numbered in the
          *     period, less cancellations approved and refunds paid in the period. ``receipts`` is cut at
@@ -16325,6 +17965,45 @@ export interface components {
              */
             skip_error_rows: boolean;
         };
+        /** CompletenessReminderIn */
+        CompletenessReminderIn: {
+            /**
+             * Exam Id
+             * @description Required for marks
+             */
+            exam_id?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "attendance" | "marks";
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+        };
+        /** CompletenessReminderOut */
+        CompletenessReminderOut: {
+            /**
+             * Sent
+             * @description 0 when the class teacher was already reminded today
+             */
+            sent: number;
+        };
+        /**
+         * CompletenessTeacherRef
+         * @description The section's class teacher (membership id and display name only).
+         */
+        CompletenessTeacherRef: {
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+        };
         /** ComplianceCertificateOut */
         ComplianceCertificateOut: {
             /**
@@ -16385,6 +18064,52 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** ComplianceCheckOut */
+        ComplianceCheckOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            document: components["schemas"]["DocumentRefOut"] | null;
+            /**
+             * Done On
+             * Format: date
+             */
+            done_on: string;
+            /** Duration Minutes */
+            duration_minutes: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Kind Label */
+            kind_label: string;
+            /** Label */
+            label: string | null;
+            led_by: components["schemas"]["ComplianceOwnerOut"] | null;
+            /** Observations */
+            observations: string | null;
+            /** Participants Count */
+            participants_count: number | null;
+            /** Recorded By Name */
+            recorded_by_name: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "ok" | "action_needed";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "recorded" | "removed";
+            /** Version */
+            version: number;
+        };
         /** ComplianceOwnerOut */
         ComplianceOwnerOut: {
             /** Active */
@@ -16399,6 +18124,67 @@ export interface components {
              * Format: uuid
              */
             membership_id: string;
+        };
+        /** CompliancePolicyOut */
+        CompliancePolicyOut: {
+            /** Ack Requested At */
+            ack_requested_at: string | null;
+            /** Ack Roles */
+            ack_roles: components["schemas"]["PolicyRoleOut"][];
+            /**
+             * Acknowledged
+             * @description How many of them acknowledged the current version.
+             */
+            acknowledged: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Current Version Id
+             * @description The clean PDF version staff acknowledge (null: not ready or removed).
+             */
+            current_version_id: string | null;
+            /** Days Left */
+            days_left: number;
+            document: components["schemas"]["DocumentRefOut"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Reviewed On */
+            last_reviewed_on: string | null;
+            /**
+             * Review Due
+             * Format: date
+             */
+            review_due: string;
+            /**
+             * Review State
+             * @enum {string}
+             */
+            review_state: "ok" | "due_soon" | "overdue";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "retired";
+            /**
+             * Targeted
+             * @description Active members asked to acknowledge it.
+             */
+            targeted: number;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
         };
         /**
          * ConcessionCreate
@@ -18128,6 +19914,128 @@ export interface components {
             status: string;
         };
         /**
+         * EnrolmentStatisticsOut
+         * @description Counts only: no names, no student ids (FR-EXP-009).
+         */
+        EnrolmentStatisticsOut: {
+            /**
+             * As Of
+             * Format: date
+             * @description Enrolment and age are counted on this day
+             */
+            as_of: string;
+            /** Gaps */
+            gaps: components["schemas"]["EnrolmentStatsGapOut"][];
+            /**
+             * Reference Date
+             * Format: date
+             * @description The configured default day of this year
+             */
+            reference_date: string;
+            /**
+             * Restricted Hidden
+             * @description True when the category, minority and CWSN tables are left out because the caller lacks school-wide student.read_sensitive
+             */
+            restricted_hidden: boolean;
+            /** Source */
+            source: string[];
+            /**
+             * Students
+             * @description Students enrolled on the day
+             */
+            students: number;
+            /** Tables */
+            tables: components["schemas"]["EnrolmentStatsTableOut"][];
+            /**
+             * Verified
+             * @description False: the UDISE+ shapes are not verified yet
+             */
+            verified: boolean;
+            year: components["schemas"]["EnrolmentStatsYearOut"];
+        };
+        /** EnrolmentStatsColumnOut */
+        EnrolmentStatsColumnOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
+        /** EnrolmentStatsGapOut */
+        EnrolmentStatsGapOut: {
+            /** Attribute Key */
+            attribute_key: string;
+            /**
+             * Count
+             * @description Students counted on the sheet without this value
+             */
+            count: number;
+            /** Label */
+            label: string;
+        };
+        /** EnrolmentStatsRowOut */
+        EnrolmentStatsRowOut: {
+            /**
+             * Class Id
+             * @description Null on the totals row
+             */
+            class_id: string | null;
+            /**
+             * Counts
+             * @description One count per column, in column order
+             */
+            counts: number[];
+            /**
+             * Label
+             * @description Class name, or 'Total'
+             */
+            label: string;
+            /**
+             * Total
+             * @description Row total (students on the row, not the sum of columns)
+             */
+            total: number;
+        };
+        /** EnrolmentStatsTableOut */
+        EnrolmentStatsTableOut: {
+            /** Columns */
+            columns: components["schemas"]["EnrolmentStatsColumnOut"][];
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "gender" | "age" | "category" | "minority" | "cwsn" | "repeaters" | "movement";
+            /**
+             * Restricted
+             * @description Counted from restricted (C3) values (category, religion, disability)
+             */
+            restricted: boolean;
+            /** Rows */
+            rows: components["schemas"]["EnrolmentStatsRowOut"][];
+            /** Title */
+            title: string;
+            totals: components["schemas"]["EnrolmentStatsRowOut"];
+        };
+        /** EnrolmentStatsYearOut */
+        EnrolmentStatsYearOut: {
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+        };
+        /**
          * EnrolOut
          * @description Returned ONCE: the agent stores the secret with Windows DPAPI (ADR-0032 §7).
          */
@@ -18436,6 +20344,117 @@ export interface components {
              * Format: date-time
              */
             trial_ends_at: string;
+        };
+        /**
+         * FamilyCounterOut
+         * @description The family of one student at the counter (FR-FEE-101/102).
+         */
+        FamilyCounterOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Max Accounts
+             * @description Accounts one family payment may cover.
+             */
+            max_accounts: number;
+            /** Members */
+            members: components["schemas"]["FamilyMember"][];
+            /**
+             * Modes
+             * @description Modes a family payment may use (never UPI).
+             */
+            modes: string[];
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Total Collectable */
+            total_collectable: string;
+        };
+        /**
+         * FamilyMember
+         * @description One child of the family at the counter: the chosen student first, then each sibling the
+         *     clerk may see (a student sharing a guardian with the chosen one, FR-FEE-101). Display
+         *     fields come from ``students.summaries`` under the clerk's own scope (inv. 3).
+         */
+        FamilyMember: {
+            /**
+             * Accounts
+             * @description Open fee accounts, earlier years first.
+             */
+            accounts: components["schemas"]["YearDue"][];
+            /** Admission No */
+            admission_no: string | null;
+            /** Class Section */
+            class_section: string | null;
+            /** Collectable */
+            collectable: string;
+            /** Display Name */
+            display_name: string | null;
+            /**
+             * Linked By
+             * @description How the shared guardian is related to this child (``father``, ``mother``, ``guardian``...); empty for the chosen student.
+             */
+            linked_by: string[];
+            /**
+             * Selected
+             * @description True for the student the clerk searched for.
+             */
+            selected: boolean;
+            /** Status */
+            status: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * FamilyPaymentCreate
+         * @description One payment by a family split across siblings' accounts (FR-FEE-103): one receipt per
+         *     account, in one transaction, with the same mode details.
+         */
+        FamilyPaymentCreate: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "cash" | "cheque" | "bank_transfer" | "upi_qr";
+            mode_details?: components["schemas"]["ModeDetailsIn"];
+            /** Parts */
+            parts: components["schemas"]["FamilyPaymentPart"][];
+        };
+        /**
+         * FamilyPaymentOut
+         * @description The receipts of one family payment, in the order of the parts (consecutive numbers).
+         */
+        FamilyPaymentOut: {
+            /** Amount */
+            amount: string;
+            /** Mode */
+            mode: string;
+            /** Receipts */
+            receipts: components["schemas"]["ReceiptOut"][];
+        };
+        /**
+         * FamilyPaymentPart
+         * @description The amount taken on one account. ``allocations`` default to oldest due first; when given
+         *     they follow the rules of a counter receipt (FR-FEE-010).
+         */
+        FamilyPaymentPart: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Allocations */
+            allocations?: components["schemas"]["AllocationIn"][] | null;
+            /** Amount */
+            amount: number | string;
         };
         /** FeedbackIn */
         FeedbackIn: {
@@ -18767,6 +20786,173 @@ export interface components {
              */
             today: string;
         };
+        /**
+         * FeeStructureChangesOut
+         * @description This year's general plans against the previous academic year's active plans
+         *     (FR-FEE-118..122).
+         */
+        FeeStructureChangesOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /** Academic Year Label */
+            academic_year_label: string;
+            /** Classes */
+            classes: components["schemas"]["FeeStructureClassChange"][];
+            /** Classes Above Threshold */
+            classes_above_threshold: number;
+            /** Previous Year Id */
+            previous_year_id: string | null;
+            /** Previous Year Label */
+            previous_year_label: string | null;
+            /** Warn Percent */
+            warn_percent: string;
+            /** Warn Percent Verified */
+            warn_percent_verified: boolean;
+        };
+        /** FeeStructureClassChange */
+        FeeStructureClassChange: {
+            /** Above Threshold */
+            above_threshold: boolean;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Label */
+            class_label: string;
+            /** Current Total */
+            current_total: string;
+            /** Difference */
+            difference: string;
+            /** Has Previous */
+            has_previous: boolean;
+            /** Heads */
+            heads: components["schemas"]["FeeStructureHeadChange"][];
+            /** Percent */
+            percent: string | null;
+            /**
+             * Plan Status
+             * @description Status of this year's plan; null when the class has no plan this year.
+             */
+            plan_status: ("draft" | "active") | null;
+            /** Previous Total */
+            previous_total: string;
+        };
+        /**
+         * FeeStructureHeadChange
+         * @description One head of one class against the previous year. ``percent`` is null when the head is
+         *     new (nothing to compare with) or was not charged.
+         */
+        FeeStructureHeadChange: {
+            /** Above Threshold */
+            above_threshold: boolean;
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "added" | "removed" | "changed" | "unchanged";
+            /** Code */
+            code: string;
+            /** Current Amount */
+            current_amount: string | null;
+            /** Difference */
+            difference: string;
+            /**
+             * Head Id
+             * Format: uuid
+             */
+            head_id: string;
+            /** Name */
+            name: string;
+            /** Percent */
+            percent: string | null;
+            /** Previous Amount */
+            previous_amount: string | null;
+        };
+        /**
+         * FeeStructureNoticeClass
+         * @description One class's general fee plan (no category) for the year: the active plan, else the
+         *     newest draft (marked DRAFT on the notice).
+         */
+        FeeStructureNoticeClass: {
+            /** Annual Total */
+            annual_total: string;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Label */
+            class_label: string;
+            /** Heads */
+            heads: components["schemas"]["FeeStructureNoticeHead"][];
+            /** Instalments */
+            instalments: components["schemas"]["FeeStructureNoticeInstalment"][];
+            /** Late Fee Text */
+            late_fee_text: string;
+            /**
+             * Plan Id
+             * Format: uuid
+             */
+            plan_id: string;
+            /**
+             * Plan Status
+             * @enum {string}
+             */
+            plan_status: "draft" | "active";
+        };
+        /** FeeStructureNoticeHead */
+        FeeStructureNoticeHead: {
+            /** Annual Amount */
+            annual_amount: string;
+            /** Code */
+            code: string;
+            /**
+             * Head Id
+             * Format: uuid
+             */
+            head_id: string;
+            /** Name */
+            name: string;
+        };
+        /** FeeStructureNoticeInstalment */
+        FeeStructureNoticeInstalment: {
+            /** Amount */
+            amount: string;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Instalment No */
+            instalment_no: number;
+            /** Label */
+            label: string;
+        };
+        /** FeeStructureNoticeOut */
+        FeeStructureNoticeOut: {
+            /**
+             * Academic Year Id
+             * Format: uuid
+             */
+            academic_year_id: string;
+            /** Academic Year Label */
+            academic_year_label: string;
+            /** Classes */
+            classes: components["schemas"]["FeeStructureNoticeClass"][];
+            /**
+             * Classes Without Plan
+             * @description Labels of the school's classes with no general plan for the year.
+             */
+            classes_without_plan: string[];
+            /** Disclaimer */
+            disclaimer: string;
+            /** Title */
+            title: string;
+        };
         /** FieldOut */
         FieldOut: {
             /** Bbox */
@@ -18906,6 +21092,125 @@ export interface components {
              * Format: uuid
              */
             value_id: string;
+        };
+        /**
+         * FixLetterOut
+         * @description One letter template for a readiness profile and the students it covers now.
+         */
+        FixLetterOut: {
+            /**
+             * Audience
+             * @enum {string}
+             */
+            audience: "parent" | "office";
+            /**
+             * Fix Owner
+             * @enum {string}
+             */
+            fix_owner: "parent_aadhaar" | "school_udise";
+            /**
+             * Followup Channel
+             * @enum {string}
+             */
+            followup_channel: "in_person" | "phone" | "whatsapp" | "letter" | "email";
+            /**
+             * Followup Event
+             * @enum {string}
+             */
+            followup_event: "slip_given" | "parent_contacted" | "promised_by" | "update_reported" | "request_sent" | "followed_up";
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "parent_aadhaar" | "board_registration";
+            /** Label */
+            label: string;
+            /** Lines Count */
+            lines_count: number;
+            /** Print Permission */
+            print_permission: string;
+            /** Recipients */
+            recipients: components["schemas"]["FixLetterRecipientOut"][];
+            /** Step Up */
+            step_up: boolean;
+            /** Students */
+            students: components["schemas"]["FixLetterStudentOut"][];
+            /** Students Count */
+            students_count: number;
+            /** Title */
+            title: string;
+            /** Verified */
+            verified: boolean;
+            /** Version */
+            version: number;
+        };
+        /** FixLetterRecipientOut */
+        FixLetterRecipientOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * FixLetterSentIn
+         * @description ``POST .../fix-letters/{letter_key}/sent``: the letters were given to the parents, or the
+         *     letter went to the board office. Records the letter's follow-up step (no free text, D56).
+         */
+        FixLetterSentIn: {
+            /**
+             * Occurred On
+             * @description When it happened (default today; not in the future).
+             */
+            occurred_on?: string | null;
+            /** Student Ids */
+            student_ids: string[];
+        };
+        /** FixLetterSentOut */
+        FixLetterSentOut: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "in_person" | "phone" | "whatsapp" | "letter" | "email";
+            /**
+             * Event
+             * @enum {string}
+             */
+            event: "slip_given" | "parent_contacted" | "promised_by" | "update_reported" | "request_sent" | "followed_up";
+            /**
+             * Fix Owner
+             * @enum {string}
+             */
+            fix_owner: "parent_aadhaar" | "school_udise";
+            /** Recorded */
+            recorded: number;
+        };
+        /** FixLettersOut */
+        FixLettersOut: {
+            /** Letters */
+            letters: components["schemas"]["FixLetterOut"][];
+            /** Profile Key */
+            profile_key: string;
+            /** Verified */
+            verified: boolean;
+        };
+        /**
+         * FixLetterStudentOut
+         * @description One student a letter would cover now, with the fields it lists (labels only).
+         */
+        FixLetterStudentOut: {
+            /** Class Section */
+            class_section: string | null;
+            /** Fields */
+            fields: string[];
+            /**
+             * Last Sent On
+             * @description The last time this letter's follow-up step was recorded for the student.
+             */
+            last_sent_on: string | null;
+            /** Section Id */
+            section_id: string | null;
+            student: components["schemas"]["StudentRef"];
         };
         /** FlagIn */
         FlagIn: {
@@ -20401,6 +22706,59 @@ export interface components {
             /** Required */
             required: boolean;
         };
+        /**
+         * InsightCountsOut
+         * @description School-wide early-warning counts for management (FT-13, FR-EW-026): numbers only, never
+         *     a name, a student, a flag, a note or a section (PRV-004, invariant 14).
+         */
+        InsightCountsOut: {
+            /** Actioned Late */
+            actioned_late: number;
+            /**
+             * Actioned On Time
+             * @description Of those, first acted on by their due date
+             */
+            actioned_on_time: number;
+            /**
+             * Closed
+             * @description Flags closed since the date
+             */
+            closed: number;
+            /** Not Actioned */
+            not_actioned: number;
+            /**
+             * Open
+             * @description Flags not closed (now)
+             */
+            open: number;
+            /**
+             * Outcomes
+             * @description Flags closed since the date per closing reason (the recorded outcome); every reason is listed, zero included
+             */
+            outcomes: {
+                [key: string]: number;
+            };
+            /**
+             * Overdue
+             * @description Open flags past their due date with no action (now)
+             */
+            overdue: number;
+            /**
+             * Raised
+             * @description Flags raised since the date
+             */
+            raised: number;
+            /**
+             * Review Due
+             * @description Open flags whose planned review is today or past (now)
+             */
+            review_due: number;
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+        };
         /** InsightFlagDetail */
         InsightFlagDetail: {
             /** Actioned */
@@ -20449,6 +22807,17 @@ export interface components {
              * Format: date
              */
             raised_on: string;
+            /**
+             * Review Due
+             * @description Open and its planned review date is today or past
+             * @default false
+             */
+            review_due: boolean;
+            /**
+             * Review On
+             * @description Next planned review of an open flag (FR-EW-019); null when none or closed
+             */
+            review_on?: string | null;
             /**
              * Rule
              * @enum {string}
@@ -20510,6 +22879,17 @@ export interface components {
              */
             raised_on: string;
             /**
+             * Review Due
+             * @description Open and its planned review date is today or past
+             * @default false
+             */
+            review_due: boolean;
+            /**
+             * Review On
+             * @description Next planned review of an open flag (FR-EW-019); null when none or closed
+             */
+            review_on?: string | null;
+            /**
              * Rule
              * @enum {string}
              */
@@ -20570,10 +22950,227 @@ export interface components {
              */
             raised: number;
             /**
+             * Review Due
+             * @description Open flags whose planned review is today or past (now)
+             * @default 0
+             */
+            review_due: number;
+            /**
              * Since
              * Format: date
              */
             since: string;
+        };
+        /** InspectionPackCountsOut */
+        InspectionPackCountsOut: {
+            /**
+             * Attention
+             * @description expiring, no copy or incomplete
+             * @default 0
+             */
+            attention: number;
+            /**
+             * Left Out
+             * @description registers not chosen for this pack
+             * @default 0
+             */
+            left_out: number;
+            /**
+             * Missing
+             * @description expired or missing
+             * @default 0
+             */
+            missing: number;
+            /**
+             * Not Tracked
+             * @default 0
+             */
+            not_tracked: number;
+            /**
+             * Ready
+             * @default 0
+             */
+            ready: number;
+        };
+        /** InspectionPackCreate */
+        InspectionPackCreate: {
+            /**
+             * Academic Year Id
+             * @description The registers' academic year (default: the current one).
+             */
+            academic_year_id?: string | null;
+            /** Pack Key */
+            pack_key: string;
+            /**
+             * Registers
+             * @description Item keys of the pack's registers to include (student lists: needs register.read). Registers not chosen print as left out.
+             */
+            registers?: string[];
+            /**
+             * Visit On
+             * @description The inspection date, if known.
+             */
+            visit_on?: string | null;
+        };
+        /** InspectionPackDetailOut */
+        InspectionPackDetailOut: {
+            /** Academic Year Id */
+            academic_year_id: string | null;
+            /** Academic Year Label */
+            academic_year_label: string | null;
+            /** Authority */
+            authority: string;
+            counts: components["schemas"]["InspectionPackCountsOut"];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Generated By Name */
+            generated_by_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Items */
+            items: components["schemas"]["InspectionPackItemOut"][];
+            /** Pack Key */
+            pack_key: string;
+            /** Pack Label */
+            pack_label: string;
+            /** Pack Version */
+            pack_version: number;
+            /** Registers */
+            registers: string[];
+            /** Verified */
+            verified: boolean;
+            /** Visit On */
+            visit_on: string | null;
+        };
+        /** InspectionPackItemOut */
+        InspectionPackItemOut: {
+            /** Applicable */
+            applicable?: number | null;
+            /** Certificate Id */
+            certificate_id?: string | null;
+            /** Done */
+            done?: number | null;
+            /**
+             * Feature
+             * @description not_tracked: the research id that would add this evidence.
+             */
+            feature?: string | null;
+            /**
+             * Fix By
+             * @description The role that usually fixes a gap (from the pack file).
+             */
+            fix_by: string;
+            /**
+             * Has Copy
+             * @description certificate: a copy in Documents.
+             */
+            has_copy?: boolean | null;
+            /**
+             * Included
+             * @description register: chosen when the pack was made (None: live view).
+             */
+            included?: boolean | null;
+            /** Issued On */
+            issued_on?: string | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @description certificate: the catalogue kind.
+             */
+            kind?: string | null;
+            /** Label */
+            label: string;
+            /** Note */
+            note?: string | null;
+            /** Notice Id */
+            notice_id?: string | null;
+            /** Published At */
+            published_at?: string | null;
+            /** Register View */
+            register_view?: ("admission_withdrawal" | "transfer_certificates" | "certificates") | null;
+            /** Snapshot Id */
+            snapshot_id?: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "certificate" | "register" | "disclosure" | "privacy_notice" | "dpdp_readiness" | "not_tracked";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ready" | "expiring" | "no_copy" | "incomplete" | "expired" | "missing" | "left_out" | "not_tracked";
+            /** Valid Until */
+            valid_until?: string | null;
+        };
+        /** InspectionPackOut */
+        InspectionPackOut: {
+            /** Academic Year Id */
+            academic_year_id: string | null;
+            /** Academic Year Label */
+            academic_year_label: string | null;
+            /** Authority */
+            authority: string;
+            counts: components["schemas"]["InspectionPackCountsOut"];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Generated By Name */
+            generated_by_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Pack Key */
+            pack_key: string;
+            /** Pack Label */
+            pack_label: string;
+            /** Pack Version */
+            pack_version: number;
+            /** Registers */
+            registers: string[];
+            /** Verified */
+            verified: boolean;
+            /** Visit On */
+            visit_on: string | null;
+        };
+        /** InspectionPackReadinessOut */
+        InspectionPackReadinessOut: {
+            /** Authority */
+            authority: string;
+            counts: components["schemas"]["InspectionPackCountsOut"];
+            /** Items */
+            items: components["schemas"]["InspectionPackItemOut"][];
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Note */
+            note: string;
+        };
+        /** InspectionReadinessOut */
+        InspectionReadinessOut: {
+            /** Packs */
+            packs: components["schemas"]["InspectionPackReadinessOut"][];
+            /** Source */
+            source: string;
+            /**
+             * Verified
+             * @description false: the lists are a SchoolOS proposal, unconfirmed.
+             */
+            verified: boolean;
+            /** Version */
+            version: number;
         };
         /**
          * InstalmentIn
@@ -21160,6 +23757,139 @@ export interface components {
             typical_validity_months: number | null;
         };
         /**
+         * KnowledgeGapCloseIn
+         * @description Close a gap with an existing verified answer or the document that was missing, or
+         *     dismiss it (a question the library should not answer).
+         */
+        KnowledgeGapCloseIn: {
+            /** Document Id */
+            document_id?: string | null;
+            /**
+             * Resolution
+             * @enum {string}
+             */
+            resolution: "verified_answer" | "document" | "dismissed";
+            /** Verified Answer Id */
+            verified_answer_id?: string | null;
+        };
+        /** KnowledgeGapMonthOut */
+        KnowledgeGapMonthOut: {
+            /** Closed With Answer */
+            closed_with_answer: number;
+            /** Closed With Document */
+            closed_with_document: number;
+            /** Dismissed */
+            dismissed: number;
+            /**
+             * Month
+             * @description IST calendar month, YYYY-MM.
+             */
+            month: string;
+        };
+        /**
+         * KnowledgeGapOut
+         * @description A group of repeated questions Ask could not answer (ETag = ``version``).
+         */
+        KnowledgeGapOut: {
+            /** Closed At */
+            closed_at: string | null;
+            /**
+             * Closed By
+             * @description Membership id of who closed it.
+             */
+            closed_by: string | null;
+            /** Closed By Name */
+            closed_by_name: string | null;
+            /** Document Id */
+            document_id: string | null;
+            /**
+             * First Seen At
+             * Format: date-time
+             */
+            first_seen_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Language */
+            language: ("en" | "te") | null;
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /**
+             * Not Found Count
+             * @description Answered "not found in school records".
+             */
+            not_found_count: number;
+            /**
+             * Not Helpful Count
+             * @description Marked "not helpful" by the asker.
+             */
+            not_helpful_count: number;
+            /**
+             * Occurrences
+             * @description Questions counted into this gap.
+             */
+            occurrences: number;
+            /**
+             * Question
+             * @description One sample question after redaction (numbers, phones, emails masked); null when it cannot be read.
+             */
+            question: string | null;
+            /** Resolution */
+            resolution: ("verified_answer" | "document") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "closed" | "dismissed";
+            /**
+             * Unchecked Count
+             * @description Came back search-only because the answer could not be checked.
+             */
+            unchecked_count: number;
+            /** Verified Answer Id */
+            verified_answer_id: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * KnowledgeGapSummaryOut
+         * @description Counts only (FR-KB-090).
+         */
+        KnowledgeGapSummaryOut: {
+            /**
+             * Months
+             * @description This month first, then two before.
+             */
+            months: components["schemas"]["KnowledgeGapMonthOut"][];
+            /**
+             * Not Found
+             * @description Not-found questions in open gaps.
+             */
+            not_found: number;
+            /**
+             * Not Helpful
+             * @description Not-helpful answers in open gaps.
+             */
+            not_helpful: number;
+            /** Open Gaps */
+            open_gaps: number;
+            /**
+             * Retention Days
+             * @description Days a gap is kept after it was last seen or closed.
+             */
+            retention_days: number;
+            /**
+             * Unchecked
+             * @description Unchecked (search-only) questions in open gaps.
+             */
+            unchecked: number;
+        };
+        /**
          * LateFeeRule
          * @description ``flat_per_instalment``: ``amount`` once per overdue instalment after ``grace_days``.
          *     ``per_day``: ``amount`` per day after ``grace_days`` up to ``cap`` per instalment. Never
@@ -21283,6 +24013,7 @@ export interface components {
          *     ADR-0044), the school's name, and exactly one content block for its kind (R2-3H).
          */
         LinkEnvelopeOut: {
+            closure?: components["schemas"]["ParentClosureOut"] | null;
             dues?: components["schemas"]["ParentDuesOut"] | null;
             /**
              * Expires At
@@ -21293,7 +24024,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "parent_notice" | "parent_receipt" | "parent_dues" | "parent_optin";
+            kind: "parent_notice" | "parent_receipt" | "parent_dues" | "parent_optin" | "parent_closure";
             /**
              * Language
              * @enum {string}
@@ -21328,7 +24059,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "parent_notice" | "parent_receipt" | "parent_dues" | "parent_optin";
+            kind: "parent_notice" | "parent_receipt" | "parent_dues" | "parent_optin" | "parent_closure";
         };
         /** LinkIn */
         LinkIn: {
@@ -21530,6 +24261,88 @@ export interface components {
              * @default 1
              */
             version: number;
+        };
+        /** MarksCompletenessCell */
+        MarksCompletenessCell: {
+            /**
+             * Entered
+             * @description Students with a mark or marked absent for the paper
+             */
+            entered: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "missing" | "no_students";
+            /** Subject */
+            subject: string;
+        };
+        /** MarksCompletenessOut */
+        MarksCompletenessOut: {
+            /** Complete */
+            complete: number;
+            /**
+             * Exam Id
+             * Format: uuid
+             */
+            exam_id: string;
+            /** Exam Name */
+            exam_name: string;
+            /**
+             * Held On
+             * Format: date
+             */
+            held_on: string;
+            /** Locked */
+            locked: boolean;
+            /** No Students */
+            no_students: number;
+            /** Not Started */
+            not_started: number;
+            /** Partial */
+            partial: number;
+            /** Reminders Enabled */
+            reminders_enabled: boolean;
+            /** Rows */
+            rows: components["schemas"]["MarksCompletenessRow"][];
+            /** Sections */
+            sections: number;
+            /**
+             * Subjects
+             * @description Subjects entered for this exam in the sections shown (first written first)
+             */
+            subjects: string[];
+        };
+        /** MarksCompletenessRow */
+        MarksCompletenessRow: {
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            class_teacher: components["schemas"]["CompletenessTeacherRef"] | null;
+            /** Label */
+            label: string;
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "not_started" | "no_students";
+            /**
+             * Students
+             * @description Students actively enrolled in the section
+             */
+            students: number;
+            /**
+             * Subjects
+             * @description One cell per subject of the exam
+             */
+            subjects: components["schemas"]["MarksCompletenessCell"][];
         };
         /** MarksGridOut */
         MarksGridOut: {
@@ -21879,7 +24692,7 @@ export interface components {
              * Purpose
              * @enum {string}
              */
-            purpose: "optin_confirm" | "school_notice" | "absence_alert" | "fee_reminder" | "fee_receipt" | "optin_stopped" | "school_closure";
+            purpose: "optin_confirm" | "school_notice" | "absence_alert" | "fee_reminder" | "fee_receipt" | "optin_stopped" | "school_closure" | "school_reopening";
             /**
              * Queued At
              * Format: date-time
@@ -21933,7 +24746,7 @@ export interface components {
              */
             limit: number;
             /** Purpose */
-            purpose?: ("optin_confirm" | "school_notice" | "absence_alert" | "fee_reminder" | "fee_receipt" | "optin_stopped" | "school_closure") | null;
+            purpose?: ("optin_confirm" | "school_notice" | "absence_alert" | "fee_reminder" | "fee_receipt" | "optin_stopped" | "school_closure" | "school_reopening") | null;
             /** Since */
             since?: string | null;
             /** Status */
@@ -22236,6 +25049,32 @@ export interface components {
             open: number;
             /** Overdue */
             overdue: number;
+        };
+        /** MyPoliciesOut */
+        MyPoliciesOut: {
+            /** Items */
+            items: components["schemas"]["MyPolicyOut"][];
+            /** Pending */
+            pending: number;
+        };
+        /** MyPolicyOut */
+        MyPolicyOut: {
+            /**
+             * Acknowledged At
+             * @description For the current version.
+             */
+            acknowledged_at: string | null;
+            /** Current Version Id */
+            current_version_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Needs Ack */
+            needs_ack: boolean;
+            /** Title */
+            title: string;
         };
         /**
          * NationalIdCheckIn
@@ -23054,6 +25893,13 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** Page[KnowledgeGapOut] */
+        Page_KnowledgeGapOut_: {
+            /** Data */
+            data: components["schemas"]["KnowledgeGapOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** Page[MemoryOut] */
         Page_MemoryOut_: {
             /** Data */
@@ -23276,6 +26122,31 @@ export interface components {
             url: string;
             /** Version No */
             version_no: number;
+        };
+        /**
+         * ParentClosureOut
+         * @description FP-02 follow-up (FR-PUB-013, FR-MSG-057): the closure message's page, read-only: the
+         *     closure dates, the reason phrase in the page's language, the order text the principal typed
+         *     (``None`` when none) and the reopening date once a "school reopens" message was sent.
+         *     Nothing about a child or a guardian (the school name is on the envelope).
+         */
+        ParentClosureOut: {
+            /**
+             * Closed From
+             * Format: date
+             */
+            closed_from: string;
+            /**
+             * Closed To
+             * Format: date
+             */
+            closed_to: string;
+            /** Notice Text */
+            notice_text: string | null;
+            /** Reason */
+            reason: string;
+            /** Reopens On */
+            reopens_on: string | null;
         };
         /**
          * ParentDocumentLinkOut
@@ -24298,6 +27169,233 @@ export interface components {
             summary: {
                 [key: string]: unknown;
             };
+        };
+        /** PoliciesOut */
+        PoliciesOut: {
+            counts: components["schemas"]["PolicyCountsOut"];
+            /** Items */
+            items: components["schemas"]["CompliancePolicyOut"][];
+            /** Review Months */
+            review_months: number;
+            /**
+             * Roles
+             * @description Roles a policy can ask to acknowledge.
+             */
+            roles: components["schemas"]["PolicyRoleOut"][];
+            /**
+             * Today
+             * Format: date
+             */
+            today: string;
+            /** Verified */
+            verified: boolean;
+        };
+        /** PolicyAcknowledge */
+        PolicyAcknowledge: {
+            /**
+             * Document Version Id
+             * Format: uuid
+             * @description The version you opened and read.
+             */
+            document_version_id: string;
+        };
+        /** PolicyAckRequestOut */
+        PolicyAckRequestOut: {
+            /**
+             * Notified
+             * @description Members who were asked (those still to acknowledge).
+             */
+            notified: number;
+        };
+        /** PolicyCountsOut */
+        PolicyCountsOut: {
+            /** Due Soon */
+            due_soon: number;
+            /** Overdue */
+            overdue: number;
+            /**
+             * Pending Acks
+             * @description Acknowledgements still missing across active policies.
+             */
+            pending_acks: number;
+        };
+        /**
+         * PolicyCreate
+         * @description Add a policy to the library: a clean PDF in Documents of purpose 'policy', its next review
+         *     date, and the roles whose members must acknowledge it.
+         */
+        PolicyCreate: {
+            /** Ack Roles */
+            ack_roles?: string[];
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Notify
+             * @description Ask those members to acknowledge it now.
+             * @default true
+             */
+            notify: boolean;
+            /**
+             * Review Due
+             * @description Next review date; default 12 months from today (config).
+             */
+            review_due?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** PolicyDetailOut */
+        PolicyDetailOut: {
+            /** Ack Requested At */
+            ack_requested_at: string | null;
+            /** Ack Roles */
+            ack_roles: components["schemas"]["PolicyRoleOut"][];
+            /**
+             * Acknowledged
+             * @description How many of them acknowledged the current version.
+             */
+            acknowledged: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Current Version Id
+             * @description The clean PDF version staff acknowledge (null: not ready or removed).
+             */
+            current_version_id: string | null;
+            /** Days Left */
+            days_left: number;
+            document: components["schemas"]["DocumentRefOut"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Reviewed On */
+            last_reviewed_on: string | null;
+            /**
+             * Members
+             * @description Who has not acknowledged comes first.
+             */
+            members: components["schemas"]["PolicyMemberOut"][];
+            /**
+             * Review Due
+             * Format: date
+             */
+            review_due: string;
+            /**
+             * Review State
+             * @enum {string}
+             */
+            review_state: "ok" | "due_soon" | "overdue";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "retired";
+            /**
+             * Targeted
+             * @description Active members asked to acknowledge it.
+             */
+            targeted: number;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** PolicyFileOut */
+        PolicyFileOut: {
+            /**
+             * Document Version Id
+             * Format: uuid
+             */
+            document_version_id: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Url */
+            url: string;
+        };
+        /** PolicyMemberOut */
+        PolicyMemberOut: {
+            /**
+             * Acknowledged At
+             * @description For the current version.
+             */
+            acknowledged_at: string | null;
+            /**
+             * Acknowledged Earlier
+             * @description Acknowledged an earlier version only.
+             */
+            acknowledged_earlier: boolean;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
+            /** Roles */
+            roles: string[];
+        };
+        /**
+         * PolicyReview
+         * @description Mark the policy reviewed today.
+         */
+        PolicyReview: {
+            /**
+             * Next Review Due
+             * @description Next review date; default 12 months from today (config).
+             */
+            next_review_due?: string | null;
+        };
+        /** PolicyRoleOut */
+        PolicyRoleOut: {
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @description The role key.
+             */
+            role: string;
+        };
+        /**
+         * PolicyUpdate
+         * @description Correct a policy (send every field). ``status: retired`` takes it out of the staff's
+         *     list; acknowledgements are kept.
+         */
+        PolicyUpdate: {
+            /** Ack Roles */
+            ack_roles: string[];
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Review Due
+             * Format: date
+             */
+            review_due: string;
+            /**
+             * Status
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "retired";
+            /** Title */
+            title: string;
         };
         /**
          * PortalTaskLinkIn
@@ -26548,6 +29646,8 @@ export interface components {
             cancellation: components["schemas"]["CancellationOut"] | null;
             /** Cancelled On */
             cancelled_on: string | null;
+            /** Cheque Status */
+            cheque_status?: ("received" | "deposited" | "cleared" | "returned") | null;
             /** Class Section */
             class_section: string;
             /** Collected By */
@@ -26619,6 +29719,8 @@ export interface components {
         ReceiptRef: {
             /** Amount */
             amount: string;
+            /** Cheque Number */
+            cheque_number?: string | null;
             /** Class Section */
             class_section: string;
             /**
@@ -26626,6 +29728,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Mode
+             * @default upi_qr
+             */
+            mode: string;
             /**
              * Receipt Date
              * Format: date
@@ -26637,6 +29744,8 @@ export interface components {
             status: string;
             /** Student Name */
             student_name: string;
+            /** Transfer Reference */
+            transfer_reference?: string | null;
             /** Utr */
             utr: string | null;
         };
@@ -27050,7 +30159,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "doc" | "student" | "finding" | "change" | "verified" | "count" | "fee" | "conversation" | "task";
+            kind: "doc" | "student" | "finding" | "change" | "verified" | "count" | "fee" | "conversation" | "task" | "readiness" | "attendance" | "certificate" | "compliance";
         };
         /** RetentionCategoryOut */
         RetentionCategoryOut: {
@@ -27353,6 +30462,156 @@ export interface components {
             section_ids?: string[] | null;
             /** Student Ids */
             student_ids?: string[] | null;
+        };
+        /**
+         * SchemeAttendanceListOut
+         * @description Names, admission numbers and the percentage only (FR-EXP-021); no eligibility.
+         */
+        SchemeAttendanceListOut: {
+            /** Academic Year Label */
+            academic_year_label: string;
+            /**
+             * From Date
+             * Format: date
+             */
+            from_date: string;
+            scheme: components["schemas"]["SchemeOut"];
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+            /** Section Label */
+            section_label: string;
+            /** Students */
+            students: components["schemas"]["SchemeAttendanceStudentOut"][];
+            /**
+             * To Date
+             * Format: date
+             */
+            to_date: string;
+        };
+        /** SchemeAttendanceStudentOut */
+        SchemeAttendanceStudentOut: {
+            /** Admission No */
+            admission_no: string | null;
+            /**
+             * Days Counted
+             * @description Marked days, leave days left out
+             */
+            days_counted: number;
+            /**
+             * Days Present
+             * @description Present or late
+             */
+            days_present: number;
+            /** Full Name */
+            full_name: string | null;
+            /** Leave Days */
+            leave_days: number;
+            /**
+             * Percent
+             * @description days_present / days_counted x 100, 1 decimal
+             */
+            percent: number | null;
+            /** Roll No */
+            roll_no: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** SchemeCertificateResultOut */
+        SchemeCertificateResultOut: {
+            /** Certificate Id */
+            certificate_id: string | null;
+            /**
+             * Error Code
+             * @description Why it was not issued (e.g. not_found, certificate_blocked)
+             */
+            error_code: string | null;
+            /** Serial */
+            serial: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "issued" | "pending" | "refused";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * SchemeCertificatesIn
+         * @description Issue one study or bonafide certificate per chosen student for a scheme (FR-EXP-024).
+         *     ``purpose_note`` defaults to the scheme's.
+         */
+        SchemeCertificatesIn: {
+            /**
+             * Certificate Type
+             * @description Defaults to the scheme's certificate type
+             */
+            certificate_type?: ("study" | "bonafide") | null;
+            /** Purpose Note */
+            purpose_note?: string | null;
+            /** Scheme Key */
+            scheme_key: string;
+            /** Student Ids */
+            student_ids: string[];
+        };
+        /** SchemeCertificatesOut */
+        SchemeCertificatesOut: {
+            /**
+             * Certificate Type
+             * @enum {string}
+             */
+            certificate_type: "study" | "bonafide";
+            /** Issued */
+            issued: number;
+            /** Refused */
+            refused: number;
+            /** Results */
+            results: components["schemas"]["SchemeCertificateResultOut"][];
+            /** Scheme Key */
+            scheme_key: string;
+        };
+        /** SchemeOut */
+        SchemeOut: {
+            /**
+             * Certificate Type
+             * @enum {string}
+             */
+            certificate_type: "study" | "bonafide";
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Note */
+            note: string;
+            /** Purpose Note */
+            purpose_note: string;
+            /** Source */
+            source: string[];
+            /** Verified */
+            verified: boolean;
+        };
+        /** SchemePackConfigOut */
+        SchemePackConfigOut: {
+            /** Excluded Statuses */
+            excluded_statuses: string[];
+            /** Max Certificates */
+            max_certificates: number;
+            /** Note */
+            note: string;
+            /** Present Statuses */
+            present_statuses: string[];
+            /** Schemes */
+            schemes: components["schemas"]["SchemeOut"][];
+            /** Verified */
+            verified: boolean;
         };
         /**
          * SchoolAiBundle
@@ -28312,6 +31571,8 @@ export interface components {
         StatementLineOut: {
             /** Amount */
             amount: string;
+            /** Cheque No */
+            cheque_no?: string | null;
             /** @description The receipt with this line's UTR when it does not match (never corrected) */
             conflict_receipt: components["schemas"]["ReceiptRef"] | null;
             /** Decided At */
@@ -28338,7 +31599,7 @@ export interface components {
             /** Line No */
             line_no: number;
             /** Match Kind */
-            match_kind: ("utr_exact" | "amount_date" | "manual") | null;
+            match_kind: ("utr_exact" | "amount_date" | "manual" | "cheque_exact" | "transfer_exact") | null;
             /**
              * Match Status
              * @enum {string}
@@ -28357,6 +31618,8 @@ export interface components {
              * @enum {string}
              */
             ref_kind: "utr" | "reference" | "none";
+            /** Transfer Ref */
+            transfer_ref?: string | null;
             /** Utr Or Ref */
             utr_or_ref: string | null;
             /**
@@ -29269,15 +32532,188 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "promotion" | "working_days" | "days_attended";
+            key: "promotion" | "working_days" | "days_attended" | "application_date" | "leaving_date" | "leaving_reason" | "conduct";
             /**
              * Source
-             * @description year_result: the confirmed annual result; attendance_register: days marked in the register up to today
+             * @description year_result: the confirmed annual result; attendance_register: days marked in the register up to today; tc_request: the open TC request in the request log (FO-09: the day it was received is the application date); conduct_certificate: the student's latest issued conduct certificate
              * @enum {string}
              */
-            source: "year_result" | "attendance_register";
+            source: "year_result" | "attendance_register" | "tc_request" | "conduct_certificate";
             /** Value */
             value: string;
+        };
+        /**
+         * TcRequestIn
+         * @description Log a TC request that reached the office on paper, by phone or in person (FR-CERT-026).
+         *     ``received_on`` (not in the future) becomes the TC's application date; ``leaving_date`` and
+         *     ``leaving_reason`` are what the parent asked for and are suggested on the TC. Nothing about
+         *     the person who asked is stored (least personal data).
+         */
+        TcRequestIn: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "paper" | "phone" | "in_person" | "other";
+            /** Leaving Date */
+            leaving_date?: string | null;
+            /** Leaving Reason */
+            leaving_reason?: ("parent_request" | "parent_transferred" | "course_completed" | "other") | null;
+            /**
+             * Received On
+             * Format: date
+             */
+            received_on: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * TcRequestList
+         * @description A page of the request log, newest received first, with the school's overdue count among
+         *     the requests the caller can see (FR-CERT-035, FR-CERT-037).
+         */
+        TcRequestList: {
+            /** Data */
+            data: components["schemas"]["TcRequestOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Overdue After Days */
+            overdue_after_days: number;
+            /** Overdue Count */
+            overdue_count: number;
+            /**
+             * Overdue Verified
+             * @description false: the number of days is a default not yet confirmed by the school.
+             */
+            overdue_verified: boolean;
+        };
+        /**
+         * TcRequestOut
+         * @description One TC request with its steps (who and when), how long it has been open and whether it is
+         *     overdue (FR-CERT-035..FR-CERT-038). Staff names are members' display names; the student's
+         *     name and admission number are the record's current values (C2).
+         */
+        TcRequestOut: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Hand Over */
+            can_hand_over: boolean;
+            /** Can Prepare */
+            can_prepare: boolean;
+            /** Cancel Reason */
+            cancel_reason: string | null;
+            /** Cancelled At */
+            cancelled_at: string | null;
+            /** Cancelled By */
+            cancelled_by: string | null;
+            /** Cancelled By Name */
+            cancelled_by_name: string | null;
+            /** Certificate Id */
+            certificate_id: string | null;
+            /** Certificate Serial */
+            certificate_serial: string | null;
+            /** Certificate Status */
+            certificate_status: ("pending" | "issued" | "rejected" | "withdrawn" | "cancelled") | null;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "paper" | "phone" | "in_person" | "other";
+            /**
+             * Class Label
+             * @description The class and section the student is in now.
+             */
+            class_label: string | null;
+            /**
+             * Days Open
+             * @description Days from the day received to the day the TC was ready (or to today while it is still received or in preparation).
+             */
+            days_open: number;
+            /** @description Outstanding fees, information only (FR-CERT-025, D16): only on one request read by a holder of finance.read school-wide while fees are on; never blocks the TC. */
+            fee_note?: components["schemas"]["TcFeeNote"] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Issued At */
+            issued_at: string | null;
+            /** Issued By */
+            issued_by: string | null;
+            /** Issued By Name */
+            issued_by_name: string | null;
+            /** Leaving Date */
+            leaving_date: string | null;
+            /** Leaving Reason */
+            leaving_reason: ("parent_request" | "parent_transferred" | "course_completed" | "other") | null;
+            /**
+             * Overdue
+             * @description Still received or in preparation more than overdue_after_days after it was received.
+             */
+            overdue: boolean;
+            /** Preparing At */
+            preparing_at: string | null;
+            /** Preparing By */
+            preparing_by: string | null;
+            /** Preparing By Name */
+            preparing_by_name: string | null;
+            /** Ready At */
+            ready_at: string | null;
+            /** Ready By */
+            ready_by: string | null;
+            /** Ready By Name */
+            ready_by_name: string | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /**
+             * Received By
+             * Format: uuid
+             */
+            received_by: string;
+            /** Received By Name */
+            received_by_name: string | null;
+            /**
+             * Received On
+             * Format: date
+             */
+            received_on: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "received" | "in_preparation" | "ready" | "issued" | "cancelled";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * TcRequestStatusIn
+         * @description Move a request on (FR-CERT-030..FR-CERT-034): ``in_preparation`` (from received),
+         *     ``issued`` (handed over; from ready) or ``cancelled`` (from any open state, with a 10..1000
+         *     character ``reason``). ``ready`` is set by SchoolOS when the request's TC is issued.
+         */
+        TcRequestStatusIn: {
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "in_preparation" | "issued" | "cancelled";
         };
         /**
          * TemplateCreate
@@ -35093,6 +38529,144 @@ export interface operations {
             };
         };
     };
+    attendance_completeness_api_v1_completeness_attendance_get: {
+        parameters: {
+            query?: {
+                /** @description IST date; default today */
+                date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceCompletenessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    marks_completeness_api_v1_completeness_exams__exam_id__get: {
+        parameters: {
+            query?: {
+                /** @description Only this class */
+                class_id?: string | null;
+            };
+            header?: never;
+            path: {
+                exam_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarksCompletenessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    send_completeness_reminder_api_v1_completeness_reminders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompletenessReminderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompletenessReminderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_register_api_v1_compliance_certificates_get: {
         parameters: {
             query?: never;
@@ -35282,6 +38856,761 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ComplianceCertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_checks_api_v1_compliance_checks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecksOverviewOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_check_entries_api_v1_compliance_checks_entries_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecksLogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    record_check_api_v1_compliance_checks_entries_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplianceCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_check_api_v1_compliance_checks_entries__check_id__remove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                check_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplianceCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_inspection_packs_api_v1_compliance_inspection_packs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionPackOut"][];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    generate_inspection_pack_api_v1_compliance_inspection_packs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InspectionPackCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionPackDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_inspection_pack_api_v1_compliance_inspection_packs__pack_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pack_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionPackDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    inspection_pack_index_api_v1_compliance_inspection_packs__pack_id__index_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pack_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 index */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_inspection_readiness_api_v1_compliance_inspection_readiness_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionReadinessOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_my_policies_api_v1_compliance_my_policies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPoliciesOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    acknowledge_my_policy_api_v1_compliance_my_policies__policy_id__acknowledge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyAcknowledge"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPolicyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_my_policy_file_api_v1_compliance_my_policies__policy_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyFileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_policies_api_v1_compliance_policies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoliciesOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_policy_api_v1_compliance_policies_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompliancePolicyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_policy_api_v1_compliance_policies__policy_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_policy_api_v1_compliance_policies__policy_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompliancePolicyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    request_policy_acknowledgement_api_v1_compliance_policies__policy_id__request_acknowledgement_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyAckRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    review_policy_api_v1_compliance_policies__policy_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompliancePolicyOut"];
                 };
             };
             /** @description Validation Error */
@@ -37205,6 +41534,162 @@ export interface operations {
             };
         };
     };
+    board_letter_api_v1_dq_readiness__profile_key__board_letter_get: {
+        parameters: {
+            query?: {
+                /** @description true: only check that the letters can be printed now; 204 */
+                check?: boolean;
+                /** @description Recipient role key */
+                recipient?: string | null;
+                section_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Readiness profile, e.g. bseap-ssc-2027 */
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 letters */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description With check=true: the letters can be printed now (nothing audited) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_fix_letters_api_v1_dq_readiness__profile_key__fix_letters_get: {
+        parameters: {
+            query?: {
+                section_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Readiness profile, e.g. bseap-ssc-2027 */
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixLettersOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    record_fix_letters_sent_api_v1_dq_readiness__profile_key__fix_letters__letter_key__sent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Letter key */
+                letter_key: "parent_aadhaar" | "board_registration";
+                /** @description Readiness profile, e.g. bseap-ssc-2027 */
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FixLetterSentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixLetterSentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_followups_api_v1_dq_readiness__profile_key__follow_ups_get: {
         parameters: {
             query?: {
@@ -37324,6 +41809,64 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FollowupHistoryOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    parent_letters_api_v1_dq_readiness__profile_key__parent_letters_get: {
+        parameters: {
+            query?: {
+                /** @description true: only check that the letters can be printed now; 204 */
+                check?: boolean;
+                finding_id?: string | null;
+                section_id?: string | null;
+                student_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Readiness profile, e.g. bseap-ssc-2027 */
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 letters */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description With check=true: the letters can be printed now (nothing audited) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -40650,6 +45193,190 @@ export interface operations {
             };
         };
     };
+    list_fee_cheques_api_v1_fees_cheques_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                status?: ("received" | "deposited" | "cleared" | "returned") | null;
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChequeListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mark_fee_cheque_returned_api_v1_fees_cheques__receipt_id__returned_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receipt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChequeReturnIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChequeReturnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    fee_cheque_deposit_slip_api_v1_fees_cheques_deposit_slip_print_get: {
+        parameters: {
+            query?: {
+                day?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A4 print page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mark_fee_cheques_deposited_api_v1_fees_cheques_deposited_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChequeDepositIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChequeDepositOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     approve_fee_concession_api_v1_fees_concessions__concession_id__approve_post: {
         parameters: {
             query?: never;
@@ -40902,6 +45629,96 @@ export interface operations {
                 };
                 content: {
                     "text/csv": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    issue_fee_family_payment_api_v1_fees_family_payments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FamilyPaymentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FamilyPaymentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    fee_family_payment_slip_api_v1_fees_family_payments_slip_get: {
+        parameters: {
+            query: {
+                receipt_ids: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready page (no scripts) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
                 };
             };
             /** @description Validation Error */
@@ -43289,6 +48106,185 @@ export interface operations {
             };
         };
     };
+    fee_structure_changes_api_v1_fees_structure_changes_get: {
+        parameters: {
+            query: {
+                academic_year_id: string;
+                warn_percent?: number | string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeStructureChangesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    fee_structure_notice_api_v1_fees_structure_notice_get: {
+        parameters: {
+            query: {
+                academic_year_id: string;
+                class_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeStructureNoticeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    fee_structure_notice_print_api_v1_fees_structure_notice_print_get: {
+        parameters: {
+            query: {
+                academic_year_id: string;
+                class_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready page (no scripts) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    fee_family_counter_api_v1_fees_students__student_id__family_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FamilyCounterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     student_fee_years_api_v1_fees_students__student_id__years_get: {
         parameters: {
             query?: {
@@ -44758,12 +49754,57 @@ export interface operations {
             };
         };
     };
+    counts_api_v1_insights_counts_get: {
+        parameters: {
+            query?: {
+                /** @description Default: 30 days ago */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightCountsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_flags_api_v1_insights_flags_get: {
         parameters: {
             query?: {
                 /** @description Opaque cursor from next_cursor. */
                 cursor?: string | null;
-                due?: ("overdue" | "due_soon") | null;
+                due?: ("overdue" | "due_soon" | "review_due") | null;
                 indicator?: ("attendance" | "behaviour" | "course") | null;
                 /** @description Page size (max 200). */
                 limit?: number;
@@ -45463,6 +50504,183 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_knowledge_gaps_api_v1_knowledge_gaps_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                status?: "open" | "closed" | "dismissed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_KnowledgeGapOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    close_knowledge_gap_api_v1_knowledge_gaps__gap_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KnowledgeGapCloseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    answer_knowledge_gap_api_v1_knowledge_gaps__gap_id__verified_answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gap_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifiedAnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    knowledge_gap_summary_api_v1_knowledge_gaps_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeGapSummaryOut"];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -47052,6 +52270,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClosureOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    send_reopening_api_v1_messaging_closures__closure_id__reopening_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                closure_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClosureReopeningConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClosureReopeningOut"];
+                };
+            };
+            /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    preview_reopening_api_v1_messaging_closures__closure_id__reopening_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                closure_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClosureReopeningIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClosureReopeningPreviewOut"];
                 };
             };
             /** @description ``module_unavailable`` on a dedicated host or with messaging off. */
@@ -55578,6 +60906,156 @@ export interface operations {
             };
         };
     };
+    get_enrolment_statistics_api_v1_reports_enrolment_statistics_get: {
+        parameters: {
+            query?: {
+                /** @description Academic year (default: the current one) */
+                academic_year_id?: string | null;
+                /** @description Count on this day (default: the configured reference date, 30 September) */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolmentStatisticsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    print_enrolment_statistics_api_v1_reports_enrolment_statistics_print_get: {
+        parameters: {
+            query?: {
+                /** @description Academic year (default: the current one) */
+                academic_year_id?: string | null;
+                /** @description Count on this day (default: the configured reference date, 30 September) */
+                as_of?: string | null;
+                /** @description true: only check that the page can be printed now; 204 */
+                check?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description With check=true: the page can be printed now (nothing audited) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    download_enrolment_statistics_api_v1_reports_enrolment_statistics_xlsx_get: {
+        parameters: {
+            query?: {
+                /** @description Academic year (default: the current one) */
+                academic_year_id?: string | null;
+                /** @description Count on this day (default: the configured reference date, 30 September) */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description XLSX workbook */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_roles_api_v1_roles_get: {
         parameters: {
             query?: {
@@ -55599,6 +61077,247 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_RoleOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_scheme_packs_api_v1_scheme_packs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchemePackConfigOut"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_scheme_attendance_api_v1_scheme_packs_attendance_get: {
+        parameters: {
+            query: {
+                /** @description First day of the period */
+                from_date: string;
+                /** @description Scheme key (GET /scheme-packs) */
+                scheme_key: string;
+                /** @description Section of the current academic year */
+                section_id: string;
+                /** @description Last day of the period (up to today) */
+                to_date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchemeAttendanceListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    print_scheme_attendance_api_v1_scheme_packs_attendance_print_get: {
+        parameters: {
+            query: {
+                /** @description true: only check that the page can be printed now; 204 */
+                check?: boolean;
+                /** @description First day of the period */
+                from_date: string;
+                /** @description Scheme key (GET /scheme-packs) */
+                scheme_key: string;
+                /** @description Section of the current academic year */
+                section_id: string;
+                /** @description Last day of the period (up to today) */
+                to_date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print-ready A4 page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description With check=true: the page can be printed now (nothing audited) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    download_scheme_attendance_api_v1_scheme_packs_attendance_xlsx_get: {
+        parameters: {
+            query: {
+                /** @description First day of the period */
+                from_date: string;
+                /** @description Scheme key (GET /scheme-packs) */
+                scheme_key: string;
+                /** @description Section of the current academic year */
+                section_id: string;
+                /** @description Last day of the period (up to today) */
+                to_date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description XLSX workbook */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    issue_scheme_certificates_api_v1_scheme_packs_certificates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchemeCertificatesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchemeCertificatesOut"];
                 };
             };
             /** @description Validation Error */
@@ -59315,6 +65034,194 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_tc_requests_api_v1_tc_requests_get: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from next_cursor. */
+                cursor?: string | null;
+                /** @description Page size (max 200). */
+                limit?: number;
+                overdue?: boolean;
+                status?: ("received" | "in_preparation" | "ready" | "issued" | "cancelled") | null;
+                student_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TcRequestList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    log_tc_request_api_v1_tc_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TcRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TcRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_tc_request_api_v1_tc_requests__tc_request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tc_request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TcRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    change_tc_request_status_api_v1_tc_requests__tc_request_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tc_request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TcRequestStatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TcRequestOut"];
                 };
             };
             /** @description Validation Error */

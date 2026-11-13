@@ -84,6 +84,13 @@ export function SchoolShell({
         { href: "/", label: t("school.nav.home"), exact: true, icon: "home" },
         // FA-05 (FR-BRF-001): the weekly management brief, owner and principal only.
         { href: "/brief", label: t("brief.nav"), permission: "brief.read", icon: "chart" },
+        {
+          // FT-13 (FR-EW-026): early-warning follow-up counts for management, no names.
+          href: "/follow-up-counts",
+          label: t("followUpCounts.nav"),
+          permission: "insights.counts_read",
+          icon: "flag",
+        },
       ],
     },
     {
@@ -148,6 +155,13 @@ export function SchoolShell({
           icon: "chart",
         },
         {
+          // FT-14 (FR-ATT-024): attendance and marks entry completeness per section.
+          href: "/completeness",
+          label: t("completeness.nav"),
+          permission: "completeness.read",
+          icon: "clipboard",
+        },
+        {
           // FT-08 (FR-YRE-019): year-end results and the UDISE+ progression sheet.
           href: "/year-end",
           label: t("yearEnd.nav"),
@@ -196,6 +210,13 @@ export function SchoolShell({
           icon: "file",
         },
         {
+          // FA-08 (FR-DQ-049..060): fix-owner letters to parents and the board office.
+          href: "/findings/fix-letters",
+          label: t("fixLetters.nav"),
+          permission: "dq.readiness.manage",
+          icon: "file",
+        },
+        {
           href: "/change-requests",
           label: t("changeRequests.nav"),
           permission: ["student.identity_change.request", "student.identity_change.approve"],
@@ -212,6 +233,20 @@ export function SchoolShell({
           href: "/exports",
           label: t("exports.nav"),
           permission: ["export.board", "export.portal", "student.export", "export.read_all"],
+          icon: "file",
+        },
+        {
+          // FO-06 (FR-EXP-009..019): enrolment statistics in the UDISE+ table shapes.
+          href: "/exports/enrolment-statistics",
+          label: t("enrolmentStats.nav"),
+          permission: "export.portal",
+          icon: "file",
+        },
+        {
+          // FO-11 (FR-EXP-020..028): scheme verification attendance lists and certificates.
+          href: "/exports/scheme-packs",
+          label: t("schemePacks.nav"),
+          permission: ["attendance.read", "certificate.issue"],
           icon: "file",
         },
       ],
@@ -402,6 +437,14 @@ export function SchoolShell({
           activePattern: "^/fees/reconcile/?$",
         },
         {
+          // FM-08 (FR-FEE-131..141): cheques received, deposited, cleared or returned.
+          href: "/fees/cheques",
+          label: t("fees.nav.cheques"),
+          permission: ["fee.collect", "fee.reconcile"],
+          feature: "fees",
+          icon: "file",
+        },
+        {
           // R2-2D (US-2111, FR-PAY-010): online payment exceptions and the daily check.
           href: "/fees/reconcile/online",
           label: t("payments.nav.reconcile"),
@@ -516,6 +559,26 @@ export function SchoolShell({
           label: t("compliance.nav"),
           permission: "compliance.read",
           icon: "checkCircle",
+        },
+        {
+          // FC-09: safety drills and periodic checks (fire drills, extinguishers, CCTV).
+          href: "/compliance/checks",
+          label: t("complianceChecks.nav"),
+          permission: "compliance.read",
+          icon: "checkCircle",
+        },
+        {
+          // FC-10: the school's policy library (review dates, who has read each policy).
+          href: "/compliance/policies",
+          label: t("compliancePolicies.nav"),
+          permission: "compliance.read",
+          icon: "file",
+        },
+        {
+          // FC-10 (FR-COMP-063): policies the signed-in member is asked to read; any member.
+          href: "/compliance/acknowledge",
+          label: t("myPolicies.nav"),
+          icon: "file",
         },
         {
           // R3-1C (US-2901, ADR-0051): the CBSE Appendix IX disclosure, CBSE schools only.

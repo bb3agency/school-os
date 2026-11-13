@@ -18,12 +18,13 @@
 version: 1
 routes:
   # --- R2-0 foundation: parent link exchange and the current link's envelope (ADR-0046) -------
+  # (FP-02 follow-up, D86: parent_closure, the closure message's read-only page, FR-PUB-013.)
   POST /api/v1/public/links/exchange:
     guard: public_handle
-    kinds: [parent_notice, parent_receipt, parent_dues, parent_optin]
+    kinds: [parent_notice, parent_receipt, parent_dues, parent_optin, parent_closure]
   GET /api/v1/public/links/current:
     guard: public_handle
-    kinds: [parent_notice, parent_receipt, parent_dues, parent_optin]
+    kinds: [parent_notice, parent_receipt, parent_dues, parent_optin, parent_closure]
   # --- R2-1A certificates: verification by code (ADR-0045; FR-CERT-021) ----------------------
   GET /api/v1/public/certificates/{code}:
     guard: public_handle

@@ -1,0 +1,57 @@
+# Bank statement matching for cheques and bank transfers; cheque clearing status (FM-08;
+# FR-FEE-126..150; ADR-0042 decision 9, P9; docs/05 §15.1). Versioned configuration shipped inside
+# the package (invariant 13). Read by app/fees/bank_matching_config.py, which validates it at
+# start-up. The statement file itself, its presets and the narration masking stay in upi.yaml.
+#
+# `verified: false`: built from the banks' published statement layouts and synthetic samples, not
+# from a pilot school's real statement (the same rule as the presets, owner decision D3). Narration
+# formats vary by bank, so a rule only PROPOSES and a person confirms every match (D19).
+version: 1
+
+# Cheque number of a credit (stored as `cheque_no`, 6 digits). Only for credits that are not UPI
+# credits (a UPI narration never carries a cheque).
+cheques:
+  verified: false
+  source: "CTS clearing narrations of SBI, HDFC, ICICI, Axis and Kotak statements as published in their sample statements (2026-11); unverified with a pilot school"
+  # The cheque/reference column holds the cheque number, often zero-padded ("000000123456").
+  # Only read when the narration looks like a cheque credit (`narration_marker`) or the column
+  # holds 6 digits exactly.
+  reference: "^0{0,12}([0-9]{6})$"
+  narration_marker: "(?i)(?:^|[^A-Za-z])(?:CHQ|CHEQUE|CLG|CLEARING|CTS|INWARD CLG|BY CLG)(?:[^A-Za-z]|$)"
+  # The cheque number inside the narration: up to 15 non-digits after the marker, then 6 digits
+  # (leading zeros allowed) that are not part of a longer number.
+  narration_group: "(?i)(?:CHQ|CHEQUE|CLG|CTS)[^0-9]{0,15}0{0,12}([0-9]{6})(?![0-9])"
+  # The credit's value date may be this many days before the receipt date (a cheque dated and
+  # entered the day after it was deposited) ...
+  credit_days_before_receipt: 1
+  # ... or this many days after it (deposit and clearing time).
+  credit_days_after_receipt: 15
+
+# Bank transfer reference of a credit (stored as `transfer_ref`). The NEFT/RTGS/IMPS reference
+# follows the marker in the narration: the first token (split on / - : | and spaces) of 12-22
+# letters and digits that has a letter (NEFT and RTGS UTRs: "SBIN426123456789") or is exactly 12
+# digits (IMPS reference). All-digit tokens of other lengths are account or mobile numbers and are
+# never kept.
+transfers:
+  verified: false
+  source: "NEFT/RTGS/IMPS narrations of SBI, HDFC, ICICI, Axis and Kotak sample statements (2026-11); unverified with a pilot school"
+  narration_marker: "(?i)(?:^|[^A-Za-z])(?:NEFT|RTGS|IMPS)(?:[^A-Za-z]|$)"
+  token_min_length: 12
+  token_max_length: 22
+  # A parent pays first and the clerk writes the receipt later, so the credit is usually earlier.
+  credit_days_before_receipt: 10
+  credit_days_after_receipt: 3
+
+# Rules (proposals only; FR-FEE-127). Each rule proposes only when exactly one receipt fits; a
+# receipt is proposed for one credit at most. There is no amount-only rule for cheques and
+# transfers (too many same-amount fee payments): a person matches the rest by hand.
+matching:
+  cheque_exact: true      # cheque number + amount + date window
+  transfer_exact: true    # reference + amount + date window
+
+# Cheques at the counter (FR-FEE-131..137).
+cheques_list:
+  max_rows: 500
+  deposit_batch_max: 200
+  # "Not deposited" after this many days is shown as overdue on the cheques list.
+  deposit_due_days: 2

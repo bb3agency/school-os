@@ -254,8 +254,17 @@ EXPECTED_TABLES = {
     "fees_addon_assignments",
     # FP-02 (0093_msg_reach_closure): urgent closure messages.
     "messaging_closures",
+    "messaging_closure_reopenings",
     # FC-01 (0096_compliance_register): the school's certificate register.
     "compliance_certificates",
+    # FC-09/FC-10 (0098_drills_policies): the safety check log, policies and acknowledgements.
+    "compliance_checks",
+    "compliance_policies",
+    "compliance_policy_acks",
+    # FC-07 (0101_inspection_packs): the inspection pack log.
+    "inspection_packs",
+    # FO-09 (0102_tc_requests): the TC request log.
+    "tc_requests",
     "fees_receipt_cancellations",
     "fees_refunds",
     "fees_day_closes",
@@ -264,6 +273,8 @@ EXPECTED_TABLES = {
     "fees_bank_statement_imports",
     "fees_bank_statement_lines",
     "fees_upi_confirmations",
+    # FM-08 (0103_bank_matching): cheque deposited / cleared / returned events.
+    "fees_cheque_status_events",
     # R2-2D online payments (the webhook inbox is not exported; no secret columns).
     "fees_payment_connections",
     "fees_payment_intents",

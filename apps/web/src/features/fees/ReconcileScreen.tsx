@@ -34,9 +34,11 @@ import { translateOr } from "@/lib/i18n-dynamic";
 import { isFeesOff, toPaise } from "./data";
 import { Amount, FeesGate, NoAccess } from "./parts";
 import {
+  bankFacts,
   confirmable,
   IGNORE_REASONS,
   initialSelection,
+  receiptModeFor,
   RECONCILE,
   STATEMENT_MAX_BYTES,
   UPI_KEYS,
@@ -61,10 +63,12 @@ function LineStatus({ line }: { line: StatementLine }) {
 function MatchDialog({ line }: { line: StatementLine }) {
   const t = useTranslations("fees.reconcile");
   const api = useBffClient("staff");
-  const receipts = useApiQuery(["staff", "fees", "upi", "candidates", line.amount], () =>
+  // FM-08: a cheque credit pays a cheque receipt, a bank transfer credit a transfer receipt.
+  const mode = receiptModeFor(line);
+  const receipts = useApiQuery(["staff", "fees", "upi", "candidates", mode, line.amount], () =>
     unwrap(
       api.GET("/api/v1/fees/receipts", {
-        params: { query: { mode: "upi_qr", status: "issued", limit: 200 } },
+        params: { query: { mode, status: "issued", limit: 200 } },
       }),
     ),
   );
@@ -214,6 +218,17 @@ function LinesTable({
                 <Td className="num font-mono whitespace-nowrap">
                   {line.utr_or_ref ?? "—"}
                   {line.ref_kind === "utr" ? <span className="sr-only"> ({t("utr")})</span> : null}
+                  {bankFacts(line).cheque_no ? (
+                    <span className="block text-xs text-ink-muted">
+                      {t("chequeNo", { number: bankFacts(line).cheque_no ?? "" })}
+                    </span>
+                  ) : null}
+                  {bankFacts(line).transfer_ref &&
+                  bankFacts(line).transfer_ref !== line.utr_or_ref ? (
+                    <span className="block text-xs text-ink-muted">
+                      {t("transferRef", { ref: bankFacts(line).transfer_ref ?? "" })}
+                    </span>
+                  ) : null}
                 </Td>
                 <Td className="max-w-64 break-words text-sm text-ink-muted">
                   {line.narration_erased ? t("narrationErased") : (line.narration ?? "—")}
@@ -795,6 +810,9 @@ export function ReconcileScreen() {
   return (
     <div className="space-y-5">
       {header}
+      <p className="text-sm">
+        <Link href="/fees/cheques">{t("chequesLink")}</Link>
+      </p>
       <Tabs
         label={t("tabs")}
         items={[

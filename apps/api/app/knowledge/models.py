@@ -289,6 +289,50 @@ class VerifiedAnswer(Base):
     version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
 
 
+class KnowledgeGap(Base):
+    """A group of repeated questions Ask could not answer (0099_knowledge_gaps; FA-06).
+
+    One redacted sample question as ciphertext, its keyed HMAC (the grouping key), counts per
+    signal; no asker. ``status`` ``open`` | ``closed`` (``resolution``) | ``dismissed``."""
+
+    __tablename__ = "knowledge_gaps"
+    __table_args__ = {"schema": SCHEMA}  # noqa: RUF012
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[uuid.UUID]
+    question_ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    question_hmac: Mapped[bytes] = mapped_column(LargeBinary)
+    key_version: Mapped[int] = mapped_column(Integer)
+    language: Mapped[str | None] = mapped_column(Text)
+    not_found_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    unchecked_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    not_helpful_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    first_seen_at: Mapped[dt.datetime]
+    last_seen_at: Mapped[dt.datetime]
+    status: Mapped[str] = mapped_column(Text, server_default=text("'open'"))
+    resolution: Mapped[str | None] = mapped_column(Text)
+    verified_answer_id: Mapped[uuid.UUID | None]
+    document_id: Mapped[uuid.UUID | None]
+    closed_by: Mapped[uuid.UUID | None]
+    closed_at: Mapped[dt.datetime | None]
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    updated_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+
+
+class KnowledgeGapQuery(Base):
+    """Which logged question was counted into which gap (the collection job's idempotency)."""
+
+    __tablename__ = "knowledge_gap_queries"
+    __table_args__ = {"schema": SCHEMA}  # noqa: RUF012
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    query_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    gap_id: Mapped[uuid.UUID]
+    signal: Mapped[str] = mapped_column(Text)
+    collected_at: Mapped[dt.datetime] = mapped_column(server_default=text("now()"))
+
+
 class LlmCall(Base):
     """One metered model call (0024_kb_metering; FR-KB-009, FR-KB-011). Ids and counts only."""
 

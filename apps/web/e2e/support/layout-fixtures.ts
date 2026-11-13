@@ -1890,6 +1890,8 @@ const INSIGHT_FLAGS: Schemas["InsightFlagOut"][] = STUDENT_NAMES.map((name, i) =
     raised_on: date(9, 10 + (i % 15)),
     due_on: date(9, 17 + (i % 12)),
     overdue: status === "open" && i % 3 === 0,
+    review_on: null,
+    review_due: false,
     actioned: status !== "open",
     first_action_at: status === "open" ? null : at(20),
     closed_at: status === "closed" ? at(26) : null,

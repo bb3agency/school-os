@@ -200,6 +200,9 @@ routes:
   GET /api/v1/dq/readiness/{profile_key}/slips: [render]
   # FO-02: the UDISE+ correction letter to the MEO
   GET /api/v1/dq/udise-corrections/{correction_id}/letter: [render]
+  # FA-08: fix-owner letters to parents and the board office
+  GET /api/v1/dq/readiness/{profile_key}/parent-letters: [render]
+  GET /api/v1/dq/readiness/{profile_key}/board-letter: [render]
   GET /api/v1/students/{student_id}/apaar-consent/form: [render]
   GET /api/v1/sections/{section_id}/apaar-consent-forms: [render]
   GET /api/v1/consents/forms: [render]
@@ -214,6 +217,8 @@ routes:
   GET /api/v1/dq/udise-corrections/candidates: [readiness_reads, readiness_school]
   POST /api/v1/dq/udise-corrections: [readiness_reads, readiness_school]
   GET /api/v1/dq/udise-corrections/{correction_id}: [readiness_reads, readiness_school]
+  # FA-08: the fix-letter overview assesses the readiness of the school's students
+  GET /api/v1/dq/readiness/{profile_key}/fix-letters: [readiness_reads, readiness_school]
   # R3-1D (FR-RDY-003): the portal calendar shows each event's readiness counts
   GET /api/v1/dq/calendar: [readiness_reads, readiness_school]
   POST /api/v1/academic-years/{year_id}/promotions:preview: [heavy_jobs]
@@ -225,6 +230,8 @@ routes:
   POST /api/v1/fees/reminders/preview: [search]
   # FP-02: a closure preview reads every guardian of the school
   POST /api/v1/messaging/closures/preview: [search]
+  # FP-02 follow-up: a reopening preview reads the closure's guardians the same way
+  POST /api/v1/messaging/closures/{closure_id}/reopening/preview: [search]
   # FM-03: the Tally voucher file reads a period's receipts, cancellations, refunds and demand
   GET /api/v1/tally/vouchers/preview: [search]
   POST /api/v1/tally/vouchers/export: [exports]
@@ -251,11 +258,18 @@ routes:
   POST /api/v1/fees/tax-certificates/bulk: [heavy_jobs]
   # FM-04 accountant and management reports: the print view, downloads and the year-end pack
   GET /api/v1/fees/reports/collections/print: [render]
+  # FM-08 (FR-FEE-136): the cheque deposit list print view.
+  GET /api/v1/fees/cheques/deposit-slip/print: [render]
   GET /api/v1/fees/reports/collections/download: [exports]
   GET /api/v1/fees/reports/dcb/download: [exports]
   GET /api/v1/fees/reports/registers/download: [exports]
   GET /api/v1/fees/reports/ageing/download: [exports]
   GET /api/v1/fees/reports/year-end-pack: [exports]
+  # FM-10 fee structure notice: the print view (one page per class)
+  GET /api/v1/fees/structure-notice/print: [render]
+  # FO-07/FO-08 (FR-UDI-03x): enrolment statistics and scheme pack print views
+  GET /api/v1/reports/enrolment-statistics/print: [render]
+  GET /api/v1/scheme-packs/attendance/print: [render]
   # support tickets
   POST /api/v1/support/tickets: [support_tickets]
   POST /api/v1/platform/support/tickets: [support_tickets]

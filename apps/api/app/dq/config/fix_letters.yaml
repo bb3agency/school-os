@@ -1,0 +1,92 @@
+# Fix-owner letters from readiness differences (FA-08; FR-DQ-049..FR-DQ-060). Templates, not AI:
+# every word of a letter is here, every value comes from the school's own records. Loaded and
+# validated by app.dq.fix_letters.load_fix_letter_config() (CLAUDE.md §6.13).
+#
+# The UDISE+ correction letter to the MEO / MIS coordinator is NOT here: it is the UDISE+
+# correction request (FO-02, app/dq/config/udise_corrections.yaml), which this file reuses for
+# the evidence wording.
+#
+# UNVERIFIED (owner decision D3): no official format was found for either letter. The parent
+# steps follow UIDAI's public guidance on demographic updates at an Aadhaar centre, which may
+# change (documents accepted, fees, how often a date of birth may be updated); the board letter
+# follows the school-to-board practice described in secondary sources. Confirm with a pilot
+# school, then set `verified: true` and bump `version`. Lead decision D86, PO to confirm.
+version: 1
+verified: false
+source:
+  - UIDAI public guidance on demographic updates at an Aadhaar centre (uidai.gov.in; page not checked, unverified wording)
+  - docs/research/2026-11-features/ai-platform.md (FA-08)
+  - docs/18 R1.1 (each readiness difference names who must fix it)
+
+# Most students one print or one "record as given" covers (one section).
+max_students: 300
+
+letters:
+  # A difference between Aadhaar-as-printed and the right value: the parent updates Aadhaar.
+  parent_aadhaar:
+    label: Letters to parents (Aadhaar update)
+    audience: parent
+    # The readiness difference a line needs: who fixes it and which record is wrong
+    # (app/dq/config/readiness.yaml owners.by_source).
+    owner: parent_aadhaar
+    source: aadhaar_as_printed
+    profiles: [bseap-ssc-2027, apaar]
+    # The follow-up step "Letters given" records (app/dq/config/udise_followup.yaml): a parent
+    # follow-up has no `request_sent`; a letter is "parent contacted" by letter.
+    followup: {event: parent_contacted, channel: letter}
+    # The date the letter asks the parent to bring the updated copy by (days after printing;
+    # the follow-up overdue rule is 14 days, D85).
+    reply_within_days: 14
+    title: Please update your child's Aadhaar details
+    salutation: Dear parent or guardian,
+    intro: >-
+      Before the school sends your child's details for the check named below, we compare the
+      school's records with the details printed on your child's Aadhaar card. For the details
+      listed here, the Aadhaar card does not match the school's record. The board and the
+      government portals check a child's details against Aadhaar, so they must be the same.
+    steps:
+      - Visit an Aadhaar enrolment or update centre with your child.
+      - Ask for an update of the details listed above, so that they match the school's record.
+      - >-
+        Take your child's proof documents, for example the birth certificate or a certificate
+        from the school. The centre will tell you which documents it accepts and any fee.
+      - >-
+        After the update, bring a copy of the updated Aadhaar card, or the update acknowledgement
+        slip, to the school office.
+    reply_by: Please bring the updated copy to the school office by
+    privacy_note: >-
+      Please do not write the Aadhaar number on this letter. The school does not need it and
+      does not keep it.
+    wrong_record_note: >-
+      If you think the school's record is wrong, do not update Aadhaar: bring the documents to the
+      school office instead, and the school will check its record.
+    signature: Head of the school, with seal
+    acknowledgement: I have received this letter.
+
+  # A difference between the board registration and the right value: the school writes to the
+  # board office (the board takes its data from UDISE+, BSEAP 2026; owner school_udise).
+  board_registration:
+    label: Letter to the board office (registration corrections)
+    audience: office
+    owner: school_udise
+    source: board_registration
+    profiles: [bseap-ssc-2027]
+    followup: {event: request_sent, channel: letter}
+    # Who the letter is addressed to: a role, never a person's name.
+    recipients:
+      deo: District Educational Officer (DEO)
+      dge: Directorate of Government Examinations
+      board_office: Regional office of the board
+    title: Request to correct student details in the board registration
+    intro: >-
+      The details below are recorded wrongly in the board registration of the students of our
+      school listed here. Each correct value is taken from the school's records, named in the
+      "Source" column, and is supported by the evidence named in the last column. We request you
+      to correct them.
+    udise_note: >-
+      The board takes students' details from UDISE+. Where UDISE+ also differs, the school has
+      asked the MEO / MIS coordinator to correct it separately.
+    closing: >-
+      We will check the registration again after the corrections are made and confirm the outcome
+      to your office.
+    signature: Signature of the head of the school, with seal

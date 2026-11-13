@@ -21,7 +21,7 @@ from starlette.concurrency import run_in_threadpool
 from app.authz.context import UserContext
 from app.authz.dependencies import TenantDB, require, require_any
 from app.authz.http import Cursor, IdempotencyDep, IfMatch, Limit, Page, etag
-from app.certificates import service
+from app.certificates import service, tc_requests
 from app.certificates.schemas import (
     ApproveIn,
     CertificateFormatOut,
@@ -35,6 +35,11 @@ from app.certificates.schemas import (
     PublicCertificateOut,
     ReasonIn,
     Status,
+    TcRequestIn,
+    TcRequestList,
+    TcRequestOut,
+    TcRequestStatus,
+    TcRequestStatusIn,
     VerificationOut,
     VerificationReasonIn,
 )
@@ -436,6 +441,75 @@ def withdraw_certificate_verification(
     ``verification_not_active`` (409)."""
     out = service.withdraw_verification(db, ctx, certificate_id, body, expected_version=expected)
     return _verification_etag(response, out)
+
+
+# --- TC request log (FO-09; FR-CERT-026..FR-CERT-045) -----------------------------------------
+
+
+def _tc_request_headers(item: TcRequestOut) -> dict[str, str]:
+    return {"Location": f"/api/v1/tc-requests/{item.id}", "ETag": etag(item.version)}
+
+
+@router.get("/tc-requests", response_model=TcRequestList)
+def list_tc_requests(
+    *,
+    ctx: Reader,
+    db: TenantDB,
+    status: Annotated[TcRequestStatus | None, Query()] = None,
+    overdue: bool = False,
+    student_id: uuid.UUID | None = None,
+    limit: Limit = 50,
+    cursor: Cursor = None,
+) -> TcRequestList:
+    """The TC request log of students you can see, newest received first, with the number of
+    overdue requests (``overdue=true`` lists only those; read, issue or approve permission;
+    FR-CERT-035..FR-CERT-037)."""
+    return tc_requests.list_requests(
+        db, ctx, status=status, overdue=overdue, student_id=student_id, limit=limit, cursor=cursor
+    )
+
+
+@router.post("/tc-requests", response_model=TcRequestOut, status_code=201)
+def log_tc_request(ctx: Issuer, db: TenantDB, body: TcRequestIn, idem: IdempotencyDep) -> Response:
+    """Log a transfer certificate request that reached the office on paper, by phone or in
+    person (permission ``certificate.issue``; FR-CERT-026, FR-CERT-027). Accepts
+    ``Idempotency-Key``. Errors: ``tc_request_open_exists`` (409); ``date_in_future`` (422)."""
+    return idem.run(
+        db,
+        body,
+        lambda: tc_requests.log_request(db, ctx, body),
+        headers=_tc_request_headers,
+    )
+
+
+@router.get("/tc-requests/{tc_request_id}", response_model=TcRequestOut)
+def get_tc_request(
+    ctx: Reader, db: TenantDB, tc_request_id: uuid.UUID, response: Response
+) -> TcRequestOut:
+    """One TC request with its steps; the fee note for holders of ``finance.read`` (information
+    only, never a blocker: D16); returns ``ETag`` (read, issue or approve permission)."""
+    out = tc_requests.get_request(db, ctx, tc_request_id)
+    response.headers["ETag"] = etag(out.version)
+    return out
+
+
+@router.post("/tc-requests/{tc_request_id}/status", response_model=TcRequestOut)
+def change_tc_request_status(
+    *,
+    ctx: Issuer,
+    db: TenantDB,
+    tc_request_id: uuid.UUID,
+    expected: IfMatch,
+    body: TcRequestStatusIn,
+    response: Response,
+) -> TcRequestOut:
+    """Start preparing the TC, record that the ready TC was handed over, or cancel the request
+    with a reason (permission ``certificate.issue``, ``If-Match``; FR-CERT-030, FR-CERT-034).
+    Errors: ``tc_request_wrong_status``, ``tc_request_certificate_pending``,
+    ``tc_request_certificate_not_issued`` (409)."""
+    out = tc_requests.change_status(db, ctx, tc_request_id, body, expected_version=expected)
+    response.headers["ETag"] = etag(out.version)
+    return out
 
 
 # --- public verification (R2; pinned in app/public/public_routes.yaml) -----------------------

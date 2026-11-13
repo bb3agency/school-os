@@ -104,6 +104,10 @@ closures:
   max_days_ahead: 7
   max_days: 7
   uses_window_days: 120
+  # FP-02 follow-up (FR-MSG-060; lead decision D86, PO to confirm): one "school reopens"
+  # message per closure, for a date after the closure started and at most this many days after
+  # the day following its last day; the same window, cap, switch and step-up as the closure.
+  reopen_max_days_after: 7
   # The reason phrase completes "... closed on <dates> because of <reason>." (Telugu texts are
   # not reviewed, like every Telugu template; they go out only with SOS_TELUGU_ENABLED on.)
   reasons:

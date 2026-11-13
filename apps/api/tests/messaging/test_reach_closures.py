@@ -64,13 +64,15 @@ def test_FR_MSG_045_not_opened_after_the_configured_hours() -> None:
     assert not rules.not_opened(None, sent, hours=hours, opened=False)
 
 
-def test_FR_MSG_047_closure_template_is_utility_without_buttons() -> None:
+def test_FR_MSG_047_closure_template_is_utility_with_the_page_button() -> None:
     from app.messaging import catalogue as cat
 
     item = cat.template("school_closure")
     assert item.category == "utility"
     assert item.optin_category == "notices"
-    assert item.buttons == ()
+    # FP-02 follow-up (FR-MSG-057, D86): version 2 links to the closure's parent page.
+    assert item.version == 2
+    assert item.buttons == ("url",)
     assert [v.name for v in item.variables] == ["school_name", "dates", "reason"]
     assert set(load_config().closures.reasons) == {
         "weather",
@@ -327,8 +329,8 @@ def test_FR_MSG_049_closure_preview_send_window_and_audit(
     row = S.message_rows(admin_engine, guardian_id=guardian, purpose="school_closure")[0]
     assert row["status"] == "sent"
     msg = [m for m in STATE.sent if m["to"] == "91" + mobile]
-    assert msg[-1]["name"].startswith("sos_school_closure_v1_")
-    assert not msg[-1].get("url_suffix")
+    assert msg[-1]["name"].startswith("sos_school_closure_v2_")
+    assert msg[-1]["url_suffix"]  # the closure page link (FR-MSG-057), in the button only
 
     listing = api.call(school.people["principal"], "GET", SEND)
     assert listing.status_code == 200, listing.text

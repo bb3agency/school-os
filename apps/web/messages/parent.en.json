@@ -116,5 +116,14 @@
     "button": "Tax certificate FY {year}",
     "notIssued": "The tuition fee certificate for FY {year} is not ready yet. Ask the school office for it.",
     "note": "For income tax: it shows the tuition fees paid in the financial year (April to March)."
+  },
+  "closure": {
+    "title": "School closed",
+    "closedOn": "The school is closed on {date}.",
+    "closedRange": "The school is closed from {from} to {to}.",
+    "reason": "Reason: {reason}.",
+    "orderTitle": "Message from the school",
+    "reopensOn": "The school reopens on {date}.",
+    "contact": "For questions, please contact the school office."
   }
 }

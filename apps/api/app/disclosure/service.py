@@ -437,6 +437,13 @@ def _live(session: Session, *, lock: bool = False) -> DisclosureSnapshot | None:
     return latest if latest is not None and latest.withdrawn_at is None else None
 
 
+def live_snapshot_published_at(session: Session) -> tuple[uuid.UUID, dt.datetime] | None:
+    """The snapshot the public page shows now (id, published at), or None; for FC-07
+    inspection packs (FR-COMP-028). No permission check: the caller's route checks its own."""
+    live = _live(session)
+    return (live.id, live.published_at) if live is not None else None
+
+
 def _ensure_link(session: Session, ctx: UserContext, draft: DisclosureDraft) -> DisclosureDraft:
     """The school's live handle (the first publish issues it; FR-DISC-008)."""
     if draft.link_handle_id is not None:
@@ -948,6 +955,7 @@ __all__ = [
     "get_snapshot",
     "link_url",
     "list_snapshots",
+    "live_snapshot_published_at",
     "public_document",
     "public_page",
     "publish",

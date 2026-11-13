@@ -33,6 +33,10 @@ from app.messaging.sends.schemas import (
     ClosureOut,
     ClosurePage,
     ClosurePreviewOut,
+    ClosureReopeningConfirmIn,
+    ClosureReopeningIn,
+    ClosureReopeningOut,
+    ClosureReopeningPreviewOut,
     CoverageOut,
     FeeReminderPreviewOut,
     FeeRemindersConfirmIn,
@@ -317,9 +321,58 @@ def list_closures(
     db: TenantDB,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> ClosurePage:
-    """Closure messages sent recently with live delivery counts, and how many were sent in the
-    window shown (FR-MSG-054; ``message.read`` school-wide). Counts only."""
+    """Closure messages sent recently with live delivery counts, their "school reopens"
+    messages, and how many were sent in the window shown (FR-MSG-054, FR-MSG-064;
+    ``message.read`` school-wide). Counts and the principal's own order text only."""
     return closures.list_closures(db, ctx, limit=limit)
+
+
+# --- FP-02 follow-up: "the school reopens" (FR-MSG-059..065; ADR-0043 amendment, D86) ----------
+
+
+@router.post(
+    "/messaging/closures/{closure_id}/reopening/preview",
+    response_model=ClosureReopeningPreviewOut,
+    responses=_UNAVAILABLE,
+)
+def preview_reopening(
+    closure_id: uuid.UUID,
+    ctx: ClosureSender,
+    db: TenantDB,
+    body: ClosureReopeningIn,
+    response: Response,
+) -> ClosureReopeningPreviewOut:
+    """Before sending "the school reopens on <date>" for a closure: recipients (the closure's
+    audience as it is now), guardians left out by reason, the English text, when sending starts
+    and the estimated Meta cost (FR-MSG-060; ``message.closure.send``: the principal). Nothing
+    is sent. Errors: 404 unknown closure; 409 ``reopening_already_sent``; 422 ``reopens_on``
+    (``in_past``, ``too_far_ahead``, ``not_after_closure_start``, ``too_long_after_closure``)."""
+    response.headers["Cache-Control"] = "no-store"
+    return closures.preview_reopening(db, ctx, closure_id, body)
+
+
+@router.post(
+    "/messaging/closures/{closure_id}/reopening",
+    response_model=ClosureReopeningOut,
+    status_code=202,
+    responses=_UNAVAILABLE,
+)
+def send_reopening(
+    *,
+    closure_id: uuid.UUID,
+    ctx: ClosureSender,
+    db: TenantDB,
+    body: ClosureReopeningConfirmIn,
+    idem: IdempotencyDep,
+) -> Response:
+    """Send the previewed reopening message (FR-MSG-061..063; ``message.closure.send`` with
+    step-up MFA, 428 without; ``Idempotency-Key``): the ``school_reopening`` utility template to
+    every guardian opted in for notices, inside the closure window, within the daily cap; one per
+    closure. Errors: 404; 409 ``reopening_already_sent``, ``preview_stale`` and the closure's
+    blocking reasons; 422 as the preview. Audited ``messaging.closure.reopening_sent``."""
+    return idem.run(
+        db, body, lambda: closures.send_reopening(db, ctx, closure_id, body), status_code=202
+    )
 
 
 __all__ = ["router"]

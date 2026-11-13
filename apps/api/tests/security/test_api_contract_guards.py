@@ -325,6 +325,13 @@ NON_UUID_PATH_PARAMS = {
     ("GET", "/api/v1/privacy/templates/{key}/preview", "key"),
     ("POST", "/api/v1/privacy/templates/{key}/pdf", "key"),
     ("GET", "/api/v1/privacy/requests/{request_id}/letters/{letter}", "letter"),
+    # FA-08: fix-owner letters per readiness profile (bounded, pattern-checked); the letter key
+    # is a closed Literal enum.
+    ("GET", "/api/v1/dq/readiness/{profile_key}/fix-letters", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/parent-letters", "profile_key"),
+    ("GET", "/api/v1/dq/readiness/{profile_key}/board-letter", "profile_key"),
+    ("POST", "/api/v1/dq/readiness/{profile_key}/fix-letters/{letter_key}/sent", "profile_key"),
+    ("POST", "/api/v1/dq/readiness/{profile_key}/fix-letters/{letter_key}/sent", "letter_key"),
 }
 
 
@@ -357,6 +364,11 @@ _SECRET_NAME = re.compile(
 
 # Response fields whose names look like secrets, with the reason they may be returned.
 RESPONSE_FIELD_ALLOWLIST = {
+    # FC-07 (FR-COMP-024..045): inspection pack catalogue and item codes.
+    "app.compliance.packs_schemas.InspectionPackOut.pack_key": "inspection pack code",
+    "app.compliance.packs_schemas.InspectionPackDetailOut.pack_key": "inspection pack code",
+    "app.compliance.packs_schemas.InspectionPackItemOut.key": "inspection pack item code",
+    "app.compliance.packs_schemas.InspectionPackReadinessOut.key": "inspection pack code",
     # R3-1A privacy (ADR-0048): template, record-class and letter catalog keys.
     "app.privacy.schemas.PrivacyErasurePlanRowOut.class_key": "record class code",
     "app.privacy.schemas.PrivacyErasureResultRowOut.class_key": "record class code",
@@ -383,6 +395,12 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.certificates.schemas.CertificatePreview.format_key": "TC format code",
     "app.certificates.schemas.CertificateOut.format_key": "TC format code",
     "app.dq.schemas.FindingOut.attribute_key": "attribute catalog key",
+    # FO-06 / FO-11: enrolment statistics table and column codes, scheme codes.
+    "app.exports.pack_schemas.EnrolmentStatsColumnOut.key": "count column code",
+    "app.exports.pack_schemas.EnrolmentStatsTableOut.key": "count table code",
+    "app.exports.pack_schemas.EnrolmentStatsGapOut.attribute_key": "attribute catalog key",
+    "app.exports.pack_schemas.SchemeOut.key": "scheme code (schemes.yaml)",
+    "app.exports.pack_schemas.SchemeCertificatesOut.scheme_key": "scheme code (schemes.yaml)",
     # R3-1C (ADR-0051): disclosure format, section and item codes.
     "app.disclosure.schemas.DisclosureFormatOut.key": "disclosure format code",
     "app.disclosure.schemas.FormatSectionOut.key": "disclosure section code",
@@ -419,6 +437,10 @@ RESPONSE_FIELD_ALLOWLIST = {
     "app.dq.udise_schemas.UdiseCandidatesOut.profile_key": "DQ profile code",
     "app.dq.udise_schemas.UdiseRequestOut.profile_key": "DQ profile code",
     "app.dq.udise_schemas.UdiseRequestDetailOut.profile_key": "DQ profile code",
+    # FA-08: fix-owner letter template and recipient role keys, and the profile code.
+    "app.dq.fix_letter_schemas.FixLettersOut.profile_key": "DQ profile code",
+    "app.dq.fix_letter_schemas.FixLetterOut.key": "letter template key",
+    "app.dq.fix_letter_schemas.FixLetterRecipientOut.key": "recipient role key",
     "app.dq.udise_schemas.UdiseLineOut.attribute_key": "attribute catalog key",
     "app.dq.udise_schemas.UdiseRecipientOut.key": "recipient role code",
     "app.dq.udise_schemas.UdiseGroupOut.key": "field group code",
@@ -443,6 +465,9 @@ RESPONSE_FIELD_ALLOWLIST = {
     "digest",
     # FP-02 (FR-MSG-048): a digest of who would get the closure message; it grants nothing.
     "app.messaging.sends.schemas.ClosurePreviewOut.preview_token": "closure preview digest",
+    # FP-02 follow-up (FR-MSG-060): the same for "the school reopens".
+    "app.messaging.sends.schemas.ClosureReopeningPreviewOut.preview_token": "reopening preview "
+    "digest",
     "app.identity.schemas.PermissionOut.key": "permission key",
     "app.identity.schemas.RoleOut.key": "role key",
     "app.platform.schemas.FlagOut.key": "feature flag key",
@@ -499,12 +524,20 @@ ACTION_SEGMENTS = {
 
 # Creating POSTs that do not take Idempotency-Key, with the reason.
 IDEMPOTENCY_EXEMPT = {
+    # FT-14 (FR-ATT-023, FR-MRK-023): one reminder per section and day (or exam), deduplicated.
+    ("POST", "/api/v1/completeness/reminders"): "notices are deduplicated per section and day "
+    "or exam; a repeat notifies no one again",
     # F1 (D49): a dedicated school told of a reopen by phone.
     ("POST", "/api/v1/platform/incidents/{incident_id}/reopen:told"): "a state transition: a "
     "repeat answers 409 reopen_not_pending",
     ("POST", "/api/v1/disclosure/link/rotate"): "a state change (step-up, audited): a repeat "
     "only issues another link and revokes the previous one",
     ("POST", "/api/v1/fleet/heartbeat"): "machine route; nonce and timestamp make it replay-safe",
+    # FC-10 (FR-COMP-064, FR-COMP-067): both are repeat-safe by design.
+    ("POST", "/api/v1/compliance/policies/{policy_id}:request-acknowledgement"): "notices are "
+    "deduplicated per member, version and day; a repeat notifies no one again",
+    ("POST", "/api/v1/compliance/my-policies/{policy_id}:acknowledge"): "insert-only, unique per "
+    "member, policy and version; a repeat changes nothing",
     # FM-03 (FR-TALLY-022): the vouchers a file carries are recorded once (UNIQUE key); a
     # repeat carries none of them as new and is audited again like any download.
     ("POST", "/api/v1/tally/vouchers/export"): "a download; already exported vouchers are "
@@ -572,6 +605,8 @@ IDEMPOTENCY_EXEMPT = {
     ("POST", "/api/v1/fees/reminders/preview"): "computes counts (R2-3J); stores and sends nothing",
     ("POST", "/api/v1/messaging/closures/preview"): "computes counts (FP-02); stores and sends "
     "nothing",
+    ("POST", "/api/v1/messaging/closures/{closure_id}/reopening/preview"): "computes counts "
+    "(FP-02 follow-up); stores and sends nothing",
     ("POST", "/api/v1/messaging/templates/sync"): "re-reads Meta; creating is idempotent per "
     "template name",
     ("POST", "/api/v1/messaging/join-slips"): "a print view; each print makes new single-use "
@@ -640,6 +675,11 @@ IDEMPOTENCY_EXEMPT = {
     # FM-02 add-on fees (FR-FEE-089, FR-FEE-090).
     ("POST", "/api/v1/fees/addons/{addon_id}/unassign"): "idempotent by design: a repeat finds "
     "no active assignment (not_assigned) and one credit stands per assignment and instalment",
+    # FM-08 cheques deposited (FR-FEE-132) and returned (FR-FEE-134).
+    ("POST", "/api/v1/fees/cheques/deposited"): "idempotent by design: one deposited event per "
+    "receipt, a repeat counts as already_deposited",
+    ("POST", "/api/v1/fees/cheques/{receipt_id}/returned"): "a state transition (409 "
+    "cheque_already_returned on repeat; one returned event per receipt in the database)",
 }
 
 

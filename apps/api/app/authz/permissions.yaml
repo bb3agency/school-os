@@ -251,6 +251,15 @@ permissions:
     description: Confirm each student's annual result (passed, promoted, detained, not appeared) with a reason for detention
     sensitivity: sensitive
     step_up: false
+  # FT-14 records completeness (D86; FR-ATT-016.., FR-MRK-016..). Migration 0097_ew_followups.
+  completeness.read:
+    description: See how complete attendance and marks entry is per section (counts) and whose entry it waits on
+    sensitivity: normal
+    step_up: false
+  completeness.remind:
+    description: Send a section's class teacher an in-app reminder to finish attendance or marks entry (when reminders are switched on)
+    sensitivity: normal
+    step_up: false
   insights.note:
     description: Write behaviour notes about students (educational purposes only)
     sensitivity: sensitive
@@ -263,6 +272,11 @@ permissions:
     description: Reassign flags, set the school's early-warning thresholds and erase notes or flags
     sensitivity: critical
     step_up: true
+  # FT-13 management counts (D86; FR-EW-026). Migration 0097_ew_followups upserts it.
+  insights.counts_read:
+    description: See the school's early-warning follow-up counts (raised, on time, overdue, outcomes); never names or flags
+    sensitivity: normal
+    step_up: false
 
   # --- certificates and registers (M3; US-1101..US-1108, FR-CERT-*, FR-REG-*) --------------
   # Migration 0033_certificates upserts these into core.permissions.

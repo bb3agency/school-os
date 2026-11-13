@@ -164,6 +164,11 @@ export function CertificatesScreen({ filters }: { filters: CertificateFilters })
         breadcrumb={[{ label: t("crumbHome"), href: "/" }, { label: t("title") }]}
         actions={
           <>
+            {/* FO-09: the TC request log (every certificate reader may open it). */}
+            <ButtonLink href="/certificates/tc-requests" variant="secondary">
+              <Icon name="clipboard" className="size-4" />
+              {t("tcRequests.nav")}
+            </ButtonLink>
             {can(REGISTER_READ) ? (
               <ButtonLink href="/registers" variant="secondary">
                 <Icon name="clipboard" className="size-4" />

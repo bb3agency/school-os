@@ -38,6 +38,22 @@ EXPECTED_UPDATE: dict[str, set[str]] = {
         "updated_at",
     },
     "audit.chain_heads": {"last_seq", "last_hash", "updated_at"},
+    # FO-09 (0102_tc_requests): the TC request log's workflow columns.
+    "sis.tc_requests": {
+        "status",
+        "certificate_id",
+        "preparing_by",
+        "preparing_at",
+        "ready_by",
+        "ready_at",
+        "issued_by",
+        "issued_at",
+        "cancelled_by",
+        "cancelled_at",
+        "cancel_reason",
+        "updated_at",
+        "version",
+    },
     # FO-03 (0091_udise_followup): the clerk's tick on a UDISE+ to-do item.
     "sis.udise_movement_marks": {
         "state",

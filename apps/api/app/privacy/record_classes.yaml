@@ -120,6 +120,18 @@ classes:
     erasure: allowed
     source: Typed by staff members
 
+  ask_gaps:
+    label: Questions "Ask the school" could not answer
+    owner: knowledge
+    tables: [kb.knowledge_gaps, kb.knowledge_gap_queries]
+    classification: C2
+    docs_row: "`kb.knowledge_gaps`, `kb.knowledge_gap_queries` (FA-06)"
+    retention: 90 days after last asked or closed (the school may shorten it)
+    basis: So that the people who keep the school's library can add missing answers and documents; redacted, without who asked.
+    # Not erased per person: a gap holds no asker; the marks go with the query log (cascade).
+    erasure: allowed_after_retention
+    source: Made by SchoolOS from staff questions (redacted)
+
   ask_memory:
     label: What "Ask the school" remembers for a staff member
     owner: knowledge
@@ -156,7 +168,8 @@ classes:
   certificates:
     label: Issued certificates
     owner: certificates
-    tables: [sis.certificates, sis.certificate_counters, sis.certificate_verifications]
+    tables: [sis.certificates, sis.certificate_counters, sis.certificate_verifications,
+             sis.tc_requests]
     classification: C2
     docs_row: Issued certificates and their counters
     retention: Life of the school (official record)
@@ -174,7 +187,7 @@ classes:
              fin.receipt_cancellations, fin.refunds, fin.ledger_entries, fin.day_closes,
              fin.provider_payments, fin.reconciliation_runs, fin.reconciliation_items,
              fin.upi_settings, fin.upi_confirmations, fin.tax_certificates,
-             fin.fee_addons, fin.fee_addon_assignments]
+             fin.fee_addons, fin.fee_addon_assignments, fin.cheque_status_events]
     classification: C2
     docs_row: Receipts, refunds, cancellations, ledger entries
     retention: 8 years after the end of the financial year (owner decision D21, 2026-10-14; a CA confirms when available)
@@ -293,6 +306,49 @@ classes:
     erasure: no_personal_data
     source: Recorded by the school office from the certificates the school holds
 
+  safety_checks:
+    label: Safety drills and periodic checks
+    owner: compliance
+    tables: [ops.compliance_checks]
+    classification: C1
+    docs_row: Safety drills and periodic checks
+    retention: Life of the school
+    basis: The school's own log of drills and checks (counts and short notes, never student names); nothing about one student.
+    erasure: no_personal_data
+    source: Logged by the school office after each drill or check
+
+  school_policies:
+    label: School policies
+    owner: compliance
+    tables: [ops.compliance_policies]
+    classification: C1
+    docs_row: School policy library
+    retention: Life of the school
+    basis: The school's own policies, their review dates and the roles asked to read them; nothing about one person.
+    erasure: no_personal_data
+    source: Added by the school office from the policy documents in Documents
+
+  policy_acknowledgements:
+    label: Policy acknowledgements by staff
+    owner: compliance
+    tables: [ops.compliance_policy_acks]
+    classification: C1
+    docs_row: Policy acknowledgements
+    retention: Life of the school
+    basis: Shows inspectors that staff read the school's child-protection and safety policies; kept as the school's record of which version each member read and when.
+    erasure: refused_official_record
+    source: Confirmed by each staff member in SchoolOS
+  inspection_packs:
+    label: Inspection packs made
+    owner: compliance
+    tables: [ops.inspection_packs]
+    classification: C1
+    docs_row: Inspection packs
+    retention: Life of the school
+    basis: The record of which inspection packs the office made and the state of each item then; labels, dates and counts, nothing about one person.
+    erasure: no_personal_data
+    source: Made by the school office from records SchoolOS holds
+
   imports:
     label: Spreadsheet imports
     owner: imports
@@ -352,7 +408,7 @@ classes:
   messages:
     label: WhatsApp messages sent
     owner: messaging
-    tables: [msg.messages, msg.send_runs, msg.broadcasts, msg.closures]
+    tables: [msg.messages, msg.send_runs, msg.broadcasts, msg.closures, msg.closure_reopenings]
     classification: C2
     docs_row: Messages (
     retention: 13 months; encrypted variables erased after 180 days

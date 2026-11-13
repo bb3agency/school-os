@@ -446,6 +446,9 @@ def test_FR_KB_004_record_question_reads_named_fields_through_scoped_tools(
     assert sorted(tools_sent) == [
         "count_students",
         "find_students",
+        # D86 (FA-04): attendance and readiness counts of the teacher's own section.
+        "get_attendance_summary",
+        "get_readiness_summary",
         "get_student_facts",
         "get_value_history",
         "list_documents",

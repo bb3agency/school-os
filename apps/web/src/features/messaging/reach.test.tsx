@@ -247,3 +247,107 @@ describe("FP-02 urgent closure message", () => {
     expect(screen.queryByRole("button", { name: en.closures.check })).not.toBeInTheDocument();
   });
 });
+
+describe("FP-02 follow-up: order text and the school reopens (FR-MSG-056..064)", () => {
+  it("FR-MSG-056: the order text goes with the preview, trimmed", async () => {
+    signedIn([READ, CLOSURE_SEND], "principal");
+    stub.routes["GET /bff/api/v1/messaging/closures"] = () => Response.json(closurePage());
+    stub.routes["POST /bff/api/v1/messaging/closures/preview"] = () =>
+      Response.json(closurePreview());
+    renderWithIntl(<ClosureScreen />);
+    await userEvent.type(
+      await screen.findByLabelText(en.closures.noticeText),
+      "  Collector's order: schools closed.  ",
+    );
+    await userEvent.click(screen.getByRole("button", { name: en.closures.check }));
+    expect(await screen.findByText(en.closures.pageNote)).toBeInTheDocument();
+    const preview = JSON.parse(
+      stub.callsTo("POST /bff/api/v1/messaging/closures/preview")[0]?.body ?? "{}",
+    );
+    expect(preview.notice_text).toBe("Collector's order: schools closed.");
+  });
+
+  it("FR-MSG-060/061: the principal previews and sends one reopening message", async () => {
+    signedIn([READ, CLOSURE_SEND], "principal");
+    stub.routes["GET /bff/api/v1/messaging/closures"] = () =>
+      Response.json(closurePage([closure()]));
+    const reopening = {
+      id: "0192f3a4-0000-7000-8000-00000000c201",
+      closure_id: CLOSURE,
+      reopens_on: "2026-11-11",
+      recipients: 420,
+      queued: 420,
+      skipped: {},
+      languages: { en: 420 },
+      estimated_cost_inr: "56.99",
+      counts: { queued: 420 },
+      sent_by: GUARDIAN,
+      sent_at: "2026-11-10T16:30:00Z",
+    };
+    stub.routes[`POST /bff/api/v1/messaging/closures/${CLOSURE}/reopening/preview`] = () =>
+      Response.json({
+        preview_token: "ro_" + "b".repeat(40),
+        closure_id: CLOSURE,
+        reopens_on: "2026-11-11",
+        guardians: 500,
+        recipients: 420,
+        skipped: {},
+        languages: { en: 420 },
+        language_fallbacks: 0,
+        estimated_cost_inr: "56.99",
+        message_en: "Update from Synthetic School: the school will reopen on 11/11/2026.",
+        sends_at: null,
+        window_start: "06:00:00",
+        window_end: "21:30:00",
+        blocked_reason: null,
+      });
+    stub.routes[`POST /bff/api/v1/messaging/closures/${CLOSURE}/reopening`] = () =>
+      Response.json(reopening, { status: 202 });
+    renderWithIntl(<ClosureScreen />);
+    await userEvent.click(await screen.findByRole("button", { name: en.closures.reopen.action }));
+    await userEvent.click(await screen.findByRole("button", { name: en.closures.reopen.check }));
+    expect(
+      await screen.findByText(
+        "Update from Synthetic School: the school will reopen on 11/11/2026.",
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Send to 420 guardians" }));
+    expect(await screen.findByText("420 messages are on their way.")).toBeInTheDocument();
+    const sent = stub.callsTo(`POST /bff/api/v1/messaging/closures/${CLOSURE}/reopening`);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.headers.get("Idempotency-Key")).toBeTruthy();
+    expect(JSON.parse(sent[0]?.body ?? "{}")).toEqual({
+      reopens_on: "2026-11-11",
+      preview_token: "ro_" + "b".repeat(40),
+    });
+  });
+
+  it("FR-MSG-064: a sent reopening shows its date; readers get no button", async () => {
+    signedIn([READ]);
+    stub.routes["GET /bff/api/v1/messaging/closures"] = () =>
+      Response.json(
+        closurePage([
+          {
+            ...closure(),
+            reopening: {
+              id: "0192f3a4-0000-7000-8000-00000000c201",
+              closure_id: CLOSURE,
+              reopens_on: "2026-11-11",
+              recipients: 1,
+              queued: 1,
+              skipped: {},
+              languages: {},
+              estimated_cost_inr: "0.14",
+              counts: {},
+              sent_by: GUARDIAN,
+              sent_at: "2026-11-10T16:30:00Z",
+            },
+          },
+        ]),
+      );
+    renderWithIntl(<ClosureScreen />);
+    const table = await screen.findByRole("table", { name: en.closures.recentTitle });
+    await waitFor(() => expect(within(table).getByText(/^Reopens /)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: en.closures.reopen.action })).toBeNull();
+  });
+});

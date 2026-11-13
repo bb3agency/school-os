@@ -25,6 +25,7 @@ export type ErrorNamespace =
   | "ask"
   | "insights"
   | "ask.verified"
+  | "ask.gaps"
   | "school.audit"
   | "circulars"
   | "tasks"
@@ -47,7 +48,11 @@ export type ErrorNamespace =
   | "schoolCalendar"
   | "udiseFollowup"
   | "udise"
-  | "compliance";
+  | "fixLetters"
+  | "compliance"
+  | "complianceChecks"
+  | "compliancePolicies"
+  | "myPolicies";
 
 type LooseTranslator = ((key: string) => string) & { has: (key: string) => boolean };
 

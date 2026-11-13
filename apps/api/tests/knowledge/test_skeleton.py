@@ -68,6 +68,11 @@ KNOWLEDGE_ROUTES = {
     # source links for askers or document readers (require_any; the service checks the source).
     ("GET", "/api/v1/knowledge/usage"): "kb.ask",
     ("GET", "/api/v1/knowledge/resolve"): "kb.ask",
+    # FA-06 (FR-KB-085..090): knowledge gaps, for the people who keep the library.
+    ("GET", "/api/v1/knowledge/gaps"): "kb.verified_answer.manage",
+    ("GET", "/api/v1/knowledge/gaps/summary"): "kb.verified_answer.manage",
+    ("POST", "/api/v1/knowledge/gaps/{gap_id}/close"): "kb.verified_answer.manage",
+    ("POST", "/api/v1/knowledge/gaps/{gap_id}/verified-answer"): "kb.verified_answer.manage",
 }
 
 

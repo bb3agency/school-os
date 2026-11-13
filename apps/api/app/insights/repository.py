@@ -197,6 +197,7 @@ def list_flags(
     due_until: dt.date | None,
     after: tuple[dt.date, uuid.UUID] | None,
     limit: int,
+    review_until: dt.date | None = None,
 ) -> list[InsightFlag]:
     """Flags ordered by due date (soonest first); ``student_ids`` None = no scope filter."""
     stmt = select(InsightFlag).where(InsightFlag.status.in_(list(statuses)))
@@ -218,6 +219,8 @@ def list_flags(
         )
     if due_until is not None:
         stmt = stmt.where(InsightFlag.due_on <= due_until)
+    if review_until is not None:
+        stmt = stmt.where(InsightFlag.review_on <= review_until)
     if after is not None:
         due, last_id = after
         stmt = stmt.where(
@@ -249,6 +252,41 @@ def overdue_flags(session: Session, today: dt.date) -> list[InsightFlag]:
             .order_by(InsightFlag.due_on, InsightFlag.id)
         )
     )
+
+
+def review_due_flags(session: Session, today: dt.date) -> list[InsightFlag]:
+    """Open flags whose planned review is today or past (FR-EW-021)."""
+    return list(
+        session.scalars(
+            select(InsightFlag)
+            .where(InsightFlag.status.in_(OPEN), InsightFlag.review_on <= today)
+            .order_by(InsightFlag.review_on, InsightFlag.id)
+        )
+    )
+
+
+def count_rows(
+    session: Session, since: dt.date, since_at: dt.datetime
+) -> list[tuple[str, dt.date, dt.date, dt.datetime | None, dt.date | None, str | None, Any]]:
+    """School-wide (status, raised_on, due_on, first_action_at, review_on, close_reason,
+    closed_at) of flags raised since ``since``, closed since ``since_at`` (the same IST
+    midnight), or open (FR-EW-026; no ids)."""
+    stmt = select(
+        InsightFlag.status,
+        InsightFlag.raised_on,
+        InsightFlag.due_on,
+        InsightFlag.first_action_at,
+        InsightFlag.review_on,
+        InsightFlag.close_reason,
+        InsightFlag.closed_at,
+    ).where(
+        or_(
+            InsightFlag.raised_on >= since,
+            InsightFlag.status.in_(OPEN),
+            InsightFlag.closed_at >= since_at,
+        )
+    )
+    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in session.execute(stmt)]
 
 
 def purge_closed(

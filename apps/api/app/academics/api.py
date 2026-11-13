@@ -15,6 +15,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query, Response
 
 from app.academics import service, year_end
+from app.academics.completeness_schemas import (
+    AttendanceCompletenessOut,
+    CompletenessReminderIn,
+    CompletenessReminderOut,
+    MarksCompletenessOut,
+)
 from app.academics.schemas import (
     AttendanceDayOut,
     AttendanceMonthOut,
@@ -64,6 +70,53 @@ MarksReader = Annotated[UserContext, Depends(require(service.MARKS_READ))]
 CalendarReader = Annotated[UserContext, Depends(require(service.CALENDAR_READ))]
 CalendarManager = Annotated[UserContext, Depends(require(service.CALENDAR_MANAGE, scope="school"))]
 MarksRecorder = Annotated[UserContext, Depends(require(service.MARKS_RECORD))]
+CompletenessReader = Annotated[
+    UserContext, Depends(require(service.COMPLETENESS_READ, scope="school"))
+]
+CompletenessReminder = Annotated[
+    UserContext, Depends(require(service.COMPLETENESS_REMIND, scope="school"))
+]
+
+
+# --- completeness (FT-14) -------------------------------------------------------------------------
+
+
+@router.get("/completeness/attendance", response_model=AttendanceCompletenessOut)
+def attendance_completeness(
+    ctx: CompletenessReader,
+    db: TenantDB,
+    date: Annotated[dt.date | None, Query(description="IST date; default today")] = None,
+) -> AttendanceCompletenessOut:
+    """How complete attendance is for a date in every section of the current year: students,
+    students with a status, the day's calendar kind and the class teacher it waits on
+    (``completeness.read``; counts only, no student is named). 409 ``no_current_year``; 422
+    ``future_date``, ``date_out_of_range``."""
+    return service.attendance_completeness(db, ctx, date)
+
+
+@router.get("/completeness/exams/{exam_id}", response_model=MarksCompletenessOut)
+def marks_completeness(
+    ctx: CompletenessReader,
+    db: TenantDB,
+    exam_id: uuid.UUID,
+    class_id: Annotated[uuid.UUID | None, Query(description="Only this class")] = None,
+) -> MarksCompletenessOut:
+    """How complete marks entry is for an exam: per section and subject entered for the exam,
+    students and students with a mark or absent, and the class teacher it waits on
+    (``completeness.read``; counts only). 404 for an exam of another school; 422
+    ``unknown_class``."""
+    return service.marks_completeness(db, ctx, exam_id, class_id)
+
+
+@router.post("/completeness/reminders", response_model=CompletenessReminderOut)
+def send_completeness_reminder(
+    ctx: CompletenessReminder, db: TenantDB, body: CompletenessReminderIn
+) -> CompletenessReminderOut:
+    """Remind the section's class teacher in the app to finish attendance (today) or an exam's
+    marks (``completeness.remind``). Once per section and day or exam (``sent`` 0 for a
+    repeat). 409 ``reminders_off`` (the default), ``no_class_teacher``, ``already_complete``;
+    422 ``exam_required``; 404 for another school's section or exam."""
+    return service.send_completeness_reminder(db, ctx, body)
 
 
 # --- attendance -----------------------------------------------------------------------------------

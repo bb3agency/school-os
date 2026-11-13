@@ -103,6 +103,18 @@ Lead decisions recorded in docs/18 §8 (the owner asked not to be asked):
 
 **Consequences.** Coastal schools can tell parents about an evening closure order the same night (until 21:30) or first thing in the morning (from 06:00) without waiting for the notice workflow. The window is a lead default for the PO to confirm (D85; the research proposal was 05:30-22:30). Telugu text of the template and the reason phrases is `reviewed: false` like every Telugu template. A parent page with the order text (the research's "Details" button) is not built: it would need a new parent-link kind (ADR-0046) and is a follow-up. Requirements FR-MSG-047..055 (docs/03 §3.22); FP-01 (opt-in coverage and reach follow-up, FR-MSG-039..046) needs no amendment.
 
+## Amendment (2026-11-12): the closure page and "the school reopens" (FP-02 follow-up; lead decision D86, PO to confirm)
+
+**Context.** The 2026-11-09 amendment left out the research's "Details" page with the order text and the optional reopening message.
+
+**Decision.**
+
+1. **Closure template v2.** `school_closure` moves to version 2 with one dynamic URL button "See details" (the parent link token as suffix, ADR-0046 amendment of 2026-11-12: kind `parent_closure`); the body ends "Tap the button below for details." The template variables stay the school name, the dates and a reason phrase: the order text never goes into the WhatsApp message. Version 2 needs Meta's approval per school before closure messages can be sent again (release step; F2 had not been released).
+2. **Order text.** The principal may type the order text (plain text, at most 1000 characters, refused when it holds an Aadhaar number). It is stored on `msg.closures.notice_text` and shown only on the closure's read-only parent page; the audit records only that one was typed.
+3. **The school reopens.** A new UTILITY template `school_reopening` (version 1, `optin_category: notices`, no button): "Update from {school}: the school will reopen on {date}. Please contact the school office if you have questions." One per closure (`msg.closure_reopenings`, migration `0100_closure_reopen`), sent by `message.closure.send` holders with step-up, to the closure's audience as it is now, under every rule of the 2026-11-09 amendment (closure window 06:00-21:30 IST also inside quiet hours, cap, pause, approval, INR, notices switch, opt-ins, D31). The date comes after the closure's first day, within 7 days from today, and at most 7 days after the day following the closure's last day (configuration). A reopening message whose day has passed is skipped `too_late`. Audited `messaging.closure.reopening_sent`. Needs Meta's approval per school (release step).
+
+**Consequences.** Parents can open the Collector's order text from the message and see the reopening date on the same page; no free text reaches the WhatsApp message. Requirements FR-MSG-056..065, FR-PUB-013..016 (docs/03 §3.22, §3.23).
+
 ## Related requirements
 
 FR-MSG-001..034 (docs/03 §3.21-3.22), FR-PUB-001..012, SEC-034, SEC-035, SEC-039, PRV-025..028; US-2201..US-2210 (docs/02 C22). Docs: 01 §7.3, 02 §9, 05 §15.3, 07 §3 TB11, §4 T28-T35, 08 §15, 09 §4 "Messaging", "Webhooks", 10 §11.2, 14 R2, 17 §5.8.

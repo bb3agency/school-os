@@ -10,6 +10,9 @@ version: 1
 
 flags:
   due_days: 7            # FR-EW-004: a flag is due 7 days after it is raised (M5 exit metric)
+  # FT-13 (lead decision D86, PO to confirm; FR-EW-019): a person may plan the next review of a
+  # flag up to this many days ahead; the owner is reminded in the app on that day.
+  review_max_days: 60
 
 rules:
   attendance_streak:

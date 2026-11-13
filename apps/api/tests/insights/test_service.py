@@ -177,7 +177,12 @@ def test_FR_EW_007_actions_then_close_with_a_reason(school: Any, admin_engine: E
         insights.add_action(db, ct, flag.id, ActionIn(kind="other"))
     assert err.value.code == "flag_closed"
     event = _events(admin_engine, school.tenant_id, "insights.flag_action_added")[-1]
-    assert event["summary"] == {"kind": "called_parent", "has_note": True, "first_action": True}
+    assert event["summary"] == {
+        "kind": "called_parent",
+        "has_note": True,
+        "first_action": True,
+        "review_on": None,  # FT-13 (FR-EW-024): the planned review date, none here
+    }
     # The note is encrypted at rest.
     with admin_engine.connect() as c:
         blob: Any = c.execute(
@@ -609,6 +614,7 @@ def test_FR_EW_015_summary_counts_only(school: Any) -> None:
         "not_actioned",
         "overdue",
         "open",
+        "review_due",  # FT-13 (FR-EW-023)
     }
 
 

@@ -1002,13 +1002,24 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
         )
         # --- FP-02 urgent closure messages (0093_msg_reach_closure) -------------------------
+        closure = uuid.uuid4()
         _run(
             c,
             "INSERT INTO msg.closures (id, tenant_id, whole_school, closed_from, closed_to, "
-            "reason_code, sent_by) VALUES (:i, :t, true, current_date, current_date, "
-            "'weather', :u)",
+            "reason_code, sent_by, notice_text) VALUES (:i, :t, true, current_date, "
+            "current_date, 'weather', :u, 'Synthetic closure order text')",
+            i=closure,
+            t=t,
+            u=u["user"],
+        )
+        # --- FP-02 follow-up: the reopening message of that closure (0100_closure_reopen) ----
+        _run(
+            c,
+            "INSERT INTO msg.closure_reopenings (id, tenant_id, closure_id, reopens_on, sent_by) "
+            "VALUES (:i, :t, :c, current_date + 1, :u)",
             i=uuid.uuid4(),
             t=t,
+            c=closure,
             u=u["user"],
         )
         # --- CBSE disclosure (R3-1C, 0065_disclosure): a draft, a snapshot and its document --
@@ -1062,6 +1073,85 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
             s=renewed,
             u=u["user"],
+        )
+        # --- FC-09/FC-10 (0098_drills_policies): a drill, a policy and an acknowledgement ----
+        _run(
+            c,
+            "INSERT INTO ops.compliance_checks (id, tenant_id, kind, done_on, participants_count, "
+            "led_by_membership_id, document_id, recorded_by) VALUES (:i, :t, 'fire_drill', "
+            "current_date - 3, 250, :m, :d, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            m=ids["m1"],
+            d=ids["doc"],
+            u=u["user"],
+        )
+        policy_id = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO ops.compliance_policies (id, tenant_id, title, document_id, ack_roles, "
+            "review_due, created_by) VALUES (:i, :t, 'Child protection policy', :d, "
+            "ARRAY['teacher'], current_date + 300, :u)",
+            i=policy_id,
+            t=t,
+            d=ids["doc"],
+            u=u["user"],
+        )
+        _run(
+            c,
+            "INSERT INTO ops.compliance_policy_acks (id, tenant_id, policy_id, "
+            "document_version_id, membership_id, user_id) VALUES (:i, :t, :p, :v, :m, :u)",
+            i=uuid.uuid4(),
+            t=t,
+            p=policy_id,
+            v=ids["ver"],
+            m=ids["m1"],
+            u=u["user"],
+        )
+        # --- FA-06 (0099_knowledge_gaps): a gap closed by the verified answer, and its mark --
+        gap = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO kb.knowledge_gaps (id, tenant_id, question_ciphertext, question_hmac, "
+            "key_version, not_found_count, first_seen_at, last_seen_at, status, resolution, "
+            "verified_answer_id, closed_by, closed_at) VALUES (:i, :t, '\\x0a', :h, 1, 1, now(), "
+            "now(), 'closed', 'verified_answer', :a, :m, now())",
+            i=gap,
+            t=t,
+            h=hashlib.sha256(b"gap").digest(),
+            a=ids["answer"],
+            m=ids["m1"],
+        )
+        _run(
+            c,
+            "INSERT INTO kb.knowledge_gap_queries (tenant_id, query_id, gap_id, signal) "
+            "VALUES (:t, :q, :g, 'not_found')",
+            t=t,
+            q=ids["query"],
+            g=gap,
+        )
+        # --- FC-07 (0101_inspection_packs): a generated pack -------------------------------
+        _run(
+            c,
+            "INSERT INTO ops.inspection_packs (id, tenant_id, pack_key, pack_version, pack_label, "
+            "authority, verified, items, counts, generated_by) VALUES (:i, :t, 'fire_inspection', "
+            "1, 'Fire department inspection', 'State fire services department', false, '[]', "
+            "'{}', :u)",
+            i=uuid.uuid4(),
+            t=t,
+            u=u["user"],
+        )
+        # --- FO-09 (0102_tc_requests): a TC request linked to the pending TC ---------------
+        _run(
+            c,
+            "INSERT INTO sis.tc_requests (id, tenant_id, student_id, status, received_on, "
+            "channel, certificate_id, received_by, preparing_by, preparing_at) VALUES "
+            "(:i, :t, :s, 'in_preparation', '2026-06-01', 'paper', :cert, :m, :m, now())",
+            i=uuid.uuid4(),
+            t=t,
+            s=ids["student2"],
+            cert=ids["cert2"],
+            m=ids["m1"],
         )
         # --- student timeline and early warning (M5, 0035_student_insights) ---------------
         exam, flag, mark = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
@@ -1634,6 +1724,51 @@ def populate_school(  # noqa: PLR0915 - one statement per table reads best as on
             t=t,
             r=upi["rcpt"],
             l=upi["line"],
+            m=ids["m1"],
+        )
+        # --- FM-08 (0103_bank_matching): a cheque receipt marked deposited --------------------
+        chq = uuid.uuid4()
+        _run(
+            c,
+            "INSERT INTO fin.receipts (id, tenant_id, account_id, financial_year, receipt_no, "
+            "receipt_number, receipt_date, amount, mode, mode_details, collected_by, content, "
+            "content_sha256) VALUES (:i, :t, :a, '2026-27', 3, 'RCT/2026-27/000003', "
+            "'2026-09-01', 30, 'cheque', CAST(:md AS jsonb), :m, '{}'::jsonb, :h)",
+            i=chq,
+            t=t,
+            a=f["acct"],
+            md='{"cheque_number": "123456", "bank_name": "Synthetic Bank", '
+            '"cheque_date": "2026-09-01"}',
+            m=ids["m1"],
+            h=b"\x00" * 32,
+        )
+        _run(
+            c,
+            "INSERT INTO fin.receipt_allocations (id, tenant_id, receipt_id, instalment_no, "
+            "head_id, amount) VALUES (:i, :t, :r, 1, :h, 30)",
+            i=uuid.uuid4(),
+            t=t,
+            r=chq,
+            h=f["head"],
+        )
+        _run(
+            c,
+            "INSERT INTO fin.ledger_entries (id, tenant_id, account_id, entry_kind, amount, "
+            "instalment_no, head_id, entry_date, receipt_id) VALUES (:i, :t, :a, 'payment', -30, "
+            "1, :h, '2026-09-01', :r)",
+            i=uuid.uuid4(),
+            t=t,
+            a=f["acct"],
+            h=f["head"],
+            r=chq,
+        )
+        _run(
+            c,
+            "INSERT INTO fin.cheque_status_events (id, tenant_id, receipt_id, status, event_date, "
+            "source, recorded_by) VALUES (:i, :t, :r, 'deposited', '2026-09-02', 'manual', :m)",
+            i=uuid.uuid4(),
+            t=t,
+            r=chq,
             m=ids["m1"],
         )
         # --- R3-1A privacy requests (0066_privacy_requests; ADR-0048) -------------------------

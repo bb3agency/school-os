@@ -347,6 +347,29 @@ templates:
     te:
       title: ఫాలో-అప్ గడువు దాటింది
       body: ఒక విద్యార్థి ఫ్లాగ్ గడువు దాటింది, ఇంకా ఎవరూ చర్యను నమోదు చేయలేదు. దాన్ని తెరిచి చేసినది నమోదు చేయండి, లేదా కారణంతో మూసివేయండి.
+
+  # FT-13 (D86; FR-EW-021): the review a person planned on a flag is due (no student details).
+  insights.flag_review_due:
+    params: [flag_id]
+    resource_type: insight_flag
+    en:
+      title: A planned follow-up review is due
+      body: You planned to review a student's flag today. Open it, record what you found, and plan the next review or close the flag with a reason.
+    te:
+      title: ప్రణాళిక చేసిన ఫాలో-అప్ సమీక్ష ఈ రోజు
+      body: ఒక విద్యార్థి ఫ్లాగ్‌ను ఈ రోజు సమీక్షించాలని మీరు ప్రణాళిక చేశారు. దాన్ని తెరిచి, మీరు గమనించినది నమోదు చేసి, తదుపరి సమీక్షను ప్రణాళిక చేయండి లేదా కారణంతో ఫ్లాగ్‌ను మూసివేయండి.
+
+  # FT-14 (D86; FR-ATT-022, FR-MRK-022): attendance or marks of a section are not complete yet.
+  # Sent only by a person and only while completeness reminders are switched on (default off).
+  academics.completeness_reminder:
+    params: [kind, section_id]
+    resource_type: section
+    en:
+      title: "{kind, select, attendance {Attendance is not complete yet} other {Marks are not complete yet}}"
+      body: "{kind, select, attendance {Today's attendance for your section is not complete. Open the attendance screen and mark the students who are missing.} other {Some marks for your section are not entered yet. Open the marks screen and finish entering them.}}"
+    te:
+      title: "{kind, select, attendance {హాజరు ఇంకా పూర్తి కాలేదు} other {మార్కులు ఇంకా పూర్తి కాలేదు}}"
+      body: "{kind, select, attendance {మీ సెక్షన్ ఈ రోజు హాజరు పూర్తి కాలేదు. హాజరు స్క్రీన్‌ను తెరిచి మిగిలిన విద్యార్థుల హాజరు నమోదు చేయండి.} other {మీ సెక్షన్ కొన్ని మార్కులు ఇంకా నమోదు కాలేదు. మార్కుల స్క్రీన్‌ను తెరిచి వాటిని నమోదు చేయండి.}}"
   # --- R2-1C WhatsApp messaging (ADR-0043; FR-MSG-007, FR-MSG-021): to messaging.configure ---
   messaging.paused:
     params: [account_id, reason]
@@ -493,6 +516,41 @@ templates:
     te:
       title: "{state, select, expired {పాఠశాల ధృవపత్రం గడువు ముగిసింది} other {పాఠశాల ధృవపత్రం గడువు త్వరలో ముగుస్తుంది}}"
       body: "{state, select, expired {{certificate} గడువు {days, plural, one {# రోజు} other {# రోజులు}} క్రితం ముగిసింది.} other {{certificate} గడువు {days, plural, =0 {ఈ రోజు} one {# రోజులో} other {# రోజుల్లో}} ముగుస్తుంది.}} పునరుద్ధరణ ప్రారంభించి, కొత్త ధృవపత్రాన్ని రిజిస్టర్‌లో నమోదు చేయండి."
+
+  # FC-09 safety checks (FR-COMP-051): a drill or periodic check falls due soon or is overdue.
+  # `check` is the catalogue label (checks.yaml), never a name the school typed. Staff only.
+  compliance.check.due:
+    params: [check, days, state]
+    resource_type: compliance_check
+    en:
+      title: "{state, select, overdue {A safety check is overdue} other {A safety check is due soon}}"
+      body: "{state, select, overdue {{check} was due {days, plural, one {# day} other {# days}} ago.} other {{check} is due {days, plural, =0 {today} one {in # day} other {in # days}}.}} Do it, then log it under Safety checks."
+    te:
+      title: "{state, select, overdue {భద్రతా తనిఖీ గడువు దాటింది} other {భద్రతా తనిఖీ త్వరలో చేయాలి}}"
+      body: "{state, select, overdue {{check} గడువు {days, plural, one {# రోజు} other {# రోజులు}} క్రితం దాటింది.} other {{check} {days, plural, =0 {ఈ రోజు} one {# రోజులో} other {# రోజుల్లో}} చేయాలి.}} తనిఖీ చేసి, భద్రతా తనిఖీల్లో నమోదు చేయండి."
+
+  # FC-10 policy library (FR-COMP-064): a staff member is asked to read and acknowledge a school
+  # policy. No params (the policy title is typed text). Staff only.
+  compliance.policy.acknowledge:
+    params: []
+    resource_type: compliance_policy_ack
+    en:
+      title: Please read a school policy
+      body: The school asks you to read a policy and confirm that you have read it. Open Policies to read.
+    te:
+      title: దయచేసి పాఠశాల విధానాన్ని చదవండి
+      body: ఒక విధానాన్ని చదివి, చదివినట్లు నిర్ధారించమని పాఠశాల కోరుతోంది. చదవాల్సిన విధానాలు తెరవండి.
+
+  # FC-10 policy library (FR-COMP-061): a policy's review date is near or has passed.
+  compliance.policy.review_due:
+    params: [days, state]
+    resource_type: compliance_policy
+    en:
+      title: "{state, select, overdue {A school policy review is overdue} other {A school policy is due for review}}"
+      body: "{state, select, overdue {A policy review was due {days, plural, one {# day} other {# days}} ago.} other {A policy is due for review {days, plural, =0 {today} one {in # day} other {in # days}}.}} Review it, then mark it reviewed in the policy library."
+    te:
+      title: "{state, select, overdue {పాఠశాల విధాన సమీక్ష గడువు దాటింది} other {పాఠశాల విధానం సమీక్షకు వస్తోంది}}"
+      body: "{state, select, overdue {ఒక విధాన సమీక్ష గడువు {days, plural, one {# రోజు} other {# రోజులు}} క్రితం దాటింది.} other {ఒక విధానం {days, plural, =0 {ఈ రోజు} one {# రోజులో} other {# రోజుల్లో}} సమీక్షకు వస్తుంది.}} సమీక్షించి, విధానాల జాబితాలో సమీక్షించినట్లు గుర్తించండి."
 
   # R3-1D portal calendar (FR-RDY-006, FR-RDY-007; ADR-0053). Staff only, never parents (D45).
   # Params are a portal code and counts: the readiness of the event's linked profile across the

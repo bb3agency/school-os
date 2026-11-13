@@ -1,0 +1,52 @@
+# Enrolment statistics sheet (FO-06; FR-EXP-009..FR-EXP-019): counts by class x gender, social
+# category, minority group, age, CWSN, repeaters, admissions and leavers, in the shapes of the
+# UDISE+ school-level enrolment tables. Versioned configuration shipped inside the package;
+# loaded and validated by app.exports.enrolment_stats.load_stats_config().
+#
+# UNVERIFIED (owner decision D3 rule for portal formats): the reference date, the age columns
+# and the minority groups follow public secondary sources on the UDISE+ Data Capture Format; no
+# 2026-27 DCF table was read field by field. Keep `verified: false` until a school's UDISE+
+# screen or the official DCF confirms them. Counts only: no names, no student ids. No RTE
+# 12(1)(c) count: the RTE register is not built (D10, D43; FO-13).
+version: 1
+verified: false
+source:
+  - https://udiseplus.gov.in/assets/img/dcf2021/DCF_Final_2022_23_v15_1804.pdf
+  - https://educationforallinindia.com/wp-content/uploads/2023/09/data-capture-format-2023-24-DOSEL-MoE-India.pdf
+title: Enrolment statistics
+unverified_note: >-
+  Counted from the school's own records for checking. The UDISE+ table shapes, the age
+  reference date and the minority groups are not yet verified against the official form.
+
+# Age as on this day of the academic year's starting calendar year (the UDISE+ practice of
+# 30 September; unverified). The sheet may be asked for another day inside the year.
+reference_date: {month: 9, day: 30}
+
+# Age columns: "Below <min>", each age from min to max - 1, "<max> and above".
+age_min: 4
+age_max: 18
+
+# Minority groups (UDISE+) from the free-text religion attribute (C3), matched ignoring case and
+# surrounding spaces. Other recorded religions count as "Not a minority group"; an empty value
+# counts as not recorded.
+minority_groups:
+  muslim: {label: Muslim, religions: [muslim, islam]}
+  christian: {label: Christian, religions: [christian, christianity]}
+  sikh: {label: Sikh, religions: [sikh, sikhism]}
+  buddhist: {label: Buddhist, religions: [buddhist, buddhism, neo buddhist]}
+  parsi: {label: Parsi, religions: [parsi, zoroastrian]}
+  jain: {label: Jain, religions: [jain, jainism]}
+
+# Social category values of the attribute catalog (students/attributes.yaml) and their labels.
+categories:
+  general: General
+  ews: EWS
+  obc: OBC
+  sc: SC
+  st: ST
+
+# Gender values of the attribute catalog and their column labels.
+genders:
+  female: Girls
+  male: Boys
+  transgender: Transgender

@@ -1110,6 +1110,47 @@ def _cert_path(suffix: str = "") -> Builder:
     return build
 
 
+# --- FO-09: the TC request log (FR-CERT-026..FR-CERT-045) ---------------------------------
+
+
+def _tc_request(w: Any, *, fresh: bool = False) -> Any:
+    """A TC request of school A logged by the office admin (shared unless ``fresh``)."""
+    if fresh or "matrix_tc_request" not in w.a.ids:
+        from app.certificates import tc_requests
+        from app.certificates.schemas import TcRequestIn
+
+        cert = _cert()
+        out = cert.call(
+            w.a,
+            w.a.people["office_admin"],
+            "office_admin",
+            tc_requests.log_request,
+            TcRequestIn(student_id=_cert_student(w), received_on=cert.today(), channel="paper"),
+        )
+        if fresh:
+            return out
+        w.a.ids["matrix_tc_request"] = out
+    return w.a.ids["matrix_tc_request"]
+
+
+def _tc_request_log(w: Any, r: str, a: Engine) -> Request:
+    body = {
+        "student_id": str(_cert_student(w)),
+        "received_on": _cert().today().isoformat(),
+        "channel": "phone",
+    }
+    return "/api/v1/tc-requests", body, {}
+
+
+def _tc_request_move(w: Any, r: str, a: Engine) -> Request:
+    out = _tc_request(w, fresh=True)
+    return (
+        f"/api/v1/tc-requests/{out.id}/status",
+        {"status": "in_preparation"},
+        {"If-Match": f'W/"{out.version}"'},
+    )
+
+
 # --- R2-1A: verification codes (ADR-0045; FR-CERT-023): add needs a certificate without one ---
 
 _VERIFY_REASON = {"reason": "Synthetic matrix verification reason"}
@@ -1932,6 +1973,15 @@ SPECS: dict[tuple[str, str], Builder] = {
         None,
         {},
     ),
+    # FO-09: the TC request log.
+    ("GET", "/api/v1/tc-requests"): lambda w, r, a: ("/api/v1/tc-requests", None, {}),
+    ("POST", "/api/v1/tc-requests"): _tc_request_log,
+    ("GET", "/api/v1/tc-requests/{tc_request_id}"): lambda w, r, a: (
+        f"/api/v1/tc-requests/{_tc_request(w).id}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/tc-requests/{tc_request_id}/status"): _tc_request_move,
     ("GET", "/api/v1/certificates/{certificate_id}/verification"): _cert_path("/verification"),
     ("POST", "/api/v1/certificates/{certificate_id}/verification"): _cert_without_code,
     ("POST", "/api/v1/certificates/{certificate_id}/verification/withdraw"): (_cert_withdraw_code),
@@ -2173,6 +2223,23 @@ SPECS: dict[tuple[str, str], Builder] = {
     ),
     ("GET", "/api/v1/insights/flags"): lambda w, r, a: ("/api/v1/insights/flags", None, {}),
     ("GET", "/api/v1/insights/summary"): lambda w, r, a: ("/api/v1/insights/summary", None, {}),
+    # FT-13 / FT-14 (D86): counts for management; completeness per section.
+    ("GET", "/api/v1/insights/counts"): lambda w, r, a: ("/api/v1/insights/counts", None, {}),
+    ("GET", "/api/v1/completeness/attendance"): lambda w, r, a: (
+        "/api/v1/completeness/attendance",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/completeness/exams/{exam_id}"): lambda w, r, a: (
+        f"/api/v1/completeness/exams/{IN.world_exam(w)}",
+        None,
+        {},
+    ),
+    ("POST", "/api/v1/completeness/reminders"): lambda w, r, a: (
+        "/api/v1/completeness/reminders",
+        {"section_id": str(w.a.ids["section_9a"]), "kind": "attendance"},
+        {},
+    ),
     ("GET", "/api/v1/insights/flags/{flag_id}"): lambda w, r, a: (
         f"/api/v1/insights/flags/{_m5_shared_flag(w)}",
         None,
@@ -2769,8 +2836,41 @@ SPECS.update(
             None,
             {},
         ),
+        # FP-02 follow-up (FR-MSG-059..063): a closure of school A that started today.
+        ("POST", "/api/v1/messaging/closures/{closure_id}/reopening/preview"): lambda w, r, a: (
+            f"/api/v1/messaging/closures/{_closure_row(w, a)}/reopening/preview",
+            {"reopens_on": _closure_day()},
+            {},
+        ),
+        # A digest that is not the preview's: the guard passed, the service says 409.
+        ("POST", "/api/v1/messaging/closures/{closure_id}/reopening"): lambda w, r, a: (
+            f"/api/v1/messaging/closures/{_closure_row(w, a)}/reopening",
+            {"reopens_on": _closure_day(), "preview_token": "ro_" + "0" * 40},
+            {"Idempotency-Key": str(uuid.uuid4())},
+        ),
     }
 )
+
+
+def _closure_row(w: Any, a: Engine) -> uuid.UUID:
+    """A synthetic closure of school A (today only), inserted once (FP-02 follow-up)."""
+    if "closure" not in _SENDS:
+        closure = uuid.uuid4()
+        with a.begin() as c:
+            c.execute(
+                text(
+                    "INSERT INTO msg.closures (id, tenant_id, whole_school, closed_from, "
+                    "closed_to, reason_code, sent_by) VALUES (:i, :t, true, :d, :d, 'weather', :u)"
+                ),
+                {
+                    "i": closure,
+                    "t": w.a.tenant_id,
+                    "d": dt.datetime.now(dt.UTC).date(),
+                    "u": w.a.people["owner"].user_id,
+                },
+            )
+        _SENDS["closure"] = closure
+    return _SENDS["closure"]
 
 
 # --- R2-3J: manual fee reminders, a receipt on WhatsApp, notice withdrawal ---------------------
@@ -2907,6 +3007,23 @@ def _addons() -> ModuleType:
 SPECS.update(_addons().matrix_specs())
 
 
+def _family() -> ModuleType:
+    """tests/fees/family_security_support.py (FM-07 family counter, FM-10 fee structure)."""
+    name = "sos_test_fees_family_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "fees" / "family_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_family().matrix_specs())
+
+
 def _disclosure() -> ModuleType:
     """tests/disclosure/security_support.py (R3-1C: CBSE on per call, snapshots of a school)."""
     name = "sos_test_disclosure_security_support"
@@ -3033,6 +3150,40 @@ def _udise() -> ModuleType:
 SPECS.update(_udise().matrix_specs())
 
 
+def _fix_letters() -> ModuleType:
+    """tests/dq/fix_letter_security_support.py (FA-08 fix-owner letters)."""
+    name = "sos_test_dq_fix_letter_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "dq" / "fix_letter_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_fix_letters().matrix_specs())
+
+
+def _gaps() -> ModuleType:
+    """tests/knowledge/gaps_security_support.py (FA-06 knowledge gaps)."""
+    name = "sos_test_knowledge_gaps_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "knowledge" / "gaps_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_gaps().matrix_specs())
+
+
 def _udise_match(w: Any, r: str, a: Engine) -> Request:
     """FO-04 (FR-UDI-014): skip the unmatched row of a fresh UDISE+ list of school A."""
     data = IM.xlsx_bytes(
@@ -3120,6 +3271,40 @@ def _compliance() -> ModuleType:
 SPECS.update(_compliance().matrix_specs())
 
 
+def _export_packs() -> ModuleType:
+    """tests/exports/pack_security_support.py (FO-06 enrolment statistics, FO-11 scheme packs)."""
+    name = "sos_test_exports_pack_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "exports" / "pack_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_export_packs().matrix_specs())
+
+
+def _safety() -> ModuleType:
+    """tests/compliance/safety_support.py (FC-09 checks, FC-10 policies of school A)."""
+    name = "sos_test_compliance_safety_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "compliance" / "safety_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_safety().matrix_specs())
+
+
 def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one answer per route family
     creates = {
         "/api/v1/users",
@@ -3138,6 +3323,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         "/api/v1/knowledge/verified-answers",
         "/api/v1/knowledge/memories",
         "/api/v1/students/{student_id}/certificates",
+        "/api/v1/tc-requests",  # FO-09
         "/api/v1/certificates/{certificate_id}/duplicates",
         "/api/v1/certificates/{certificate_id}/verification",
         "/api/v1/tasks",
@@ -3190,12 +3376,22 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         return 202
     if (method, path) in _udise().MATRIX_STATUS:
         return int(_udise().MATRIX_STATUS[(method, path)])  # FO-02: guard passed (no difference)
+    if (method, path) in _fix_letters().MATRIX_STATUS:
+        return int(_fix_letters().MATRIX_STATUS[(method, path)])  # FA-08: no board difference
+    if (method, path) in _gaps().MATRIX_STATUS:
+        return int(_gaps().MATRIX_STATUS[(method, path)])  # FA-06: guard passed, no such gap
+    if method == "POST" and path in _fix_letters().MATRIX_CREATES:
+        return 201
     if (method, path) in _disclosure().MATRIX_STATUS:
         return int(_disclosure().MATRIX_STATUS[(method, path)])
     if (method, path) in _consents().MATRIX_STATUS:
         return int(_consents().MATRIX_STATUS[(method, path)])
     if method == "POST" and path in (
-        _privacy().MATRIX_CREATES | _consents().MATRIX_CREATES | _compliance().MATRIX_CREATES
+        _privacy().MATRIX_CREATES
+        | _consents().MATRIX_CREATES
+        | _compliance().MATRIX_CREATES
+        | _export_packs().MATRIX_CREATES
+        | _safety().MATRIX_CREATES
     ):
         return 201
     if (method, path) in _privacy().MATRIX_STATUS:
@@ -3205,6 +3401,7 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         | _upi().MATRIX_CREATES
         | _tax().MATRIX_CREATES
         | _addons().MATRIX_CREATES
+        | _family().MATRIX_CREATES
     ):
         return 201
     if (method, path) in _fees().ONLINE_REFUSED:
@@ -3218,10 +3415,15 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         ("POST", "/api/v1/fees/receipts/{receipt_id}/whatsapp"),
     ):
         return 409  # guard passed; a stale digest / nobody to send to (R2-3J)
-    if (method, path) == ("POST", "/api/v1/messaging/closures"):
+    if (method, path) in (
+        ("POST", "/api/v1/messaging/closures"),
+        ("POST", "/api/v1/messaging/closures/{closure_id}/reopening"),
+    ):
         return 409  # guard passed; the digest is not the preview's (FP-02)
     if (method, path) == ("POST", "/api/v1/users/{user_id}/invitation-email"):
         return 409  # guard passed; the service refuses (email off in tests)
+    if (method, path) == ("POST", "/api/v1/completeness/reminders"):
+        return 409  # guard passed; reminders are off by default (FT-14, D86)
     if method == "POST" and path.startswith("/api/v1/me/invitations/"):
         return 404  # guard passed; not the caller's own open invitation (DL-09)
     if method == "DELETE" and path in (

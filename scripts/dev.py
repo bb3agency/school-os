@@ -513,9 +513,29 @@ def seed_only(argv: list[str]) -> int:
     return 0
 
 
+def demo_only(argv: list[str]) -> int:
+    """``make seed-demo`` / ``make demo-reset``: the demo school (FA-12, FR-DEMO-013) with the
+    same environment as ``make seed-synthetic``. The demo seeder refuses outside local/ci itself.
+    Its subjects depend on the generation (``synthetic|demo-g<n>-a|<role>|1``): see the summary
+    line and the dev sign-in page."""
+    env = preflight(check_ports=False)
+    if env is None:
+        return 2
+    if not start_backing(env) or not prepare(env, seed=False):
+        print(paint("  Setup failed: fix the above, then retry.", "1;31"))
+        return 2
+    command = [PY, "-m", "app.devtools.seed_demo", *seed_args(argv)]
+    if not step("demo school", command, env, API_DIR):
+        return 1
+    print(f"  Demo school ready. Sign in at {DEV_SIGN_IN_URL} (docs/guides/demo-school.md)")
+    return 0
+
+
 def main() -> int:
     if "--seed-only" in sys.argv:
         return seed_only(sys.argv)
+    if "--demo-only" in sys.argv:
+        return demo_only(sys.argv)
     raw = "--raw" in sys.argv
     seed = "--no-seed" not in sys.argv
     if isinstance(sys.stdout, io.TextIOWrapper):

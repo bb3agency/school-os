@@ -355,7 +355,19 @@ class UsageOut(_Out):
 
 
 ResolveKind = Literal[
-    "doc", "student", "finding", "change", "verified", "count", "fee", "conversation", "task"
+    "doc",
+    "student",
+    "finding",
+    "change",
+    "verified",
+    "count",
+    "fee",
+    "conversation",
+    "task",
+    "readiness",
+    "attendance",
+    "certificate",
+    "compliance",
 ]
 
 

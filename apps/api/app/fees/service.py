@@ -37,6 +37,8 @@ from app.fees import (
     approvals,
     arrears,
     ask,
+    bank_matching,
+    family,
     ledger,
     online,
     parent_pages,
@@ -46,11 +48,13 @@ from app.fees import (
     reports,
     setup,
     statements,
+    structure_notice,
     tally_feed,
     tax_certificates,
     upi,
 )
 from app.fees import addons_repository as addon_repo
+from app.fees import bank_matching_repository as bm_repo
 from app.fees import late_fees as late
 from app.fees import online_repository as orepo
 from app.fees import repository as repo
@@ -160,6 +164,14 @@ year_end_pack = period_reports.year_end_pack
 
 post_late_fees = late.post_for_school
 
+# FM-07 family counter (FR-FEE-101..112) and FM-10 fee structure notice (FR-FEE-113..125); D86
+family_counter = family.family_counter
+issue_family_payment = family.issue_family_payment
+family_slip = family.slip_page
+fee_structure_notice = structure_notice.structure_notice
+fee_structure_notice_print = structure_notice.notice_print
+fee_structure_changes = structure_notice.structure_changes
+
 # R2-2E UPI and bank statements (ADR-0042 decision 9; FR-FEE-014..017)
 get_upi_settings = upi.get_settings
 put_upi_settings = upi.put_settings
@@ -177,6 +189,12 @@ ignore_line = statements.ignore
 rematch = statements.rematch
 upi_exceptions = statements.exceptions
 erase_statement_narrations = statements.erase_old_narrations
+
+# FM-08 cheque status and the deposit list (FR-FEE-131..140; app.fees.api_bank_matching)
+list_cheques = bank_matching.list_cheques
+mark_cheques_deposited = bank_matching.mark_deposited
+mark_cheque_returned = bank_matching.mark_returned
+cheque_deposit_slip_page = bank_matching.deposit_slip_page
 
 
 # --- data contract for other modules (R2-2F Ask, R2-3G sending, R2-3H parent pages) -------------
@@ -500,6 +518,7 @@ def export_records(session: Session) -> list[RecordTable]:
         *upi_repo.export_tables(session),
         *trepo.export_tables(session),
         *addon_repo.export_tables(session),
+        *bm_repo.export_tables(session),
     ]
 
 
@@ -511,6 +530,8 @@ _PURGE = purging.PurgeTables(
     deleted=(
         # FM-06 (0083_fee_tax_cert): certificates reference students, members and documents
         "fin.tax_certificates",
+        # FM-08 (0103_bank_matching): cheque events reference receipts, lines, cancellations
+        "fin.cheque_status_events",
         # R2-2E (0060_fees_upi): confirmations and statement lines reference receipts
         "fin.upi_confirmations",
         "fin.bank_statement_lines",
