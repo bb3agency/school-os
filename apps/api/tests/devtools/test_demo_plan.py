@@ -146,3 +146,43 @@ def test_FR_DEMO_014_bad_arguments() -> None:
     out, err = io.StringIO(), io.StringIO()
     assert seed_demo.main(["--students", "0"], settings=ci, stdout=out, stderr=err) == 2
     assert "--students" in err.getvalue()
+
+
+def test_FR_DEMO_016_marks_are_deterministic_and_fictional() -> None:
+    key = "demo-tenant:DEMO-0001"
+    assert demo.demo_mark(key, 0, "English") == demo.demo_mark(key, 0, "English")
+    values = [
+        demo.demo_mark(f"demo-tenant:{n}", e, s)
+        for n in range(400)
+        for e in range(len(demo.EXAMS))
+        for s in demo.MARKS_SUBJECTS
+    ]
+    for m in values:
+        assert m.absent == (m.marks is None)
+        assert m.marks is None or 0 <= m.marks <= demo.MARKS_MAX
+    assert any(m.absent for m in values)
+    assert all("(demo)" in e.name for e in demo.EXAMS)
+
+
+def _percent(key: str, exam: int) -> float:
+    marks = [demo.demo_mark(key, exam, s) for s in demo.MARKS_SUBJECTS]
+    got = [float(m.marks) for m in marks if m.marks is not None]
+    return sum(got) / (len(got) * float(demo.MARKS_MAX))
+
+
+def test_FR_DEMO_017_some_students_fall_low_or_drop() -> None:
+    keys = [f"demo-tenant:{n}" for n in range(400)]
+    low = [k for k in keys if _percent(k, 1) < 0.35]
+    drop = [k for k in keys if _percent(k, 0) - _percent(k, 1) >= 0.15]
+    assert 5 <= len(low) <= 60
+    assert 5 <= len(drop) <= 80
+    assert len(low) + len(drop) < len(keys) // 2
+
+
+def test_FR_DEMO_018_019_tc_requests_and_siblings() -> None:
+    days = [r.days_ago for r in demo.TC_REQUESTS]
+    assert sum(1 for d in days if d > 7) == 2  # overdue after 7 days (D86)
+    assert 0 in days
+    first, second = demo.SIBLING_ACCOUNTS
+    assert first != second
+    assert first >= (demo.ARREARS_ACCOUNTS.stop or 0)  # not an earlier-year dues account

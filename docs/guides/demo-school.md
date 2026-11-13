@@ -2,8 +2,8 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1 · 2026-11-12 (FA-12, feature wave F3) |
-| Requirements | FR-DEMO-001..015 ([docs/03 §3.38](../03-TRD.md)) |
+| Version | 0.2 · 2026-11-13 (FA-12, feature waves F3 and F4) |
+| Requirements | FR-DEMO-001..020 ([docs/03 §3.38](../03-TRD.md)) |
 | Audience | The SchoolOS owner (selling), association partners who present SchoolOS |
 | Data | **Synthetic only** (CLAUDE.md invariant 11). The demo school "Sunrise Synthetic Demo School" and every person in it are made up by the generator. Never show, type or import a real school's data in a demo. |
 
@@ -32,7 +32,7 @@ Both commands refuse to run unless `SOS_ENV` is `local` or `ci`, exactly like
 Sign in at `http://localhost:3000/dev/sign-in` and type a subject of the form
 `synthetic|<code>|<role>|1`, for example `synthetic|demo-g1-a|principal|1` or
 `synthetic|demo-g1-a|office_admin|1`. Roles you will use: `owner`, `principal`, `office_admin`,
-`accountant`, `class_teacher`.
+`accountant`, `exam_coordinator`, `class_teacher`.
 
 ### What the demo school contains
 
@@ -50,10 +50,15 @@ Sign in at `http://localhost:3000/dev/sign-in` and type a subject of the form
 | School calendar | Sundays and second Saturdays off, Dasara and Sankranti holidays, Republic Day, one extra working day (demo dates, not an official calendar) | Settings → Structure → Calendar |
 | CBSE disclosure | A draft with a few fictional values; nothing published | Settings → Disclosure |
 | Weekly brief | Last week's management brief | Brief (owner, principal) |
+| Exams and marks | Two exams of 2026-27, "Unit test 1 (demo)" and "Quarterly exam (demo)", with made-up marks out of 100 in five subjects for classes VI to X. The quarterly exam is unfinished on purpose: the last two sections have no marks and the two before them miss Social studies | Marks, Records completeness (principal, exam coordinator) |
+| Year-end results | Proposed from those marks; nothing is confirmed, so the principal can confirm a few live | Year-end (principal) |
+| Early-warning flags | A few students below the pass mark or falling 15 points or more between the two exams, raised once by the rules | Flags (principal, class teacher) |
+| TC requests | Four requests from Class X: two overdue (received 12 and 9 days ago, one already in preparation), one from 3 days ago, one from today; no TC prepared yet | Certificates → TC requests |
+| One family | Two Class X students share a guardian, so the counter shows them as siblings with fees due | Fees → counter → Family |
 | WhatsApp | Only when messaging is switched on locally (`SOS_MESSAGING_ENABLED`): settings with every switch off and no WhatsApp connection, so nothing is ever sent | Settings → WhatsApp |
 
-Not in the demo school yet: exam marks and the year-end results (FT-08), so the year-end
-progression pages are empty (follow-up).
+Not in the demo school: daily attendance (the attendance side of Records completeness and the
+attendance flags stay empty) and confirmed year-end results (confirm them live).
 
 ## 2. The 10-minute walkthrough
 
