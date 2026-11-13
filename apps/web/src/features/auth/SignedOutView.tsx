@@ -6,6 +6,7 @@ import { cardClasses } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
+import { ClearDeviceDrafts } from "./ClearDeviceDrafts";
 
 export const SIGN_IN_ERRORS = [
   "signin_expired",
@@ -59,6 +60,8 @@ export function SignedOutView({
             {t(`errors.${error}`)}
           </Alert>
         ) : null}
+        {/* FT-11 (FR-ATT-032): also after an idle timeout or a sign-out in another tab. */}
+        <ClearDeviceDrafts />
         {idle ? <Alert tone="info">{t("signedOut.idle")}</Alert> : null}
         <p className="text-ink-muted">
           {support ? t("signedOut.supportBody") : t("signedOut.body")}

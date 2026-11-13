@@ -56,6 +56,20 @@ export type AttendanceMonth = S["AttendanceMonthOut"];
 export type AttendanceStatus = S["AttendanceEntryIn"]["status"];
 export type AttendanceEntry = S["AttendanceEntryIn"];
 export type AttendanceSheet = S["AttendanceSheetOut"];
+
+/** FT-11 (FR-ATT-026): hours an unsent day may stay on the device when the API does not say. */
+export const DEFAULT_DRAFT_KEEP_HOURS = 24;
+
+/**
+ * `draft_keep_hours` of the day (app/academics/config.yaml). Read defensively until the
+ * generated client carries the field (lead: regenerate, then use `day.draft_keep_hours`).
+ */
+export function draftKeepHours(day: AttendanceDay): number {
+  const value = (day as { draft_keep_hours?: unknown }).draft_keep_hours;
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 72
+    ? value
+    : DEFAULT_DRAFT_KEEP_HOURS;
+}
 export type Exam = S["ExamOut"];
 export type MarksGrid = S["MarksGridOut"];
 export type MarkIn = S["MarkIn-Input"];

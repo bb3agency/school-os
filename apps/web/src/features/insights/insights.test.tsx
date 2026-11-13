@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { uploadDocument } from "@/features/imports/upload";
 import { notificationHref } from "@/features/notifications/data";
 import { ApiError } from "@/lib/bff/query";
+import { clearDeviceDrafts } from "@/lib/device-drafts";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { expectOneCall, fireTwice } from "@/test/double-submit";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
@@ -277,6 +278,8 @@ afterEach(() => {
   uninstallBffStub();
   // An unsaved attendance day holds the page's unsaved-changes guard (XA-05).
   resetUnsavedGuardForTesting();
+  // FT-11: an unsent day kept on the device must not leak into the next test.
+  clearDeviceDrafts();
   expect(intlErrors).toEqual([]);
 });
 
