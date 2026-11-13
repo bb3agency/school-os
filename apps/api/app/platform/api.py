@@ -40,6 +40,7 @@ from app.platform import (
     invoice_files,
     offboarding,
     operators,
+    payment_links,
     provisioning,
     support,
     tenants,
@@ -78,6 +79,8 @@ from app.platform.schemas import (
     InvoiceCreate,
     InvoiceOut,
     InvoicePatch,
+    InvoicePaymentLinkOut,
+    InvoicePaymentLinksOut,
     InvoicePdfDownloadOut,
     InvoiceRunIn,
     JobOut,
@@ -1002,6 +1005,72 @@ def reverse_payment(
     deleted. ``409 invalid_state`` if it is already reversed. The invoice is re-settled, so a
     ``paid`` invoice goes back to ``issued``; read the invoice again for its new status."""
     return billing.reverse_payment(_actor(ctx), payment_id, data.reason)
+
+
+# --- FA-13 online payment links of SchoolOS invoices (FR-PAY-017..024) ---------------------------
+
+
+@router.get("/invoices/{invoice_id}/payment-links", response_model=InvoicePaymentLinksOut)
+def list_invoice_payment_links(
+    *, invoice_id: uuid.UUID, ctx: Annotated[Ctx, InvRead]
+) -> InvoicePaymentLinksOut:
+    """The invoice's Razorpay payment links, newest first, and whether online payment is set up
+    (``enabled``). 404 for an unknown invoice."""
+    return payment_links.list_links(invoice_id)
+
+
+@router.post(
+    "/invoices/{invoice_id}/payment-links", response_model=InvoicePaymentLinkOut, status_code=201
+)
+def create_invoice_payment_link(
+    *,
+    invoice_id: uuid.UUID,
+    request: Request,
+    response: Response,
+    ctx: Annotated[Ctx, InvManage],
+    store: Store,
+    idempotency_key: IdemKey = None,
+) -> Any:
+    """A Razorpay payment link for the balance due of an issued invoice (SchoolOS is the
+    merchant). 409 ``online_payments_off``, ``invalid_state``, ``link_exists`` or
+    ``invoice_changed``; 502 ``payment_link_failed``; 503 when Razorpay does not answer. Audited
+    as ``payment_link.created``."""
+
+    def run() -> tuple[uuid.UUID, BaseModel]:
+        out = payment_links.create_link(_actor(ctx), invoice_id)
+        return out.id, out
+
+    return _idempotent(
+        ctx=ctx,
+        request=request,
+        response=response,
+        store=store,
+        key=idempotency_key,
+        body=None,
+        run=run,
+        replay=payment_links.get_link,
+        resource_type="invoice_payment_link",
+        location=lambda _l: f"/api/v1/platform/invoices/{invoice_id}",
+    )
+
+
+@router.post("/payment-links/{link_id}/cancel", response_model=InvoicePaymentLinkOut)
+def cancel_invoice_payment_link(
+    *, link_id: uuid.UUID, ctx: Annotated[Ctx, InvManage]
+) -> InvoicePaymentLinkOut:
+    """Cancel an active link at Razorpay and here. 409 ``invalid_state`` when it is not active,
+    ``link_paid`` when Razorpay reports it paid (the payment is then applied). Audited as
+    ``payment_link.cancelled``."""
+    return payment_links.cancel_link(_actor(ctx), link_id)
+
+
+@router.post("/payment-links/{link_id}/check", response_model=InvoicePaymentLinkOut)
+def check_invoice_payment_link(
+    *, link_id: uuid.UUID, ctx: Annotated[Ctx, InvManage]
+) -> InvoicePaymentLinkOut:
+    """Ask Razorpay about an active link now and apply a captured payment the webhook missed
+    (same checks as the webhook; audited as ``payment.online_received``)."""
+    return payment_links.check_link(_actor(ctx), link_id)
 
 
 @router.post("/invoice-runs", response_model=JobOut, status_code=202)

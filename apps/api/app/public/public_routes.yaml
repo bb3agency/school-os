@@ -41,6 +41,11 @@ routes:
     guard: webhook_signature
     provider: razorpay
   # --- end R2-2D ------------------------------------------------------------------------------
+  # --- FA-13 SchoolOS invoice payments: Razorpay events of SchoolOS's own account (shared tier)
+  POST /api/v1/webhooks/schoolos-billing:
+    guard: webhook_signature
+    provider: razorpay_schoolos
+  # --- end FA-13 ------------------------------------------------------------------------------
   # --- R2-3H parent pages: the other /api/v1/public/links/current/* routes ------------------
   GET /api/v1/public/links/current/document:
     guard: public_handle
