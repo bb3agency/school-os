@@ -243,7 +243,7 @@ Rules:
 
 ### 3.6 Schema `platform`
 
-Control-plane tables (operators, plans, subscriptions, billing accounts, invoices, payments, deployments, usage, usage threshold events, feature flags, announcements, support tickets, break-glass requests, platform audit, platform jobs) live in schema `platform`. It holds no student data, so it has **no RLS**; isolation is by grants: only `sos_platform` has DML; `sos_app` has only SELECT on `platform.feature_flags`; `sos_readonly` has nothing; `sos_definer` has SELECT on the four tables `core.current_subscription()` reads. Full DDL: [16 §7](16-platform-admin-panel.md#7-data-model-schema-platform).
+Control-plane tables (operators, plans, subscriptions, billing accounts, invoices, payments, invoice payment links (FA-13, `0106_invoice_payment_links`: Razorpay links of SchoolOS's own invoices, one active per invoice; `platform.payments` gains provider `razorpay`, method `online` and a NULL `recorded_by` for provider payments), deployments, usage, usage threshold events, feature flags, announcements, support tickets, break-glass requests, platform audit, platform jobs) live in schema `platform`. It holds no student data, so it has **no RLS**; isolation is by grants: only `sos_platform` has DML; `sos_app` has only SELECT on `platform.feature_flags`; `sos_readonly` has nothing; `sos_definer` has SELECT on the four tables `core.current_subscription()` reads. Full DDL: [16 §7](16-platform-admin-panel.md#7-data-model-schema-platform).
 
 ## 4. Core schema (tenancy, identity, authorization)
 
