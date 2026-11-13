@@ -1,16 +1,10 @@
-import type { ApiClient } from "@schoolos/api-client";
-import * as z from "@/lib/zod";
+import type { ApiClient, components } from "@schoolos/api-client";
 import { unwrap } from "@/lib/bff/query";
 
 /**
  * Board candidate choices: medium, languages, subjects and the photo and signature tick
  * (FO-10, FR-STU-026..029). The office enters them per section; DQ-032 lists what is missing.
  * SchoolOS never holds the photograph or signature itself, only whether they were collected.
- *
- * The routes are not in the generated client yet (the lead regenerates apps/api/openapi.json
- * after the wave): the calls go through `loose()` and every answer is checked with the zod
- * schemas below. After regeneration, swap `loose(api)` for `api` and the zod types for
- * `components["schemas"]["BoardCandidateGridOut" | "BoardStudentCandidateOut" | ...]`.
  */
 
 export const CANDIDATE_EDIT = "student.update_nonidentity";
@@ -22,35 +16,9 @@ export const CANDIDATE_KEYS = {
   student: (studentId: string) => ["staff", "board-candidates", "student", studentId] as const,
 };
 
-const code = z.object({ code: z.string(), label: z.string() });
+type S = components["schemas"];
 
-export const schemeSchema = z.object({
-  key: z.string(),
-  version: z.number(),
-  label_en: z.string(),
-  board: z.string(),
-  classes: z.array(z.string()),
-  verified: z.boolean(),
-  source: z.array(z.string()),
-  source_note: z.string(),
-  medium_required: z.boolean(),
-  medium_options: z.array(z.string()),
-  languages: z.array(z.object({ slot: z.string(), required: z.boolean(), options: z.array(code) })),
-  subjects: z.array(
-    z.object({
-      key: z.string(),
-      label_en: z.string(),
-      required: z.boolean(),
-      min: z.number(),
-      max: z.number(),
-      options: z.array(code),
-    }),
-  ),
-  max_subjects: z.number(),
-  photo_required: z.boolean(),
-  keys: z.array(z.string()),
-});
-export type BoardScheme = z.infer<typeof schemeSchema>;
+export type BoardScheme = S["BoardSchemeOut"];
 
 export const ISSUE_REASONS = [
   "missing",
@@ -59,54 +27,13 @@ export const ISSUE_REASONS = [
   "group_missing",
   "too_many",
   "photo",
-] as const;
-export type IssueReason = (typeof ISSUE_REASONS)[number];
-
-const issueSchema = z.object({
-  field: z.string(),
-  reason: z.enum(ISSUE_REASONS),
-  code: z.string().nullable().optional(),
-  group: z.string().nullable().optional(),
-});
-export type CandidateIssue = z.infer<typeof issueSchema>;
-
-const valuesSchema = z.record(z.string(), z.string().nullable());
-
-export const gridSchema = z.object({
-  section_id: z.string(),
-  class_section: z.string().nullable(),
-  class_code: z.string().nullable(),
-  scheme: schemeSchema.nullable(),
-  available_schemes: z.array(z.string()),
-  rows: z.array(
-    z.object({
-      student_id: z.string(),
-      admission_no: z.string().nullable(),
-      display_name: z.string().nullable(),
-      roll_no: z.string().nullable(),
-      values: valuesSchema,
-      issues: z.array(issueSchema),
-      ready: z.boolean(),
-    }),
-  ),
-  ready_count: z.number(),
-});
-export type CandidateGrid = z.infer<typeof gridSchema>;
+] as const satisfies readonly S["BoardCandidateIssueOut"]["reason"][];
+export type IssueReason = S["BoardCandidateIssueOut"]["reason"];
+export type CandidateIssue = S["BoardCandidateIssueOut"];
+export type CandidateGrid = S["BoardCandidateGridOut"];
 export type CandidateRow = CandidateGrid["rows"][number];
-
-export const studentCandidateSchema = z.object({
-  student_id: z.string(),
-  section_id: z.string().nullable(),
-  class_section: z.string().nullable(),
-  scheme: schemeSchema.nullable(),
-  values: valuesSchema,
-  issues: z.array(issueSchema),
-  ready: z.boolean(),
-});
-export type StudentCandidate = z.infer<typeof studentCandidateSchema>;
-
-const saveSchema = z.object({ recorded: z.number(), unchanged: z.number(), grid: gridSchema });
-export type CandidateSaved = z.infer<typeof saveSchema>;
+export type StudentCandidate = S["BoardStudentCandidateOut"];
+export type CandidateSaved = S["BoardCandidateSaveOut"];
 
 /** One student's changes; a field left out is not changed (values are never cleared). */
 export interface CandidateEntry {
@@ -119,32 +46,16 @@ export interface CandidateEntry {
   photo_signature_ready?: boolean;
 }
 
-type Init = {
-  params?: { path?: Record<string, string>; query?: Record<string, string> };
-  body?: unknown;
-};
-type Result = Promise<{ data?: unknown; error?: unknown; response: Response }>;
-interface LooseClient {
-  GET(path: string, init?: Init): Result;
-  PUT(path: string, init?: Init): Result;
-}
-
-/** The generated client without path typing, for the routes not generated yet (see above). */
-function loose(api: ApiClient): LooseClient {
-  return api as unknown as LooseClient;
-}
-
 export async function fetchSectionGrid(
   api: ApiClient,
   sectionId: string,
   scheme: string,
 ): Promise<CandidateGrid> {
-  const data = await unwrap(
-    loose(api).GET("/api/v1/sections/{section_id}/board-candidates", {
+  return unwrap(
+    api.GET("/api/v1/sections/{section_id}/board-candidates", {
       params: { path: { section_id: sectionId }, ...(scheme ? { query: { scheme } } : {}) },
     }),
   );
-  return gridSchema.parse(data);
 }
 
 export async function saveSectionGrid(
@@ -152,25 +63,23 @@ export async function saveSectionGrid(
   sectionId: string,
   input: { scheme: string; source: "manual_entry" | "parent_form"; rows: CandidateEntry[] },
 ): Promise<CandidateSaved> {
-  const data = await unwrap(
-    loose(api).PUT("/api/v1/sections/{section_id}/board-candidates", {
+  return unwrap(
+    api.PUT("/api/v1/sections/{section_id}/board-candidates", {
       params: { path: { section_id: sectionId } },
       body: input,
     }),
   );
-  return saveSchema.parse(data);
 }
 
 export async function fetchStudentCandidate(
   api: ApiClient,
   studentId: string,
 ): Promise<StudentCandidate> {
-  const data = await unwrap(
-    loose(api).GET("/api/v1/students/{student_id}/board-candidate", {
+  return unwrap(
+    api.GET("/api/v1/students/{student_id}/board-candidate", {
       params: { path: { student_id: studentId } },
     }),
   );
-  return studentCandidateSchema.parse(data);
 }
 
 // --- drafts ---------------------------------------------------------------------------------

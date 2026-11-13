@@ -711,6 +711,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/board-candidates/schemes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Board Schemes
+         * @description The board candidate schemes (medium, languages, subjects per board; ``verified: false``
+         *     until a school confirmed them) (permission ``student.read_basic``).
+         */
+        get: operations["list_board_schemes_api_v1_board_candidates_schemes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/breakglass/grants/{grant_id}/revoke": {
         parameters: {
             query?: never;
@@ -11500,6 +11521,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sections/{section_id}/board-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Section Board Candidates
+         * @description The section's students with their medium, languages, subjects and photo tick, and what
+         *     is still missing for the board (permission ``student.read_basic``; 404 outside scope).
+         */
+        get: operations["section_board_candidates_api_v1_sections__section_id__board_candidates_get"];
+        /**
+         * Save Section Board Candidates
+         * @description Record the choices of many students of one section (permission
+         *     ``student.update_nonidentity`` with its scope on each student). Fields left out are not
+         *     changed; codes outside the scheme are refused (422 ``not_in_scheme``).
+         */
+        put: operations["save_section_board_candidates_api_v1_sections__section_id__board_candidates_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sections/{section_id}/exams/{exam_id}/marks": {
         parameters: {
             query?: never;
@@ -11852,6 +11900,27 @@ export interface paths {
          *     to 500 characters, stored encrypted and never sent to AI. Accepts ``Idempotency-Key``.
          */
         post: operations["add_note_api_v1_students__student_id__behaviour_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/board-candidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Student Board Candidate
+         * @description One student's board candidate choices and what is missing (permission
+         *     ``student.read_basic``; 404 outside scope).
+         */
+        get: operations["student_board_candidate_api_v1_students__student_id__board_candidate_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -15302,6 +15371,119 @@ export interface components {
             rule_id?: string | null;
         };
         /**
+         * BoardCandidateEntryIn
+         * @description One student's choices; a field left out (null) is not changed. Values cannot be cleared:
+         *     a correction is a new value (history kept, FR-STU-003).
+         */
+        BoardCandidateEntryIn: {
+            /** Board Subjects */
+            board_subjects?: string[] | null;
+            /** Exam Medium */
+            exam_medium?: string | null;
+            /** First Language */
+            first_language?: string | null;
+            /** Photo Signature Ready */
+            photo_signature_ready?: boolean | null;
+            /** Second Language */
+            second_language?: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Third Language */
+            third_language?: string | null;
+        };
+        /** BoardCandidateGridOut */
+        BoardCandidateGridOut: {
+            /** Available Schemes */
+            available_schemes: string[];
+            /** Class Code */
+            class_code: string | null;
+            /** Class Section */
+            class_section: string | null;
+            /** Ready Count */
+            ready_count: number;
+            /** Rows */
+            rows: components["schemas"]["BoardCandidateRowOut"][];
+            scheme: components["schemas"]["BoardSchemeOut"] | null;
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+        };
+        /** BoardCandidateIssueOut */
+        BoardCandidateIssueOut: {
+            /** Code */
+            code?: string | null;
+            /** Field */
+            field: string;
+            /** Group */
+            group?: string | null;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "missing" | "not_in_list" | "repeated" | "group_missing" | "too_many" | "photo";
+        };
+        /** BoardCandidateRowOut */
+        BoardCandidateRowOut: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Display Name */
+            display_name: string | null;
+            /** Issues */
+            issues: components["schemas"]["BoardCandidateIssueOut"][];
+            /** Ready */
+            ready: boolean;
+            /** Roll No */
+            roll_no: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Values */
+            values: {
+                [key: string]: string | null;
+            };
+        };
+        /** BoardCandidateSaveIn */
+        BoardCandidateSaveIn: {
+            /** Rows */
+            rows: components["schemas"]["BoardCandidateEntryIn"][];
+            /** Scheme */
+            scheme: string;
+            /**
+             * Source
+             * @default manual_entry
+             * @enum {string}
+             */
+            source: "manual_entry" | "parent_form" | "board_registration";
+        };
+        /** BoardCandidateSaveOut */
+        BoardCandidateSaveOut: {
+            grid: components["schemas"]["BoardCandidateGridOut"];
+            /**
+             * Recorded
+             * @description Values recorded (a new or changed value).
+             */
+            recorded: number;
+            /**
+             * Unchanged
+             * @description Values that were already recorded as sent.
+             */
+            unchanged: number;
+        };
+        /** BoardCodeOut */
+        BoardCodeOut: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+        };
+        /**
          * BoardFieldOut
          * @description A column of the board's own form; ``attribute`` null when SchoolOS does not hold it.
          */
@@ -15312,6 +15494,93 @@ export interface components {
             name: string;
             /** Note */
             note: string;
+            /** Required */
+            required: boolean;
+        };
+        /** BoardLanguageSlotOut */
+        BoardLanguageSlotOut: {
+            /** Options */
+            options: components["schemas"]["BoardCodeOut"][];
+            /** Required */
+            required: boolean;
+            /** Slot */
+            slot: string;
+        };
+        /**
+         * BoardSchemeOut
+         * @description One board scheme of ``board_catalogue.yaml`` (``verified: false`` until confirmed).
+         */
+        BoardSchemeOut: {
+            /** Board */
+            board: string;
+            /** Classes */
+            classes: string[];
+            /** Key */
+            key: string;
+            /**
+             * Keys
+             * @description Attribute keys this scheme asks for (grid columns).
+             */
+            keys: string[];
+            /** Label En */
+            label_en: string;
+            /** Languages */
+            languages: components["schemas"]["BoardLanguageSlotOut"][];
+            /** Max Subjects */
+            max_subjects: number;
+            /** Medium Options */
+            medium_options: string[];
+            /** Medium Required */
+            medium_required: boolean;
+            /** Photo Required */
+            photo_required: boolean;
+            /** Source */
+            source: string[];
+            /** Source Note */
+            source_note: string;
+            /** Subjects */
+            subjects: components["schemas"]["BoardSubjectGroupOut"][];
+            /** Verified */
+            verified: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
+         * BoardStudentCandidateOut
+         * @description One student's board candidate choices (student profile).
+         */
+        BoardStudentCandidateOut: {
+            /** Class Section */
+            class_section: string | null;
+            /** Issues */
+            issues: components["schemas"]["BoardCandidateIssueOut"][];
+            /** Ready */
+            ready: boolean;
+            scheme: components["schemas"]["BoardSchemeOut"] | null;
+            /** Section Id */
+            section_id: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Values */
+            values: {
+                [key: string]: string | null;
+            };
+        };
+        /** BoardSubjectGroupOut */
+        BoardSubjectGroupOut: {
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /** Max */
+            max: number;
+            /** Min */
+            min: number;
+            /** Options */
+            options: components["schemas"]["BoardCodeOut"][];
             /** Required */
             required: boolean;
         };
@@ -36487,6 +36756,39 @@ export interface operations {
             };
         };
     };
+    list_board_schemes_api_v1_board_candidates_schemes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardSchemeOut"][];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     revoke_grant_api_v1_breakglass_grants__grant_id__revoke_post: {
         parameters: {
             query?: never;
@@ -41221,7 +41523,7 @@ export interface operations {
                 /** @description Page size (max 200). */
                 limit?: number;
                 profile_key?: string | null;
-                rule_id?: ("DQ-001" | "DQ-002" | "DQ-003" | "DQ-004" | "DQ-005" | "DQ-006" | "DQ-007" | "DQ-008" | "DQ-009" | "DQ-010" | "DQ-011" | "DQ-012" | "DQ-021" | "DQ-022" | "DQ-030" | "DQ-031")[] | null;
+                rule_id?: ("DQ-001" | "DQ-002" | "DQ-003" | "DQ-004" | "DQ-005" | "DQ-006" | "DQ-007" | "DQ-008" | "DQ-009" | "DQ-010" | "DQ-011" | "DQ-012" | "DQ-021" | "DQ-022" | "DQ-030" | "DQ-031" | "DQ-032")[] | null;
                 section_id?: string | null;
                 severity?: ("blocker" | "high" | "medium" | "low" | "info")[] | null;
                 status?: ("open" | "resolved" | "waived" | "reopened" | "needs_confirmation")[] | null;
@@ -61826,6 +62128,100 @@ export interface operations {
             };
         };
     };
+    section_board_candidates_api_v1_sections__section_id__board_candidates_get: {
+        parameters: {
+            query?: {
+                scheme?: string | null;
+            };
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardCandidateGridOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    save_section_board_candidates_api_v1_sections__section_id__board_candidates_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoardCandidateSaveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardCandidateSaveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     section_marks_api_v1_sections__section_id__exams__exam_id__marks_get: {
         parameters: {
             query?: never;
@@ -62762,6 +63158,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    student_board_candidate_api_v1_students__student_id__board_candidate_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardStudentCandidateOut"];
                 };
             };
             /** @description Validation Error */

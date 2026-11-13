@@ -5,7 +5,7 @@ import { installBffStub, page, uninstallBffStub, type BffStub } from "@/test/bff
 import { me } from "@/test/records-fixtures";
 import { messages, renderWithIntl } from "@/test/render";
 import { BoardCandidatesScreen } from "./BoardCandidatesScreen";
-import { draftOf, entryFor, fillBlanks, gridSchema, type BoardScheme } from "./data";
+import { draftOf, entryFor, fillBlanks, type BoardScheme, type CandidateGrid } from "./data";
 
 /** Board candidates (FO-10, FR-STU-026..029). Synthetic data only. */
 
@@ -75,7 +75,7 @@ const SCHEME: BoardScheme = {
   ],
 };
 
-const GRID = {
+const GRID: CandidateGrid = {
   section_id: SECTION,
   class_section: "X-A",
   class_code: "X",
@@ -135,7 +135,7 @@ afterEach(uninstallBffStub);
 
 describe("board candidate helpers", () => {
   it("parses the grid and sorts subject codes into their groups", () => {
-    const grid = gridSchema.parse(GRID);
+    const grid = GRID;
     const draft = draftOf(SCHEME, grid.rows[0]?.values ?? {});
     expect(draft.subjects).toEqual({ mathematics: "", science: "086" });
     expect(draft.first_language).toBe("184");
