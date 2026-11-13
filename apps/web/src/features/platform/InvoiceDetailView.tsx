@@ -24,6 +24,7 @@ import type { Loadable } from "@/lib/loadable";
 import { reason } from "@/lib/validation";
 import { PK, useCan, useSchoolDirectory } from "./data";
 import { InvoiceDownload } from "./InvoiceDownload";
+import { InvoicePaymentLinks } from "./InvoicePaymentLinks";
 import { InvoiceStatusPill } from "./InvoiceTable";
 import { Figure, MonoTime } from "./pills";
 import { ReasonField } from "./SubscriptionActions";
@@ -62,6 +63,7 @@ export function InvoicePayments({
 }) {
   const t = useTranslations("platform.invoices.payments");
   const tm = useTranslations("platform.invoices.methods");
+  const tl = useTranslations("invoicePayments");
   const inr = useMoney();
   const api = useBffClient("operator");
   const queryClient = useQueryClient();
@@ -146,7 +148,9 @@ export function InvoicePayments({
           <span>
             {(PAYMENT_METHODS as readonly string[]).includes(row.method)
               ? tm(row.method as PaymentMethod)
-              : row.method}
+              : row.method === "online"
+                ? tl("methodOnline")
+                : row.method}
           </span>
           <span className="font-mono text-xs [overflow-wrap:anywhere] text-ink-muted">
             <span className="sr-only">{t("colReference")}: </span>
@@ -160,7 +164,9 @@ export function InvoicePayments({
       header: t("colRecordedBy"),
       cell: (row) => (
         <span className="flex min-w-28 flex-col gap-0.5">
-          <Value>{row.recorded_by_name ?? null}</Value>
+          <Value>
+            {row.recorded_by_name ?? (row.provider === "manual" ? null : tl("byRazorpay"))}
+          </Value>
           <MonoTime value={row.recorded_at} />
         </span>
       ),
@@ -221,6 +227,7 @@ export function InvoicePayments({
 export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
   const t = useTranslations("platform.invoices");
   const tn = useTranslations("platform.nav");
+  const tl = useTranslations("invoicePayments");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
   const inr = useMoney();
@@ -298,6 +305,9 @@ export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
       </Card>
       <Card title={t("payments.title")}>
         <InvoicePayments invoice={data} payments={payments} />
+      </Card>
+      <Card title={tl("title")}>
+        <InvoicePaymentLinks invoice={data} />
       </Card>
     </div>
   );

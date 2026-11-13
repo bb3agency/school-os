@@ -2235,6 +2235,8 @@ const ROUTES: Array<[RegExp, Handler]> = [
     ([, id = ""]) => PLATFORM_INVOICES.find((row) => row.id === id) ?? PLATFORM_INVOICES[1],
   ],
   [re("/platform/invoices/{id}/payments"), ([, id = ""]) => invoicePayments(id)],
+  // FA-13: the invoice's Razorpay payment links (online payment off in the fixtures).
+  [re("/platform/invoices/{id}/payment-links"), () => ({ enabled: false, data: [] })],
 ];
 
 /** Searches sent as POST that only read (answered like the GET lists above). */

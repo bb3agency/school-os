@@ -13927,5 +13927,78 @@
         "body": "Ask the office to check the document, then try again later."
       }
     }
+  },
+  "invoicePayments": {
+    "title": "Online payment",
+    "intro": "A payment link opens SchoolOS's Razorpay page for the balance due. The school can pay from its Plan and billing page, or you can send the link to its billing contact. The invoice is marked paid once Razorpay confirms the payment.",
+    "off": "Online payment of invoices is not set up yet. Record payments by hand above.",
+    "create": "Create payment link",
+    "createTitle": "Create a payment link?",
+    "createBody": "Razorpay makes a link for {amount}, the balance due. It stays payable for 30 days.",
+    "createConsequence": "The school's Plan and billing page shows \"Pay online\" for this invoice.",
+    "rowLabel": "Payment link for {amount}",
+    "copy": "Copy link",
+    "copied": "Link copied.",
+    "copyFailed": "Could not copy. Select the link and copy it yourself.",
+    "check": "Check payment",
+    "cancel": "Cancel link",
+    "cancelTitle": "Cancel this payment link?",
+    "cancelBody": "Razorpay stops accepting payments on this link. You can create a new one later.",
+    "cancelConsequence": "The school no longer sees \"Pay online\" for this invoice.",
+    "colCreated": "Created",
+    "colAmount": "Amount",
+    "colStatus": "Status",
+    "colLink": "Link",
+    "colActions": "Actions",
+    "expires": "Payable until {date}",
+    "linkClosed": "No longer payable",
+    "status": {
+      "active": "Waiting for payment",
+      "paid": "Paid",
+      "cancelled": "Cancelled",
+      "expired": "Expired",
+      "needs_review": "Needs review"
+    },
+    "review": {
+      "invoice_not_open": "Paid after the invoice was settled or voided. Refund it in Razorpay's dashboard.",
+      "amount_exceeds_balance": "Paid after another payment lowered the balance. Refund the difference in Razorpay's dashboard and record the rest by hand.",
+      "amount_mismatch": "Razorpay reports a different amount. Check the payment in Razorpay's dashboard."
+    },
+    "emptyTitle": "No payment links yet",
+    "emptyBody": "Payment links made for this invoice appear here, newest first.",
+    "methodOnline": "Online (Razorpay)",
+    "byRazorpay": "Razorpay (automatic)",
+    "errors": {
+      "online_payments_off": {
+        "title": "Online payment is not set up",
+        "body": "Record the payment by hand instead, or ask an engineer to set up SchoolOS's Razorpay account."
+      },
+      "link_exists": {
+        "title": "A link already exists",
+        "body": "This invoice already has a payment link waiting for payment. The list has been reloaded."
+      },
+      "invalid_state": {
+        "title": "Not possible for this invoice or link",
+        "body": "The invoice is not open for payment, or the link is no longer active. The list has been reloaded."
+      },
+      "invoice_changed": {
+        "title": "The invoice changed",
+        "body": "A payment was recorded while the link was being made. Check the balance and try again."
+      },
+      "payment_link_failed": {
+        "title": "Razorpay did not accept the request",
+        "body": "Try again in a few minutes. If it keeps failing, ask an engineer to check SchoolOS's Razorpay account."
+      },
+      "link_paid": {
+        "title": "Already paid",
+        "body": "The link was paid before it could be cancelled. The payment has been applied to the invoice."
+      }
+    },
+    "school": {
+      "colPay": "Pay",
+      "payOnline": "Pay online",
+      "payOnlineLabel": "Pay online: invoice {number}",
+      "payNote": "\"Pay online\" opens SchoolOS's secure Razorpay page in a new tab for the amount still to pay. The invoice shows as paid here once Razorpay confirms the payment."
+    }
   }
 }
