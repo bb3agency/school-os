@@ -92,6 +92,11 @@ class AttendanceDayOut(_Out):
         "None when the year has no calendar. Attendance on a day that is not ``working`` is "
         "refused (422 ``holiday``).",
     )
+    draft_keep_hours: int = Field(
+        default=24,
+        description="Hours the screen may keep this day's unsent statuses on the device (student "
+        "ids and statuses only) before dropping them (FT-11, FR-ATT-026)",
+    )
 
 
 class AttendanceMonthStudent(_Out):

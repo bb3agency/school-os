@@ -20,6 +20,8 @@ class AttendanceRules(_Model):
     codes: dict[str, AttendanceStatus] = Field(min_length=4)
     max_entries: int = Field(ge=100, le=10000)
     max_sheet_dates: int = Field(ge=1, le=62)
+    # FT-11 (FR-ATT-026): how long the screen keeps an unsent day on the device.
+    draft_keep_hours: int = Field(default=24, ge=1, le=72)
 
 
 class MarksRules(_Model):
