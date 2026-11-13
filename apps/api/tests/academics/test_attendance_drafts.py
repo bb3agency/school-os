@@ -35,7 +35,7 @@ def ds(world: Any, admin_engine: Engine) -> Any:
 
 def _day(back: int) -> str:
     """A distinct past school day per test (no two tests touch the same day)."""
-    return S.school_days(1, end=S.school_days(back)[0])[0].isoformat()
+    return str(S.school_days(1, end=S.school_days(back)[0])[0].isoformat())
 
 
 def _path(s: Any) -> str:
