@@ -170,6 +170,12 @@ def enabled() -> llm.AnswerRouting:
         ("how  many GIRLS in class 9 B", "count_students"),
         ("What\u2019s due this week?", "list_due_tasks"),
         ("Any pending tasks for the office?", "list_due_tasks"),
+        # FR-KB-097: the D86 tools that answer a question alone.
+        ("How many Class 10 students are SSC-ready?", "get_readiness_summary"),
+        ("How many of my students are ready for UDISE+?", "get_readiness_summary"),
+        ("Which sections had attendance below 75% this week?", "get_attendance_summary"),
+        ("When does our fire NOC expire?", "list_compliance_status"),
+        ("Which of our certificates have expired?", "list_compliance_status"),
     ],
 )
 def test_FR_KB_049_single_tool_questions_go_to_the_light_role(question: str, tool: str) -> None:

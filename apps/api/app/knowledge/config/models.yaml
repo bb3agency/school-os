@@ -362,6 +362,14 @@ routing:
       "how many girls", "class strength", "strength of class"]
     list_due_tasks: ["what's due", "what is due", "due this week", "due today", "due tomorrow",
       "pending tasks", "deadlines this week"]
+    # D86 tools (FR-KB-097). get_certificates is left out on purpose: it needs find_students
+    # first (two tools), so it is never a single-tool question.
+    get_readiness_summary: ["ssc-ready", "ready for ssc", "ready for the ssc", "ready for udise",
+      "ready for apaar", "readiness count", "readiness summary"]
+    get_attendance_summary: ["attendance this week", "attendance last week", "attendance today",
+      "attendance yesterday", "attendance this month", "attendance below", "section attendance"]
+    list_compliance_status: ["fire noc", "compliance register", "compliance certificates",
+      "certificates have expired", "certificates expire", "certificates expiring"]
 
 limits:
   max_tool_rounds: 3                  # ADR-0008, §5 step 3
