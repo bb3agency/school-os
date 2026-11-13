@@ -50,8 +50,9 @@ describe("fix-owner letters (FA-08, FR-DQ-049..060)", () => {
       "key-1",
     );
     expect(client.POST).toHaveBeenCalledWith(
-      "/api/v1/dq/readiness/bseap-ssc-2027/fix-letters/parent_aadhaar/sent",
+      "/api/v1/dq/readiness/{profile_key}/fix-letters/{letter_key}/sent",
       {
+        params: { path: { profile_key: "bseap-ssc-2027", letter_key: "parent_aadhaar" } },
         body: { student_ids: ["s-1", "s-2"], occurred_on: "2026-11-12" },
         headers: { "Idempotency-Key": "key-1" },
       },
@@ -61,8 +62,8 @@ describe("fix-owner letters (FA-08, FR-DQ-049..060)", () => {
   it("checks the board letter before opening it (step-up, nothing audited)", async () => {
     const { client, api } = fakeClient();
     await fixLettersApi.checkBoardLetter(api, "bseap-ssc-2027", "deo");
-    expect(client.GET).toHaveBeenCalledWith("/api/v1/dq/readiness/bseap-ssc-2027/board-letter", {
-      params: { query: { recipient: "deo", check: true } },
+    expect(client.GET).toHaveBeenCalledWith("/api/v1/dq/readiness/{profile_key}/board-letter", {
+      params: { path: { profile_key: "bseap-ssc-2027" }, query: { recipient: "deo", check: true } },
       parseAs: "text",
     });
   });
