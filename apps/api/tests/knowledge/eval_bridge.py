@@ -79,6 +79,20 @@ and cancelled through its status moves). A question naming "task" makes the stan
 whole, so leakage and recall measure the application's scope rule (own tasks unless
 ``task.read_all`` school-wide), status and date filters, never Claude.
 
+School status questions (D86, ``sos_evals.status``; FA-04 / FC-11 tools): each case is its own
+BSEAP school seeded through the owning services: for readiness and attendance one class per
+item (``Status class <key>``, section A) with students (attendance: marked present today; a
+small section keeps its roll under the minimum), for certificates the asked student (the
+admission number in the question) and another one with certificates issued, cancelled, given to
+the other student or a TC request rejected, for the register the item's kind recorded valid,
+expired or left missing plus another school's line. The asker has the case's system role (a
+class teacher reaches the sections of the items ``in_reach``). The stand-in calls a D86 tool
+only for a status question (:func:`status_tool`) and cites every passage whole; the answer is
+read back into the case's phrases where the application's passage states the item's fact (a
+figure on its line, its serial number, its register state) or cites its record
+(:func:`status_result`), so leakage measures the application's permission, scope, small-cell
+and own-record rules, never Claude.
+
 English first (ADR-0036; ``sos_evals.english_first``): the adapter runs every pass with
 ``SOS_TELUGU_ENABLED`` ON (the dormant Telugu path keeps its gates), then the harness calls
 :meth:`AppFakeAdapter.set_telugu` with ``False`` (the runtime is rebuilt with the product
@@ -214,6 +228,33 @@ RECALL_OTHER_CHUNKS: Final = 500
 """Authorised-recall corpus (the CI size of ``test_retrieval_recall.py``; docs/06 §6)."""
 FEE_WORDS: Final = ("fee", "dues", "owe", "ఫీజు", "బకాయి", "బాకీ", "kattali")
 """Fee questions the stand-in recognises (only when the application offers get_fee_dues)."""
+READINESS: Final = "get_readiness_summary"
+ATTENDANCE: Final = "get_attendance_summary"
+CERTIFICATES: Final = "get_certificates"
+COMPLIANCE: Final = "list_compliance_status"
+_READY: Final = re.compile(r"\bready\b|\breadiness\b")
+_ATTENDANCE: Final = re.compile(r"\battendance\b")
+_ATTENDANCE_SPAN: Final = re.compile(r"\b(?:week|vaaram|today|month|section)\b")
+_CERTIFICATE: Final = re.compile(r"\b(?:tc|certificates?)\b")
+_COMPLIANCE: Final = re.compile(r"\b(?:noc|expire[sd]?|expiry)\b")
+STATUS_ADMISSION_NO: Final = re.compile(r"\b[A-Z]{2,4}-\d{4}(?:-\d{4})?\b")
+"""School status questions (D86 tools; only when the application offers the tool): readiness
+("ready"), attendance over a span ("attendance" with a week, month, day or section), one
+student's certificates (an admission number with "TC" or "certificate") and the compliance
+register ("NOC", "expire"). Narrow on purpose: document questions that only mention attendance
+or a certificate ("What attendance do students need ...?", "When was the fire safety certificate
+renewed?") still search documents."""
+STATUS_CLASS_CODES: Final = ("IX", "X", "VIII", "VII", "VI", "XI")
+"""Class codes of a status school (one class per readiness or attendance item; the APAAR
+readiness profile covers every class, the BSEAP SSC one IX and X)."""
+CERTIFICATE_KINDS: Final = (("tc", "transfer"), ("bonafide", "bonafide"), ("study", "study"))
+COMPLIANCE_KINDS: Final = (
+    ("fire noc", "fire_noc"),
+    ("building safety", "building_safety"),
+    ("recognition", "state_recognition"),
+    ("water", "water_safety"),
+)
+"""Words of a status item's phrase -> the certificate type or compliance kind it is seeded as."""
 _STUDENT_ID: Final = re.compile(r"Student ID: ([0-9a-f-]{36})\.")
 _STUDENT_URI: Final = re.compile(r"^sos://student/([0-9a-f-]{36})(.*)$")
 Step = tuple[str, dict[str, Any]] | list[dict[str, Any]]
@@ -274,6 +315,25 @@ def record_request(question: str) -> tuple[str, str] | None:
     for name, words in FIELD_WORDS:
         if any(w in folded for w in words):
             return number.group(0), name
+    return None
+
+
+def status_tool(question: str, tools: set[str]) -> str | None:
+    """The D86 tool a school status question needs, when the application offers it."""
+    folded = question.casefold()
+    if READINESS in tools and _READY.search(folded):
+        return READINESS
+    if ATTENDANCE in tools and _ATTENDANCE.search(folded) and _ATTENDANCE_SPAN.search(folded):
+        return ATTENDANCE
+    if (
+        CERTIFICATES in tools
+        and FIND in tools
+        and STATUS_ADMISSION_NO.search(question)
+        and _CERTIFICATE.search(folded)
+    ):
+        return CERTIFICATES
+    if COMPLIANCE in tools and _COMPLIANCE.search(folded):
+        return COMPLIANCE
     return None
 
 
@@ -443,6 +503,28 @@ class EvalFakeTransport:
             return DUE, {}
         return self._whole(messages, DUE, prefix)
 
+    def _status_step(
+        self, messages: Sequence[Mapping[str, Any]], question: str, tool: str, prefix: str
+    ) -> Step:
+        """One D86 tool with its defaults (``get_certificates``: the student found by the
+        admission number in the question, never by a name), then every passage it returned,
+        cited whole."""
+        called = set(self._calls(messages).values())
+        if tool == CERTIFICATES:
+            number = STATUS_ADMISSION_NO.search(question)
+            if number is None:
+                return []
+            if FIND not in called:
+                return FIND, {"query": number.group(0)}
+            student = student_id_for(number.group(0), self._results(messages, FIND))
+            if student is None:
+                return []
+            if CERTIFICATES not in called:
+                return CERTIFICATES, {"student_id": student}
+        elif tool not in called:
+            return tool, {}
+        return self._whole(messages, tool, prefix)
+
     def _whole(
         self, messages: Sequence[Mapping[str, Any]], tool: str, prefix: str
     ) -> list[dict[str, Any]]:
@@ -515,6 +597,8 @@ class EvalFakeTransport:
                 step = self._due_step(messages, prefix)
             elif FEES in tools and any(w in question.casefold() for w in FEE_WORDS):
                 step = self._fee_step(messages, question, tools, prefix)
+            elif (status := status_tool(question, tools)) is not None:
+                step = self._status_step(messages, question, status, prefix)
             elif wanted is not None:
                 step = self._record_step(messages, wanted, tools, prefix)
             else:
@@ -532,6 +616,50 @@ class EvalFakeTransport:
 
 
 # --- the application side -----------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class StatusEvidence:
+    """How the application states one status item: a pattern its passage text carries only when
+    it discloses the item's fact, and/or the item's own record sources."""
+
+    key: str
+    pattern: re.Pattern[str] | None
+    sources: frozenset[str]
+
+    def stated(self, text_: str, source: str | None = None) -> bool:
+        if source is not None and source in self.sources:
+            return True
+        return self.pattern is not None and self.pattern.search(text_) is not None
+
+
+def status_result(case: Any, answer: Any, evidence: Sequence[StatusEvidence]) -> Any:
+    """The application's answer in the case's words: each segment keeps its text and adds the
+    phrase of every item it states (its text, or one of its citations); each citation keeps its
+    source and adds the phrase of every item its cited text states, or whose record it is. The
+    harness then scores phrases exactly as for the stubs; sources stay the application's."""
+    from sos_evals.status import StatusCitation, StatusResult
+
+    phrases = {i.key: i.phrase for i in case.items}
+    texts: list[str] = []
+    citations: list[Any] = []
+    for segment in answer.segments:
+        said: list[str] = []
+        for c in segment.citations:
+            found = [phrases[e.key] for e in evidence if e.stated(c.cited_text, c.source)]
+            citations.append(
+                StatusCitation(source=c.source, cited_text=" ".join([c.cited_text, *found]))
+            )
+            said += [f for f in found if f not in said]
+        said += [
+            phrases[e.key]
+            for e in evidence
+            if e.stated(segment.text) and phrases[e.key] not in said
+        ]
+        texts.append(" ".join([segment.text, *said]))
+    return StatusResult(
+        text=" ".join(texts), citations=tuple(citations), provided_sources=tuple(answer.provided)
+    )
 
 
 @dataclass(frozen=True)
@@ -599,7 +727,8 @@ class ParityError(ValueError):
 class AppFakeAdapter:
     """``RetrievalAdapter`` + ``AskAdapter`` over ``knowledge.service``, the M4
     ``CircularAdapter`` over ``circulars.service`` and the M6 ``FeeAdapter`` over
-    ``knowledge.service`` with ``get_fee_dues`` (see the docstring)."""
+    ``knowledge.service`` with ``get_fee_dues``, and the ``DueAdapter`` and ``StatusAdapter``
+    over ``knowledge.service`` with the D74 and D86 tools (see the docstring)."""
 
     name = "app-fake"
 
@@ -1520,6 +1649,242 @@ class AppFakeAdapter:
             ),
             provided_sources=tuple(answer.provided),
         )
+
+    # --- school status questions (sos_evals.status; D86, FA-04 / FC-11 tools) ----------------
+
+    def _status_school(self, case: Any) -> Any:
+        """The case's own BSEAP school: the current year and, for readiness and attendance, one
+        class per item (label ``Status class <key>``, section A), else one class with section
+        A. AI on, like every eval school."""
+        from app.core.db import tenant_session
+        from app.tenancy import service as tenancy
+        from app.tenancy.schemas import AcademicYearCreate, ClassCreate, SectionCreate
+
+        world = self.K.W
+        school = world.School(world.provision_school())
+        school.people["owner"] = world.add_member(self._admin, school.tenant_id, ["owner"])
+        per_item = case.tool in {READINESS, ATTENDANCE}
+        classes = [(i.key, f"Status class {i.key}") for i in case.items] if per_item else []
+        with tenant_session(school.tenant_id, school.people["owner"].user_id) as db:
+            year = tenancy.create_academic_year(
+                db,
+                AcademicYearCreate(
+                    label="2026-27",
+                    starts_on=dt.date(2026, 6, 1),
+                    ends_on=dt.date(2027, 3, 31),
+                    is_current=True,
+                ),
+            )
+            for index, (key, label) in enumerate(classes or [("main", "Class IX")]):
+                klass = tenancy.create_class(
+                    db,
+                    ClassCreate(
+                        code=STATUS_CLASS_CODES[index],
+                        display_en=label,
+                        display_te=label,
+                        sort_order=100 + index,
+                    ),
+                )
+                section = tenancy.create_section(
+                    db, SectionCreate(academic_year_id=year.id, class_id=klass.id, name="A")
+                )
+                school.ids[f"status:{key}"] = section.id
+        with self._admin.begin() as c:
+            c.execute(
+                text("UPDATE core.tenants SET boards = :b WHERE id = :t"),
+                {"b": ["BSEAP"], "t": school.tenant_id},
+            )
+        self.K.enable_ai(self._admin, school.tenant_id)
+        return school
+
+    def _status_students(self, school: Any, key: str, count: int) -> list[uuid.UUID]:
+        return [
+            self.K.SW.create(
+                school,
+                name=f"Synthetica Status Student {key} {n:02d}",
+                section_key=f"status:{key}",
+                admission_no=f"ST-{uuid.uuid4().hex[:8].upper()}",
+            )
+            for n in range(count)
+        ]
+
+    def _status_counts(self, case: Any, school: Any) -> list[StatusEvidence]:
+        """Readiness and attendance: students in each item's class (attendance: the item's roll
+        when it is under the small-cell minimum, else one more than the minimum, each marked
+        present today). An item is stated when its class's line carries a figure."""
+        from app.knowledge.tools.due import today_ist
+        from sos_evals.status import SMALL_CELL_MIN
+
+        out: list[StatusEvidence] = []
+        for item in case.items:
+            label = re.escape(f"Status class {item.key}")
+            if case.tool == READINESS:
+                self._status_students(school, item.key, 2)
+                pattern = rf"{label}(?!\d): \d+ of [1-9]\d* ready"
+            else:
+                count = item.students if item.students < SMALL_CELL_MIN else SMALL_CELL_MIN + 1
+                section = school.ids[f"status:{item.key}"]
+                for student in self._status_students(school, item.key, count):
+                    with self._admin.begin() as c:
+                        c.execute(
+                            text(
+                                "INSERT INTO sis.attendance_marks (id, tenant_id, student_id, "
+                                "section_id, on_date, status, recorded_by) VALUES "
+                                "(:i, :t, :s, :sec, :d, 'present', :u)"
+                            ),
+                            {
+                                "i": uuid.uuid4(),
+                                "t": school.tenant_id,
+                                "s": student,
+                                "sec": section,
+                                "d": today_ist(),
+                                "u": school.people["owner"].user_id,
+                            },
+                        )
+                pattern = rf"{label}(?!\d) A: \d+\.\d% present or late"
+            out.append(StatusEvidence(item.key, re.compile(pattern), frozenset()))
+        return out
+
+    def _status_certificates(self, case: Any, school: Any) -> list[StatusEvidence]:
+        """The asked student (the admission number in the question) and another student in the
+        same section; each item is a certificate made through ``certificates.service``: issued
+        (a TC approved by the principal), issued then cancelled, issued to the OTHER student
+        (``shown`` False), or a TC request the principal rejected (``shown`` False; a direct
+        type like the study certificate is never pending, so it cannot be rejected). Stated: its
+        serial number in the answer, or its record cited."""
+        from app.certificates import service as certificates
+        from app.certificates.schemas import ReasonIn
+
+        cert = _load("sos_test_certificates_support", TESTS / "certificates" / "support.py")
+        cert.install()
+        for role in ("office_admin", "principal"):
+            school.people[role] = self.K.W.add_member(self._admin, school.tenant_id, [role])
+        number = STATUS_ADMISSION_NO.search(case.question)
+        asked = self.K.SW.create(
+            school,
+            name="Synthetica Status Student asked",
+            section_key="status:main",
+            admission_no=number.group(0) if number else "ST-0000",
+        )
+        other = self._status_students(school, "main", 1)[0]
+
+        def kind_of(item: Any) -> str:
+            folded = item.phrase.casefold()
+            return next(
+                (k for w, k in CERTIFICATE_KINDS if re.search(rf"\b{w}\b", folded)), "bonafide"
+            )
+
+        def order(item: Any) -> int:
+            # An issued TC takes the student off the roll: every other certificate comes first.
+            return int(kind_of(item) == "transfer" and "rejected" not in item.phrase.casefold())
+
+        out: list[StatusEvidence] = []
+        for item in sorted(case.items, key=order):
+            folded = item.phrase.casefold()
+            kind = kind_of(item)
+            if "rejected" in folded:
+                made = cert.pending_tc(school, asked)
+                made = cert.call(
+                    school,
+                    school.people["principal"],
+                    "principal",
+                    certificates.reject,
+                    made.id,
+                    ReasonIn(reason="Synthetic rejection for the status evaluation"),
+                    expected_version=made.version,
+                )
+            else:
+                student = asked if item.shown else other
+                made = (
+                    cert.issued_tc(school, student)
+                    if kind == "transfer"
+                    else cert.issue(school, student, kind)
+                )
+                if "cancelled" in folded:
+                    made = cert.cancel(school, made)
+            serial = re.compile(re.escape(made.serial)) if made.serial else None
+            out.append(
+                StatusEvidence(item.key, serial, frozenset({f"sos://certificate/{made.id}"}))
+            )
+        return out
+
+    def _status_register(self, case: Any, school: Any) -> list[StatusEvidence]:
+        """The school's compliance register (the catalogue kinds of a BSEAP school): an item
+        naming a kind is recorded valid for a year, expired a month ago, or left missing, as its
+        phrase says; another school's line (``shown`` False) is an ``other`` certificate with
+        its own label in a second school. Stated: the kind's line in that state, or the other
+        school's label."""
+        from app.compliance.config import catalogue
+        from app.knowledge.tools.due import today_ist
+
+        comp = _load("sos_test_compliance_support", TESTS / "compliance" / "support.py")
+        labels = {key: kind.label for key, kind in catalogue().kinds.items()}
+        today = today_ist()
+        out: list[StatusEvidence] = []
+        for item in case.items:
+            folded = item.phrase.casefold()
+            if not item.shown:
+                other = self._status_school(case)
+                label = item.phrase.removeprefix("Synthetic ")
+                comp.certificate(self._admin, other, kind="other", label=label, valid_until=today)
+                out.append(StatusEvidence(item.key, re.compile(re.escape(label)), frozenset()))
+                continue
+            kind = next(k for w, k in COMPLIANCE_KINDS if w in folded)
+            state = "missing"
+            if "expired" in folded:
+                state = "expired"
+                until = today - dt.timedelta(days=30)
+            elif "missing" not in folded:
+                state = "valid"
+                until = today + dt.timedelta(days=365)
+            if state != "missing":
+                comp.certificate(self._admin, school, kind=kind, valid_until=until)
+            pattern = re.compile(rf"{re.escape(labels[kind])}: {state}\b")
+            out.append(StatusEvidence(item.key, pattern, frozenset()))
+        return out
+
+    def ask_status(self, case: Any) -> Any:
+        """One school status case (``sos_evals.status``; D86): its own school seeded through
+        the owning services (:meth:`_status_counts`, :meth:`_status_certificates`,
+        :meth:`_status_register`), one asker with the case's system role (a scoped role reaches
+        the sections of the items ``in_reach``), then the question through
+        ``knowledge.service``. The application's answer is read back into the case's phrases by
+        :func:`status_result`."""
+        from app.authz.catalog import system_roles
+        from app.core.db import tenant_session
+        from app.knowledge.domain import AskRequest
+
+        school = self._status_school(case)
+        if case.tool in {READINESS, ATTENDANCE}:
+            evidence = self._status_counts(case, school)
+        elif case.tool == CERTIFICATES:
+            evidence = self._status_certificates(case, school)
+        else:
+            evidence = self._status_register(case, school)
+        template = system_roles()[case.asker]
+        scoped = any((g := template.grant(p)) and g.scoped for p in template.permission_keys)
+        reach = [
+            school.ids[f"status:{i.key}"]
+            for i in case.items
+            if i.in_reach and f"status:{i.key}" in school.ids
+        ] or [v for k, v in school.ids.items() if k.startswith("status:")][:1]
+        member = self.K.W.add_member(
+            self._admin,
+            school.tenant_id,
+            [case.asker],
+            scopes=[("section", s) for s in reach] if scoped else None,
+        )
+        ctx = self.K.SW.ctx_for(
+            school.tenant_id,
+            member,
+            case.asker,
+            section_ids=frozenset(reach) if scoped else frozenset(),
+        )
+        with tenant_session(school.tenant_id, ctx.user_id) as s:
+            outcome = self._service.respond(
+                s, ctx, AskRequest(question=case.question, session_id=uuid.uuid4())
+            )
+        return status_result(case, outcome.answer, evidence)
 
     # --- contextual retrieval and reranking (sos_evals.contextual; docs/06 §13.6) ------------
 
