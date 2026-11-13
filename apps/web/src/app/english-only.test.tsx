@@ -4,8 +4,11 @@ import { isValidElement, type ReactElement } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformShell } from "@/components/shell/PlatformShell";
 import { SchoolShell } from "@/components/shell/SchoolShell";
+import { NextIntlClientProvider } from "next-intl";
 import { ClientMessages } from "@/i18n/ClientMessages";
-import { intlErrors, renderWithIntl, testQueryClient } from "@/test/render";
+import { CLIENT_NAMESPACES, pickMessages } from "@/i18n/client-messages";
+import { SCHOOL_AREAS, type SchoolArea } from "@/i18n/school-areas";
+import { intlErrors, messages, renderWithIntl, testQueryClient } from "@/test/render";
 
 /**
  * ADR-0036 (English first, Telugu hidden): with SOS_TELUGU_ENABLED off (the default) no page
@@ -130,6 +133,15 @@ function localePrefixed(root: HTMLElement): string[] {
 const PATHS = Object.keys(modules).sort();
 /** Pages that render `<ClientMessages scope="marketing" | "dev">` themselves (WP-04). */
 const SELF_SCOPED = /^\.\/\[locale\]\/(welcome|features|pricing|security|about|dev)\//;
+/** The school area of a page: its folder under (school), settings pages by subfolder. */
+function schoolArea(path: string): SchoolArea {
+  const rest = path.split("/(school)/")[1] ?? "";
+  if (rest === "page.tsx") return "home";
+  const [first, second] = rest.split("/");
+  const area = first === "settings" ? `settings/${second}` : first;
+  if (!area || !(area in SCHOOL_AREAS)) throw new Error(`${path}: no school area`);
+  return area as SchoolArea;
+}
 const scanned: string[] = [];
 let links = 0;
 
@@ -150,9 +162,17 @@ describe("English only while Telugu is switched off (ADR-0036)", () => {
           <PlatformShell permissions={null}>{page}</PlatformShell>
         </ClientMessages>
       ) : path.includes("/(school)/") ? (
-        <ClientMessages scope="school">
+        // The school layout sends the shell's list and the area's layout its own (PERF-014).
+        // Here a nested ClientMessages would pick from the shell's list, so the area's list is
+        // picked from the whole catalogue, as on the server.
+        <ClientMessages scope="schoolBase">
           <SchoolShell permissions={null} languages={["te", "en"]}>
-            {page}
+            <NextIntlClientProvider
+              locale="en"
+              messages={pickMessages(messages.englishOnly, CLIENT_NAMESPACES[schoolArea(path)])}
+            >
+              {page}
+            </NextIntlClientProvider>
           </SchoolShell>
         </ClientMessages>
       ) : SELF_SCOPED.test(path) ? (
