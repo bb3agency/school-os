@@ -380,6 +380,9 @@ RESPONSE_FIELD_ALLOWLIST = {
     # Catalog and code keys, not credentials.
     "app.admin.schemas.RetentionCategoryOut.key": "retention category code",
     "app.students.schemas.AttributeOut.key": "attribute catalog key",
+    # FO-10: board candidate scheme and subject group codes (board_catalogue.yaml).
+    "app.students.board_candidate_schemas.BoardSchemeOut.key": "board scheme code",
+    "app.students.board_candidate_schemas.BoardSubjectGroupOut.key": "subject group code",
     "app.certificates.schemas.CertificateTypeOut.key": "certificate type code",
     "app.certificates.schemas.InputOut.key": "certificate input code",
     "app.certificates.schemas.PrintedField.key": "printed field code",

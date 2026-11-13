@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/Table";
 import { Tabs } from "@/components/ui/Tabs";
 import { Value } from "@/components/ui/Value";
+import { StudentBoardCandidate } from "@/features/board-candidates/StudentBoardCandidate";
 import { StudentConsentsPanel } from "@/features/consents/StudentConsentsPanel";
 import { StudentInsights } from "@/features/insights/StudentInsights";
 import { GuardianOptinsCard } from "@/features/messaging/GuardianOptins";
@@ -684,7 +685,7 @@ export function StudentDetailView({
   const fullName = data.canonical.full_name;
   const avatarName = fullName && !fullName.masked && fullName.value ? fullName.value : null;
 
-  const detailsPanel = (
+  const valuesCard = (
     <Card
       title={t("valuesTitle")}
       description={t("valuesDescription")}
@@ -734,6 +735,14 @@ export function StudentDetailView({
         )}
       </div>
     </Card>
+  );
+
+  // FO-10 (FR-STU-026): board candidate choices of a board class, above the values table.
+  const detailsPanel = (
+    <div className="space-y-5">
+      <StudentBoardCandidate studentId={data.id} />
+      {valuesCard}
+    </div>
   );
 
   const goTo = relatedLinks(data.id, permissions, (key) => t(key as "findingsLink"));

@@ -44,6 +44,7 @@ export const CLIENT_NAMESPACES = {
     "ask.nav",
     "attendance.nav",
     "auth",
+    "boardCandidates.nav",
     "breaches.nav",
     "breakGlass.nav",
     "brief.nav",

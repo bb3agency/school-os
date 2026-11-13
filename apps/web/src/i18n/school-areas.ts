@@ -357,6 +357,7 @@ export const SCHOOL_AREAS = {
   "settings/whatsapp": ["common", "errors", "messaging", "ui", "validation"],
   students: [
     "apaar",
+    "boardCandidates",
     "certificates",
     "common",
     "consents",

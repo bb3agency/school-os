@@ -192,3 +192,20 @@ rules:
     severity: {mode: fixed, level: blocker}
     explanation_key: DQ-031
     routes: [ROUTE-SCHOOL-CR, ROUTE-UIDAI, ROUTE-UDISE]
+
+  # FO-10 (FR-STU-030..033): board candidate choices (medium, languages, subjects, photo and
+  # signature tick) for profiles with a `candidate_scheme` (bseap-ssc-2027, cbse-loc-2027),
+  # checked against app/students/board_catalogue.yaml (verified: false). One finding per field
+  # to fix; the reason sets the explanation. The office enters the choice; nothing is corrected
+  # automatically (invariant 6).
+  - id: DQ-032
+    version: 1
+    check: board_candidate
+    scope: student
+    attribute_keys: [exam_medium, first_language, second_language, third_language,
+                     board_subjects, photo_signature_ready]
+    sources: [canonical]
+    requires_profile: true
+    severity: {mode: fixed, level: high}
+    explanation_key: DQ-032
+    routes: [ROUTE-CANDIDATE]

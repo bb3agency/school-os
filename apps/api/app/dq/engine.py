@@ -209,10 +209,15 @@ def load_context(
     source_keys = set().union(*needed.values()) if needed else set()
     # The APAAR ID gates DQ-009/DQ-022 and is compared for DQ-021 (ADR-0037).
     canonical_keys = {*BASE_CANONICAL_KEYS, cfg.apaar_attribute}
+    # FO-10 (DQ-032): the board candidate schemes the profiles name, and their choices.
+    schemes = {s.key: s for s in students.board_schemes()}
     for profile in profiles:
         canonical_keys.update(profile.required_fields)
         if profile.name_format is not None:
             canonical_keys.update(profile.name_format.fields)
+        scheme = schemes.get(profile.candidate_scheme) if profile.candidate_scheme else None
+        if scheme is not None:
+            canonical_keys.update(scheme.keys)
     source_keys.update(canonical_keys & {"full_name", "father_name", "mother_name", "dob"})
     facts = load_facts(session, student_ids, source_keys, canonical_keys)
     return CheckContext(
@@ -224,6 +229,7 @@ def load_context(
         profiles=tuple(profiles),
         identity_keys=identity_keys,
         class_boards=tenancy.school_boards(session)[1],
+        candidate_schemes=schemes,
     )
 
 

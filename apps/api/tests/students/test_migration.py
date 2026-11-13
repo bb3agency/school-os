@@ -122,6 +122,17 @@ def _add_students(admin: Engine) -> None:
             )
 
 
+# FO-10 (0104_board_candidate): board candidate attributes seeded after 0008.
+LATER_KEYS = (
+    "exam_medium",
+    "first_language",
+    "second_language",
+    "third_language",
+    "board_subjects",
+    "photo_signature_ready",
+)
+
+
 def _scalar(admin: Engine, sql: str) -> Any:
     with admin.connect() as c:
         return c.execute(text(sql)).scalar_one()
@@ -135,7 +146,8 @@ def test_CLAUDE_6_12_sis_migration_reversible_with_data(populated: tuple[Config,
     assert _scalar(admin, "SELECT to_regclass('sis.students') IS NULL") is True
     assert _scalar(admin, "SELECT count(*) FROM core.memberships") > 0, "earlier data untouched"
     command.upgrade(cfg, "0008_sis_students")
-    # 0008 seeds its own keys; later revisions seed the keys they add (0042_apaar_id).
+    # 0008 seeds its own keys; later revisions seed the keys they add (0042_apaar_id,
+    # 0104_board_candidate).
     assert _scalar(
         admin,
         "SELECT array_agg(id ORDER BY key) FROM sis.attribute_definitions "
@@ -144,7 +156,9 @@ def test_CLAUDE_6_12_sis_migration_reversible_with_data(populated: tuple[Config,
         admin,
         "SELECT array_agg(id ORDER BY key) FROM sis.attribute_definitions",
     )
-    assert len(ids) - 2 == _scalar(admin, "SELECT count(*) FROM sis.attribute_definitions")
+    assert len(ids) - 2 - len(LATER_KEYS) == _scalar(
+        admin, "SELECT count(*) FROM sis.attribute_definitions"
+    )
     command.downgrade(cfg, "0007_accept_invitations")
     command.upgrade(cfg, "head")
     assert _scalar(

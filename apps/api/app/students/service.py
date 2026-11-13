@@ -75,6 +75,19 @@ from app.ops import service as ops
 from app.public import service as public
 from app.students import crypto
 from app.students import repository as repo
+from app.students.board_catalogue import (  # FO-10 board candidate catalogue (re-exports)
+    CANDIDATE_KEYS as CANDIDATE_KEYS,  # noqa: PLC0414
+)
+from app.students.board_catalogue import (
+    BoardScheme as BoardScheme,  # noqa: PLC0414
+)
+from app.students.board_catalogue import (
+    CandidateIssue as CandidateIssue,  # noqa: PLC0414
+)
+from app.students.board_catalogue import (
+    candidate_issues as candidate_issues,  # noqa: PLC0414
+)
+from app.students.board_catalogue import load_board_catalogue as _load_board_catalogue
 from app.students.canonical import Resolution, resolve
 from app.students.definitions import (
     AADHAAR_DETAIL,
@@ -3671,3 +3684,10 @@ def set_guardian_language_from_parent_page(
         request_id=request_id if isinstance(request_id, str) else None,
     )
     return True
+
+
+def board_schemes() -> tuple[BoardScheme, ...]:
+    """The board candidate schemes of ``board_catalogue.yaml`` (FO-10; dq rule DQ-032 and the
+    board pre-check sheets). Reference data only; :func:`candidate_issues` checks one
+    candidate's choices against a scheme."""
+    return tuple(_load_board_catalogue().schemes.values())

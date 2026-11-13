@@ -138,3 +138,34 @@ def test_FR_DQ_033_an_erp_refresh_value_never_replaces_the_register_and_becomes_
         canonical = students.canonical_values(db, [sid], ["full_name", "gender"])[sid]
     assert canonical["full_name"].value == name
     assert canonical["gender"].value == "male"
+
+
+def test_FR_STU_030_dq_032_raises_and_clears_board_candidate_findings(
+    world: Any, admin_engine: Engine
+) -> None:
+    """FO-10: a Class IX SSC candidate without medium, languages and photo tick gets one DQ-032
+    finding per field; recording the choices (office entry, not a change request) clears them."""
+    sid = DS.student(world.a)
+    with _boards(admin_engine, world.a.tenant_id, ["BSEAP"], {}):
+        DS.run(world.a, sid, profile_key="bseap-ssc-2027")
+        open_rows = [r for r in DS.findings(admin_engine, sid, "DQ-032") if r["status"] == "open"]
+        assert {r["attribute_key"] for r in open_rows} == {
+            "exam_medium",
+            "first_language",
+            "second_language",
+            "third_language",
+            "photo_signature_ready",
+        }
+        assert {r["route_codes"][0] for r in open_rows} == {"ROUTE-CANDIDATE"}
+        assert {r["profile_key"] for r in open_rows} == {"bseap-ssc-2027"}
+        for key, source, value in (
+            ("exam_medium", "parent_form", "english"),
+            ("first_language", "parent_form", "TELUGU"),
+            ("second_language", "parent_form", "HINDI"),
+            ("third_language", "parent_form", "ENGLISH"),
+            ("photo_signature_ready", "manual_entry", "yes"),
+        ):
+            DS.call(world.a, students.record_value, sid, key, source, value)
+        DS.run(world.a, sid, profile_key="bseap-ssc-2027")
+        still = [r for r in DS.findings(admin_engine, sid, "DQ-032") if r["status"] == "open"]
+        assert still == []

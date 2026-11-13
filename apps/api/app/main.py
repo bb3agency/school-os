@@ -68,6 +68,7 @@ from app.privacy.readiness_api import router as readiness_router
 from app.public.api import router as public_router
 from app.public.config import rules as public_rules
 from app.students.api import router as students_router
+from app.students.board_candidate_api import router as board_candidate_router
 from app.tally.api import agent_router as tally_agent_router
 from app.tally.api import router as tally_router
 from app.tally.api_vouchers import router as tally_vouchers_router
@@ -102,6 +103,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(identity_router)
     app.include_router(tenancy_router)
     app.include_router(students_router)
+    app.include_router(board_candidate_router)  # FO-10 board candidate choices
     app.include_router(audit_router)
     app.include_router(documents_router)
     app.include_router(imports_router)
