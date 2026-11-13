@@ -10,9 +10,10 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { components } from "@schoolos/api-client";
 import { createFakeIdp, type FakeIdp } from "../../src/test/fake-idp";
 import { askAnswer, askEvents, resetAsk } from "./ask-api";
+import { f3Answer, f3Html, isF3Subject, PRINT_CSP, resetF3 } from "./f3-api";
 import { FILES_PREFIX, journeyAnswer, resetJourney } from "./journey-api";
 import { OFFICE, r1Answer, resetR1 } from "./r1-api";
-import { lastReceiptRequest, r2Answer, resetR2 } from "./r2-api";
+import { CASHIER, lastReceiptRequest, r2Answer, resetR2 } from "./r2-api";
 import {
   isR3SchoolSubject,
   lastR3Write,
@@ -881,6 +882,7 @@ async function startApi(): Promise<Server> {
       resetAsk();
       resetSheets();
       resetR3();
+      resetF3();
       return send(response, 204, "");
     }
     if (url.pathname === "/__e2e/r3/clock" && method === "POST") {
@@ -941,22 +943,35 @@ async function startApi(): Promise<Server> {
       );
     }
     const subject = subjectOf(request);
+    // Wave F3 print pages (the API renders them; FO-06, FO-11, FC-07, FM-08, FM-10, FA-08).
+    const html = f3Html(method, url, subject);
+    if (html !== undefined) {
+      response.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": PRINT_CSP,
+        "cache-control": "no-store",
+      });
+      return response.end(html);
+    }
     const publicToken = request.headers["x-sos-public-token"];
+    // The F3 principal shares the R2 cashier's counter and the R1 office admin's school.
+    const f3 = isF3Subject(subject);
     const [status, answer] = r3Decorate(
       method,
       url.pathname,
       subject,
-      r3Answer(method, url, subject, body) ??
+      f3Answer(method, url, subject, body) ??
+        r3Answer(method, url, subject, body) ??
         askAnswer(method, url.pathname, body) ??
         r2Answer(
           method,
           url,
-          subject,
+          f3 && url.pathname.startsWith("/api/v1/fees/") ? CASHIER : subject,
           body,
           typeof publicToken === "string" ? publicToken : undefined,
         ) ??
         // The R3 subjects share the R1 office admin's canned school (readiness, students).
-        r1Answer(method, url, isR3SchoolSubject(subject) ? OFFICE : subject, body) ??
+        r1Answer(method, url, isR3SchoolSubject(subject) || f3 ? OFFICE : subject, body) ??
         journeyAnswer(method, url, subject, body) ??
         apiAnswer(method, url.pathname, subject),
     );
