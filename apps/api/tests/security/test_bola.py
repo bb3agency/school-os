@@ -1155,7 +1155,10 @@ def _id_routes() -> list[tuple[str, str]]:
         # tests/dq/test_calendar_api.py). A UDISE+ to-do item key (FO-03, ``kind:uuid``) is derived
         # only from the caller's own reach (cross-school 404 in
         # tests/dq/test_udise_followup_api.py::test_FR_UDI_039_todo_authz_scope_and_tenant).
-        configuration = {"profile_key", "event_key", "key", "item_key"}
+        # A fix-owner letter key (FA-08) names a letter of the catalogue; its students are
+        # looked up only inside the caller's reach (cross-school 404 in
+        # tests/dq/test_fix_letters.py).
+        configuration = {"profile_key", "event_key", "key", "item_key", "letter_key"}
         if isinstance(rc.original_route, APIRoute) and params - configuration:
             out.extend((m, str(rc.path)) for m in sorted(rc.methods or ()))
     return sorted(out)
@@ -1251,6 +1254,27 @@ def _safety() -> ModuleType:
 
 
 BODIES.update(_safety().BOLA_BODIES)
+
+
+def _gaps() -> ModuleType:
+    """tests/knowledge/gaps_security_support.py (FA-06 knowledge gaps)."""
+    name = "sos_test_knowledge_gaps_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "knowledge" / "gaps_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+# FA-06: ``gap_id`` is a knowledge gap of school B; kb.verified_answer.manage is the
+# principal's and the office admin's, not the owner's.
+PARAM_TO_B["gap_id"] = lambda w: _gaps().b_gap(w)
+BODIES.update(_gaps().BOLA_BODIES)
+ACTOR.update(dict.fromkeys(_gaps().BOLA_BODIES, "principal"))
 
 
 def _b_id(template: str, w: Any) -> uuid.UUID:
