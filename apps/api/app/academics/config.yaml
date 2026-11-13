@@ -20,6 +20,10 @@ attendance:
   max_entries: 2500
   # Dates per sheet (one month of a register, with some slack).
   max_sheet_dates: 31
+  # FT-11 (FR-ATT-026): hours a teacher's unsent day may stay on the device (browser storage:
+  # student ids and statuses only) before the screen drops it. Lead decision D87 (PO to
+  # confirm); 1 to 72.
+  draft_keep_hours: 24
 
 marks:
   max_subjects: 20

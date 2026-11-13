@@ -7994,7 +7994,23 @@
       "keep": "నమోదు కొనసాగించండి"
     },
     "unsavedLeave": "ఈ రోజు హాజరు సేవ్ కాలేదు. వదిలి వెళ్లి దాన్ని కోల్పోవాలా?",
-    "changedBySomeone": "మీరు నమోదు చేస్తున్నప్పుడు ఈ రోజు హాజరును వేరొకరు సేవ్ చేశారు, కాబట్టి ఏదీ సేవ్ కాలేదు. రిజిస్టర్ ఇప్పుడు వారి మార్పులను, మీరు మార్చిన స్థితులతో కలిపి చూపిస్తుంది. వాటిని తనిఖీ చేసి మళ్లీ సేవ్ చేయండి."
+    "changedBySomeone": "మీరు నమోదు చేస్తున్నప్పుడు ఈ రోజు హాజరును వేరొకరు సేవ్ చేశారు, కాబట్టి ఏదీ సేవ్ కాలేదు. రిజిస్టర్ ఇప్పుడు వారి మార్పులను, మీరు మార్చిన స్థితులతో కలిపి చూపిస్తుంది. వాటిని తనిఖీ చేసి మళ్లీ సేవ్ చేయండి.",
+    "draft": {
+      "notSavedYet": "Not saved yet.",
+      "keptUntil": "Your changes are kept on this device until {time}.",
+      "notKept": "This browser can't keep a copy, so keep this page open until it is saved.",
+      "sending": "Saving…",
+      "offline": "No network. It will be sent when the network is back.",
+      "retrying": "The school couldn't be reached. Trying again automatically.",
+      "tryNow": "Try now",
+      "discard": "Discard my changes",
+      "restoredTitle": "Your unsaved changes are back",
+      "restoredBody": "{count, plural, one {# status} other {# statuses}} you chose on this device at {time} {count, plural, one {is} other {are}} not saved yet. Check them, then save.",
+      "savedNow": "Saved now: {status}",
+      "pendingTitle": "{count, plural, one {# day} other {# days}} not saved yet",
+      "pendingBody": "You marked these on this device but they did not reach the school. Open one to save it.",
+      "pendingOpen": "{section}, {date}"
+    }
   },
   "marks": {
     "nav": "మార్కులు",

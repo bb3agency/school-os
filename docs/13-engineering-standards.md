@@ -78,7 +78,7 @@ schoolos/
 - Accessibility: semantic HTML, labels for all inputs, visible focus, keyboard paths, `prefers-reduced-motion` respected.
 - UI: build screens from `components/ui` primitives and the design tokens (docs/17-ui-design-system.md); no one-off colours, no inline styles.
 - Browser support: Baseline Widely Available; check current guidance before adopting newer web platform features.
-- Security: no `dangerouslySetInnerHTML`; CSP nonces; no tokens in `localStorage`/`sessionStorage`; no third-party scripts or font CDNs.
+- Security: no `dangerouslySetInnerHTML`; CSP nonces; no tokens in `localStorage`/`sessionStorage` (and no personal data: the only records kept there are unsent drafts through `lib/device-drafts`, ids and statuses only, cleared on sign-out; FT-11, FR-ATT-032); no third-party scripts or font CDNs.
 
 ## 6. API design rules
 
