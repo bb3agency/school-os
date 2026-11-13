@@ -246,6 +246,115 @@ def test_FR_TALLY_008_fee_questions_find_the_student_by_number_then_read_fee_due
     assert call["name"] == "search_documents"
 
 
+STATUS_TOOLS = {
+    "find_students",
+    "search_documents",
+    "get_readiness_summary",
+    "get_attendance_summary",
+    "get_certificates",
+    "list_compliance_status",
+}
+
+
+@pytest.mark.parametrize(
+    ("question", "tool"),
+    [
+        ("How many Class 10 students are SSC-ready?", "get_readiness_summary"),
+        ("How many of my students are ready for UDISE+?", "get_readiness_summary"),
+        ("Which sections had attendance below 75% this week?", "get_attendance_summary"),
+        ("ee vaaram naa section attendance entha?", "get_attendance_summary"),
+        ("Was a TC issued to admission number SYN-4412, and when?", "get_certificates"),
+        ("When does our fire NOC expire?", "list_compliance_status"),
+        ("mana school recognition certificate eppudu expire avutundi?", "list_compliance_status"),
+        # Document questions that only mention attendance or a certificate keep searching.
+        ("What attendance do students need to write the annual examinations?", None),
+        ("When was the fire safety certificate renewed?", None),
+        ("Until when is the school's recognition extended?", None),
+        ("Is the readymade uniform shop open already?", None),
+    ],
+)
+def test_FR_KB_096_status_questions_route_to_their_d86_tool_only(
+    question: str, tool: str | None
+) -> None:
+    assert B.status_tool(question, STATUS_TOOLS) == tool
+    if tool is not None:  # a tool the asker is not offered is never tried
+        assert B.status_tool(question, STATUS_TOOLS - {tool}) is None
+
+
+def test_FR_KB_096_certificate_questions_find_the_student_by_number_then_cite_every_line() -> None:
+    question = "Was a TC issued to admission number SYN-4412, and when?"
+    offered = [{"name": n} for n in sorted(STATUS_TOOLS)]
+    first: list[dict[str, Any]] = [
+        {"role": "user", "content": [{"type": "text", "text": question}]}
+    ]
+    t = B.EvalFakeTransport()
+
+    def send(messages: list[dict[str, Any]]) -> Any:
+        return t.send(MessagesRequest({"model": "m", "messages": messages, "tools": offered}, 1))
+
+    call = send(first)["content"][0]
+    assert (call["name"], call["input"]) == ("find_students", {"query": "SYN-4412"})
+    found = first + _turn("find_students", [_find_block("SYN-4412")], "t1")
+    call = send(found)["content"][0]
+    assert (call["name"], call["input"]) == ("get_certificates", {"student_id": STUDENT})
+    lines = [
+        _result(f"Transfer certificate (TC). Serial number: TC/2026-27/000{n}.", f"sos://c/{n}")
+        for n in (1, 2)
+    ]
+    reply = send(found + _turn("get_certificates", lines, "t2"))["content"]
+    assert [b["citations"][0]["source"] for b in reply] == ["sos://c/1", "sos://c/2"]
+    nobody = first + _turn("find_students", [_find_block("SYN-9999")], "t1")
+    assert send(nobody)["content"][0]["text"] == "I could not find this in the records."
+
+
+class _Cite:
+    def __init__(self, source: str, cited_text: str) -> None:
+        self.source, self.cited_text = source, cited_text
+
+
+class _Segment:
+    def __init__(self, text: str, citations: list[_Cite]) -> None:
+        self.text, self.citations = text, citations
+
+
+class _Answer:
+    def __init__(self, segments: list[_Segment], provided: list[str]) -> None:
+        self.segments, self.provided = segments, provided
+
+
+def test_FR_KB_096_status_answers_are_read_back_into_the_cases_phrases() -> None:
+    """Not vacuous: a line with a figure outside the asker's reach is a leak, a stated fact
+    without a citation is not valid, and a cited record counts as stating its item."""
+    import re
+
+    from sos_evals import status
+
+    case = next(c for c in DATA.status if c.id == "status-readiness-class-teacher-own")
+    evidence = [
+        B.StatusEvidence(
+            "I1", re.compile(r"Status class I1(?!\d): \d+ of [1-9]\d* ready"), frozenset()
+        ),
+        B.StatusEvidence(
+            "I2", re.compile(r"Status class I2(?!\d): \d+ of [1-9]\d* ready"), frozenset()
+        ),
+    ]
+    own = "Status class I1: 1 of 2 ready."
+    good = _Answer([_Segment(own, [_Cite("sos://readiness/a", own)])], ["sos://readiness/a"])
+    outcome = status.score(case, B.status_result(case, good, evidence))
+    assert (outcome.found, outcome.leaks, outcome.valid) == (1, (), 1)
+    both = f"{own} Status class I2: 0 of 3 ready."
+    leaky = _Answer([_Segment(both, [_Cite("sos://readiness/a", own)])], ["sos://readiness/a"])
+    outcome = status.score(case, B.status_result(case, leaky, evidence))
+    assert outcome.leaks == ("I2",)
+    assert (outcome.stated, outcome.valid) == (2, 1)
+    record = [B.StatusEvidence("I1", None, frozenset({"sos://certificate/1"}))]
+    cited = _Answer(
+        [_Segment("TC.", [_Cite("sos://certificate/1", "TC.")])], ["sos://certificate/1"]
+    )
+    outcome = status.score(case, B.status_result(case, cited, record))
+    assert (outcome.found, outcome.valid) == (1, 1)
+
+
 def test_FR_TALLY_008_fee_readers_are_roles_yaml() -> None:
     """``sos_evals.fees.FEE_READERS``: school-wide finance.read AND kb.ask (roles.yaml)."""
     from sos_evals.fees import FEE_READERS
@@ -396,6 +505,32 @@ def test_D74_due_cases_pass_the_hard_gates_through_the_application(bridge: Any) 
     assert metrics.due_citation_validity == 1.0
     assert metrics.due_task_recall == 1.0
     assert len([g for g in gates.load_gates() if g.metric.startswith("due_")]) == 3
+
+
+@pytest.mark.db
+def test_FR_KB_096_status_cases_pass_the_hard_gates_through_the_application(bridge: Any) -> None:
+    """Every synthetic school status case through the real ask pipeline and the D86 tools
+    (app-fake): no figure outside the asker's reach, no small section, no other student's or
+    school's record; every fact stated is cited."""
+    from sos_evals import gates, status
+
+    metrics, outcomes = status.run(DATA.status, bridge)
+    assert [o.id for o in outcomes if o.leaks or o.found < o.expected or o.valid < o.stated] == []
+    assert metrics.status_leakage_count == 0
+    assert metrics.status_citation_validity == 1.0
+    assert metrics.status_recall == 1.0
+    assert len([g for g in gates.load_gates() if g.metric.startswith("status_")]) == 3
+
+
+@pytest.mark.db
+def test_FR_KB_096_the_status_read_back_sees_a_wider_reach_as_a_leak(bridge: Any) -> None:
+    """Guard against a vacuous status run: the class teacher's question asked by the principal
+    (school-wide reach) states the other class's figure, which the case counts as a leak."""
+    from sos_evals import status
+
+    case = next(c for c in DATA.status if c.id == "status-readiness-class-teacher-own")
+    wider = bridge.ask_status(case.model_copy(update={"asker": "principal"}))
+    assert status.score(case, wider).leaks == ("I2",)
 
 
 @pytest.mark.db
