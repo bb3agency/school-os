@@ -6,7 +6,8 @@ Synthetic facts only. Findings carry codes and labels, never a typed value outsi
 from __future__ import annotations
 
 import sys
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 
 from app.dq.checks import build_checks, evaluate
 from app.dq.explanations import load_explanations
@@ -31,10 +32,14 @@ def dq032(*facts: Any, profiles: tuple[str, ...] = ("bseap-ssc-2027",)) -> list[
     return [f for f in evaluate(context, CHECKS_ALL) if f.rule_id == "DQ-032"]
 
 
-def candidate(values: dict[str, str | None], class_code: str = "X", current: bool = True) -> Any:
+def candidate(values: Mapping[str, str | None], class_code: str = "X", current: bool = True) -> Any:
     return CS.facts(
         canonical=values, enrolments=[CS.enrolment(class_code=class_code, current=current)]
     )
+
+
+def params_of(finding: Finding) -> dict[str, Any]:
+    return cast("dict[str, Any]", finding.details["params"])
 
 
 def test_FR_STU_030_ready_candidate_raises_nothing() -> None:
@@ -54,7 +59,8 @@ def test_FR_STU_031_one_finding_per_missing_field_with_explanation() -> None:
     assert by_key["photo_signature_ready"].explanation_code == "DQ-032-PHOTO"
     catalog = load_explanations()
     for finding in findings:
-        params = {k: str(v) for k, v in finding.details["params"].items()}
+        raw = params_of(finding)
+        params = {k: str(v) for k, v in raw.items()}
         assert catalog.render(finding.explanation_code, "en", **params)
         assert catalog.render(finding.explanation_code, "te", **params)
 
@@ -67,7 +73,7 @@ def test_FR_STU_032_typed_codes_outside_the_list_never_reach_the_finding() -> No
     assert "SYNTHETICA" not in repr(third.details)
     second = by_key["second_language"]
     assert second.explanation_code == "DQ-032-REPEATED"
-    assert second.details["params"]["code"] == "TELUGU"
+    assert params_of(second)["code"] == "TELUGU"
 
 
 def test_FR_STU_033_cbse_subject_group_and_class_limits() -> None:
@@ -80,7 +86,7 @@ def test_FR_STU_033_cbse_subject_group_and_class_limits() -> None:
     (finding,) = dq032(candidate(values), profiles=("cbse-loc-2027",))
     assert finding.attribute_key == "board_subjects"
     assert finding.explanation_code == "DQ-032-GROUP"
-    assert finding.details["params"]["group"] == "Mathematics (standard or basic)"
+    assert params_of(finding)["group"] == "Mathematics (standard or basic)"
     # cbse-loc-2027 is Class X and XII; the scheme covers IX and X: Class IX is not checked.
     assert dq032(candidate(values, class_code="IX"), profiles=("cbse-loc-2027",)) == []
 

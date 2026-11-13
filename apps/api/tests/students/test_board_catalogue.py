@@ -174,3 +174,15 @@ def test_FR_STU_034_profiles_name_a_scheme_of_their_board_and_sheets_hold_its_ke
         assert wanted <= fields, (profile.key, wanted - fields)
         columns = {f.attribute for f in profile.board_fields}
         assert wanted <= columns, (profile.key, wanted - columns)
+
+
+def test_FR_STU_024_subject_capture_is_secondary_only() -> None:
+    # CBSE Classes IX and X and BSEAP SSC only: no XI/XII, no subject-teacher allocation.
+    for scheme in load_board_catalogue().schemes.values():
+        assert set(scheme.classes) <= {"IX", "X"}, scheme.key
+
+
+def test_FR_STU_025_no_photo_or_signature_attribute_is_stored() -> None:
+    keys = set(_attributes())
+    assert not {k for k in keys if "photo" in k or "signature" in k} - {PHOTO_KEY}
+    assert _attributes()[PHOTO_KEY]["data_type"] == "enum"
