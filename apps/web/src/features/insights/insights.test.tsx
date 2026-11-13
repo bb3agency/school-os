@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { uploadDocument } from "@/features/imports/upload";
 import { notificationHref } from "@/features/notifications/data";
 import { ApiError } from "@/lib/bff/query";
+import { clearDeviceDrafts } from "@/lib/device-drafts";
 import { installBffStub, page, problem, uninstallBffStub, type BffStub } from "@/test/bff-stub";
 import { expectOneCall, fireTwice } from "@/test/double-submit";
 import { intlErrors, messages, renderWithIntl } from "@/test/render";
@@ -164,6 +165,7 @@ function day(overrides: Partial<AttendanceDay> = {}): AttendanceDay {
     section: section(),
     on_date: todayIst(),
     marked: false,
+    draft_keep_hours: 24,
     students: [
       {
         student: {
@@ -277,6 +279,8 @@ afterEach(() => {
   uninstallBffStub();
   // An unsaved attendance day holds the page's unsaved-changes guard (XA-05).
   resetUnsavedGuardForTesting();
+  // FT-11: an unsent day kept on the device must not leak into the next test.
+  clearDeviceDrafts();
   expect(intlErrors).toEqual([]);
 });
 
@@ -353,6 +357,24 @@ describe("flags list (US-1705, US-1706, US-1708; FR-EW-009, FR-EW-015)", () => {
           ),
       ).toBe(true),
     );
+  });
+
+  it("FR-EW-030 lists the flags whose review is due, shown as a chip", async () => {
+    signedIn(TEACHER);
+    stub.routes["GET /bff/api/v1/insights/flags"] = () => page([]);
+    renderWithIntl(<FlagsScreen />);
+    expect(await screen.findByText(en.insights.emptyTitle)).toBeVisible();
+    await userEvent.selectOptions(screen.getByLabelText(en.insights.dueLabel), "review_due");
+    await waitFor(() =>
+      expect(
+        stub.callsTo("GET /bff/api/v1/insights/flags").at(-1)?.url.searchParams.get("due"),
+      ).toBe("review_due"),
+    );
+    expect(
+      await screen.findByRole("button", {
+        name: `Remove filter ${en.insights.dueLabel}: ${en.insights.reviewDue}`,
+      }),
+    ).toBeVisible();
   });
 
   it("shows active filters as chips; removing one asks for the default again", async () => {

@@ -149,15 +149,25 @@ def attendance_month(
 
 @router.post("/sections/{section_id}/attendance", response_model=WriteResultOut)
 def record_attendance(
-    ctx: AttendanceRecorder, db: TenantDB, section_id: uuid.UUID, body: AttendanceWrite
-) -> WriteResultOut:
+    ctx: AttendanceRecorder,
+    db: TenantDB,
+    section_id: uuid.UUID,
+    body: AttendanceWrite,
+    idem: IdempotencyDep,
+) -> Response:
     """Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a
     day again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range``,
     ``before_enrolment`` (before the student's explicit enrolment start) or ``duplicate_entry``
     per entry. An entry may carry ``expected_version`` (the ``version`` read
     from the day): 412 ``attendance_changed`` when someone else changed that mark since, and
-    nothing is saved. The early-warning rules look at these students again."""
-    return service.record_attendance(db, ctx, section_id, body)
+    nothing is saved. The early-warning rules look at these students again. Accepts
+    ``Idempotency-Key`` (FT-11, FR-ATT-027): a retry of a draft kept on the teacher's device
+    with the same key and body replays the first answer (``Idempotent-Replayed: true``) and
+    saves nothing again, so it can never overwrite a newer save; a failed save is not kept, and
+    the retry meets the same checks."""
+    return idem.run(
+        db, body, lambda: service.record_attendance(db, ctx, section_id, body), status_code=200
+    )
 
 
 @router.post("/sections/{section_id}/attendance/sheet", response_model=AttendanceSheetOut)

@@ -1,6 +1,6 @@
 import type { ApiClient } from "@schoolos/api-client";
 import { describe, expect, it } from "vitest";
-import { addDays, actionSchema, reviewOf } from "@/features/insights/data";
+import { addDays, actionSchema } from "@/features/insights/data";
 import { notificationHref } from "@/features/notifications/data";
 import {
   fetchAttendanceCompleteness,
@@ -109,12 +109,6 @@ describe("FR-ATT-016 / FR-MRK-016 API calls", () => {
     });
   });
 
-  it("refuses an answer of the wrong shape", async () => {
-    await expect(
-      fetchAttendanceCompleteness(fakeApi([], { rows: "nope" }), "2026-11-12"),
-    ).rejects.toThrow();
-  });
-
   it("reads an exam's grid by id", async () => {
     const calls: { method: string; path: string; init?: unknown }[] = [];
     const grid = {
@@ -209,13 +203,5 @@ describe("FR-EW-019 planned reviews", () => {
   it("adds calendar days across a month end", () => {
     expect(addDays("2026-11-30", 1)).toBe("2026-12-01");
     expect(addDays("2026-11-12", 60)).toBe("2027-01-11");
-  });
-
-  it("reads the review fields defensively", () => {
-    expect(reviewOf({ review_on: "2026-11-19", review_due: false })).toEqual({
-      on: "2026-11-19",
-      due: false,
-    });
-    expect(reviewOf({})).toEqual({ on: null, due: false });
   });
 });

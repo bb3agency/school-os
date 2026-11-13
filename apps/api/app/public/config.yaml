@@ -38,6 +38,8 @@ disclosure_key_bytes: 16
 webhook_providers:
   razorpay: {max_body_bytes: 262144}
   meta: {max_body_bytes: 3145728}
+  # FA-13: Razorpay events of SchoolOS's own account (payment links of SchoolOS invoices).
+  razorpay_schoolos: {max_body_bytes: 262144}
 replay_window_hours: 72
 
 # Where "Pay online" may send a parent (R2-3H; FR-PUB-010: Razorpay's hosted page is the only

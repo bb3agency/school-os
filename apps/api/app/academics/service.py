@@ -333,6 +333,7 @@ def attendance_day(
             for s in roster
         ],
         counts=_counts(v for k, v in by_student.items() if k in shown),
+        draft_keep_hours=load_config().attendance.draft_keep_hours,
     )
 
 

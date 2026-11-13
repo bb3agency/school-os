@@ -3539,6 +3539,12 @@
             "title": "Counts",
             "type": "object"
           },
+          "draft_keep_hours": {
+            "default": 24,
+            "description": "Hours the screen may keep this day's unsent statuses on the device (student ids and statuses only) before dropping them (FT-11, FR-ATT-026)",
+            "title": "Draft Keep Hours",
+            "type": "integer"
+          },
           "marked": {
             "description": "Whether any student of the section is marked that day",
             "title": "Marked",
@@ -5075,6 +5081,371 @@
         "title": "Blocker",
         "type": "object"
       },
+      "BoardCandidateEntryIn": {
+        "additionalProperties": false,
+        "description": "One student's choices; a field left out (null) is not changed. Values cannot be cleared:\na correction is a new value (history kept, FR-STU-003).",
+        "properties": {
+          "board_subjects": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 16,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_]{1,15}$",
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Subjects"
+          },
+          "exam_medium": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exam Medium"
+          },
+          "first_language": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_]{1,15}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Language"
+          },
+          "photo_signature_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Signature Ready"
+          },
+          "second_language": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_]{1,15}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Language"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "third_language": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_]{1,15}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Third Language"
+          }
+        },
+        "required": [
+          "student_id"
+        ],
+        "title": "BoardCandidateEntryIn",
+        "type": "object"
+      },
+      "BoardCandidateGridOut": {
+        "properties": {
+          "available_schemes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Available Schemes",
+            "type": "array"
+          },
+          "class_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Code"
+          },
+          "class_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Section"
+          },
+          "ready_count": {
+            "title": "Ready Count",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/BoardCandidateRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "scheme": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardSchemeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "section_id": {
+            "format": "uuid",
+            "title": "Section Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "section_id",
+          "class_section",
+          "class_code",
+          "scheme",
+          "available_schemes",
+          "rows",
+          "ready_count"
+        ],
+        "title": "BoardCandidateGridOut",
+        "type": "object"
+      },
+      "BoardCandidateIssueOut": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "reason": {
+            "enum": [
+              "missing",
+              "not_in_list",
+              "repeated",
+              "group_missing",
+              "too_many",
+              "photo"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "reason"
+        ],
+        "title": "BoardCandidateIssueOut",
+        "type": "object"
+      },
+      "BoardCandidateRowOut": {
+        "properties": {
+          "admission_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission No"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/BoardCandidateIssueOut"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "roll_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roll No"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "student_id",
+          "admission_no",
+          "display_name",
+          "roll_no",
+          "values",
+          "issues",
+          "ready"
+        ],
+        "title": "BoardCandidateRowOut",
+        "type": "object"
+      },
+      "BoardCandidateSaveIn": {
+        "additionalProperties": false,
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/BoardCandidateEntryIn"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Rows",
+            "type": "array"
+          },
+          "scheme": {
+            "pattern": "^[a-z][a-z0-9-]{1,39}$",
+            "title": "Scheme",
+            "type": "string"
+          },
+          "source": {
+            "default": "manual_entry",
+            "enum": [
+              "manual_entry",
+              "parent_form",
+              "board_registration"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scheme",
+          "rows"
+        ],
+        "title": "BoardCandidateSaveIn",
+        "type": "object"
+      },
+      "BoardCandidateSaveOut": {
+        "properties": {
+          "grid": {
+            "$ref": "#/components/schemas/BoardCandidateGridOut"
+          },
+          "recorded": {
+            "description": "Values recorded (a new or changed value).",
+            "title": "Recorded",
+            "type": "integer"
+          },
+          "unchanged": {
+            "description": "Values that were already recorded as sent.",
+            "title": "Unchanged",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "recorded",
+          "unchanged",
+          "grid"
+        ],
+        "title": "BoardCandidateSaveOut",
+        "type": "object"
+      },
+      "BoardCodeOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "BoardCodeOut",
+        "type": "object"
+      },
       "BoardFieldOut": {
         "description": "A column of the board's own form; ``attribute`` null when SchoolOS does not hold it.",
         "properties": {
@@ -5109,6 +5480,255 @@
           "note"
         ],
         "title": "BoardFieldOut",
+        "type": "object"
+      },
+      "BoardLanguageSlotOut": {
+        "properties": {
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/BoardCodeOut"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "slot": {
+            "title": "Slot",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slot",
+          "required",
+          "options"
+        ],
+        "title": "BoardLanguageSlotOut",
+        "type": "object"
+      },
+      "BoardSchemeOut": {
+        "description": "One board scheme of ``board_catalogue.yaml`` (``verified: false`` until confirmed).",
+        "properties": {
+          "board": {
+            "title": "Board",
+            "type": "string"
+          },
+          "classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "keys": {
+            "description": "Attribute keys this scheme asks for (grid columns).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Keys",
+            "type": "array"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/BoardLanguageSlotOut"
+            },
+            "title": "Languages",
+            "type": "array"
+          },
+          "max_subjects": {
+            "title": "Max Subjects",
+            "type": "integer"
+          },
+          "medium_options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Medium Options",
+            "type": "array"
+          },
+          "medium_required": {
+            "title": "Medium Required",
+            "type": "boolean"
+          },
+          "photo_required": {
+            "title": "Photo Required",
+            "type": "boolean"
+          },
+          "source": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source",
+            "type": "array"
+          },
+          "source_note": {
+            "title": "Source Note",
+            "type": "string"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/BoardSubjectGroupOut"
+            },
+            "title": "Subjects",
+            "type": "array"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "version",
+          "label_en",
+          "board",
+          "classes",
+          "verified",
+          "source",
+          "source_note",
+          "medium_required",
+          "medium_options",
+          "languages",
+          "subjects",
+          "max_subjects",
+          "photo_required",
+          "keys"
+        ],
+        "title": "BoardSchemeOut",
+        "type": "object"
+      },
+      "BoardStudentCandidateOut": {
+        "description": "One student's board candidate choices (student profile).",
+        "properties": {
+          "class_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Section"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/BoardCandidateIssueOut"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "scheme": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardSchemeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "student_id",
+          "section_id",
+          "class_section",
+          "scheme",
+          "values",
+          "issues",
+          "ready"
+        ],
+        "title": "BoardStudentCandidateOut",
+        "type": "object"
+      },
+      "BoardSubjectGroupOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_en": {
+            "title": "Label En",
+            "type": "string"
+          },
+          "max": {
+            "title": "Max",
+            "type": "integer"
+          },
+          "min": {
+            "title": "Min",
+            "type": "integer"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/BoardCodeOut"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label_en",
+          "required",
+          "min",
+          "max",
+          "options"
+        ],
+        "title": "BoardSubjectGroupOut",
         "type": "object"
       },
       "BreachCreate": {
@@ -25071,6 +25691,8 @@
           "registers": {
             "description": "Item keys of the pack's registers to include (student lists: needs register.read). Registers not chosen print as left out.",
             "items": {
+              "maxLength": 64,
+              "minLength": 1,
               "type": "string"
             },
             "maxItems": 10,
@@ -26308,6 +26930,193 @@
           }
         },
         "title": "InvoicePatch",
+        "type": "object"
+      },
+      "InvoicePaymentLinkOut": {
+        "description": "A Razorpay payment link of a SchoolOS invoice (FA-13; FR-PAY-017..024). SchoolOS is the\nmerchant. ``needs_review``: paid but not applied (``review_reason``); refund it in\nRazorpay's dashboard. No payer details are kept.",
+        "properties": {
+          "amount_inr": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount Inr",
+            "type": "string"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancelled_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "expire_by": {
+            "format": "date-time",
+            "title": "Expire By",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "invoice_id": {
+            "format": "uuid",
+            "title": "Invoice Id",
+            "type": "string"
+          },
+          "payment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Id"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_link_id": {
+            "title": "Provider Link Id",
+            "type": "string"
+          },
+          "provider_payment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Payment Id"
+          },
+          "review_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "invoice_not_open",
+                  "amount_exceeds_balance",
+                  "amount_mismatch"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Reason"
+          },
+          "settled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settled At"
+          },
+          "short_url": {
+            "title": "Short Url",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "paid",
+              "cancelled",
+              "expired",
+              "needs_review"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "invoice_id",
+          "tenant_id",
+          "provider",
+          "provider_link_id",
+          "short_url",
+          "amount_inr",
+          "status",
+          "expire_by",
+          "created_by",
+          "created_at",
+          "version"
+        ],
+        "title": "InvoicePaymentLinkOut",
+        "type": "object"
+      },
+      "InvoicePaymentLinksOut": {
+        "description": "An invoice's payment links, newest first; ``enabled`` says whether online payment of\nSchoolOS invoices is set up (``SOS_PLATFORM_PAYMENTS_ENABLED``).",
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/InvoicePaymentLinkOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "data"
+        ],
+        "title": "InvoicePaymentLinksOut",
         "type": "object"
       },
       "InvoicePdfDownloadOut": {
@@ -35180,9 +35989,16 @@
             "title": "Recorded At"
           },
           "recorded_by": {
-            "format": "uuid",
-            "title": "Recorded By",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By"
           },
           "recorded_by_name": {
             "anyOf": [
@@ -35269,7 +36085,6 @@
           "received_on",
           "reference",
           "status",
-          "recorded_by",
           "recorded_at"
         ],
         "title": "PaymentOut",
@@ -51739,6 +52554,17 @@
             ],
             "title": "Issue Date"
           },
+          "payment_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Url"
+          },
           "period_end": {
             "format": "date",
             "title": "Period End",
@@ -59767,6 +60593,56 @@
         ]
       }
     },
+    "/api/v1/board-candidates/schemes": {
+      "get": {
+        "description": "The board candidate schemes (medium, languages, subjects per board; ``verified: false``\nuntil a school confirmed them) (permission ``student.read_basic``).",
+        "operationId": "list_board_schemes_api_v1_board_candidates_schemes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BoardSchemeOut"
+                  },
+                  "title": "Response List Board Schemes Api V1 Board Candidates Schemes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Board Schemes",
+        "tags": [
+          "students"
+        ]
+      }
+    },
     "/api/v1/breakglass/grants/{grant_id}/revoke": {
       "post": {
         "description": "End support access now (step-up MFA), including emergency access.",
@@ -67601,7 +68477,8 @@
                       "DQ-021",
                       "DQ-022",
                       "DQ-030",
-                      "DQ-031"
+                      "DQ-031",
+                      "DQ-032"
                     ],
                     "type": "string"
                   },
@@ -91854,6 +92731,156 @@
         ]
       }
     },
+    "/api/v1/platform/invoices/{invoice_id}/payment-links": {
+      "get": {
+        "description": "The invoice's Razorpay payment links, newest first, and whether online payment is set up\n(``enabled``). 404 for an unknown invoice.",
+        "operationId": "list_invoice_payment_links_api_v1_platform_invoices__invoice_id__payment_links_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invoice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoicePaymentLinksOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Invoice Payment Links",
+        "tags": [
+          "platform"
+        ]
+      },
+      "post": {
+        "description": "A Razorpay payment link for the balance due of an issued invoice (SchoolOS is the\nmerchant). 409 ``online_payments_off``, ``invalid_state``, ``link_exists`` or\n``invoice_changed``; 502 ``payment_link_failed``; 503 when Razorpay does not answer. Audited\nas ``payment_link.created``.",
+        "operationId": "create_invoice_payment_link_api_v1_platform_invoices__invoice_id__payment_links_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invoice Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoicePaymentLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Invoice Payment Link",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
     "/api/v1/platform/invoices/{invoice_id}/payments": {
       "get": {
         "description": "The invoice's payments, newest received first, reversed ones included with who reversed\nthem, when and why (docs/16 \u00a75.9). 404 for an unknown invoice.",
@@ -92512,6 +93539,142 @@
           }
         },
         "summary": "Set Operator Roles",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/payment-links/{link_id}/cancel": {
+      "post": {
+        "description": "Cancel an active link at Razorpay and here. 409 ``invalid_state`` when it is not active,\n``link_paid`` when Razorpay reports it paid (the payment is then applied). Audited as\n``payment_link.cancelled``.",
+        "operationId": "cancel_invoice_payment_link_api_v1_platform_payment_links__link_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoicePaymentLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel Invoice Payment Link",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/payment-links/{link_id}/check": {
+      "post": {
+        "description": "Ask Razorpay about an active link now and apply a captured payment the webhook missed\n(same checks as the webhook; audited as ``payment.online_received``).",
+        "operationId": "check_invoice_payment_link_api_v1_platform_payment_links__link_id__check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoicePaymentLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Check Invoice Payment Link",
         "tags": [
           "platform"
         ]
@@ -101583,7 +102746,7 @@
         ]
       },
       "post": {
-        "description": "Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a\nday again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range``,\n``before_enrolment`` (before the student's explicit enrolment start) or ``duplicate_entry``\nper entry. An entry may carry ``expected_version`` (the ``version`` read\nfrom the day): 412 ``attendance_changed`` when someone else changed that mark since, and\nnothing is saved. The early-warning rules look at these students again.",
+        "description": "Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a\nday again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range``,\n``before_enrolment`` (before the student's explicit enrolment start) or ``duplicate_entry``\nper entry. An entry may carry ``expected_version`` (the ``version`` read\nfrom the day): 412 ``attendance_changed`` when someone else changed that mark since, and\nnothing is saved. The early-warning rules look at these students again. Accepts\n``Idempotency-Key`` (FT-11, FR-ATT-027): a retry of a draft kept on the teacher's device\nwith the same key and body replays the first answer (``Idempotent-Replayed: true``) and\nsaves nothing again, so it can never overwrite a newer save; a failed save is not kept, and\nthe retry meets the same checks.",
         "operationId": "record_attendance_api_v1_sections__section_id__attendance_post",
         "parameters": [
           {
@@ -101814,6 +102977,167 @@
         "summary": "Preview Attendance Sheet",
         "tags": [
           "attendance and marks"
+        ]
+      }
+    },
+    "/api/v1/sections/{section_id}/board-candidates": {
+      "get": {
+        "description": "The section's students with their medium, languages, subjects and photo tick, and what\nis still missing for the board (permission ``student.read_basic``; 404 outside scope).",
+        "operationId": "section_board_candidates_api_v1_sections__section_id__board_candidates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scheme",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9-]{1,39}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scheme"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardCandidateGridOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Section Board Candidates",
+        "tags": [
+          "students"
+        ]
+      },
+      "put": {
+        "description": "Record the choices of many students of one section (permission\n``student.update_nonidentity`` with its scope on each student). Fields left out are not\nchanged; codes outside the scheme are refused (422 ``not_in_scheme``).",
+        "operationId": "save_section_board_candidates_api_v1_sections__section_id__board_candidates_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Section Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardCandidateSaveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardCandidateSaveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Save Section Board Candidates",
+        "tags": [
+          "students"
         ]
       }
     },
@@ -103638,6 +104962,74 @@
         "summary": "Add Note",
         "tags": [
           "student insights"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/board-candidate": {
+      "get": {
+        "description": "One student's board candidate choices and what is missing (permission\n``student.read_basic``; 404 outside scope).",
+        "operationId": "student_board_candidate_api_v1_students__student_id__board_candidate_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardStudentCandidateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Student Board Candidate",
+        "tags": [
+          "students"
         ]
       }
     },
@@ -108576,6 +109968,62 @@
           }
         },
         "summary": "Razorpay Webhook",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/api/v1/webhooks/schoolos-billing": {
+      "post": {
+        "description": "Razorpay events of SchoolOS's own account (payment links of SchoolOS invoices). Only\n``payment_link.paid`` is acted on; the link and payment are re-fetched before the invoice\nis marked paid. A replayed event is acknowledged without effect.",
+        "operationId": "schoolos_billing_webhook_api_v1_webhooks_schoolos_billing_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bad or missing X-Razorpay-Signature (no detail)."
+          },
+          "404": {
+            "description": "Online payment of SchoolOS invoices is not set up."
+          },
+          "413": {
+            "description": "Larger than 256 KB."
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Razorpay could not be asked; Razorpay retries the event."
+          }
+        },
+        "summary": "Schoolos Billing Webhook",
         "tags": [
           "webhooks"
         ]

@@ -64,15 +64,19 @@ profiles:
     value_maps:
       gender: {female: Female, male: Male, transgender: Transgender}
       category: {general: General, ews: General, obc: OBC, sc: SC, st: ST}
+  # layout_version 3 (FO-10, FR-STU-034): the two language codes, the other subject codes and
+  # whether the photo and signature were collected (board codes of
+  # app/students/board_catalogue.yaml, verified: false); empty when not recorded.
   cbse-loc-2027:
     kind: board
-    layout_version: 2
+    layout_version: 3
     date_format: "%d/%m/%Y"
     fields: [admission_no, full_name, mother_name, father_name, dob, gender, category, disability,
-             apaar_id]
+             apaar_id, first_language, second_language, board_subjects, photo_signature_ready]
     value_maps:
       gender: {female: Female, male: Male, transgender: Transgender}
       category: {general: General, ews: General, obc: OBC, sc: SC, st: ST}
+      photo_signature_ready: {"yes": "Yes", "no": "No"}
   # AP State Board SSC nominal roll (FR-EXP-008, FR-DQ-048; ADR-0040 follow-up). UNVERIFIED
   # (owner decision D3): no official column list was found; the order follows the public guides
   # in docs/research/2026-10-market/notes/regulation_portals.md §3 (name, parents' names, date of
@@ -86,15 +90,21 @@ profiles:
   # when no category is recorded). The check runs only when restricted values are included
   # (category is C3; a masked cell is entered from the record). UNVERIFIED (owner decision
   # D3): confirm the codes against the current BSEAP nominal-roll format.
+  # layout_version 3 (FO-10, FR-STU-034): medium, first/second/third language and whether the
+  # photo and signature were collected (app/students/board_catalogue.yaml, verified: false).
   bseap-ssc-2027:
     kind: board
-    layout_version: 2
+    layout_version: 3
     verified: false
     date_format: "%d/%m/%Y"
     fields: [admission_no, full_name, father_name, mother_name, dob, gender, category, caste,
-             religion, mother_tongue, udise_pen, aadhaar_last4]
+             religion, mother_tongue, udise_pen, aadhaar_last4, exam_medium, first_language,
+             second_language, third_language, photo_signature_ready]
     value_maps:
       gender: {female: Female, male: Male, transgender: Transgender}
+      exam_medium: {english: English, telugu: Telugu, urdu: Urdu, hindi: Hindi, tamil: Tamil,
+                    kannada: Kannada, odia: Odia}
+      photo_signature_ready: {"yes": "Yes", "no": "No"}
     coded_values:
       category:
         version: 1

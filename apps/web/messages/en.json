@@ -2214,7 +2214,11 @@
       "unknown_check_kind": "Choose a check from the list.",
       "policy_document_not_ready": "Choose a PDF in Documents with the purpose policy that has finished its virus scan.",
       "review_in_past": "Choose a date after today.",
-      "too_many_roles": "Choose fewer roles."
+      "too_many_roles": "Choose fewer roles.",
+      "not_in_scheme": "This is not in the board's list for this class. Choose one from the list.",
+      "not_for_this_class": "This board does not apply to this class. Choose another board.",
+      "board_code_required": "Enter the board's code, for example 184 or HINDI.",
+      "board_codes_required": "Enter the board's subject codes separated by commas, for example 041,086,087."
     },
     "api": {
       "year_result_changed": {
@@ -7994,7 +7998,23 @@
       "keep": "Keep marking"
     },
     "unsavedLeave": "Attendance for this day is not saved. Leave and lose it?",
-    "changedBySomeone": "Someone else saved attendance for this day while you were marking it, so nothing was saved. The register now shows their changes, with the statuses you changed kept. Check them, then save again."
+    "changedBySomeone": "Someone else saved attendance for this day while you were marking it, so nothing was saved. The register now shows their changes, with the statuses you changed kept. Check them, then save again.",
+    "draft": {
+      "notSavedYet": "Not saved yet.",
+      "keptUntil": "Your changes are kept on this device until {time}.",
+      "notKept": "This browser can't keep a copy, so keep this page open until it is saved.",
+      "sending": "Saving…",
+      "offline": "No network. It will be sent when the network is back.",
+      "retrying": "The school couldn't be reached. Trying again automatically.",
+      "tryNow": "Try now",
+      "discard": "Discard my changes",
+      "restoredTitle": "Your unsaved changes are back",
+      "restoredBody": "{count, plural, one {# status} other {# statuses}} you chose on this device at {time} {count, plural, one {is} other {are}} not saved yet. Check them, then save.",
+      "savedNow": "Saved now: {status}",
+      "pendingTitle": "{count, plural, one {# day} other {# days}} not saved yet",
+      "pendingBody": "You marked these on this device but they did not reach the school. Open one to save it.",
+      "pendingOpen": "{section}, {date}"
+    }
   },
   "marks": {
     "nav": "Marks",
@@ -8131,6 +8151,7 @@
     },
     "dueLabel": "Due",
     "overdue": "Overdue",
+    "reviewDue": "Review due",
     "emptyTitle": "No flags here",
     "emptyBody": "Flags appear when a rule notices a pattern, like three school days absent in a row.",
     "pagesLabel": "Pages of students to follow up",
@@ -13926,6 +13947,162 @@
         "title": "The policy is not ready to read",
         "body": "Ask the office to check the document, then try again later."
       }
+    }
+  },
+  "boardCandidates": {
+    "nav": "Board candidates",
+    "title": "Board candidates",
+    "description": "Record each candidate's medium, languages, subjects and whether the photo and signature were collected, before the board portal opens.",
+    "noPermissionTitle": "You can't open board candidates",
+    "noPermissionBody": "Ask the school's admin for access to student records.",
+    "section": "Section",
+    "chooseSection": "Choose a section",
+    "scheme": "Board",
+    "schemes": {
+      "bseap-ssc": "AP SSC (BSEAP)",
+      "cbse-secondary": "CBSE secondary"
+    },
+    "pickTitle": "Choose a section",
+    "pickBody": "Board classes only: Class IX and X.",
+    "noSchemeTitle": "This is not a board class",
+    "noSchemeBody": "Board candidate details are recorded for the school's board classes only. Choose a Class IX or X section.",
+    "noStudentsTitle": "No students in this section",
+    "noStudentsBody": "Students appear here once they are enrolled in the section.",
+    "gridTitle": "Candidates of {section}",
+    "readyCount": "{ready} of {total} ready for the board",
+    "unverifiedTitle": "Lists not yet confirmed",
+    "unverifiedBody": "These lists come from public guides and are not yet checked against the board's own portal. Check the portal before you submit.",
+    "fillTitle": "Same for the whole section",
+    "fillButton": "Fill empty cells",
+    "fillHint": "Fills only the cells that are empty. Nothing is saved until you press Save.",
+    "choose": "Choose",
+    "none": "None",
+    "tableLabel": "Board candidates of the section",
+    "formLabel": "Board candidate details",
+    "colStudent": "Student",
+    "colPhoto": "Photo and signature",
+    "colStatus": "What is missing",
+    "unnamed": "Name not recorded",
+    "roll": "Roll {roll}",
+    "photoCollected": "Collected",
+    "ready": "Ready",
+    "sourceLabel": "Taken from",
+    "source": {
+      "parent_form": "Parent's form",
+      "manual_entry": "Office records"
+    },
+    "discard": "Discard changes",
+    "save": "{count, plural, =0 {Save} one {Save # student} other {Save # students}}",
+    "saved": "{count, plural, =0 {Nothing changed.} one {Saved # value.} other {Saved # values.}}",
+    "medium": {
+      "label": "Medium",
+      "english": "English",
+      "telugu": "Telugu",
+      "urdu": "Urdu",
+      "hindi": "Hindi",
+      "tamil": "Tamil",
+      "kannada": "Kannada",
+      "odia": "Odia"
+    },
+    "slot": {
+      "first_language": "First language",
+      "second_language": "Second language",
+      "third_language": "Third language"
+    },
+    "field": {
+      "exam_medium": "Medium",
+      "first_language": "First language",
+      "second_language": "Second language",
+      "third_language": "Third language",
+      "board_subjects": "Subjects",
+      "photo_signature_ready": "Photo and signature"
+    },
+    "issue": {
+      "missing": "{field}: not recorded",
+      "not_in_list": "{field}: not in the board's list",
+      "repeated": "{field}: {code} is chosen twice",
+      "group_missing": "Choose {group}",
+      "too_many": "{field}: too many",
+      "photo": "Photo and signature not collected"
+    },
+    "profileTitle": "Board candidate",
+    "profileDescription": "{scheme}. Photos and signatures are uploaded on the board portal; SchoolOS records only whether they were collected.",
+    "openGrid": "Open the section grid",
+    "notRecorded": "Not recorded",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "invoicePayments": {
+    "title": "Online payment",
+    "intro": "A payment link opens SchoolOS's Razorpay page for the balance due. The school can pay from its Plan and billing page, or you can send the link to its billing contact. The invoice is marked paid once Razorpay confirms the payment.",
+    "off": "Online payment of invoices is not set up yet. Record payments by hand above.",
+    "create": "Create payment link",
+    "createTitle": "Create a payment link?",
+    "createBody": "Razorpay makes a link for {amount}, the balance due. It stays payable for 30 days.",
+    "createConsequence": "The school's Plan and billing page shows \"Pay online\" for this invoice.",
+    "rowLabel": "Payment link for {amount}",
+    "copy": "Copy link",
+    "copied": "Link copied.",
+    "copyFailed": "Could not copy. Select the link and copy it yourself.",
+    "check": "Check payment",
+    "cancel": "Cancel link",
+    "cancelTitle": "Cancel this payment link?",
+    "cancelBody": "Razorpay stops accepting payments on this link. You can create a new one later.",
+    "cancelConsequence": "The school no longer sees \"Pay online\" for this invoice.",
+    "colCreated": "Created",
+    "colAmount": "Amount",
+    "colStatus": "Status",
+    "colLink": "Link",
+    "colActions": "Actions",
+    "expires": "Payable until {date}",
+    "linkClosed": "No longer payable",
+    "status": {
+      "active": "Waiting for payment",
+      "paid": "Paid",
+      "cancelled": "Cancelled",
+      "expired": "Expired",
+      "needs_review": "Needs review"
+    },
+    "review": {
+      "invoice_not_open": "Paid after the invoice was settled or voided. Refund it in Razorpay's dashboard.",
+      "amount_exceeds_balance": "Paid after another payment lowered the balance. Refund the difference in Razorpay's dashboard and record the rest by hand.",
+      "amount_mismatch": "Razorpay reports a different amount. Check the payment in Razorpay's dashboard."
+    },
+    "emptyTitle": "No payment links yet",
+    "emptyBody": "Payment links made for this invoice appear here, newest first.",
+    "methodOnline": "Online (Razorpay)",
+    "byRazorpay": "Razorpay (automatic)",
+    "errors": {
+      "online_payments_off": {
+        "title": "Online payment is not set up",
+        "body": "Record the payment by hand instead, or ask an engineer to set up SchoolOS's Razorpay account."
+      },
+      "link_exists": {
+        "title": "A link already exists",
+        "body": "This invoice already has a payment link waiting for payment. The list has been reloaded."
+      },
+      "invalid_state": {
+        "title": "Not possible for this invoice or link",
+        "body": "The invoice is not open for payment, or the link is no longer active. The list has been reloaded."
+      },
+      "invoice_changed": {
+        "title": "The invoice changed",
+        "body": "A payment was recorded while the link was being made. Check the balance and try again."
+      },
+      "payment_link_failed": {
+        "title": "Razorpay did not accept the request",
+        "body": "Try again in a few minutes. If it keeps failing, ask an engineer to check SchoolOS's Razorpay account."
+      },
+      "link_paid": {
+        "title": "Already paid",
+        "body": "The link was paid before it could be cancelled. The payment has been applied to the invoice."
+      }
+    },
+    "school": {
+      "colPay": "Pay",
+      "payOnline": "Pay online",
+      "payOnlineLabel": "Pay online: invoice {number}",
+      "payNote": "\"Pay online\" opens SchoolOS's secure Razorpay page in a new tab for the amount still to pay. The invoice shows as paid here once Razorpay confirms the payment."
     }
   }
 }

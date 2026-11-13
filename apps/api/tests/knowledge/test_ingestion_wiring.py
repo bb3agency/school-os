@@ -37,6 +37,17 @@ S = _load("sos_test_ingestion_support", Path(__file__).with_name("ingestion_supp
 DOC = uuid.UUID("0190e000-0000-7000-8000-0000000000d1")
 
 
+@pytest.fixture(autouse=True)
+def _school_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every ``knowledge.*`` task is an ``ops.TenantTask``, which reads the school's status from
+    ``core.tenants`` before the body runs (A-12, BR-08). These are unit tests without a
+    database: the school counts as active here (the hold and drop rules have their own tests in
+    ``tests/ops/test_suspended_hold.py``). Without this, the tests passed only when an earlier
+    test had pointed the engine at the test database, and otherwise waited for a connection to
+    localhost:5432 and failed with ``OperationalError``."""
+    monkeypatch.setattr(ops, "school_work_decision", lambda tenant_id, task_name: "run")
+
+
 @pytest.fixture
 def enqueued(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, str, dict[str, Any]]]:
     calls: list[tuple[Any, str, dict[str, Any]]] = []

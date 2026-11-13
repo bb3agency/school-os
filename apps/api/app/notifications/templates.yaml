@@ -265,6 +265,17 @@ templates:
     te:
       title: ధృవీకరణ పత్రం ఆమోదించబడలేదు
       body: మీరు తయారు చేసిన ధృవీకరణ పత్రం ఆమోదించబడలేదు. కారణం తెలుసుకోవడానికి దాన్ని తెరవండి.
+  # FO-09 follow-up (FR-CERT-045): the daily overdue TC request reminder to the principal and the
+  # office. Counts only (the overdue requests the recipient can see) and the configured days; no
+  # names, no request IDs, so no link: the body says where to look.
+  tc_request.overdue:
+    params: [count, days]
+    en:
+      title: "TC requests overdue: {count}"
+      body: "{count, plural, one {# transfer certificate request has} other {# transfer certificate requests have}} waited more than {days, plural, one {# day} other {# days}}. Open Certificates > TC requests to prepare the TC or hand it over."
+    te:
+      title: "గడువు దాటిన TC అభ్యర్థనలు: {count}"
+      body: "{count, plural, one {# బదిలీ ధృవీకరణ పత్రం అభ్యర్థన} other {# బదిలీ ధృవీకరణ పత్రం అభ్యర్థనలు}} {days, plural, one {# రోజు} other {# రోజుల}} కంటే ఎక్కువగా వేచి ఉన్నాయి. ధృవీకరణ పత్రాలు > TC అభ్యర్థనలు తెరిచి TC తయారు చేయండి లేదా అందజేయండి."
   # --- circulars and tasks (M4; FR-CIR-001, FR-CIR-005, FR-TASK-003, FR-TASK-007) ---------------
   circular.read_ready:
     params: [document_id, suggestions]

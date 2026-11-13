@@ -30,7 +30,9 @@ HandleKind = Literal[
 ParentKind = Literal[
     "parent_notice", "parent_receipt", "parent_dues", "parent_optin", "parent_closure"
 ]
-WebhookProvider = Literal["razorpay", "meta"]
+# razorpay_schoolos (FA-13): SchoolOS's own Razorpay account, for SchoolOS's invoices (control
+# plane); "razorpay" is each school's own account (fees, ADR-0042).
+WebhookProvider = Literal["razorpay", "meta", "razorpay_schoolos"]
 
 HANDLE_KINDS: Final[tuple[HandleKind, ...]] = get_args(HandleKind)
 PARENT_KINDS: Final[tuple[ParentKind, ...]] = get_args(ParentKind)
@@ -102,7 +104,7 @@ class PublicConfig(_Model):
         cls, value: dict[WebhookProvider, WebhookProviderConfig]
     ) -> dict[WebhookProvider, WebhookProviderConfig]:
         if set(value) != set(WEBHOOK_PROVIDERS):
-            raise ValueError("webhook_providers must list razorpay and meta")
+            raise ValueError("webhook_providers must list every webhook provider")
         return value
 
     def lifetime(self, kind: ParentKind) -> dt.timedelta:

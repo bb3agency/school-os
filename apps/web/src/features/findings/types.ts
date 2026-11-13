@@ -65,6 +65,7 @@ const ruleIds = [
   "DQ-022",
   "DQ-030",
   "DQ-031",
+  "DQ-032",
 ] as const satisfies readonly RuleId[];
 export const RULE_IDS: Exhaustive<RuleId, typeof ruleIds> = ruleIds;
 

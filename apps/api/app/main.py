@@ -57,6 +57,7 @@ from app.messaging.api import router as messaging_router
 from app.messaging.api import webhook_router as messaging_webhook_router
 from app.notifications.api import invitations_router
 from app.notifications.api import router as notifications_router
+from app.platform import payment_webhook as platform_payment_webhook
 from app.platform.api import fleet_router
 from app.platform.api import router as platform_router
 from app.platform.tenant_api import router as platform_tenant_router
@@ -68,6 +69,7 @@ from app.privacy.readiness_api import router as readiness_router
 from app.public.api import router as public_router
 from app.public.config import rules as public_rules
 from app.students.api import router as students_router
+from app.students.board_candidate_api import router as board_candidate_router
 from app.tally.api import agent_router as tally_agent_router
 from app.tally.api import router as tally_router
 from app.tally.api_vouchers import router as tally_vouchers_router
@@ -102,6 +104,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     app.include_router(identity_router)
     app.include_router(tenancy_router)
     app.include_router(students_router)
+    app.include_router(board_candidate_router)  # FO-10 board candidate choices
     app.include_router(audit_router)
     app.include_router(documents_router)
     app.include_router(imports_router)
@@ -184,6 +187,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:  # noqa: PLR0915 - 
     if settings.deployment_mode is DeploymentMode.SHARED:
         app.include_router(platform_router)
         app.include_router(fleet_router)
+        # FA-13: Razorpay webhook of SchoolOS's own account (SchoolOS invoices), pinned in
+        # public_routes.yaml; 404 until SOS_PLATFORM_PAYMENTS_ENABLED.
+        app.include_router(platform_payment_webhook.router)
+        platform_payment_webhook.install()
     setup_telemetry(app, settings)
     return app
 

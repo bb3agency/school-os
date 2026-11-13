@@ -39,6 +39,9 @@ needs_apaar: true
 # printed details before the school submits (secondary sources above).
 parent_verification_slip: true
 
+# FO-10 (DQ-032): languages, subjects and the photo tick for Class X (the scheme also covers IX).
+candidate_scheme: cbse-secondary
+
 board_fields:
   - {name: "Registration number (from Class IX/XI)", attribute: null,
      note: "Printed on the registration slip; SchoolOS does not hold it yet."}
@@ -52,9 +55,13 @@ board_fields:
   - {name: "APAAR ID", attribute: apaar_id,
      note: "12 digits; REFUSED where the parent refused consent in writing; NOGEN where generation failed."}
   - {name: "Admission number", attribute: admission_no}
-  - {name: "Subjects (codes)", attribute: null,
-     note: "Enter on the portal; Class X Maths, Science and Social Science get two levels from 2028."}
+  # FO-10 (FR-STU-034): the two languages and the other subject codes the office records on the
+  # board candidates screen (codes of app/students/board_catalogue.yaml, verified: false).
+  - {name: "First language (code)", attribute: first_language}
+  - {name: "Second language (code)", attribute: second_language}
+  - {name: "Subjects (codes)", attribute: board_subjects,
+     note: "Class X Maths, Science and Social Science get two levels from 2028 (not modelled yet)."}
   - {name: "Person with disability (PwD/CWSN) and exam concessions", attribute: disability,
      required: false, note: "Restricted value; shown masked in the pre-check sheet."}
-  - {name: "Photograph and signature", attribute: null,
-     note: "Uploaded on the portal; SchoolOS does not hold them."}
+  - {name: "Photograph and signature", attribute: photo_signature_ready,
+     note: "Uploaded on the portal; SchoolOS does not hold them, only whether they were collected."}

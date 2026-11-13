@@ -1784,6 +1784,23 @@ forbidden_modules =
     requests
 allow_indirect_imports = True
 
+# FA-13: only app.platform.link_providers talks to Razorpay for SchoolOS's own invoices (egress
+# api.razorpay.com); the payment-link service and its webhook never import an HTTP client, and
+# the control plane never reuses the school-as-merchant fees providers (ADR-0020, ADR-0042).
+[importlinter:contract:platform-link-provider-egress]
+name = platform: only link_providers/ make HTTP calls to a payment provider
+type = forbidden
+source_modules =
+    app.platform.payment_links
+    app.platform.payment_webhook
+    app.platform.billing
+    app.platform.payments
+forbidden_modules =
+    httpx
+    requests
+    app.fees
+allow_indirect_imports = True
+
 # --- 9. CBSE Appendix IX disclosure (R3-1C; ADR-0051) ----------------------------------------
 # Other modules use only app.disclosure.service.
 

@@ -111,7 +111,7 @@ describe("area layouts send only their own message namespaces (WP-04)", () => {
     await signInDirect("staff", HARNESS_TENANT);
     const school = (await SchoolLayout({ children: "x" })) as ReactElement<{ scope: string }>;
     expect(school.type).toBe(ClientMessages);
-    expect(school.props.scope).toBe("school");
+    expect(school.props.scope).toBe("schoolBase");
     await signInDirect("operator", null);
     const platform = (await PlatformLayout({ children: "x" })) as ReactElement<{ scope: string }>;
     expect(platform.type).toBe(ClientMessages);

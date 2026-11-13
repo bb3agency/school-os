@@ -711,6 +711,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/board-candidates/schemes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Board Schemes
+         * @description The board candidate schemes (medium, languages, subjects per board; ``verified: false``
+         *     until a school confirmed them) (permission ``student.read_basic``).
+         */
+        get: operations["list_board_schemes_api_v1_board_candidates_schemes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/breakglass/grants/{grant_id}/revoke": {
         parameters: {
             query?: never;
@@ -9014,6 +9035,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/invoices/{invoice_id}/payment-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Invoice Payment Links
+         * @description The invoice's Razorpay payment links, newest first, and whether online payment is set up
+         *     (``enabled``). 404 for an unknown invoice.
+         */
+        get: operations["list_invoice_payment_links_api_v1_platform_invoices__invoice_id__payment_links_get"];
+        put?: never;
+        /**
+         * Create Invoice Payment Link
+         * @description A Razorpay payment link for the balance due of an issued invoice (SchoolOS is the
+         *     merchant). 409 ``online_payments_off``, ``invalid_state``, ``link_exists`` or
+         *     ``invoice_changed``; 502 ``payment_link_failed``; 503 when Razorpay does not answer. Audited
+         *     as ``payment_link.created``.
+         */
+        post: operations["create_invoice_payment_link_api_v1_platform_invoices__invoice_id__payment_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/invoices/{invoice_id}/payments": {
         parameters: {
             query?: never;
@@ -9133,6 +9182,49 @@ export interface paths {
         /** Set Operator Roles */
         put: operations["set_operator_roles_api_v1_platform_operators__operator_id__roles_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/payment-links/{link_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Invoice Payment Link
+         * @description Cancel an active link at Razorpay and here. 409 ``invalid_state`` when it is not active,
+         *     ``link_paid`` when Razorpay reports it paid (the payment is then applied). Audited as
+         *     ``payment_link.cancelled``.
+         */
+        post: operations["cancel_invoice_payment_link_api_v1_platform_payment_links__link_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/payment-links/{link_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Invoice Payment Link
+         * @description Ask Razorpay about an active link now and apply a captured payment the webhook missed
+         *     (same checks as the webhook; audited as ``payment.online_received``).
+         */
+        post: operations["check_invoice_payment_link_api_v1_platform_payment_links__link_id__check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11441,7 +11533,11 @@ export interface paths {
          *     ``before_enrolment`` (before the student's explicit enrolment start) or ``duplicate_entry``
          *     per entry. An entry may carry ``expected_version`` (the ``version`` read
          *     from the day): 412 ``attendance_changed`` when someone else changed that mark since, and
-         *     nothing is saved. The early-warning rules look at these students again.
+         *     nothing is saved. The early-warning rules look at these students again. Accepts
+         *     ``Idempotency-Key`` (FT-11, FR-ATT-027): a retry of a draft kept on the teacher's device
+         *     with the same key and body replays the first answer (``Idempotent-Replayed: true``) and
+         *     saves nothing again, so it can never overwrite a newer save; a failed save is not kept, and
+         *     the retry meets the same checks.
          */
         post: operations["record_attendance_api_v1_sections__section_id__attendance_post"];
         delete?: never;
@@ -11490,6 +11586,33 @@ export interface paths {
          *     ``document_not_ready`` while the virus check runs.
          */
         post: operations["preview_attendance_sheet_api_v1_sections__section_id__attendance_sheet_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sections/{section_id}/board-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Section Board Candidates
+         * @description The section's students with their medium, languages, subjects and photo tick, and what
+         *     is still missing for the board (permission ``student.read_basic``; 404 outside scope).
+         */
+        get: operations["section_board_candidates_api_v1_sections__section_id__board_candidates_get"];
+        /**
+         * Save Section Board Candidates
+         * @description Record the choices of many students of one section (permission
+         *     ``student.update_nonidentity`` with its scope on each student). Fields left out are not
+         *     changed; codes outside the scheme are refused (422 ``not_in_scheme``).
+         */
+        put: operations["save_section_board_candidates_api_v1_sections__section_id__board_candidates_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11848,6 +11971,27 @@ export interface paths {
          *     to 500 characters, stored encrypted and never sent to AI. Accepts ``Idempotency-Key``.
          */
         post: operations["add_note_api_v1_students__student_id__behaviour_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/board-candidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Student Board Candidate
+         * @description One student's board candidate choices and what is missing (permission
+         *     ``student.read_basic``; 404 outside scope).
+         */
+        get: operations["student_board_candidate_api_v1_students__student_id__board_candidate_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -13137,6 +13281,28 @@ export interface paths {
          *     acknowledged without effect.
          */
         post: operations["razorpay_webhook_api_v1_webhooks_razorpay__route__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/schoolos-billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Schoolos Billing Webhook
+         * @description Razorpay events of SchoolOS's own account (payment links of SchoolOS invoices). Only
+         *     ``payment_link.paid`` is acted on; the link and payment are re-fetched before the invoice
+         *     is marked paid. A replayed event is acknowledged without effect.
+         */
+        post: operations["schoolos_billing_webhook_api_v1_webhooks_schoolos_billing_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14741,6 +14907,12 @@ export interface components {
                 [key: string]: number;
             };
             /**
+             * Draft Keep Hours
+             * @description Hours the screen may keep this day's unsent statuses on the device (student ids and statuses only) before dropping them (FT-11, FR-ATT-026)
+             * @default 24
+             */
+            draft_keep_hours: number;
+            /**
              * Marked
              * @description Whether any student of the section is marked that day
              */
@@ -15292,6 +15464,119 @@ export interface components {
             rule_id?: string | null;
         };
         /**
+         * BoardCandidateEntryIn
+         * @description One student's choices; a field left out (null) is not changed. Values cannot be cleared:
+         *     a correction is a new value (history kept, FR-STU-003).
+         */
+        BoardCandidateEntryIn: {
+            /** Board Subjects */
+            board_subjects?: string[] | null;
+            /** Exam Medium */
+            exam_medium?: string | null;
+            /** First Language */
+            first_language?: string | null;
+            /** Photo Signature Ready */
+            photo_signature_ready?: boolean | null;
+            /** Second Language */
+            second_language?: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Third Language */
+            third_language?: string | null;
+        };
+        /** BoardCandidateGridOut */
+        BoardCandidateGridOut: {
+            /** Available Schemes */
+            available_schemes: string[];
+            /** Class Code */
+            class_code: string | null;
+            /** Class Section */
+            class_section: string | null;
+            /** Ready Count */
+            ready_count: number;
+            /** Rows */
+            rows: components["schemas"]["BoardCandidateRowOut"][];
+            scheme: components["schemas"]["BoardSchemeOut"] | null;
+            /**
+             * Section Id
+             * Format: uuid
+             */
+            section_id: string;
+        };
+        /** BoardCandidateIssueOut */
+        BoardCandidateIssueOut: {
+            /** Code */
+            code?: string | null;
+            /** Field */
+            field: string;
+            /** Group */
+            group?: string | null;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "missing" | "not_in_list" | "repeated" | "group_missing" | "too_many" | "photo";
+        };
+        /** BoardCandidateRowOut */
+        BoardCandidateRowOut: {
+            /** Admission No */
+            admission_no: string | null;
+            /** Display Name */
+            display_name: string | null;
+            /** Issues */
+            issues: components["schemas"]["BoardCandidateIssueOut"][];
+            /** Ready */
+            ready: boolean;
+            /** Roll No */
+            roll_no: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Values */
+            values: {
+                [key: string]: string | null;
+            };
+        };
+        /** BoardCandidateSaveIn */
+        BoardCandidateSaveIn: {
+            /** Rows */
+            rows: components["schemas"]["BoardCandidateEntryIn"][];
+            /** Scheme */
+            scheme: string;
+            /**
+             * Source
+             * @default manual_entry
+             * @enum {string}
+             */
+            source: "manual_entry" | "parent_form" | "board_registration";
+        };
+        /** BoardCandidateSaveOut */
+        BoardCandidateSaveOut: {
+            grid: components["schemas"]["BoardCandidateGridOut"];
+            /**
+             * Recorded
+             * @description Values recorded (a new or changed value).
+             */
+            recorded: number;
+            /**
+             * Unchanged
+             * @description Values that were already recorded as sent.
+             */
+            unchanged: number;
+        };
+        /** BoardCodeOut */
+        BoardCodeOut: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+        };
+        /**
          * BoardFieldOut
          * @description A column of the board's own form; ``attribute`` null when SchoolOS does not hold it.
          */
@@ -15302,6 +15587,93 @@ export interface components {
             name: string;
             /** Note */
             note: string;
+            /** Required */
+            required: boolean;
+        };
+        /** BoardLanguageSlotOut */
+        BoardLanguageSlotOut: {
+            /** Options */
+            options: components["schemas"]["BoardCodeOut"][];
+            /** Required */
+            required: boolean;
+            /** Slot */
+            slot: string;
+        };
+        /**
+         * BoardSchemeOut
+         * @description One board scheme of ``board_catalogue.yaml`` (``verified: false`` until confirmed).
+         */
+        BoardSchemeOut: {
+            /** Board */
+            board: string;
+            /** Classes */
+            classes: string[];
+            /** Key */
+            key: string;
+            /**
+             * Keys
+             * @description Attribute keys this scheme asks for (grid columns).
+             */
+            keys: string[];
+            /** Label En */
+            label_en: string;
+            /** Languages */
+            languages: components["schemas"]["BoardLanguageSlotOut"][];
+            /** Max Subjects */
+            max_subjects: number;
+            /** Medium Options */
+            medium_options: string[];
+            /** Medium Required */
+            medium_required: boolean;
+            /** Photo Required */
+            photo_required: boolean;
+            /** Source */
+            source: string[];
+            /** Source Note */
+            source_note: string;
+            /** Subjects */
+            subjects: components["schemas"]["BoardSubjectGroupOut"][];
+            /** Verified */
+            verified: boolean;
+            /** Version */
+            version: number;
+        };
+        /**
+         * BoardStudentCandidateOut
+         * @description One student's board candidate choices (student profile).
+         */
+        BoardStudentCandidateOut: {
+            /** Class Section */
+            class_section: string | null;
+            /** Issues */
+            issues: components["schemas"]["BoardCandidateIssueOut"][];
+            /** Ready */
+            ready: boolean;
+            scheme: components["schemas"]["BoardSchemeOut"] | null;
+            /** Section Id */
+            section_id: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Values */
+            values: {
+                [key: string]: string | null;
+            };
+        };
+        /** BoardSubjectGroupOut */
+        BoardSubjectGroupOut: {
+            /** Key */
+            key: string;
+            /** Label En */
+            label_en: string;
+            /** Max */
+            max: number;
+            /** Min */
+            min: number;
+            /** Options */
+            options: components["schemas"]["BoardCodeOut"][];
             /** Required */
             required: boolean;
         };
@@ -23459,6 +23831,79 @@ export interface components {
             notes?: string | null;
         };
         /**
+         * InvoicePaymentLinkOut
+         * @description A Razorpay payment link of a SchoolOS invoice (FA-13; FR-PAY-017..024). SchoolOS is the
+         *     merchant. ``needs_review``: paid but not applied (``review_reason``); refund it in
+         *     Razorpay's dashboard. No payer details are kept.
+         */
+        InvoicePaymentLinkOut: {
+            /** Amount Inr */
+            amount_inr: string;
+            /** Cancelled At */
+            cancelled_at?: string | null;
+            /** Cancelled By */
+            cancelled_by?: string | null;
+            /** Created At */
+            created_at: string | null;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /**
+             * Expire By
+             * Format: date-time
+             */
+            expire_by: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Invoice Id
+             * Format: uuid
+             */
+            invoice_id: string;
+            /** Payment Id */
+            payment_id?: string | null;
+            /** Provider */
+            provider: string;
+            /** Provider Link Id */
+            provider_link_id: string;
+            /** Provider Payment Id */
+            provider_payment_id?: string | null;
+            /** Review Reason */
+            review_reason?: ("invoice_not_open" | "amount_exceeds_balance" | "amount_mismatch") | null;
+            /** Settled At */
+            settled_at?: string | null;
+            /** Short Url */
+            short_url: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "paid" | "cancelled" | "expired" | "needs_review";
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * InvoicePaymentLinksOut
+         * @description An invoice's payment links, newest first; ``enabled`` says whether online payment of
+         *     SchoolOS invoices is set up (``SOS_PLATFORM_PAYMENTS_ENABLED``).
+         */
+        InvoicePaymentLinksOut: {
+            /** Data */
+            data: components["schemas"]["InvoicePaymentLinkOut"][];
+            /** Enabled */
+            enabled: boolean;
+        };
+        /**
          * InvoicePdfDownloadOut
          * @description A presigned GET (at most 5 minutes, attachment) for an issued invoice's PDF.
          */
@@ -26671,11 +27116,8 @@ export interface components {
             received_on: string;
             /** Recorded At */
             recorded_at: string | null;
-            /**
-             * Recorded By
-             * Format: uuid
-             */
-            recorded_by: string;
+            /** Recorded By */
+            recorded_by?: string | null;
             /** Recorded By Name */
             recorded_by_name?: string | null;
             /** Reference */
@@ -33004,6 +33446,8 @@ export interface components {
             invoice_number: string | null;
             /** Issue Date */
             issue_date: string | null;
+            /** Payment Url */
+            payment_url?: string | null;
             /**
              * Period End
              * Format: date
@@ -36460,6 +36904,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_board_schemes_api_v1_board_candidates_schemes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardSchemeOut"][];
                 };
             };
             /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
@@ -41211,7 +41688,7 @@ export interface operations {
                 /** @description Page size (max 200). */
                 limit?: number;
                 profile_key?: string | null;
-                rule_id?: ("DQ-001" | "DQ-002" | "DQ-003" | "DQ-004" | "DQ-005" | "DQ-006" | "DQ-007" | "DQ-008" | "DQ-009" | "DQ-010" | "DQ-011" | "DQ-012" | "DQ-021" | "DQ-022" | "DQ-030" | "DQ-031")[] | null;
+                rule_id?: ("DQ-001" | "DQ-002" | "DQ-003" | "DQ-004" | "DQ-005" | "DQ-006" | "DQ-007" | "DQ-008" | "DQ-009" | "DQ-010" | "DQ-011" | "DQ-012" | "DQ-021" | "DQ-022" | "DQ-030" | "DQ-031" | "DQ-032")[] | null;
                 section_id?: string | null;
                 severity?: ("blocker" | "high" | "medium" | "low" | "info")[] | null;
                 status?: ("open" | "resolved" | "waived" | "reopened" | "needs_confirmation")[] | null;
@@ -55726,6 +56203,96 @@ export interface operations {
             };
         };
     };
+    list_invoice_payment_links_api_v1_platform_invoices__invoice_id__payment_links_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePaymentLinksOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_invoice_payment_link_api_v1_platform_invoices__invoice_id__payment_links_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePaymentLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_invoice_payments_api_v1_platform_invoices__invoice_id__payments_get: {
         parameters: {
             query?: never;
@@ -56104,6 +56671,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OperatorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    cancel_invoice_payment_link_api_v1_platform_payment_links__link_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePaymentLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    check_invoice_payment_link_api_v1_platform_payment_links__link_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePaymentLinkOut"];
                 };
             };
             /** @description Validation Error */
@@ -61816,6 +62471,100 @@ export interface operations {
             };
         };
     };
+    section_board_candidates_api_v1_sections__section_id__board_candidates_get: {
+        parameters: {
+            query?: {
+                scheme?: string | null;
+            };
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardCandidateGridOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    save_section_board_candidates_api_v1_sections__section_id__board_candidates_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoardCandidateSaveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardCandidateSaveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     section_marks_api_v1_sections__section_id__exams__exam_id__marks_get: {
         parameters: {
             query?: never;
@@ -62752,6 +63501,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    student_board_candidate_api_v1_students__student_id__board_candidate_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardStudentCandidateOut"];
                 };
             };
             /** @description Validation Error */
@@ -65864,6 +66657,67 @@ export interface operations {
                     "RateLimit-Policy"?: string;
                     /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
                     "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    schoolos_billing_webhook_api_v1_webhooks_schoolos_billing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Bad or missing X-Razorpay-Signature (no detail). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Online payment of SchoolOS invoices is not set up. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Larger than 256 KB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Razorpay could not be asked; Razorpay retries the event. */
+            503: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content?: never;

@@ -93,7 +93,8 @@ test.describe("Ask the school: chat, keyboard and axe (stand-in IdP)", () => {
     await expect(
       page.getByRole("link", { name: /^Open: Dasara holidays circular 2026/ }),
     ).toBeVisible();
-    await expectNoAxeViolations(page, "citation popover");
+    // The page was checked above; with the fixed popover open, check the popover itself.
+    await expectNoAxeViolations(page, "citation popover", ".chat-popover");
     await page.keyboard.press("Escape");
     await expect(
       page.getByRole("link", { name: /^Open: Dasara holidays circular 2026/ }),

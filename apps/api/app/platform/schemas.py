@@ -578,13 +578,49 @@ class PaymentOut(Out):
     reference: str
     notes: str | None = None
     status: Literal["recorded", "reversed"]
-    recorded_by: uuid.UUID
+    # NULL for an online payment applied from the provider (FA-13, FR-PAY-021).
+    recorded_by: uuid.UUID | None = None
     recorded_by_name: str | None = None
     recorded_at: dt.datetime | None
     reversed_by: uuid.UUID | None = None
     reversed_by_name: str | None = None
     reversed_at: dt.datetime | None = None
     reversal_reason: str | None = None
+
+
+class InvoicePaymentLinkOut(Out):
+    """A Razorpay payment link of a SchoolOS invoice (FA-13; FR-PAY-017..024). SchoolOS is the
+    merchant. ``needs_review``: paid but not applied (``review_reason``); refund it in
+    Razorpay's dashboard. No payer details are kept."""
+
+    id: uuid.UUID
+    invoice_id: uuid.UUID
+    tenant_id: uuid.UUID
+    provider: str
+    provider_link_id: str
+    short_url: str
+    amount_inr: Decimal
+    status: Literal["active", "paid", "cancelled", "expired", "needs_review"]
+    expire_by: dt.datetime
+    created_by: uuid.UUID
+    created_at: dt.datetime | None
+    payment_id: uuid.UUID | None = None
+    provider_payment_id: str | None = None
+    settled_at: dt.datetime | None = None
+    review_reason: (
+        Literal["invoice_not_open", "amount_exceeds_balance", "amount_mismatch"] | None
+    ) = None
+    cancelled_by: uuid.UUID | None = None
+    cancelled_at: dt.datetime | None = None
+    version: int
+
+
+class InvoicePaymentLinksOut(Out):
+    """An invoice's payment links, newest first; ``enabled`` says whether online payment of
+    SchoolOS invoices is set up (``SOS_PLATFORM_PAYMENTS_ENABLED``)."""
+
+    enabled: bool
+    data: list[InvoicePaymentLinkOut]
 
 
 class InvoiceRunIn(In):

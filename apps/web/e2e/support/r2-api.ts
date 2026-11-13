@@ -55,6 +55,8 @@ export const PARENT_TOKENS = {
   notice: fixedToken("parent-notice"),
   dues: fixedToken("parent-dues"),
   optin: fixedToken("parent-optin"),
+  /** FP-02 follow-up (FR-PUB-013): the closure message's read-only page. */
+  closure: fixedToken("parent-closure"),
 } as const;
 
 export const PARENT_SCHOOL = "Sri Saraswati High School";
@@ -219,8 +221,25 @@ function envelopeBase(kind: Schemas["LinkEnvelopeOut"]["kind"]): Schemas["LinkEn
     receipt: null,
     dues: null,
     optin: null,
+    closure: null,
   };
 }
+
+/** The closure message's page: two days closed, the order text, the day it reopens. */
+export const PARENT_CLOSURE = {
+  reason: "Heavy rain",
+  orderParagraph: "Synthetic order: all schools in the mandal stay closed for heavy rain.",
+} as const;
+
+const CLOSURE: Schemas["ParentClosureOut"] = {
+  closed_from: "2026-10-22",
+  closed_to: "2026-10-23",
+  reason: PARENT_CLOSURE.reason,
+  notice_text: `${PARENT_CLOSURE.orderParagraph}
+
+Synthetic order: the school reopens on Saturday.`,
+  reopens_on: "2026-10-24",
+};
 
 const NOTICE: Schemas["ParentNoticeOut"] = {
   title: PARENT_NOTICE.title,
@@ -275,6 +294,7 @@ const KIND_OF: Record<string, Schemas["LinkEnvelopeOut"]["kind"]> = {
   [PARENT_TOKENS.notice]: "parent_notice",
   [PARENT_TOKENS.dues]: "parent_dues",
   [PARENT_TOKENS.optin]: "parent_optin",
+  [PARENT_TOKENS.closure]: "parent_closure",
 };
 
 function envelope(token: string): Schemas["LinkEnvelopeOut"] | null {
@@ -282,6 +302,7 @@ function envelope(token: string): Schemas["LinkEnvelopeOut"] | null {
   if (kind === "parent_notice") return { ...envelopeBase(kind), notice: NOTICE };
   if (kind === "parent_dues") return { ...envelopeBase(kind), dues: DUES };
   if (kind === "parent_optin") return { ...envelopeBase(kind), optin: optin() };
+  if (kind === "parent_closure") return { ...envelopeBase(kind), closure: CLOSURE };
   return null;
 }
 
@@ -505,32 +526,29 @@ export function r2Answer(
     };
     return [200, years];
   }
-  // FM-07 (FR-FEE-101): no sibling, so the counter shows no "Family" panel. Hand-written until
-  // the client is regenerated with FamilyCounterOut.
+  // FM-07 (FR-FEE-101): no sibling, so the counter shows no "Family" panel.
   if (path === `/api/v1/fees/students/${state.account.student_id}/family` && get) {
-    return [
-      200,
-      {
-        student_id: state.account.student_id,
-        as_of: "2026-10-21",
-        members: [
-          {
-            student_id: state.account.student_id,
-            display_name: null,
-            admission_no: null,
-            class_section: null,
-            status: "active",
-            selected: true,
-            linked_by: [],
-            accounts: [],
-            collectable: "0.00",
-          },
-        ],
-        total_collectable: "0.00",
-        max_accounts: 8,
-        modes: ["cash", "cheque", "bank_transfer"],
-      },
-    ];
+    const family: Schemas["FamilyCounterOut"] = {
+      student_id: state.account.student_id,
+      as_of: "2026-10-21",
+      members: [
+        {
+          student_id: state.account.student_id,
+          display_name: null,
+          admission_no: null,
+          class_section: null,
+          status: "active",
+          selected: true,
+          linked_by: [],
+          accounts: [],
+          collectable: "0.00",
+        },
+      ],
+      total_collectable: "0.00",
+      max_accounts: 8,
+      modes: ["cash", "cheque", "bank_transfer"],
+    };
+    return [200, family];
   }
   if (path === `/api/v1/fees/accounts/${state.account.id}` && get) return [200, state.account];
   if (path.startsWith("/api/v1/fees/accounts/") && get) return notFound;

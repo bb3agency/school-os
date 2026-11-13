@@ -18,6 +18,7 @@ from kombu import Queue
 from app.admin.tasks import beat_schedule as admin_beat_schedule
 from app.breakglass.tasks import beat_schedule as breakglass_beat_schedule
 from app.brief.tasks import beat_schedule as brief_beat_schedule
+from app.certificates.tasks import beat_schedule as certificates_beat_schedule
 from app.changes.tasks import beat_schedule as changes_beat_schedule
 from app.circulars.tasks import beat_schedule as circulars_beat_schedule
 from app.compliance.tasks import beat_schedule as compliance_beat_schedule
@@ -216,6 +217,8 @@ def create_celery() -> Celery:
             "notifications.plan_limit_sweep": {"queue": "maintenance"},
             # FR-CERT-010: certificate PDFs render on the Chromium workers.
             "certificates.render": {"queue": "pdf"},
+            # FR-CERT-045: the daily overdue TC request reminder is database work only.
+            "certificates.tc_overdue_reminders": {"queue": "maintenance"},
             # FR-FEE-011: receipt PDFs on the Chromium workers; FR-FEE-009 late fees nightly.
             "fees.render_receipt": {"queue": "pdf"},
             "fees.render_tax_certificate": {"queue": "pdf"},  # FM-06 (FR-FEE-053)
@@ -320,6 +323,8 @@ def create_celery() -> Celery:
             **brief_beat_schedule(),
             # FR-COMP-011 (FC-01): certificate expiry reminders to staff (daily, 07:10 IST).
             **compliance_beat_schedule(),
+            # FR-CERT-045 (FO-09): overdue TC request count to principal and office, 07:15 IST.
+            **certificates_beat_schedule(),
             # FR-PUB-006: expired parent link handles deleted 30 days after expiry (daily).
             **public_beat_schedule(),
             # FR-MSG-006, FR-MSG-020, FR-MSG-021, FR-MSG-023: webhook inbox sweep (1 min),

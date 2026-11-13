@@ -1,4 +1,4 @@
-"""The demo school as pure data (FA-12; FR-DEMO-001..015; docs/guides/demo-school.md). NEVER real
+"""The demo school as pure data (FA-12; FR-DEMO-001..020; docs/guides/demo-school.md). NEVER real
 data.
 
 SYNTHETIC ONLY (CLAUDE.md invariant 11). The demo school is one school of the synthetic dataset
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import random
 import re
 from dataclasses import dataclass
 from decimal import Decimal
@@ -178,3 +179,81 @@ DISCLOSURE_INPUTS: Final[dict[str, object]] = {
     "campus_area": 6000,
     "library_area": 120,
 }
+
+
+# FR-DEMO-016 exams and marks (FT-08 year-end, FT-14 completeness, M5 early warning). Two exams of
+# the current year, dated from the year's first day; marks out of 100 for the subjects below in
+# every section of MARKS_CLASSES. The second exam is left unfinished on purpose: the last
+# MARKS_NOT_STARTED sections have no marks yet and the MARKS_PARTIAL sections before them miss
+# the last subject, so the completeness page shows "not started" and "partly entered".
+
+
+@dataclass(frozen=True, slots=True)
+class ExamSpec:
+    name: str
+    days_after_year_start: int
+
+
+EXAMS: Final = (
+    ExamSpec("Unit test 1 (demo)", 49),
+    ExamSpec("Quarterly exam (demo)", 112),
+)
+MARKS_CLASSES: Final = ("VI", "VII", "VIII", "IX", "X")
+MARKS_SUBJECTS: Final = ("English", "Telugu", "Mathematics", "Science", "Social studies")
+MARKS_MAX: Final = Decimal("100")
+MARKS_NOT_STARTED: Final = 2
+MARKS_PARTIAL: Final = 2
+# Of 100 students, this many fall below the pass mark in the second exam (early-warning rule
+# course_low, 35 %) and this many drop by 15 points or more between the exams (course_decline).
+MARKS_LOW_PER_100: Final = 5
+MARKS_DROP_PER_100: Final = 5
+MARKS_ABSENT_PER_1000: Final = 8
+
+
+@dataclass(frozen=True, slots=True)
+class DemoMark:
+    marks: Decimal | None
+    absent: bool
+
+
+def demo_mark(key: str, exam_index: int, subject: str) -> DemoMark:
+    """The fictional mark of one student (``key``: tenant and admission number), exam and subject.
+    Pure: the same key always gives the same marks (FR-DEMO-003)."""
+    profile = random.Random(f"demo-marks:{key}")  # noqa: S311 - fictional demo data
+    band = profile.randrange(100)
+    base = profile.randint(48, 88)
+    first, second = base, base + profile.randint(-6, 6)
+    if band < MARKS_LOW_PER_100:
+        first, second = profile.randint(36, 46), profile.randint(18, 30)
+    elif band < MARKS_LOW_PER_100 + MARKS_DROP_PER_100:
+        first, second = profile.randint(70, 84), profile.randint(45, 52)
+    paper = random.Random(f"demo-marks:{key}:{exam_index}:{subject}")  # noqa: S311
+    if paper.randrange(1000) < MARKS_ABSENT_PER_1000:
+        return DemoMark(None, True)
+    centre = first if exam_index == 0 else second
+    value = min(int(MARKS_MAX), max(0, centre + paper.randint(-5, 5)))
+    return DemoMark(Decimal(value), False)
+
+
+@dataclass(frozen=True, slots=True)
+class TcRequestSpec:
+    days_ago: int
+    channel: Literal["paper", "phone", "in_person", "other"]
+    leaving_reason: Literal["parent_request", "parent_transferred", "course_completed", "other"]
+    prepare: bool
+    """Move it to "in preparation" (the clerk started the TC)."""
+
+
+# FR-DEMO-018 TC requests (FO-09): two overdue (7 days, D86), one recent, one received today; the
+# students are the last Class X students by admission number. No TC is prepared or issued.
+TC_REQUESTS: Final = (
+    TcRequestSpec(12, "paper", "parent_transferred", False),
+    TcRequestSpec(9, "in_person", "parent_request", True),
+    TcRequestSpec(3, "phone", "parent_transferred", False),
+    TcRequestSpec(0, "paper", "parent_request", False),
+)
+
+# FR-DEMO-019 one family (FM-07): two Class X students (by admission number, after the earlier-
+# year dues accounts) share the first one's primary guardian, so the family counter shows two
+# siblings with fees due. The link is made on the student record like staff do (FR-STU-008).
+SIBLING_ACCOUNTS: Final = (10, 11)

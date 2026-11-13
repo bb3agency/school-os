@@ -273,11 +273,37 @@ payments = Table(
     Column("provider_payment_id", Text),
     Column("status", Text, nullable=False),
     Column("notes", Text),
-    Column("recorded_by", Uuid, nullable=False),
+    # NULL for a provider payment applied by the signed webhook (0106, FA-13).
+    Column("recorded_by", Uuid),
     Column("recorded_at", DateTime(timezone=True)),
     Column("reversed_by", Uuid),
     Column("reversed_at", DateTime(timezone=True)),
     Column("reversal_reason", Text),
+)
+
+# FA-13 (0106): Razorpay payment links of SchoolOS invoices (SchoolOS is the merchant).
+invoice_payment_links = Table(
+    "invoice_payment_links",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("invoice_id", Uuid, nullable=False),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("provider", Text, nullable=False),
+    Column("provider_link_id", Text, nullable=False),
+    Column("short_url", Text, nullable=False),
+    Column("amount_inr", Numeric(14, 2), nullable=False),
+    Column("status", Text, nullable=False),
+    Column("expire_by", DateTime(timezone=True), nullable=False),
+    Column("created_by", Uuid, nullable=False),
+    Column("created_at", DateTime(timezone=True)),
+    Column("payment_id", Uuid),
+    Column("provider_payment_id", Text),
+    Column("settled_at", DateTime(timezone=True)),
+    Column("review_reason", Text),
+    Column("cancelled_by", Uuid),
+    Column("cancelled_at", DateTime(timezone=True)),
+    Column("updated_at", DateTime(timezone=True)),
+    Column("version", Integer),
 )
 
 usage_daily = Table(

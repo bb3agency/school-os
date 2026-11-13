@@ -234,3 +234,22 @@ offboarding:
 # platform.incident.clock_overdue once it has; CloudWatch alarms on both (docs/11).
 incident_alerts:
   due_soon_minutes: 120
+# Online payment of SchoolOS's own invoices (FA-13; ADR-0016; FR-PAY-017..030). SchoolOS is the
+# merchant; the key and webhook secret are SOS_PLATFORM_RAZORPAY_* (Secrets Manager), never here.
+# Payment links only: no UPI Autopay or e-mandate (lead default D87; owner question open).
+# Sources (checked 2026-11-13, verified: false until the first staging run with SchoolOS's own
+# account): Razorpay Payment Links API (create, fetch, cancel), Payments API (fetch by id),
+# webhook signature X-Razorpay-Signature = hex HMAC-SHA256 of the raw body, event id header
+# x-razorpay-event-id. Razorpay waits about 5 s for a webhook answer, so the re-fetch timeout is
+# shorter; a missed event is picked up by "Check payment" on the invoice screen.
+payment_links:
+  verified: false
+  api_base_url: "https://api.razorpay.com"
+  timeout_s: 4
+  # A link stays payable this many days (Razorpay requires at least 15 minutes ahead).
+  expiry_days: 30
+  # Printed on Razorpay's hosted page; no school or student data beyond the invoice number.
+  description: "SchoolOS invoice {invoice_number}"
+  # Events acted on; every other event is acknowledged and ignored.
+  events: [payment_link.paid]
+  event_id_pattern: "^[A-Za-z0-9_:.-]{1,100}$"

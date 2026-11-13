@@ -79,6 +79,7 @@ class CheckKind(StrEnum):
     APAAR_ID = "apaar_id"  # DQ-021 (ADR-0037)
     APAAR_DEMOGRAPHICS = "apaar_demographics"  # DQ-022 (ADR-0037)
     READINESS_DIFF = "readiness_diff"  # DQ-031 (ADR-0040)
+    BOARD_CANDIDATE = "board_candidate"  # DQ-032 (FO-10, FR-STU-030..033)
 
 
 # sis.attribute_values.source (docs/05 §5) plus the resolved canonical value (docs/05 §10).

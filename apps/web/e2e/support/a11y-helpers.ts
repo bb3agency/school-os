@@ -29,9 +29,15 @@ export async function settleAnimations(page: Page) {
   );
 }
 
-export async function expectNoAxeViolations(page: Page, label: string) {
+/**
+ * `include` limits the check to one region, e.g. an open overlay: a fixed popover covers part
+ * of the page while it is open, and axe then reports the targets under it as too small
+ * (target-size counts only the uncovered area). Check the page itself before opening it.
+ */
+export async function expectNoAxeViolations(page: Page, label: string, include?: string) {
   await settleAnimations(page);
-  const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  const builder = new AxeBuilder({ page }).withTags(WCAG);
+  const results = await (include ? builder.include(include) : builder).analyze();
   const summary = results.violations.map(
     (violation) =>
       `${violation.id} (${violation.impact ?? "?"}): ${violation.nodes

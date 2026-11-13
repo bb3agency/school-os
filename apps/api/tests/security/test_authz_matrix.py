@@ -2115,6 +2115,31 @@ SPECS: dict[tuple[str, str], Builder] = {
         {},
     ),
     ("POST", "/api/v1/sections/{section_id}/attendance/sheet"): _m5_sheet("attendance"),
+    # FO-10 board candidate choices (FR-STU-026..029): section 9A (Class IX, BSEAP SSC).
+    ("GET", "/api/v1/board-candidates/schemes"): lambda w, r, a: (
+        "/api/v1/board-candidates/schemes",
+        None,
+        {},
+    ),
+    ("GET", "/api/v1/sections/{section_id}/board-candidates"): lambda w, r, a: (
+        f"/api/v1/sections/{_ct(r, w, 'section_10a', 'section_9a')}/board-candidates"
+        "?scheme=bseap-ssc",
+        None,
+        {},
+    ),
+    ("PUT", "/api/v1/sections/{section_id}/board-candidates"): lambda w, r, a: (
+        _m5_section(w, "/board-candidates"),
+        {
+            "scheme": "bseap-ssc",
+            "rows": [{"student_id": str(_m5_s9a(w)), "exam_medium": "english"}],
+        },
+        {},
+    ),
+    ("GET", "/api/v1/students/{student_id}/board-candidate"): lambda w, r, a: (
+        _st(w, r, "/board-candidate"),
+        None,
+        {},
+    ),
     ("GET", "/api/v1/exams"): lambda w, r, a: ("/api/v1/exams", None, {}),
     ("POST", "/api/v1/exams"): lambda w, r, a: (
         "/api/v1/exams",

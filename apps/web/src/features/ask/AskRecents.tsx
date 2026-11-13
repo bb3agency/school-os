@@ -58,7 +58,8 @@ function SubLink({
  * here at once.
  */
 export function AskRecents() {
-  const t = useTranslations("ask");
+  const t = useTranslations("ask.chat");
+  const tm = useTranslations("ask.memory");
   const pathname = usePathname() ?? "";
   const inAsk = pathname === "/ask" || pathname.startsWith("/ask/");
   const list = useConversationList(inAsk);
@@ -73,18 +74,18 @@ export function AskRecents() {
       <SubLink
         href="/ask"
         icon="newChat"
-        label={t("chat.newChat")}
+        label={t("newChat")}
         active={false}
         onClick={() => window.dispatchEvent(new Event(NEW_CHAT_EVENT))}
       />
       {recent.length > 0 ? (
         <>
           <p id={headingId} className="eyebrow px-2 pt-2 pb-1 text-ink-subtle">
-            {t("chat.recent")}
+            {t("recent")}
           </p>
           <ul aria-labelledby={headingId} className="space-y-0.5">
             {recent.map((item) => {
-              const title = titleOf(item) ?? t("chat.untitled");
+              const title = titleOf(item) ?? t("untitled");
               const href = `/ask/c/${item.id}`;
               const active = pathname === href;
               return (
@@ -99,7 +100,7 @@ export function AskRecents() {
                     {item.pinned ? (
                       <>
                         <Icon name="pin" className="size-3.5 shrink-0" />
-                        <span className="sr-only">{`${t("chat.pinnedMark")}: `}</span>
+                        <span className="sr-only">{`${t("pinnedMark")}: `}</span>
                       </>
                     ) : null}
                     <span className="min-w-0 flex-1 truncate leading-relaxed">{title}</span>
@@ -113,13 +114,13 @@ export function AskRecents() {
       <SubLink
         href="/ask/history"
         icon="clock"
-        label={t("chat.allChats")}
+        label={t("allChats")}
         active={pathname === "/ask/history"}
       />
       <SubLink
         href="/ask/memory"
         icon="memory"
-        label={t("memory.nav")}
+        label={tm("nav")}
         active={pathname === "/ask/memory"}
       />
     </div>

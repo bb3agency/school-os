@@ -1274,6 +1274,13 @@ def _gaps() -> ModuleType:
 # principal's and the office admin's, not the owner's.
 PARAM_TO_B["gap_id"] = lambda w: _gaps().b_gap(w)
 BODIES.update(_gaps().BOLA_BODIES)
+# FO-10: a board candidate save names school B's section (rows of a random student);
+# student.update_nonidentity is the office's and the principal's, not the owner's.
+BODIES[("PUT", "/api/v1/sections/{section_id}/board-candidates")] = {
+    "scheme": "bseap-ssc",
+    "rows": [{"student_id": str(uuid.uuid4()), "exam_medium": "english"}],
+}
+ACTOR[("PUT", "/api/v1/sections/{section_id}/board-candidates")] = "principal"
 ACTOR.update(dict.fromkeys(_gaps().BOLA_BODIES, "principal"))
 
 

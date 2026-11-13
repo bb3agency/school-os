@@ -51,6 +51,10 @@ EXPECTED_MIN = {
     "ops.disclosure_drafts": 1,
     "ops.weekly_briefs": 1,
     "fin.receipts": 4,
+    "sis.exams": 2,
+    "sis.exam_marks": 100,
+    "sis.insight_flags": 1,
+    "sis.tc_requests": 4,
 }
 
 
@@ -196,6 +200,61 @@ def test_FR_DEMO_009_certificate_states(seeded: Seeded, admin_engine: Engine) ->
     assert kinds["water_safety"] == (False, True)
     assert kinds["fire_noc"] == (False, False)
     assert kinds["trust_registration"][0] is True
+
+
+def test_FR_DEMO_016_017_exams_marks_and_flags(seeded: Seeded, admin_engine: Engine) -> None:
+    created = seeded.first["tenants"][0]["created"]
+    assert created["exams"] == len(demo.EXAMS)
+    assert created["marks"] > 0
+    assert created["insight_flags"] > 0
+    with admin_engine.connect() as c:
+        per_exam = {
+            str(r.name): (int(r.sections), int(r.subjects))
+            for r in c.execute(
+                text(
+                    "SELECT e.name, count(DISTINCT m.section_id) AS sections, "
+                    "count(DISTINCT m.subject) AS subjects FROM sis.exams AS e "
+                    "JOIN sis.exam_marks AS m ON m.tenant_id = e.tenant_id AND m.exam_id = e.id "
+                    "WHERE e.tenant_id = :t GROUP BY e.name"
+                ),
+                {"t": seeded.live_tenant_id},
+            )
+        }
+        rules = {
+            str(r[0])
+            for r in c.execute(
+                text("SELECT DISTINCT rule FROM sis.insight_flags WHERE tenant_id = :t"),
+                {"t": seeded.live_tenant_id},
+            )
+        }
+    first, second = (per_exam[e.name] for e in demo.EXAMS)
+    assert first[1] == len(demo.MARKS_SUBJECTS)
+    # FT-14: the second exam is unfinished (sections not started).
+    assert second[0] < first[0]
+    assert rules & {"course_low", "course_decline"}
+
+
+def test_FR_DEMO_018_019_tc_requests_and_one_family(seeded: Seeded, admin_engine: Engine) -> None:
+    created = seeded.first["tenants"][0]["created"]
+    assert created["tc_requests"] == len(demo.TC_REQUESTS)
+    assert created["sibling_links"] == 1
+    with admin_engine.connect() as c:
+        statuses = sorted(
+            str(r[0])
+            for r in c.execute(
+                text("SELECT status FROM sis.tc_requests WHERE tenant_id = :t"),
+                {"t": seeded.live_tenant_id},
+            )
+        )
+        shared: int = c.execute(
+            text(
+                "SELECT count(*) FROM (SELECT guardian_id FROM sis.student_guardians "
+                "WHERE tenant_id = :t GROUP BY guardian_id HAVING count(*) >= 2) AS g"
+            ),
+            {"t": seeded.live_tenant_id},
+        ).scalar_one()
+    assert statuses == ["in_preparation", "received", "received", "received"]
+    assert shared >= 1
 
 
 def test_FR_DEMO_003_rerun_is_idempotent(seeded: Seeded) -> None:

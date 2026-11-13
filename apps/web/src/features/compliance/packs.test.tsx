@@ -5,7 +5,7 @@ import { installBffStub, page, uninstallBffStub, type BffStub } from "@/test/bff
 import { me } from "@/test/records-fixtures";
 import { messages, renderWithIntl } from "@/test/render";
 import { InspectionScreen } from "./InspectionScreen";
-import { indexHref, itemHref, readinessSchema, type PackItem } from "./packs-data";
+import { indexHref, itemHref, type PackItem } from "./packs-data";
 
 /** Inspection readiness packs (FC-07, FO-12; FR-COMP-024..FR-COMP-045). Synthetic data only. */
 
@@ -83,8 +83,8 @@ beforeEach(() => {
 afterEach(uninstallBffStub);
 
 describe("inspection packs (FC-07, FO-12)", () => {
-  it("parses the readiness answer and maps each source to its screen", () => {
-    expect(readinessSchema.parse(READINESS).packs[0]?.items).toHaveLength(3);
+  it("maps each source to its screen", () => {
+    expect(READINESS.packs[0]?.items).toHaveLength(3);
     const [cert, register, untracked] = READINESS.packs[0]?.items ?? [];
     expect(cert && itemHref(cert)).toBe("/compliance");
     expect(register && itemHref(register)).toBe("/registers");

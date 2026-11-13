@@ -1765,6 +1765,14 @@ def _settle(s: Session, invoice: Mapping[Any, Any], today: dt.date) -> RowMappin
     return row
 
 
+def settle_invoice(
+    s: Session, invoice: Mapping[Any, Any], *, today: dt.date | None = None
+) -> RowMapping:
+    """Re-settle ``invoice`` (caller holds its row lock) after a payment was added: ``paid`` when
+    covered, the subscription's past due cleared (FR-PLT-018; FA-13 online payments, FR-PAY-021)."""
+    return _settle(s, invoice, today or today_ist())
+
+
 def record_payment(
     actor: Actor, invoice_id: uuid.UUID, data: PaymentIn, *, today: dt.date | None = None
 ) -> PaymentOut:

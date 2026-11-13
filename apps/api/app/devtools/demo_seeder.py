@@ -1,4 +1,5 @@
-"""Apply the demo scenario to a seeded demo school (FA-12; FR-DEMO-005..012). NEVER real data.
+"""Apply the demo scenario to a seeded demo school (FA-12; FR-DEMO-005..012, FR-DEMO-016..020).
+NEVER real data.
 
 Called by :mod:`app.devtools.seed_demo` after :func:`app.devtools.seeder.seed_tenant` made the
 school, its staff, students, documents and Class X fees. Every write goes through the owning
@@ -23,9 +24,15 @@ missing; the summary counts only what this run created):
 6. **UDISE+ follow-ups** (office admin; FO-01): slips given to parents, and correction requests
    sent long enough ago to be overdue.
 7. **CBSE disclosure draft** (principal; FC-02): fictional typed values; nothing published.
-8. **Weekly brief** (system job; FA-05): last week's brief, stored once.
-
-Year-end results (FT-08) are not seeded: the generator has no exams or marks yet (follow-up).
+8. **Exams and marks** (exam coordinator; FR-DEMO-016): two exams of the current year and
+   fictional marks for classes VI-X through ``academics.service``, the second exam left
+   unfinished in a few sections (FT-14 completeness); year-end results (FT-08) are proposed from
+   these marks and left for the principal to confirm live.
+9. **Early-warning evaluation** (system job; FR-DEMO-017): the rules run once over the school, so
+   the low and falling marks become flags (M5) without waiting for the worker.
+10. **TC requests** (office admin; FR-DEMO-018, FO-09): two overdue, one recent, one of today.
+11. **One family** (office admin; FR-DEMO-019, FM-07): two Class X students share a guardian.
+12. **Weekly brief** (system job; FA-05): last week's brief, stored once.
 """
 
 from __future__ import annotations
@@ -40,8 +47,11 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.academics import service as academics
-from app.academics.schemas import CalendarEntryIn, CalendarPatternIn
+from app.academics.schemas import CalendarEntryIn, CalendarPatternIn, ExamCreate, MarkIn, MarksWrite
 from app.brief import service as brief
+from app.certificates import service as certificates
+from app.certificates import tc_requests
+from app.certificates.schemas import TcRequestIn, TcRequestStatusIn
 from app.compliance import service as compliance
 from app.compliance.schemas import CertificateCreate
 from app.core.db import tenant_session
@@ -64,8 +74,9 @@ from app.fees.schemas import (
     PlanApplyIn,
     PlanLineIn,
 )
+from app.insights import service as insights
 from app.students import service as students
-from app.students.schemas import EnrollmentEnd, EnrollmentIn
+from app.students.schemas import EnrollmentEnd, EnrollmentIn, GuardianCreate
 from app.tenancy import service as tenancy
 
 
@@ -78,6 +89,7 @@ class DemoActors:
     principal: Actor
     office_admin: Actor
     accountant: Actor
+    exam_coordinator: Actor
 
 
 def _session(tenant_id: uuid.UUID, actor: Actor) -> AbstractContextManager[Session]:
@@ -90,6 +102,7 @@ def actors_for(plan: TenantPlan) -> DemoActors:
             principal=seeder.actor(plan, "principal"),
             office_admin=seeder.actor(plan, "office_admin"),
             accountant=seeder.actor(plan, "accountant"),
+            exam_coordinator=seeder.actor(plan, "exam_coordinator"),
         )
     except seeder.SeedError as exc:
         raise DemoSeedError(str(exc)) from exc
@@ -381,7 +394,147 @@ def _ensure_followups(plan: TenantPlan, actor: Actor, created: Counter[str]) -> 
             created["dq_followups"] += len(requests)
 
 
-# --- 7. disclosure draft and 8. weekly brief ------------------------------------------------------
+# --- 8. exams and marks and 9. early-warning evaluation ------------------------------------------
+
+
+def _ensure_exams(session: Session, actor: Actor, created: Counter[str]) -> list[uuid.UUID]:
+    year = tenancy.get_current_academic_year(session)
+    if year is None:
+        raise DemoSeedError("the school has no current academic year")
+    held = {e.name: e.id for e in academics.list_exams(session, actor.ctx, year.id)}
+    out: list[uuid.UUID] = []
+    for spec in demo.EXAMS:
+        if spec.name not in held:
+            held_on = year.starts_on + dt.timedelta(days=spec.days_after_year_start)
+            held[spec.name] = academics.create_exam(
+                session, actor.ctx, ExamCreate(name=spec.name, held_on=held_on)
+            ).id
+            created["exams"] += 1
+        out.append(held[spec.name])
+    return out
+
+
+def _marks_sections(session: Session) -> list[uuid.UUID]:
+    """Current-year sections of the marks classes, in class and section order."""
+    year = tenancy.get_current_academic_year(session)
+    if year is None:
+        raise DemoSeedError("the school has no current academic year")
+    order = {code: i for i, code in enumerate(demo.MARKS_CLASSES)}
+    classes = {c.id: c.code for c in tenancy.list_classes(session) if c.code in order}
+    sections = [
+        s
+        for s in tenancy.list_sections(session, academic_year_id=year.id, include_archived=False)
+        if s.class_id in classes
+    ]
+    sections.sort(key=lambda s: (order[classes[s.class_id]], s.name))
+    return [s.id for s in sections]
+
+
+def _subjects_for(exam_index: int, position: int, total: int) -> tuple[str, ...]:
+    """The subjects entered for one section and exam (FR-DEMO-016: the second exam unfinished)."""
+    if exam_index == len(demo.EXAMS) - 1:
+        if position >= total - demo.MARKS_NOT_STARTED:
+            return ()
+        if position >= total - demo.MARKS_NOT_STARTED - demo.MARKS_PARTIAL:
+            return demo.MARKS_SUBJECTS[:-1]
+    return demo.MARKS_SUBJECTS
+
+
+def _ensure_marks(plan: TenantPlan, actor: Actor, created: Counter[str]) -> None:
+    with _session(plan.tenant_id, actor) as session:
+        exam_ids = _ensure_exams(session, actor, created)
+        sections = _marks_sections(session)
+        for exam_index, exam_id in enumerate(exam_ids):
+            for position, section_id in enumerate(sections):
+                subjects = _subjects_for(exam_index, position, len(sections))
+                grid = academics.section_marks(session, actor.ctx, section_id, exam_id)
+                if not subjects or grid.subjects or not grid.students:
+                    continue  # nothing planned here, or entered on an earlier run
+                entries = []
+                for row in grid.students:
+                    pupil = row.student
+                    key = f"{plan.tenant_id}:{pupil.admission_no or pupil.student_id}"
+                    for subject in subjects:
+                        mark = demo.demo_mark(key, exam_index, subject)
+                        entries.append(
+                            MarkIn(
+                                student_id=pupil.student_id,
+                                subject=subject,
+                                max_marks=demo.MARKS_MAX,
+                                marks=mark.marks,
+                                absent=mark.absent,
+                            )
+                        )
+                out = academics.record_marks(
+                    session, actor.ctx, section_id, exam_id, MarksWrite(entries=entries)
+                )
+                created["marks"] += out.written
+
+
+def _ensure_flags(plan: TenantPlan, created: Counter[str]) -> None:
+    with tenant_session(plan.tenant_id) as session:
+        created["insight_flags"] += insights.evaluate(session)
+
+
+# --- 10. TC requests and 11. one family -----------------------------------------------------------
+
+
+def _ensure_tc_requests(
+    plan: TenantPlan, actor: Actor, class_x: Sequence[uuid.UUID], created: Counter[str]
+) -> None:
+    picked = list(reversed(class_x))[: len(demo.TC_REQUESTS)]
+    with _session(plan.tenant_id, actor) as session:
+        if tc_requests.list_requests(session, actor.ctx, limit=1).data:
+            return
+        today = certificates._today(session)
+        for spec, student_id in zip(demo.TC_REQUESTS, picked, strict=False):
+            row = tc_requests.log_request(
+                session,
+                actor.ctx,
+                TcRequestIn(
+                    student_id=student_id,
+                    received_on=today - dt.timedelta(days=spec.days_ago),
+                    channel=spec.channel,
+                    leaving_reason=spec.leaving_reason,
+                ),
+            )
+            created["tc_requests"] += 1
+            if spec.prepare:
+                tc_requests.change_status(
+                    session,
+                    actor.ctx,
+                    row.id,
+                    TcRequestStatusIn(status="in_preparation"),
+                    expected_version=row.version,
+                )
+
+
+def _ensure_family(
+    plan: TenantPlan, actor: Actor, class_x: Sequence[uuid.UUID], created: Counter[str]
+) -> None:
+    first_no, second_no = demo.SIBLING_ACCOUNTS
+    if len(class_x) <= max(first_no, second_no):
+        return
+    first, second = class_x[first_no], class_x[second_no]
+    with _session(plan.tenant_id, actor) as session:
+        guardians = students.list_guardians(session, actor.ctx, first)
+        shared = next((g for g in guardians if g.is_primary), guardians[0] if guardians else None)
+        if shared is None:
+            raise DemoSeedError("the first sibling has no guardian")
+        if any(g.id == shared.id for g in students.list_guardians(session, actor.ctx, second)):
+            return
+        students.add_guardian(
+            session,
+            actor.ctx,
+            second,
+            GuardianCreate.model_validate(
+                {"relationship": shared.relationship, "guardian_id": shared.id}
+            ),
+        )
+        created["sibling_links"] += 1
+
+
+# --- 7. disclosure draft and 12. weekly brief ---------------------------------------------------
 
 
 def _ensure_disclosure(plan: TenantPlan, actor: Actor, created: Counter[str]) -> None:
@@ -420,6 +573,10 @@ def seed_scenario(plan: TenantPlan) -> dict[str, int]:
     _ensure_findings(plan, actors.office_admin, created)
     _ensure_followups(plan, actors.office_admin, created)
     _ensure_disclosure(plan, actors.principal, created)
+    _ensure_marks(plan, actors.exam_coordinator, created)
+    _ensure_flags(plan, created)
+    _ensure_tc_requests(plan, actors.office_admin, class_x, created)
+    _ensure_family(plan, actors.office_admin, class_x, created)
     _ensure_brief(plan, created)
     return {k: v for k, v in sorted(created.items()) if v}
 
@@ -429,6 +586,8 @@ def counts(tenant_id: uuid.UUID) -> dict[str, int]:
     with tenant_session(tenant_id) as session:
         found = {
             **compliance.tenant_data_counts(session),
+            **academics.tenant_data_counts(session),
+            **insights.tenant_data_counts(session),
             **disclosure.tenant_data_counts(session),
             **brief.tenant_data_counts(session),
         }

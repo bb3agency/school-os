@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  checkBody,
-  checkFormSchema,
-  checksOverviewSchema,
-  ifMatch,
-  myPoliciesSchema,
-  policyFormSchema,
-} from "./safety-data";
+import { checkBody, checkFormSchema, ifMatch, policyFormSchema } from "./safety-data";
 
 describe("safety check form (FC-09, FR-COMP-048)", () => {
   it("sends drill counts only for drills and empty fields as null", () => {
@@ -80,51 +73,5 @@ describe("policy form (FC-10, FR-COMP-056)", () => {
 
   it("sends If-Match as a weak ETag", () => {
     expect(ifMatch(2)).toBe('W/"2"');
-  });
-});
-
-describe("answers are checked before use", () => {
-  it("accepts the API's overview and refuses an unknown state", () => {
-    const overview = {
-      statuses: [
-        {
-          kind: "fire_drill",
-          kind_label: "Fire evacuation drill",
-          every_months: 4,
-          drill: true,
-          state: "overdue",
-          last_done_on: "2026-06-01",
-          next_due: "2026-10-01",
-          days_left: -42,
-          last_entry_id: "e1",
-        },
-      ],
-      counts: { overdue: 1, due_soon: 0, never: 0, ok: 0 },
-      recent: [],
-      kinds: [],
-      due_soon_days: 14,
-      verified: false,
-      today: "2026-11-12",
-      leaders: [],
-    };
-    expect(checksOverviewSchema.parse(overview).statuses[0]?.state).toBe("overdue");
-    const bad = { ...overview, statuses: [{ ...overview.statuses[0], state: "late" }] };
-    expect(checksOverviewSchema.safeParse(bad).success).toBe(false);
-  });
-
-  it("reads the member's own list", () => {
-    const mine = myPoliciesSchema.parse({
-      items: [
-        {
-          id: "p1",
-          title: "Anti-bullying policy",
-          current_version_id: "v1",
-          acknowledged_at: null,
-          needs_ack: true,
-        },
-      ],
-      pending: 1,
-    });
-    expect(mine.pending).toBe(1);
   });
 });

@@ -79,6 +79,21 @@ TENANT_SIDE_IMPORTS: dict[str, frozenset[str] | None] = {
     "app.identity.service_token": frozenset(
         {"InMemoryReplayStore", "RedisReplayStore", "ReplayStore"}
     ),
+    # FA-13 (ADR-0020 amendment 2026-11-13): the webhook guard and verifier registry of the
+    # public surface (ADR-0047) for the Razorpay webhook of SchoolOS's own account. No tenant
+    # data: the verifier resolves no school handle and the route reads platform rows only.
+    "app.public.config": frozenset({"WebhookProvider"}),
+    "app.public.guards": frozenset({"WebhookCaller", "forget_event", "require_webhook_signature"}),
+    "app.public.webhooks": frozenset(
+        {
+            "VerifiedWebhook",
+            "WebhookRejected",
+            "WebhookRequest",
+            "WebhookUnknownRoute",
+            "register_webhook_verifier",
+            "webhook_verifier",
+        }
+    ),
     # Idempotency-Key replay on the KV store (ops.idempotency_keys is never touched).
     "app.ops.idempotency": frozenset(
         {

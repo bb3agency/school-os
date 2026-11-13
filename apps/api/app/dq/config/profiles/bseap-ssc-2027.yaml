@@ -38,6 +38,9 @@ needs_apaar: false
 # parent verification slip (FR-DQ-045) is how parents check name, date of birth and gender.
 parent_verification_slip: true
 
+# FO-10 (DQ-032): medium, languages and the photo tick for Classes IX and X.
+candidate_scheme: bseap-ssc
+
 # The nominal roll's columns as far as public guides describe them (research notes,
 # regulation_portals.md §3: name, surname, parents' names, date of birth, gender, caste,
 # religion, medium, languages, photo and signature, Aadhaar, PEN; unverified, D3). The data
@@ -56,13 +59,18 @@ board_fields:
   - {name: "Religion", attribute: religion, required: false,
      note: "Not editable at the board (BSEAP 2026); correct it in UDISE+ before the window."}
   - {name: "Mother tongue", attribute: mother_tongue, required: false}
-  - {name: "Medium of instruction and languages", attribute: null,
-     note: "SchoolOS does not hold them; check on the board portal."}
+  # FO-10 (FR-STU-034): the medium, languages and photo tick the office records on the board
+  # candidates screen (codes of app/students/board_catalogue.yaml, verified: false).
+  - {name: "Medium of instruction", attribute: exam_medium,
+     note: "Recorded on the board candidates screen."}
+  - {name: "First language", attribute: first_language}
+  - {name: "Second language", attribute: second_language}
+  - {name: "Third language", attribute: third_language}
   - {name: "UDISE+ PEN", attribute: udise_pen, required: false}
   - {name: "Aadhaar", attribute: aadhaar_last4, required: false,
      note: "SchoolOS keeps only the last four digits; the number itself is never stored."}
-  - {name: "Photograph and signature", attribute: null,
-     note: "Uploaded on the board portal; SchoolOS does not hold them."}
+  - {name: "Photograph and signature", attribute: photo_signature_ready,
+     note: "Uploaded on the board portal; SchoolOS does not hold them, only whether they were collected."}
 
 readiness:
   classes: [IX, X]

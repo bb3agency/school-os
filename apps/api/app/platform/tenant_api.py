@@ -3,7 +3,8 @@ FR-PLT-027, FR-PLT-030).
 
 Mounted in BOTH deployment modes (they are tenant routes guarded by ``require``):
 - ``GET /api/v1/tenant/billing`` and ``/tenant/billing/invoices`` (``tenant.billing.read``): the
-  school's own plan, status, period, usage vs limits and invoices, read through the allowlisted
+  school's own plan, status, period, usage vs limits and invoices (each open invoice with its
+  "Pay online" link when SchoolOS made one, FA-13), read through the allowlisted
   definer ``core.current_subscription()`` in the caller's ``tenant_session`` (never another
   school's rows). The AI answer bundle of that subscription, its ex-GST prices and this month's
   answer count are platform rows read for the caller's own tenant and subscription
@@ -88,6 +89,9 @@ class TenantInvoice(BaseModel):
     total_inr: Decimal
     amount_due_inr: Decimal
     status: str
+    # FA-13 (FR-PAY-027): SchoolOS's Razorpay page for this invoice's balance due, when an
+    # active payment link exists ("Pay online"); null otherwise.
+    payment_url: str | None = None
 
 
 class TenantBillingOut(BaseModel):
@@ -137,6 +141,18 @@ def _invoices(data: dict[str, Any] | None) -> list[TenantInvoice]:
     return [TenantInvoice.model_validate(i) for i in (data or {}).get("invoices", [])]
 
 
+def _with_payment_urls(tenant_id: uuid.UUID, invoices: list[TenantInvoice]) -> list[TenantInvoice]:
+    """Each open invoice with the short URL of its active payment link (FA-13): platform rows of
+    the caller's own school only (``service.school_payment_urls``)."""
+    urls = service.school_payment_urls(
+        tenant_id, [(i.invoice_id, i.amount_due_inr) for i in invoices if i.amount_due_inr > 0]
+    )
+    return [
+        i.model_copy(update={"payment_url": urls[i.invoice_id]}) if i.invoice_id in urls else i
+        for i in invoices
+    ]
+
+
 @router.get("/tenant/billing", response_model=TenantBillingOut)
 def get_billing(ctx: BillingReader, db: TenantDB) -> TenantBillingOut:
     """Current plan, status, period, usage vs limits and the AI answer bundle (permission
@@ -183,7 +199,8 @@ def _dedicated_billing() -> TenantBillingOut | None:
 @router.get("/tenant/billing/invoices", response_model=Page[TenantInvoice])
 def list_billing_invoices(ctx: BillingReader, db: TenantDB) -> Page[TenantInvoice]:
     """This school's issued invoices, newest first (last 24; permission ``tenant.billing.read``)."""
-    return Page[TenantInvoice](data=_invoices(service.current_subscription(db)), next_cursor=None)
+    invoices = _with_payment_urls(ctx.tenant_id, _invoices(service.current_subscription(db)))
+    return Page[TenantInvoice](data=invoices, next_cursor=None)
 
 
 @router.get("/announcements", response_model=list[AnnouncementBrief])

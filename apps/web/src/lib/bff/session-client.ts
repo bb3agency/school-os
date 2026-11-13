@@ -1,8 +1,11 @@
 /**
  * Browser side of the BFF session (docs/07 §5.2). The browser only ever sees non-secret
  * facts: signed in or not, display name, CSRF token and idle expiry. Nothing here is
- * stored in localStorage/sessionStorage; the CSRF token lives in memory only.
+ * stored in localStorage/sessionStorage; the CSRF token lives in memory only. Sign-out also
+ * clears the unsent drafts other screens keep on the device (`lib/device-drafts`, FT-11).
  */
+
+import { clearDeviceDrafts } from "@/lib/device-drafts";
 
 /** `support`: a SchoolOS operator using an approved break-glass grant (ADR-0023). */
 export type SessionKind = "staff" | "operator" | "support";
@@ -169,6 +172,8 @@ export async function signOut(kind: SessionKind, navigate: Navigate = defaultNav
   if (!response.ok) throw new Error(`sign out ${response.status}`);
   const { redirect_to: redirectTo } = (await response.json()) as { redirect_to: string };
   forgetSessionInfo(kind);
+  // FT-11 (FR-ATT-032): unsent attendance kept on this device goes with the session.
+  clearDeviceDrafts();
   navigate(redirectTo);
 }
 
@@ -187,5 +192,7 @@ export async function signOutEverywhere(kind: SessionKind, navigate: Navigate = 
   if (!response.ok) throw new Error(`sign out everywhere ${response.status}`);
   const { redirect_to: redirectTo } = (await response.json()) as { redirect_to: string };
   forgetSessionInfo(kind);
+  // FT-11 (FR-ATT-032): unsent attendance kept on this device goes with the session.
+  clearDeviceDrafts();
   navigate(redirectTo);
 }
