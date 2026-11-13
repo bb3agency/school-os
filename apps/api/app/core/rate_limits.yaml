@@ -267,6 +267,9 @@ routes:
   GET /api/v1/fees/reports/year-end-pack: [exports]
   # FM-10 fee structure notice: the print view (one page per class)
   GET /api/v1/fees/structure-notice/print: [render]
+  # FO-07/FO-08 (FR-UDI-03x): enrolment statistics and scheme pack print views
+  GET /api/v1/reports/enrolment-statistics/print: [render]
+  GET /api/v1/scheme-packs/attendance/print: [render]
   # support tickets
   POST /api/v1/support/tickets: [support_tickets]
   POST /api/v1/platform/support/tickets: [support_tickets]
