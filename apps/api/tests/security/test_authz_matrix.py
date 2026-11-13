@@ -3167,6 +3167,23 @@ def _fix_letters() -> ModuleType:
 SPECS.update(_fix_letters().matrix_specs())
 
 
+def _gaps() -> ModuleType:
+    """tests/knowledge/gaps_security_support.py (FA-06 knowledge gaps)."""
+    name = "sos_test_knowledge_gaps_security_support"
+    if name not in sys.modules:
+        path = Path(__file__).resolve().parents[1] / "knowledge" / "gaps_security_support.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+SPECS.update(_gaps().matrix_specs())
+
+
 def _udise_match(w: Any, r: str, a: Engine) -> Request:
     """FO-04 (FR-UDI-014): skip the unmatched row of a fresh UDISE+ list of school A."""
     data = IM.xlsx_bytes(
@@ -3361,6 +3378,8 @@ def _success(method: str, path: str) -> int:  # noqa: PLR0911, PLR0912 - one ans
         return int(_udise().MATRIX_STATUS[(method, path)])  # FO-02: guard passed (no difference)
     if (method, path) in _fix_letters().MATRIX_STATUS:
         return int(_fix_letters().MATRIX_STATUS[(method, path)])  # FA-08: no board difference
+    if (method, path) in _gaps().MATRIX_STATUS:
+        return int(_gaps().MATRIX_STATUS[(method, path)])  # FA-06: guard passed, no such gap
     if method == "POST" and path in _fix_letters().MATRIX_CREATES:
         return 201
     if (method, path) in _disclosure().MATRIX_STATUS:
