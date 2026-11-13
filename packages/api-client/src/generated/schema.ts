@@ -9035,6 +9035,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/invoices/{invoice_id}/payment-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Invoice Payment Links
+         * @description The invoice's Razorpay payment links, newest first, and whether online payment is set up
+         *     (``enabled``). 404 for an unknown invoice.
+         */
+        get: operations["list_invoice_payment_links_api_v1_platform_invoices__invoice_id__payment_links_get"];
+        put?: never;
+        /**
+         * Create Invoice Payment Link
+         * @description A Razorpay payment link for the balance due of an issued invoice (SchoolOS is the
+         *     merchant). 409 ``online_payments_off``, ``invalid_state``, ``link_exists`` or
+         *     ``invoice_changed``; 502 ``payment_link_failed``; 503 when Razorpay does not answer. Audited
+         *     as ``payment_link.created``.
+         */
+        post: operations["create_invoice_payment_link_api_v1_platform_invoices__invoice_id__payment_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/invoices/{invoice_id}/payments": {
         parameters: {
             query?: never;
@@ -9154,6 +9182,49 @@ export interface paths {
         /** Set Operator Roles */
         put: operations["set_operator_roles_api_v1_platform_operators__operator_id__roles_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/payment-links/{link_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Invoice Payment Link
+         * @description Cancel an active link at Razorpay and here. 409 ``invalid_state`` when it is not active,
+         *     ``link_paid`` when Razorpay reports it paid (the payment is then applied). Audited as
+         *     ``payment_link.cancelled``.
+         */
+        post: operations["cancel_invoice_payment_link_api_v1_platform_payment_links__link_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/payment-links/{link_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Invoice Payment Link
+         * @description Ask Razorpay about an active link now and apply a captured payment the webhook missed
+         *     (same checks as the webhook; audited as ``payment.online_received``).
+         */
+        post: operations["check_invoice_payment_link_api_v1_platform_payment_links__link_id__check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -13210,6 +13281,28 @@ export interface paths {
          *     acknowledged without effect.
          */
         post: operations["razorpay_webhook_api_v1_webhooks_razorpay__route__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/schoolos-billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Schoolos Billing Webhook
+         * @description Razorpay events of SchoolOS's own account (payment links of SchoolOS invoices). Only
+         *     ``payment_link.paid`` is acted on; the link and payment are re-fetched before the invoice
+         *     is marked paid. A replayed event is acknowledged without effect.
+         */
+        post: operations["schoolos_billing_webhook_api_v1_webhooks_schoolos_billing_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -23738,6 +23831,79 @@ export interface components {
             notes?: string | null;
         };
         /**
+         * InvoicePaymentLinkOut
+         * @description A Razorpay payment link of a SchoolOS invoice (FA-13; FR-PAY-017..024). SchoolOS is the
+         *     merchant. ``needs_review``: paid but not applied (``review_reason``); refund it in
+         *     Razorpay's dashboard. No payer details are kept.
+         */
+        InvoicePaymentLinkOut: {
+            /** Amount Inr */
+            amount_inr: string;
+            /** Cancelled At */
+            cancelled_at?: string | null;
+            /** Cancelled By */
+            cancelled_by?: string | null;
+            /** Created At */
+            created_at: string | null;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /**
+             * Expire By
+             * Format: date-time
+             */
+            expire_by: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Invoice Id
+             * Format: uuid
+             */
+            invoice_id: string;
+            /** Payment Id */
+            payment_id?: string | null;
+            /** Provider */
+            provider: string;
+            /** Provider Link Id */
+            provider_link_id: string;
+            /** Provider Payment Id */
+            provider_payment_id?: string | null;
+            /** Review Reason */
+            review_reason?: ("invoice_not_open" | "amount_exceeds_balance" | "amount_mismatch") | null;
+            /** Settled At */
+            settled_at?: string | null;
+            /** Short Url */
+            short_url: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "paid" | "cancelled" | "expired" | "needs_review";
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * InvoicePaymentLinksOut
+         * @description An invoice's payment links, newest first; ``enabled`` says whether online payment of
+         *     SchoolOS invoices is set up (``SOS_PLATFORM_PAYMENTS_ENABLED``).
+         */
+        InvoicePaymentLinksOut: {
+            /** Data */
+            data: components["schemas"]["InvoicePaymentLinkOut"][];
+            /** Enabled */
+            enabled: boolean;
+        };
+        /**
          * InvoicePdfDownloadOut
          * @description A presigned GET (at most 5 minutes, attachment) for an issued invoice's PDF.
          */
@@ -26950,11 +27116,8 @@ export interface components {
             received_on: string;
             /** Recorded At */
             recorded_at: string | null;
-            /**
-             * Recorded By
-             * Format: uuid
-             */
-            recorded_by: string;
+            /** Recorded By */
+            recorded_by?: string | null;
             /** Recorded By Name */
             recorded_by_name?: string | null;
             /** Reference */
@@ -33283,6 +33446,8 @@ export interface components {
             invoice_number: string | null;
             /** Issue Date */
             issue_date: string | null;
+            /** Payment Url */
+            payment_url?: string | null;
             /**
              * Period End
              * Format: date
@@ -56038,6 +56203,96 @@ export interface operations {
             };
         };
     };
+    list_invoice_payment_links_api_v1_platform_invoices__invoice_id__payment_links_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePaymentLinksOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_invoice_payment_link_api_v1_platform_invoices__invoice_id__payment_links_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                invoice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePaymentLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_invoice_payments_api_v1_platform_invoices__invoice_id__payments_get: {
         parameters: {
             query?: never;
@@ -56416,6 +56671,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OperatorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    cancel_invoice_payment_link_api_v1_platform_payment_links__link_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePaymentLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    check_invoice_payment_link_api_v1_platform_payment_links__link_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePaymentLinkOut"];
                 };
             };
             /** @description Validation Error */
@@ -66314,6 +66657,67 @@ export interface operations {
                     "RateLimit-Policy"?: string;
                     /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
                     "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    schoolos_billing_webhook_api_v1_webhooks_schoolos_billing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Bad or missing X-Razorpay-Signature (no detail). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Online payment of SchoolOS invoices is not set up. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Larger than 256 KB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many requests (`rate_limited`, docs/09 §2.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`. */
+            429: {
+                headers: {
+                    /** @description Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers). */
+                    RateLimit?: string;
+                    /** @description Policies that applied (draft-ietf-httpapi-ratelimit-headers). */
+                    "RateLimit-Policy"?: string;
+                    /** @description Seconds to wait before retrying (RFC 9110 §10.2.3). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Razorpay could not be asked; Razorpay retries the event. */
+            503: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content?: never;

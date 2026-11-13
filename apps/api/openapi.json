@@ -26932,6 +26932,193 @@
         "title": "InvoicePatch",
         "type": "object"
       },
+      "InvoicePaymentLinkOut": {
+        "description": "A Razorpay payment link of a SchoolOS invoice (FA-13; FR-PAY-017..024). SchoolOS is the\nmerchant. ``needs_review``: paid but not applied (``review_reason``); refund it in\nRazorpay's dashboard. No payer details are kept.",
+        "properties": {
+          "amount_inr": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount Inr",
+            "type": "string"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancelled_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "expire_by": {
+            "format": "date-time",
+            "title": "Expire By",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "invoice_id": {
+            "format": "uuid",
+            "title": "Invoice Id",
+            "type": "string"
+          },
+          "payment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Id"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "provider_link_id": {
+            "title": "Provider Link Id",
+            "type": "string"
+          },
+          "provider_payment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Payment Id"
+          },
+          "review_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "invoice_not_open",
+                  "amount_exceeds_balance",
+                  "amount_mismatch"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Reason"
+          },
+          "settled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settled At"
+          },
+          "short_url": {
+            "title": "Short Url",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "paid",
+              "cancelled",
+              "expired",
+              "needs_review"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "invoice_id",
+          "tenant_id",
+          "provider",
+          "provider_link_id",
+          "short_url",
+          "amount_inr",
+          "status",
+          "expire_by",
+          "created_by",
+          "created_at",
+          "version"
+        ],
+        "title": "InvoicePaymentLinkOut",
+        "type": "object"
+      },
+      "InvoicePaymentLinksOut": {
+        "description": "An invoice's payment links, newest first; ``enabled`` says whether online payment of\nSchoolOS invoices is set up (``SOS_PLATFORM_PAYMENTS_ENABLED``).",
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/InvoicePaymentLinkOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "data"
+        ],
+        "title": "InvoicePaymentLinksOut",
+        "type": "object"
+      },
       "InvoicePdfDownloadOut": {
         "description": "A presigned GET (at most 5 minutes, attachment) for an issued invoice's PDF.",
         "properties": {
@@ -35802,9 +35989,16 @@
             "title": "Recorded At"
           },
           "recorded_by": {
-            "format": "uuid",
-            "title": "Recorded By",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By"
           },
           "recorded_by_name": {
             "anyOf": [
@@ -35891,7 +36085,6 @@
           "received_on",
           "reference",
           "status",
-          "recorded_by",
           "recorded_at"
         ],
         "title": "PaymentOut",
@@ -52360,6 +52553,17 @@
               }
             ],
             "title": "Issue Date"
+          },
+          "payment_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Url"
           },
           "period_end": {
             "format": "date",
@@ -92527,6 +92731,156 @@
         ]
       }
     },
+    "/api/v1/platform/invoices/{invoice_id}/payment-links": {
+      "get": {
+        "description": "The invoice's Razorpay payment links, newest first, and whether online payment is set up\n(``enabled``). 404 for an unknown invoice.",
+        "operationId": "list_invoice_payment_links_api_v1_platform_invoices__invoice_id__payment_links_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invoice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoicePaymentLinksOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Invoice Payment Links",
+        "tags": [
+          "platform"
+        ]
+      },
+      "post": {
+        "description": "A Razorpay payment link for the balance due of an issued invoice (SchoolOS is the\nmerchant). 409 ``online_payments_off``, ``invalid_state``, ``link_exists`` or\n``invoice_changed``; 502 ``payment_link_failed``; 503 when Razorpay does not answer. Audited\nas ``payment_link.created``.",
+        "operationId": "create_invoice_payment_link_api_v1_platform_invoices__invoice_id__payment_links_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoice_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invoice Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoicePaymentLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create Invoice Payment Link",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
     "/api/v1/platform/invoices/{invoice_id}/payments": {
       "get": {
         "description": "The invoice's payments, newest received first, reversed ones included with who reversed\nthem, when and why (docs/16 \u00a75.9). 404 for an unknown invoice.",
@@ -93185,6 +93539,142 @@
           }
         },
         "summary": "Set Operator Roles",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/payment-links/{link_id}/cancel": {
+      "post": {
+        "description": "Cancel an active link at Razorpay and here. 409 ``invalid_state`` when it is not active,\n``link_paid`` when Razorpay reports it paid (the payment is then applied). Audited as\n``payment_link.cancelled``.",
+        "operationId": "cancel_invoice_payment_link_api_v1_platform_payment_links__link_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoicePaymentLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel Invoice Payment Link",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/payment-links/{link_id}/check": {
+      "post": {
+        "description": "Ask Razorpay about an active link now and apply a captured payment the webhook missed\n(same checks as the webhook; audited as ``payment.online_received``).",
+        "operationId": "check_invoice_payment_link_api_v1_platform_payment_links__link_id__check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoicePaymentLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Check Invoice Payment Link",
         "tags": [
           "platform"
         ]
@@ -109478,6 +109968,62 @@
           }
         },
         "summary": "Razorpay Webhook",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/api/v1/webhooks/schoolos-billing": {
+      "post": {
+        "description": "Razorpay events of SchoolOS's own account (payment links of SchoolOS invoices). Only\n``payment_link.paid`` is acted on; the link and payment are re-fetched before the invoice\nis marked paid. A replayed event is acknowledged without effect.",
+        "operationId": "schoolos_billing_webhook_api_v1_webhooks_schoolos_billing_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bad or missing X-Razorpay-Signature (no detail)."
+          },
+          "404": {
+            "description": "Online payment of SchoolOS invoices is not set up."
+          },
+          "413": {
+            "description": "Larger than 256 KB."
+          },
+          "429": {
+            "description": "Too many requests (`rate_limited`, docs/09 \u00a72.7): RFC 9457 problem with `retry_after`. Limited responses also carry `RateLimit-Policy` and `RateLimit`.",
+            "headers": {
+              "RateLimit": {
+                "description": "Remaining quota per policy (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "RateLimit-Policy": {
+                "description": "Policies that applied (draft-ietf-httpapi-ratelimit-headers).",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "description": "Seconds to wait before retrying (RFC 9110 \u00a710.2.3).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Razorpay could not be asked; Razorpay retries the event."
+          }
+        },
+        "summary": "Schoolos Billing Webhook",
         "tags": [
           "webhooks"
         ]
