@@ -27,7 +27,6 @@ import {
   closeSchema,
   eraseSchema,
   ifMatch,
-  reviewOf,
   todayIst,
   useFlag,
   useOwners,
@@ -65,7 +64,6 @@ export function ActionLog({ actions, label }: { actions: readonly FlagAction[]; 
 
 function FlagFacts({ flag }: { flag: FlagDetail }) {
   const t = useTranslations("insights");
-  const review = reviewOf(flag);
   const rows: [string, ReactNode][] = [
     [
       t("detail.raisedOn"),
@@ -81,13 +79,13 @@ function FlagFacts({ flag }: { flag: FlagDetail }) {
       </span>,
     ],
     [t("detail.owner"), flag.owner?.display_name ?? t("unassigned")],
-    ...(review.on
+    ...(flag.review_on
       ? ([
           [
             t("detail.reviewOn"),
             <span key="review" className="inline-flex flex-wrap items-center gap-1">
-              <span className="num">{formatDate(review.on)}</span>
-              {review.due ? <span>{t("detail.reviewDue")}</span> : null}
+              <span className="num">{formatDate(flag.review_on)}</span>
+              {flag.review_due ? <span>{t("detail.reviewDue")}</span> : null}
             </span>,
           ],
         ] as [string, ReactNode][])

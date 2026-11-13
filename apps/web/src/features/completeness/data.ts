@@ -1,16 +1,12 @@
-import type { ApiClient } from "@schoolos/api-client";
-import * as z from "@/lib/zod";
+import type { ApiClient, components } from "@schoolos/api-client";
 import { unwrap } from "@/lib/bff/query";
 
 /**
  * Records completeness (FT-14, FR-ATT-016..025, FR-MRK-016..025) and the management follow-up
  * counts (FT-13, FR-EW-026..028). Counts only: no student is named anywhere here.
- *
- * The three routes are not in the generated client yet (the lead regenerates apps/api/openapi.json
- * after the wave): until then the calls go through `loose()` and every answer is checked with
- * the zod schemas below. After regeneration, swap `loose(api)` for `api` and the zod types for
- * `components["schemas"]["AttendanceCompletenessOut" | "MarksCompletenessOut" | ...]`.
  */
+
+type Schemas = components["schemas"];
 
 export const COMPLETENESS_READ = "completeness.read";
 export const COMPLETENESS_REMIND = "completeness.remind";
@@ -23,130 +19,34 @@ export const COMPLETENESS_KEYS = {
   counts: (since: string) => ["staff", "insights", "counts", since] as const,
 };
 
-const teacher = z.object({ membership_id: z.string(), display_name: z.string().nullable() });
+export type AttendanceCompleteness = Schemas["AttendanceCompletenessOut"];
+export type AttendanceRowStatus = Schemas["AttendanceCompletenessRow"]["status"];
+export type MarksCompleteness = Schemas["MarksCompletenessOut"];
+export type FollowUpCounts = Schemas["InsightCountsOut"];
+export type ReminderInput = Schemas["CompletenessReminderIn"];
 
-export const attendanceCompletenessSchema = z.object({
-  on_date: z.string(),
-  academic_year_id: z.string(),
-  sections: z.number(),
-  complete: z.number(),
-  partial: z.number(),
-  not_taken: z.number(),
-  day_off: z.number(),
-  no_students: z.number(),
-  reminders_enabled: z.boolean(),
-  rows: z.array(
-    z.object({
-      section_id: z.string(),
-      class_id: z.string(),
-      label: z.string(),
-      students: z.number(),
-      marked: z.number(),
-      status: z.enum(["complete", "partial", "not_taken", "day_off", "no_students"]),
-      calendar: z.string().nullable(),
-      class_teacher: teacher.nullable(),
-    }),
-  ),
-});
-export type AttendanceCompleteness = z.infer<typeof attendanceCompletenessSchema>;
-export type AttendanceRowStatus = AttendanceCompleteness["rows"][number]["status"];
-
-export const marksCompletenessSchema = z.object({
-  exam_id: z.string(),
-  exam_name: z.string(),
-  held_on: z.string(),
-  locked: z.boolean(),
-  subjects: z.array(z.string()),
-  sections: z.number(),
-  complete: z.number(),
-  partial: z.number(),
-  not_started: z.number(),
-  no_students: z.number(),
-  reminders_enabled: z.boolean(),
-  rows: z.array(
-    z.object({
-      section_id: z.string(),
-      class_id: z.string(),
-      label: z.string(),
-      students: z.number(),
-      status: z.enum(["complete", "partial", "not_started", "no_students"]),
-      subjects: z.array(
-        z.object({
-          subject: z.string(),
-          entered: z.number(),
-          status: z.enum(["complete", "partial", "missing", "no_students"]),
-        }),
-      ),
-      class_teacher: teacher.nullable(),
-    }),
-  ),
-});
-export type MarksCompleteness = z.infer<typeof marksCompletenessSchema>;
-
-export const followUpCountsSchema = z.object({
-  since: z.string(),
-  raised: z.number(),
-  actioned_on_time: z.number(),
-  actioned_late: z.number(),
-  not_actioned: z.number(),
-  overdue: z.number(),
-  open: z.number(),
-  review_due: z.number(),
-  closed: z.number(),
-  outcomes: z.record(z.string(), z.number()),
-});
-export type FollowUpCounts = z.infer<typeof followUpCountsSchema>;
-
-type Init = {
-  params?: { path?: Record<string, string>; query?: Record<string, string> };
-  body?: unknown;
-};
-type Result = Promise<{ data?: unknown; error?: unknown; response: Response }>;
-interface LooseClient {
-  GET(path: string, init?: Init): Result;
-  POST(path: string, init?: Init): Result;
-}
-
-/** The generated client without path typing, for the routes not generated yet (see above). */
-function loose(api: ApiClient): LooseClient {
-  return api as unknown as LooseClient;
-}
-
-export async function fetchAttendanceCompleteness(
+export function fetchAttendanceCompleteness(
   api: ApiClient,
   date: string,
 ): Promise<AttendanceCompleteness> {
-  const data = await unwrap(
-    loose(api).GET("/api/v1/completeness/attendance", { params: { query: { date } } }),
-  );
-  return attendanceCompletenessSchema.parse(data);
+  return unwrap(api.GET("/api/v1/completeness/attendance", { params: { query: { date } } }));
 }
 
-export async function fetchMarksCompleteness(
+export function fetchMarksCompleteness(api: ApiClient, examId: string): Promise<MarksCompleteness> {
+  return unwrap(
+    api.GET("/api/v1/completeness/exams/{exam_id}", { params: { path: { exam_id: examId } } }),
+  );
+}
+
+export function sendReminder(
   api: ApiClient,
-  examId: string,
-): Promise<MarksCompleteness> {
-  const data = await unwrap(
-    loose(api).GET("/api/v1/completeness/exams/{exam_id}", {
-      params: { path: { exam_id: examId } },
-    }),
-  );
-  return marksCompletenessSchema.parse(data);
+  input: ReminderInput,
+): Promise<Schemas["CompletenessReminderOut"]> {
+  return unwrap(api.POST("/api/v1/completeness/reminders", { body: input }));
 }
 
-export async function sendReminder(
-  api: ApiClient,
-  input: { section_id: string; kind: "attendance" | "marks"; exam_id?: string },
-): Promise<{ sent: number }> {
-  const data = await unwrap(loose(api).POST("/api/v1/completeness/reminders", { body: input }));
-  return z.object({ sent: z.number() }).parse(data);
-}
-
-export async function fetchFollowUpCounts(api: ApiClient, since: string): Promise<FollowUpCounts> {
-  const data = await unwrap(
-    loose(api).GET("/api/v1/insights/counts", since ? { params: { query: { since } } } : {}),
-  );
-  return followUpCountsSchema.parse(data);
+export function fetchFollowUpCounts(api: ApiClient, since: string): Promise<FollowUpCounts> {
+  return unwrap(api.GET("/api/v1/insights/counts", since ? { params: { query: { since } } } : {}));
 }
 
 /** "Attendance taken in 14 of 16 sections": sections with students, and those complete. */

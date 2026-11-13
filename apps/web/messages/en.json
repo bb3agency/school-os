@@ -8131,6 +8131,7 @@
     },
     "dueLabel": "Due",
     "overdue": "Overdue",
+    "reviewDue": "Review due",
     "emptyTitle": "No flags here",
     "emptyBody": "Flags appear when a rule notices a pattern, like three school days absent in a row.",
     "pagesLabel": "Pages of students to follow up",

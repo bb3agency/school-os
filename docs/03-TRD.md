@@ -460,7 +460,7 @@ Every row below is proposed from the roadmap scope (14 · M5; stories US-1701..U
 | FR-EW-027 | The counts MUST be numbers only: no student, flag, note, member or section; holding `insights.counts_read` opens no flag, note, timeline or summary (PRV-004); other roles 403. Not an `insights.viewed` event. *(Lead decision D86, PO to confirm.)* | T |
 | FR-EW-028 | The outcome of a follow-up MUST be the closing reason (FR-EW-007: improved, support in place, parent informed, no concern, student left, raised in error); the counts list every reason, zero included. No new outcome field is added. *(Lead decision D86, PO to confirm.)* | T |
 | FR-EW-029 | Not built, waiting for the PO or an ADR: a counsellor role (a new system role is a new docs/07 matrix column; PO question 2), exam coordinator access to course flags (owner decision; PO question 11), a child-safety concern category (new sensitive class: ADR and privacy review), the AP streak definition (PO question 5). *(Lead decision D86, PO to confirm.)* | T |
-| FR-EW-030 | The web MUST let the person acting plan the next review on the flag screen and show it there, and show management the counts (no names) on a follow-up counts screen; the flag list's "Review due" filter follows once the API client is regenerated. *(Lead decision D86, PO to confirm.)* | T |
+| FR-EW-030 | The web MUST let the person acting plan the next review on the flag screen and show it there, and show management the counts (no names) on a follow-up counts screen, and offer a "Review due" filter on the flag list. *(Lead decision D86, PO to confirm.)* | T |
 
 ---
 
