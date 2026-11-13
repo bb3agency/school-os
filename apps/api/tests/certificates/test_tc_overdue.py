@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import Engine, text
 
 from app.certificates import tasks, tc_overdue, tc_requests
+from app.tenancy import service as tenancy
 
 pytestmark = pytest.mark.db
 C = sys.modules["sos_test_certificates_support"]
@@ -134,7 +135,7 @@ def test_FR_CERT_045_job_runs_every_active_school_and_is_in_the_beat(
             raise RuntimeError("database unavailable")
         return 2
 
-    monkeypatch.setattr(tasks.tenancy, "list_tenant_ids", fake_ids)
+    monkeypatch.setattr(tenancy, "list_tenant_ids", fake_ids)
     monkeypatch.setattr(tc_overdue, "send_reminders", fake_send)
     assert tasks.tc_overdue_all() == {"tenants": 2, "notified": 2, "failed": 1}
     assert seen == [broken, ok]
