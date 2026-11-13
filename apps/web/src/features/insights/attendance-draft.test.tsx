@@ -52,6 +52,7 @@ function day(overrides: Partial<AttendanceDay> = {}): AttendanceDay {
     },
     on_date: todayIst(),
     marked: false,
+    draft_keep_hours: 24,
     students: [
       {
         student: {

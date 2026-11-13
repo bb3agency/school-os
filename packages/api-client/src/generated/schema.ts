@@ -11441,7 +11441,11 @@ export interface paths {
          *     ``before_enrolment`` (before the student's explicit enrolment start) or ``duplicate_entry``
          *     per entry. An entry may carry ``expected_version`` (the ``version`` read
          *     from the day): 412 ``attendance_changed`` when someone else changed that mark since, and
-         *     nothing is saved. The early-warning rules look at these students again.
+         *     nothing is saved. The early-warning rules look at these students again. Accepts
+         *     ``Idempotency-Key`` (FT-11, FR-ATT-027): a retry of a draft kept on the teacher's device
+         *     with the same key and body replays the first answer (``Idempotent-Replayed: true``) and
+         *     saves nothing again, so it can never overwrite a newer save; a failed save is not kept, and
+         *     the retry meets the same checks.
          */
         post: operations["record_attendance_api_v1_sections__section_id__attendance_post"];
         delete?: never;
@@ -14740,6 +14744,12 @@ export interface components {
             counts: {
                 [key: string]: number;
             };
+            /**
+             * Draft Keep Hours
+             * @description Hours the screen may keep this day's unsent statuses on the device (student ids and statuses only) before dropping them (FT-11, FR-ATT-026)
+             * @default 24
+             */
+            draft_keep_hours: number;
             /**
              * Marked
              * @description Whether any student of the section is marked that day

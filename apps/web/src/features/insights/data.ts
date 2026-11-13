@@ -61,11 +61,10 @@ export type AttendanceSheet = S["AttendanceSheetOut"];
 export const DEFAULT_DRAFT_KEEP_HOURS = 24;
 
 /**
- * `draft_keep_hours` of the day (app/academics/config.yaml). Read defensively until the
- * generated client carries the field (lead: regenerate, then use `day.draft_keep_hours`).
+ * `draft_keep_hours` of the day (app/academics/config.yaml), kept within 1..72 hours.
  */
 export function draftKeepHours(day: AttendanceDay): number {
-  const value = (day as { draft_keep_hours?: unknown }).draft_keep_hours;
+  const value = day.draft_keep_hours;
   return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 72
     ? value
     : DEFAULT_DRAFT_KEEP_HOURS;

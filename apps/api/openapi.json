@@ -3539,6 +3539,12 @@
             "title": "Counts",
             "type": "object"
           },
+          "draft_keep_hours": {
+            "default": 24,
+            "description": "Hours the screen may keep this day's unsent statuses on the device (student ids and statuses only) before dropping them (FT-11, FR-ATT-026)",
+            "title": "Draft Keep Hours",
+            "type": "integer"
+          },
           "marked": {
             "description": "Whether any student of the section is marked that day",
             "title": "Marked",
@@ -25071,6 +25077,8 @@
           "registers": {
             "description": "Item keys of the pack's registers to include (student lists: needs register.read). Registers not chosen print as left out.",
             "items": {
+              "maxLength": 64,
+              "minLength": 1,
               "type": "string"
             },
             "maxItems": 10,
@@ -101583,7 +101591,7 @@
         ]
       },
       "post": {
-        "description": "Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a\nday again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range``,\n``before_enrolment`` (before the student's explicit enrolment start) or ``duplicate_entry``\nper entry. An entry may carry ``expected_version`` (the ``version`` read\nfrom the day): 412 ``attendance_changed`` when someone else changed that mark since, and\nnothing is saved. The early-warning rules look at these students again.",
+        "description": "Save statuses for one or more dates, all or nothing (``attendance.record``). Saving a\nday again corrects it. 422 ``not_in_section``, ``future_date``, ``date_out_of_range``,\n``before_enrolment`` (before the student's explicit enrolment start) or ``duplicate_entry``\nper entry. An entry may carry ``expected_version`` (the ``version`` read\nfrom the day): 412 ``attendance_changed`` when someone else changed that mark since, and\nnothing is saved. The early-warning rules look at these students again. Accepts\n``Idempotency-Key`` (FT-11, FR-ATT-027): a retry of a draft kept on the teacher's device\nwith the same key and body replays the first answer (``Idempotent-Replayed: true``) and\nsaves nothing again, so it can never overwrite a newer save; a failed save is not kept, and\nthe retry meets the same checks.",
         "operationId": "record_attendance_api_v1_sections__section_id__attendance_post",
         "parameters": [
           {
