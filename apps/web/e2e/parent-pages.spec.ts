@@ -5,7 +5,13 @@ import {
   expectNoHorizontalOverflow,
   pressOn,
 } from "./support/a11y-helpers";
-import { PARENT_NOTICE, PARENT_SCHOOL, PARENT_TOKENS, PAY_REDIRECT } from "./support/r2-api";
+import {
+  PARENT_CLOSURE,
+  PARENT_NOTICE,
+  PARENT_SCHOOL,
+  PARENT_TOKENS,
+  PAY_REDIRECT,
+} from "./support/r2-api";
 import { API_PORT } from "./support/stand-in";
 
 /**
@@ -64,6 +70,7 @@ const ENV_TOKEN: Record<Kind, string> = {
   notice: "E2E_PARENT_NOTICE_TOKEN",
   dues: "E2E_PARENT_DUES_TOKEN",
   optin: "E2E_PARENT_OPTIN_TOKEN",
+  closure: "E2E_PARENT_CLOSURE_TOKEN",
 };
 
 const standIn = process.env.E2E_STAND_IN === "1";
@@ -319,6 +326,32 @@ test.describe.serial("parent link pages on a 375px phone (FR-PUB-010, ADR-0046) 
     await expectNoStopPrompt(page);
     await expectNoHorizontalOverflow(page, "/p/view opt-in saved");
     expectNoReferrer(documents, "opt-in");
+  });
+
+  test("closure page: dates, reason, the school's order and the reopening day, read-only (FR-PUB-013)", async ({
+    page,
+    context,
+  }) => {
+    const token = tokenFor("closure");
+    test.skip(!token, `set ${ENV_TOKEN.closure} or E2E_STAND_IN=1`);
+    const documents = await openLink(page, context, token ?? "");
+    await checkParentPage(page, "School closed", "/p/view closure");
+    await expect(page.getByRole("heading", { level: 1, name: "School closed" })).toBeVisible();
+    if (canned("closure")) {
+      await expect(
+        page.getByText("The school is closed from 22/10/2026 to 23/10/2026."),
+      ).toBeVisible();
+      await expect(page.getByText(`Reason: ${PARENT_CLOSURE.reason}.`)).toBeVisible();
+      await expect(
+        page.getByRole("heading", { level: 2, name: "Message from the school" }),
+      ).toBeVisible();
+      await expect(page.getByText(PARENT_CLOSURE.orderParagraph)).toBeVisible();
+      await expect(page.getByText("The school reopens on 24/10/2026.")).toBeVisible();
+    }
+    // Read-only (FR-PUB-013): no form, no button, nothing about a child.
+    await expect(page.locator("form")).toHaveCount(0);
+    await expect(page.getByRole("button")).toHaveCount(0);
+    expectNoReferrer(documents, "closure");
   });
 });
 
