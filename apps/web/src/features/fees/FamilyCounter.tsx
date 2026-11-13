@@ -11,7 +11,7 @@ import { TextField } from "@/components/ui/Input";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Table, TableScroll, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import type { Locale } from "@/i18n/routing";
-import { ApiError, newIdempotencyKey } from "@/lib/bff/query";
+import { ApiError, newIdempotencyKey, useBffClient } from "@/lib/bff/query";
 import { formatInr } from "@/lib/format";
 import {
   BANK_REFERENCE,
@@ -23,8 +23,7 @@ import {
   toPaise,
 } from "./data";
 import {
-  bffJson,
-  familyPaymentSchema,
+  postFamilyPayment,
   slipHref,
   useFamily,
   type FamilyCounter,
@@ -97,6 +96,7 @@ function FamilyCard({ data }: { data: FamilyCounter }) {
   const tm = useTranslations("fees.modes");
   const td = useTranslations("fees.modeDetails");
   const locale = useLocale() as Locale;
+  const api = useBffClient("staff");
   const queryClient = useQueryClient();
   const formId = useId();
   const rows = useMemo(() => rowsOf(data), [data]);
@@ -164,10 +164,9 @@ function FamilyCard({ data }: { data: FamilyCounter }) {
           : {};
     setPending(true);
     try {
-      const out = await bffJson(locale, "/api/v1/fees/family-payments", familyPaymentSchema, {
-        method: "POST",
-        headers: { "Idempotency-Key": key },
-        body: {
+      const out = await postFamilyPayment(
+        api,
+        {
           mode,
           mode_details: details,
           parts: chosen.map((x) => ({
@@ -175,7 +174,8 @@ function FamilyCard({ data }: { data: FamilyCounter }) {
             amount: fromPaise(x.paise ?? 0),
           })),
         },
-      });
+        key,
+      );
       setDone(out);
       setKey(newIdempotencyKey());
       await queryClient.invalidateQueries({ queryKey: KEYS.all });
