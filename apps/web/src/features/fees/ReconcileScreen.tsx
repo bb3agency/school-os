@@ -34,7 +34,6 @@ import { translateOr } from "@/lib/i18n-dynamic";
 import { isFeesOff, toPaise } from "./data";
 import { Amount, FeesGate, NoAccess } from "./parts";
 import {
-  bankFacts,
   confirmable,
   IGNORE_REASONS,
   initialSelection,
@@ -218,15 +217,14 @@ function LinesTable({
                 <Td className="num font-mono whitespace-nowrap">
                   {line.utr_or_ref ?? "—"}
                   {line.ref_kind === "utr" ? <span className="sr-only"> ({t("utr")})</span> : null}
-                  {bankFacts(line).cheque_no ? (
+                  {line.cheque_no ? (
                     <span className="block text-xs text-ink-muted">
-                      {t("chequeNo", { number: bankFacts(line).cheque_no ?? "" })}
+                      {t("chequeNo", { number: line.cheque_no })}
                     </span>
                   ) : null}
-                  {bankFacts(line).transfer_ref &&
-                  bankFacts(line).transfer_ref !== line.utr_or_ref ? (
+                  {line.transfer_ref && line.transfer_ref !== line.utr_or_ref ? (
                     <span className="block text-xs text-ink-muted">
-                      {t("transferRef", { ref: bankFacts(line).transfer_ref ?? "" })}
+                      {t("transferRef", { ref: line.transfer_ref })}
                     </span>
                   ) : null}
                 </Td>

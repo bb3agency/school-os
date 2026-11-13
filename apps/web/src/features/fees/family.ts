@@ -1,142 +1,24 @@
 "use client";
 
-import { useLocale } from "next-intl";
-import { createBffFetch } from "@/lib/bff/fetch";
-import { ApiError, NotAvailableError, useApiQuery } from "@/lib/bff/query";
+import type { ApiClient, components } from "@schoolos/api-client";
+import { unwrap, useApiQuery, useBffClient } from "@/lib/bff/query";
 import type { Loadable } from "@/lib/loadable";
-import * as z from "@/lib/zod";
 
 /**
  * Family counter (FM-07; FR-FEE-101..112) and fee structure notice (FM-10; FR-FEE-113..125).
- *
- * These routes are newer than the generated client (`packages/api-client`), so they are called
- * through the BFF with `createBffFetch` and their answers checked with the zod schemas below
- * (hand-written from `app/fees/family_schemas.py` and `structure_notice_schemas.py`). After the
- * OpenAPI document and client are regenerated these can move to `api.GET(...)` with the
- * generated types. Amounts stay exact decimal strings (FR-FEE-028).
+ * The calls go through the BFF client, so CSRF, step-up (428) and sign-in handling apply.
+ * Amounts stay exact decimal strings (FR-FEE-028).
  */
 
-const money = z.string();
+type Schemas = components["schemas"];
 
-const yearDue = z.object({
-  account_id: z.string(),
-  academic_year_id: z.string(),
-  academic_year_label: z.string().nullable(),
-  earlier_year: z.boolean(),
-  balance: money,
-  overdue: money,
-  collectable: money,
-  oldest_due_on: z.string().nullable(),
-});
-
-const familyMember = z.object({
-  student_id: z.string(),
-  display_name: z.string().nullable(),
-  admission_no: z.string().nullable(),
-  class_section: z.string().nullable(),
-  status: z.string(),
-  selected: z.boolean(),
-  linked_by: z.array(z.string()),
-  accounts: z.array(yearDue),
-  collectable: money,
-});
-
-export const familyCounterSchema = z.object({
-  student_id: z.string(),
-  as_of: z.string(),
-  members: z.array(familyMember),
-  total_collectable: money,
-  max_accounts: z.number(),
-  modes: z.array(z.string()),
-});
-
-const issuedReceipt = z.object({
-  id: z.string(),
-  receipt_number: z.string(),
-  amount: money,
-  account_id: z.string(),
-  student_id: z.string(),
-  student_name: z.string(),
-  class_section: z.string(),
-});
-
-export const familyPaymentSchema = z.object({
-  receipts: z.array(issuedReceipt),
-  amount: money,
-  mode: z.string(),
-});
-
-const noticeHead = z.object({
-  head_id: z.string(),
-  code: z.string(),
-  name: z.string(),
-  annual_amount: money,
-});
-
-const noticeClass = z.object({
-  class_id: z.string(),
-  class_label: z.string(),
-  plan_id: z.string(),
-  plan_status: z.enum(["draft", "active"]),
-  heads: z.array(noticeHead),
-  annual_total: money,
-  instalments: z.array(
-    z.object({ instalment_no: z.number(), label: z.string(), due_on: z.string(), amount: money }),
-  ),
-  late_fee_text: z.string(),
-});
-
-export const structureNoticeSchema = z.object({
-  academic_year_id: z.string(),
-  academic_year_label: z.string(),
-  title: z.string(),
-  disclaimer: z.string(),
-  classes: z.array(noticeClass),
-  classes_without_plan: z.array(z.string()),
-});
-
-const headChange = z.object({
-  head_id: z.string(),
-  code: z.string(),
-  name: z.string(),
-  change: z.enum(["added", "removed", "changed", "unchanged"]),
-  previous_amount: money.nullable(),
-  current_amount: money.nullable(),
-  difference: money,
-  percent: z.string().nullable(),
-  above_threshold: z.boolean(),
-});
-
-const classChange = z.object({
-  class_id: z.string(),
-  class_label: z.string(),
-  plan_status: z.enum(["draft", "active"]).nullable(),
-  has_previous: z.boolean(),
-  previous_total: money,
-  current_total: money,
-  difference: money,
-  percent: z.string().nullable(),
-  above_threshold: z.boolean(),
-  heads: z.array(headChange),
-});
-
-export const structureChangesSchema = z.object({
-  academic_year_id: z.string(),
-  academic_year_label: z.string(),
-  previous_year_id: z.string().nullable(),
-  previous_year_label: z.string().nullable(),
-  warn_percent: z.string(),
-  warn_percent_verified: z.boolean(),
-  classes: z.array(classChange),
-  classes_above_threshold: z.number(),
-});
-
-export type FamilyCounter = z.infer<typeof familyCounterSchema>;
-export type FamilyMember = z.infer<typeof familyMember>;
-export type FamilyPayment = z.infer<typeof familyPaymentSchema>;
-export type StructureNotice = z.infer<typeof structureNoticeSchema>;
-export type StructureChanges = z.infer<typeof structureChangesSchema>;
-export type ClassChange = z.infer<typeof classChange>;
+export type FamilyCounter = Schemas["FamilyCounterOut"];
+export type FamilyMember = Schemas["FamilyMember"];
+export type FamilyPayment = Schemas["FamilyPaymentOut"];
+export type FamilyPaymentInput = Schemas["FamilyPaymentCreate"];
+export type StructureNotice = Schemas["FeeStructureNoticeOut"];
+export type StructureChanges = Schemas["FeeStructureChangesOut"];
+export type ClassChange = StructureChanges["classes"][number];
 
 export const FAMILY_KEYS = {
   family: (studentId: string) => ["staff", "fees", "family", studentId] as const,
@@ -157,51 +39,40 @@ export function noticePrintHref(yearId: string, classId?: string): string {
   return `/bff/api/v1/fees/structure-notice/print?${query.toString()}`;
 }
 
-/** JSON through the BFF (CSRF, step-up and sign-in handled by `createBffFetch`). */
-export async function bffJson<T>(
-  locale: string,
-  path: string,
-  schema: z.ZodType<T>,
-  init: { method?: "GET" | "POST"; body?: unknown; headers?: Record<string, string> } = {},
-): Promise<T> {
-  const send = createBffFetch({ kind: "staff", locale });
-  const headers: Record<string, string> = { accept: "application/json", ...init.headers };
-  if (init.body !== undefined) headers["content-type"] = "application/json";
-  const response = await send(
-    new Request(`${window.location.origin}/bff${path}`, {
-      method: init.method ?? "GET",
-      headers,
-      ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+/** Takes one family payment (FR-FEE-104): one receipt per account, one idempotency key. */
+export function postFamilyPayment(
+  api: ApiClient,
+  body: FamilyPaymentInput,
+  idempotencyKey: string,
+): Promise<FamilyPayment> {
+  return unwrap(
+    api.POST("/api/v1/fees/family-payments", {
+      body,
+      headers: { "Idempotency-Key": idempotencyKey },
     }),
   );
-  if (response.status === 405 || response.status === 501) throw new NotAvailableError();
-  if (!response.ok) {
-    const problem = (await response.json().catch(() => ({}))) as { code?: string };
-    throw new ApiError(response.status, problem.code, problem);
-  }
-  return schema.parse(await response.json());
 }
 
 export function useFamily(studentId: string): Loadable<FamilyCounter> {
-  const locale = useLocale();
+  const api = useBffClient("staff");
   return useApiQuery(FAMILY_KEYS.family(studentId), () =>
-    bffJson(
-      locale,
-      `/api/v1/fees/students/${encodeURIComponent(studentId)}/family`,
-      familyCounterSchema,
+    unwrap(
+      api.GET("/api/v1/fees/students/{student_id}/family", {
+        params: { path: { student_id: studentId } },
+      }),
     ),
   );
 }
 
 export function useStructureNotice(yearId: string | null): Loadable<StructureNotice> {
-  const locale = useLocale();
+  const api = useBffClient("staff");
   return useApiQuery(
     FAMILY_KEYS.notice(yearId ?? ""),
     () =>
-      bffJson(
-        locale,
-        `/api/v1/fees/structure-notice?academic_year_id=${encodeURIComponent(yearId ?? "")}`,
-        structureNoticeSchema,
+      unwrap(
+        api.GET("/api/v1/fees/structure-notice", {
+          params: { query: { academic_year_id: yearId ?? "" } },
+        }),
       ),
     { enabled: yearId !== null },
   );
@@ -211,18 +82,17 @@ export function useStructureChanges(
   yearId: string | null,
   warn: string,
 ): Loadable<StructureChanges> {
-  const locale = useLocale();
+  const api = useBffClient("staff");
   return useApiQuery(
     FAMILY_KEYS.changes(yearId ?? "", warn),
-    () => {
-      const query = new URLSearchParams({ academic_year_id: yearId ?? "" });
-      if (warn) query.set("warn_percent", warn);
-      return bffJson(
-        locale,
-        `/api/v1/fees/structure-changes?${query.toString()}`,
-        structureChangesSchema,
-      );
-    },
+    () =>
+      unwrap(
+        api.GET("/api/v1/fees/structure-changes", {
+          params: {
+            query: { academic_year_id: yearId ?? "", ...(warn ? { warn_percent: warn } : {}) },
+          },
+        }),
+      ),
     { enabled: yearId !== null },
   );
 }

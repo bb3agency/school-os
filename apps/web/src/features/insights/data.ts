@@ -102,7 +102,8 @@ export interface FlagFilters {
   view: "mine" | "all";
   status: FlagStatus | "active";
   indicator: Indicator | "any";
-  due: "overdue" | "any";
+  /** FR-EW-030: "review_due" lists the flags whose planned review has come. */
+  due: "overdue" | "review_due" | "any";
 }
 
 export const KEYS = {
@@ -379,18 +380,6 @@ export function addDays(iso: string, days: number): string {
   const [y, m, d] = iso.split("-").map(Number);
   const out = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + days));
   return out.toISOString().slice(0, 10);
-}
-
-/**
- * The flag's planned review (FR-EW-023). The field is not in the generated client yet; it is
- * read defensively until the client is regenerated, then flag.review_on can be used directly.
- */
-export function reviewOf(flag: object): { on: string | null; due: boolean } {
-  const value = flag as { review_on?: unknown; review_due?: unknown };
-  return {
-    on: typeof value.review_on === "string" ? value.review_on : null,
-    due: value.review_due === true,
-  };
 }
 
 /** Closing a flag: a reason and an optional note. */

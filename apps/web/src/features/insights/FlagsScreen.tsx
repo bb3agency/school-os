@@ -253,7 +253,15 @@ export function FlagsScreen() {
           },
         ]
       : []),
-    ...(filters.due !== "any" ? [{ id: "due", label: t("dueLabel"), value: t("overdue") }] : []),
+    ...(filters.due !== "any"
+      ? [
+          {
+            id: "due",
+            label: t("dueLabel"),
+            value: t(filters.due === "overdue" ? "overdue" : "reviewDue"),
+          },
+        ]
+      : []),
   ];
   const removeChip = (id: string) => {
     if (id === "status" || id === "indicator" || id === "due") {
@@ -388,6 +396,7 @@ export function FlagsScreen() {
                   options={[
                     { value: "any", label: t("filter.any") },
                     { value: "overdue", label: t("overdue") },
+                    { value: "review_due", label: t("reviewDue") },
                   ]}
                 />
               </div>

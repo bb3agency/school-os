@@ -1,4 +1,4 @@
-import type { ApiClient } from "@schoolos/api-client";
+import type { ApiClient, components } from "@schoolos/api-client";
 import { unwrap } from "@/lib/bff/query";
 import * as z from "@/lib/zod";
 
@@ -6,13 +6,9 @@ import * as z from "@/lib/zod";
  * TC request log (FO-09; FR-CERT-026..FR-CERT-045): transfer certificate requests that reached
  * the office on paper, by phone or in person. Reading needs `certificate.read`, `.issue` or
  * `.approve`; logging and moving a request need `certificate.issue`.
- *
- * LOCAL WRAPPER: the routes under /api/v1/tc-requests are new in wave F3 and not yet in the
- * generated client (`packages/api-client`). The types below are written by hand from
- * `app/certificates/schemas.py` (TcRequestOut, TcRequestList) and the answers are checked with
- * zod. After `make openapi` the lead swaps `looseClient` and these types for
- * `components["schemas"]["TcRequestOut"]` and `api.GET("/api/v1/tc-requests")`.
  */
+
+type Schemas = components["schemas"];
 
 export const TC_REQUEST_STATUSES = [
   "received",
@@ -20,74 +16,28 @@ export const TC_REQUEST_STATUSES = [
   "ready",
   "issued",
   "cancelled",
-] as const;
-export type TcRequestStatus = (typeof TC_REQUEST_STATUSES)[number];
-export const TC_REQUEST_CHANNELS = ["paper", "phone", "in_person", "other"] as const;
+] as const satisfies readonly TcRequestStatus[];
+export type TcRequestStatus = Schemas["TcRequestOut"]["status"];
+export const TC_REQUEST_CHANNELS = [
+  "paper",
+  "phone",
+  "in_person",
+  "other",
+] as const satisfies readonly Schemas["TcRequestOut"]["channel"][];
 export const LEAVING_REASONS = [
   "parent_request",
   "parent_transferred",
   "course_completed",
   "other",
-] as const;
+] as const satisfies readonly NonNullable<Schemas["TcRequestOut"]["leaving_reason"]>[];
 
 export const TC_REQUEST_KEYS = {
   all: ["staff", "certificates", "tc-requests"] as const,
   list: (filter: string) => ["staff", "certificates", "tc-requests", "list", filter] as const,
 };
-const BASE = "/api/v1/tc-requests";
 
-const feeNoteSchema = z.object({
-  balance: z.union([z.string(), z.number()]),
-  overdue: z.union([z.string(), z.number()]),
-  oldest_due_on: z.string().nullable(),
-  last_payment_on: z.string().nullable(),
-  account_id: z.string(),
-});
-
-const requestSchema = z.object({
-  id: z.string(),
-  student_id: z.string(),
-  student_name: z.string().nullable(),
-  admission_no: z.string().nullable(),
-  class_label: z.string().nullable(),
-  status: z.enum(TC_REQUEST_STATUSES),
-  received_on: z.string(),
-  channel: z.enum(TC_REQUEST_CHANNELS),
-  leaving_date: z.string().nullable(),
-  leaving_reason: z.enum(LEAVING_REASONS).nullable(),
-  certificate_id: z.string().nullable(),
-  certificate_status: z.string().nullable(),
-  certificate_serial: z.string().nullable(),
-  received_by_name: z.string().nullable(),
-  received_at: z.string(),
-  preparing_by_name: z.string().nullable(),
-  preparing_at: z.string().nullable(),
-  ready_by_name: z.string().nullable(),
-  ready_at: z.string().nullable(),
-  issued_by_name: z.string().nullable(),
-  issued_at: z.string().nullable(),
-  cancelled_by_name: z.string().nullable(),
-  cancelled_at: z.string().nullable(),
-  cancel_reason: z.string().nullable(),
-  days_open: z.number(),
-  overdue: z.boolean(),
-  fee_note: feeNoteSchema.nullable().optional(),
-  can_prepare: z.boolean(),
-  can_hand_over: z.boolean(),
-  can_cancel: z.boolean(),
-  version: z.number(),
-});
-
-const listSchema = z.object({
-  data: z.array(requestSchema),
-  next_cursor: z.string().nullable(),
-  overdue_count: z.number(),
-  overdue_after_days: z.number(),
-  overdue_verified: z.boolean(),
-});
-
-export type TcRequest = z.output<typeof requestSchema>;
-export type TcRequestList = z.output<typeof listSchema>;
+export type TcRequest = Schemas["TcRequestOut"];
+export type TcRequestList = Schemas["TcRequestList"];
 
 /** The list filter: a status, only overdue requests, or everything (""). */
 export type TcRequestFilter = "" | "overdue" | TcRequestStatus;
@@ -108,7 +58,7 @@ export const logRequestSchema = z.object({
 export type LogRequestInput = z.output<typeof logRequestSchema>;
 
 /** The body the API takes (FR-CERT-026): optional values left out when empty. */
-export function logRequestBody(input: LogRequestInput) {
+export function logRequestBody(input: LogRequestInput): Schemas["TcRequestIn"] {
   return {
     student_id: input.student_id,
     received_on: input.received_on,
@@ -127,59 +77,46 @@ export function prepareHref(request: Pick<TcRequest, "student_id">): string {
   return `/students/${request.student_id}/certificates/new?type=transfer`;
 }
 
-// --- local wrapper (see the note at the top) ------------------------------------------------
-
-type ClientResult = { data?: unknown; error?: unknown; response: Response };
-interface LooseInit {
-  body?: unknown;
-  headers?: Record<string, string>;
-  params?: { query?: Record<string, string | number | boolean> };
-}
-interface LooseClient {
-  GET(path: string, init?: LooseInit): Promise<ClientResult>;
-  POST(path: string, init?: LooseInit): Promise<ClientResult>;
+interface ListQuery {
+  limit: number;
+  overdue?: boolean;
+  status?: TcRequestStatus;
+  cursor?: string;
 }
 
-function looseClient(api: ApiClient): LooseClient {
-  return api as unknown as LooseClient;
-}
-
-export async function fetchRequests(
+export function fetchRequests(
   api: ApiClient,
   filter: TcRequestFilter,
   cursor: string | null,
   limit = 50,
 ): Promise<TcRequestList> {
-  const query: Record<string, string | number | boolean> = { limit };
+  const query: ListQuery = { limit };
   if (filter === "overdue") query.overdue = true;
   else if (filter) query.status = filter;
   if (cursor) query.cursor = cursor;
-  return listSchema.parse(await unwrap(looseClient(api).GET(BASE, { params: { query } })));
+  return unwrap(api.GET("/api/v1/tc-requests", { params: { query } }));
 }
 
-export async function logRequest(
+export function logRequest(
   api: ApiClient,
-  body: ReturnType<typeof logRequestBody>,
+  body: Schemas["TcRequestIn"],
   idempotencyKey: string,
 ): Promise<TcRequest> {
-  return requestSchema.parse(
-    await unwrap(
-      looseClient(api).POST(BASE, { body, headers: { "Idempotency-Key": idempotencyKey } }),
-    ),
+  return unwrap(
+    api.POST("/api/v1/tc-requests", { body, headers: { "Idempotency-Key": idempotencyKey } }),
   );
 }
 
-export async function moveRequest(
+export function moveRequest(
   api: ApiClient,
   request: Pick<TcRequest, "id" | "version">,
-  body: { status: "in_preparation" | "issued" | "cancelled"; reason?: string },
+  body: Schemas["TcRequestStatusIn"],
 ): Promise<TcRequest> {
-  return requestSchema.parse(
-    await unwrap(
-      looseClient(api).POST(`${BASE}/${request.id}/status`, {
-        body,
-        headers: { "If-Match": ifMatch(request.version) },
-      }),
-    ),
+  return unwrap(
+    api.POST("/api/v1/tc-requests/{tc_request_id}/status", {
+      params: { path: { tc_request_id: request.id } },
+      body,
+      headers: { "If-Match": ifMatch(request.version) },
+    }),
   );
 }

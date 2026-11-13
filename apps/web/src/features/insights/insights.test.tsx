@@ -355,6 +355,24 @@ describe("flags list (US-1705, US-1706, US-1708; FR-EW-009, FR-EW-015)", () => {
     );
   });
 
+  it("FR-EW-030 lists the flags whose review is due, shown as a chip", async () => {
+    signedIn(TEACHER);
+    stub.routes["GET /bff/api/v1/insights/flags"] = () => page([]);
+    renderWithIntl(<FlagsScreen />);
+    expect(await screen.findByText(en.insights.emptyTitle)).toBeVisible();
+    await userEvent.selectOptions(screen.getByLabelText(en.insights.dueLabel), "review_due");
+    await waitFor(() =>
+      expect(
+        stub.callsTo("GET /bff/api/v1/insights/flags").at(-1)?.url.searchParams.get("due"),
+      ).toBe("review_due"),
+    );
+    expect(
+      await screen.findByRole("button", {
+        name: `Remove filter ${en.insights.dueLabel}: ${en.insights.reviewDue}`,
+      }),
+    ).toBeVisible();
+  });
+
   it("shows active filters as chips; removing one asks for the default again", async () => {
     signedIn(TEACHER);
     stub.routes["GET /bff/api/v1/insights/flags"] = () => page([]);

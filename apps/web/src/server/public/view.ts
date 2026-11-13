@@ -19,26 +19,12 @@ import { parentLanguage, type ParentLanguage } from "./messages";
 
 const CURRENT_PATH = "/api/v1/public/links/current";
 
-/**
- * FP-02 follow-up (FR-PUB-013; D86): the closure message's read-only page. Hand-written until
- * the lead regenerates the client; then it is `components["schemas"]["ParentClosureOut"]` and
- * `LinkEnvelopeOut` carries `closure` and the `parent_closure` kind itself.
- */
-export interface ParentClosure {
-  closed_from: string;
-  closed_to: string;
-  reason: string;
-  notice_text: string | null;
-  reopens_on: string | null;
-}
+/** FP-02 follow-up (FR-PUB-013; D86): the closure message's read-only page. */
+export type ParentClosure = components["schemas"]["ParentClosureOut"];
 
 type Envelope = components["schemas"]["LinkEnvelopeOut"];
 
-export type LinkPage = Omit<Envelope, "language" | "kind"> & {
-  kind: Envelope["kind"] | "parent_closure";
-  language: ParentLanguage;
-  closure?: ParentClosure | null;
-};
+export type LinkPage = Omit<Envelope, "language"> & { language: ParentLanguage };
 
 export type LinkView =
   { state: "ok"; envelope: LinkPage; csrf: string } | { state: "expired" } | { state: "busy" };
